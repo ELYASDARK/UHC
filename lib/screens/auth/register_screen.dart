@@ -27,17 +27,69 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController(); // Added
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  DateTime? _dateOfBirth; // Added
   bool _isGoogleLoading = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose(); // Added
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDateOfBirth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(
+        const Duration(days: 365 * 18),
+      ), // Default to 18 years ago
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: AppColors.textPrimaryLight,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _dateOfBirth = picked;
+      });
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   Future<void> _handleRegister() async {
@@ -47,6 +99,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
         fullName: _nameController.text.trim(),
+        phoneNumber: _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : null,
+        dateOfBirth: _dateOfBirth,
       );
 
       if (success && mounted) {
@@ -98,8 +154,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 20),
-
               // Back button
               IconButton(
                 onPressed: widget.onLoginTap,
@@ -109,7 +163,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ).animate().fadeIn(duration: 300.ms),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 10),
 
               // Header
               Text(
@@ -166,6 +220,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         .animate(delay: 200.ms)
                         .fadeIn(duration: 400.ms)
                         .slideX(begin: 0.1),
+
+                    const SizedBox(height: 20),
+
+                    // Phone Number field
+                    CustomTextField(
+                          label: 'Phone Number',
+                          hintText: '+964...',
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          prefixIcon: Icons.phone_outlined,
+                          textInputAction: TextInputAction.next,
+                          validator: (value) {
+                            // Optional or required depending on logic, mostly optional in screenshots
+                            // But usually good to validate if entered
+                            if (value != null &&
+                                value.isNotEmpty &&
+                                value.length < 5) {
+                              return 'Invalid phone number';
+                            }
+                            return null;
+                          },
+                        )
+                        .animate(delay: 250.ms)
+                        .fadeIn(duration: 400.ms)
+                        .slideX(begin: 0.1),
+
+                    const SizedBox(height: 20),
+
+                    // Date of Birth field
+                    GestureDetector(
+                      onTap: _selectDateOfBirth,
+                      child: AbsorbPointer(
+                        child: CustomTextField(
+                          label: 'Date of Birth',
+                          hintText: 'Select your date of birth',
+                          // We'll use a controller updated by the date picker
+                          controller: TextEditingController(
+                            text: _dateOfBirth != null
+                                ? _formatDate(_dateOfBirth!)
+                                : '',
+                          ),
+                          prefixIcon: Icons.cake_outlined,
+                          suffix: const Icon(Icons.calendar_today, size: 20),
+                          validator: (value) {
+                            // Making it optional for now, or required?
+                            // User request implies adding them, usually DOB is good for health apps.
+                            // Let's make it optional to avoid friction unless user wants strict.
+                            return null;
+                          },
+                        ),
+                      ),
+                    ).animate(delay: 250.ms).fadeIn(duration: 400.ms).slideX(begin: 0.1),
 
                     const SizedBox(height: 20),
 

@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Header
               Text(
-                'Welcome Back! 👋',
+                'Welcome Back',
                 style: GoogleFonts.poppins(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,

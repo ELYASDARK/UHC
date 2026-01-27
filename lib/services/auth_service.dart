@@ -39,6 +39,8 @@ class AuthService {
     required String email,
     required String password,
     required String fullName,
+    String? phoneNumber,
+    DateTime? dateOfBirth,
   }) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
@@ -51,7 +53,12 @@ class AuthService {
 
       // Create user document in Firestore
       if (credential.user != null) {
-        await _createUserDocument(credential.user!, fullName);
+        await _createUserDocument(
+          credential.user!,
+          fullName,
+          phoneNumber: phoneNumber,
+          dateOfBirth: dateOfBirth,
+        );
       }
 
       return credential;
@@ -110,12 +117,19 @@ class AuthService {
   }
 
   /// Create user document in Firestore
-  Future<void> _createUserDocument(User user, String fullName) async {
+  Future<void> _createUserDocument(
+    User user,
+    String fullName, {
+    String? phoneNumber,
+    DateTime? dateOfBirth,
+  }) async {
     final userModel = UserModel(
       id: user.uid,
       email: user.email ?? '',
       fullName: fullName,
       photoUrl: user.photoURL,
+      phoneNumber: phoneNumber,
+      dateOfBirth: dateOfBirth,
       role: UserRole.student,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),

@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 /// Local notifications service for scheduling and displaying notifications
 class LocalNotificationService {
@@ -218,6 +219,9 @@ class LocalNotificationService {
     required DateTime appointmentTime,
     required String timeSlot,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('notif_appointment_reminders') == false) return;
+
     final reminderTime = appointmentTime.subtract(const Duration(days: 7));
 
     if (reminderTime.isAfter(DateTime.now())) {
@@ -245,6 +249,10 @@ class LocalNotificationService {
     required DateTime appointmentTime,
     required String timeSlot,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('notif_appointment_reminders') == false) return;
+    if (prefs.getBool('notif_reminder_24h') == false) return;
+
     final reminderTime = appointmentTime.subtract(const Duration(hours: 24));
 
     if (reminderTime.isAfter(DateTime.now())) {
@@ -272,6 +280,10 @@ class LocalNotificationService {
     required DateTime appointmentTime,
     required String timeSlot,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('notif_appointment_reminders') == false) return;
+    if (prefs.getBool('notif_reminder_1h') == false) return;
+
     final reminderTime = appointmentTime.subtract(const Duration(hours: 1));
 
     if (reminderTime.isAfter(DateTime.now())) {

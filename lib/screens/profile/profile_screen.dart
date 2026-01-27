@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -789,6 +790,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String? photoUrl,
     bool isDark,
   ) {
+    // Get user initial for the avatar
+    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U';
+
     return Column(
       children: [
         GestureDetector(
@@ -800,32 +804,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
           child: Stack(
             children: [
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: AppColors.primary.withOpacity(0.1),
-                backgroundImage: photoUrl != null
-                    ? (photoUrl.startsWith('http')
-                          ? NetworkImage(photoUrl)
-                          : FileImage(File(photoUrl)) as ImageProvider)
-                    : null,
-                child: photoUrl == null
-                    ? const Icon(
-                        Icons.person,
-                        size: 50,
-                        color: AppColors.primary,
-                      )
-                    : null,
+              // Avatar Container matching Home Screen style but larger
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white10
+                        : Colors.grey.withOpacity(0.1),
+                    width: 1.5,
+                  ),
+                ),
+                child: ClipOval(
+                  child: photoUrl != null
+                      ? (photoUrl.startsWith('http')
+                            ? Image.network(
+                                photoUrl,
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Text(
+                                    initial,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 40,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : (kIsWeb
+                                  ? Center(
+                                      child: Text(
+                                        initial,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 40,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    )
+                                  : Image.file(
+                                      File(photoUrl),
+                                      width: 100,
+                                      height: 100,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Center(
+                                        child: Text(
+                                          initial,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 40,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    )))
+                      : Center(
+                          child: Text(
+                            initial,
+                            style: GoogleFonts.outfit(
+                              fontSize: 40,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                ),
               ),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDark ? AppColors.surfaceDark : Colors.white,
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: const Icon(Icons.edit, size: 16, color: Colors.white),
+                  child: const Icon(Icons.edit, size: 18, color: Colors.white),
                 ),
               ),
             ],

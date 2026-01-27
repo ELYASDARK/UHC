@@ -84,6 +84,8 @@ class AuthProvider with ChangeNotifier {
     required String email,
     required String password,
     required String fullName,
+    String? phoneNumber,
+    DateTime? dateOfBirth,
   }) async {
     try {
       _state = AuthState.loading;
@@ -94,6 +96,8 @@ class AuthProvider with ChangeNotifier {
         email: email,
         password: password,
         fullName: fullName,
+        phoneNumber: phoneNumber,
+        dateOfBirth: dateOfBirth,
       );
 
       await _loadUserData(credential.user!.uid);

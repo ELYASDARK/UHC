@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -94,8 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final userName =
-        authProvider.currentUser?.fullName.split(' ').first ?? 'User';
+    final currentUser = authProvider.currentUser;
+    final userName = currentUser?.fullName.split(' ').first ?? 'User';
+    final photoUrl = currentUser?.photoUrl;
 
     return Scaffold(
       body: SafeArea(
@@ -105,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header with greeting
-              _buildHeader(context, userName, isDark),
+              _buildHeader(context, userName, photoUrl, isDark),
 
               const SizedBox(height: 24),
 
@@ -135,49 +138,145 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, String userName, bool isDark) {
+  Widget _buildHeader(
+    BuildContext context,
+    String userName,
+    String? photoUrl,
+    bool isDark,
+  ) {
+    // Get user initial for the avatar
+    final initial = userName.isNotEmpty
+        ? userName.substring(0, 1).toUpperCase()
+        : 'U';
+
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        // 1. Avatar with initials or image
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+            border: Border.all(
+              color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.1),
+            ),
+          ),
+          child: ClipOval(
+            child: photoUrl != null
+                ? (photoUrl.startsWith('http')
+                      ? Image.network(
+                          photoUrl,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(
+                            child: Text(
+                              initial,
+                              style: GoogleFonts.outfit(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        )
+                      : (kIsWeb
+                            ? Center(
+                                child: Text(
+                                  initial,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              )
+                            : Image.file(
+                                File(photoUrl),
+                                width: 56,
+                                height: 56,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Text(
+                                    initial,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              )))
+                : Center(
+                    child: Text(
+                      initial,
+                      style: GoogleFonts.outfit(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+          ),
+        ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack),
+
+        const SizedBox(width: 16),
+
+        // 2. Welcome Text & Subtitle
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${AppLocalizations.of(context).welcome}, $userName! 👋',
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
+                '${AppLocalizations.of(context).welcome}, $userName',
+                style: GoogleFonts.outfit(
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: isDark
                       ? AppColors.textPrimaryDark
                       : AppColors.textPrimaryLight,
+                  height: 1.1,
                 ),
-              ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.1),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.2),
               const SizedBox(height: 4),
               Text(
                     AppLocalizations.of(context).howAreYouFeeling,
-                    style: GoogleFonts.roboto(
+                    style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
+                      fontWeight: FontWeight.w500,
                       color: isDark
                           ? AppColors.textSecondaryDark
                           : AppColors.textSecondaryLight,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   )
-                  .animate(delay: 100.ms)
+                  .animate(delay: 200.ms)
                   .fadeIn(duration: 400.ms)
-                  .slideX(begin: -0.1),
+                  .slideX(begin: -0.2),
             ],
           ),
         ),
-        // Notification bell with dynamic badge
+
+        // 3. Notification Bell
         Consumer<NotificationProvider>(
           builder: (context, notificationProvider, _) {
             return Container(
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.surfaceDark
-                        : AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? AppColors.surfaceDark : Colors.white,
+                    shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.05),
@@ -185,31 +284,49 @@ class _HomeScreenState extends State<HomeScreen> {
                         offset: const Offset(0, 2),
                       ),
                     ],
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white10
+                          : Colors.grey.withOpacity(0.1),
+                    ),
                   ),
-                  child: IconButton(
-                    onPressed: widget.onNotificationsTap,
-                    icon: Stack(
-                      children: [
-                        const Icon(Icons.notifications_outlined, size: 26),
-                        if (notificationProvider.unreadCount > 0)
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: const BoxDecoration(
-                                color: AppColors.error,
-                                shape: BoxShape.circle,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: widget.onNotificationsTap,
+                        icon: Icon(
+                          Icons.notifications_none_rounded,
+                          size: 26,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      if (notificationProvider.unreadCount > 0)
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDark
+                                    ? AppColors.surfaceDark
+                                    : Colors.white,
+                                width: 1.5,
                               ),
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
                 )
-                .animate(delay: 200.ms)
-                .fadeIn(duration: 400.ms)
+                .animate(delay: 300.ms)
+                .fadeIn()
                 .scale(begin: const Offset(0.8, 0.8));
           },
         ),
@@ -419,7 +536,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: widget.onDoctorsTap,
               child: Text(
                 AppLocalizations.of(context).viewAll,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: AppColors.primary,

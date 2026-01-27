@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -24,6 +25,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _allergiesController = TextEditingController();
 
   File? _selectedImage;
+  bool _isPhotoRemoved = false; // New state to track removal
   DateTime? _dateOfBirth;
   bool _isLoading = false;
 
@@ -66,6 +68,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
+        _isPhotoRemoved = false; // Reset removal if new image picked
       });
     }
   }
@@ -135,7 +138,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 },
               ),
               if (_selectedImage != null ||
-                  context.read<AuthProvider>().user?.photoUrl != null)
+                  (context.read<AuthProvider>().user?.photoUrl != null &&
+                      !_isPhotoRemoved)) // Only show if not already removed
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(10),
@@ -151,6 +155,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     Navigator.pop(context);
                     setState(() {
                       _selectedImage = null;
+                      _isPhotoRemoved = true; // Mark as removed
                     });
                   },
                 ),
@@ -234,6 +239,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _selectedImage!,
           authProvider.user!.id,
         );
+      } else if (_isPhotoRemoved) {
+        photoUrl = ''; // Pass empty string to remove the photo
       }
 
       await authProvider.updateProfile(
@@ -293,6 +300,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
 
+    // Determine what to show in the avatar
+    Widget avatarContent;
+    if (_selectedImage != null) {
+      if (kIsWeb) {
+        avatarContent = Image.network(_selectedImage!.path, fit: BoxFit.cover);
+      } else {
+        avatarContent = Image.file(_selectedImage!, fit: BoxFit.cover);
+      }
+    } else if (_isPhotoRemoved) {
+      avatarContent = _buildDefaultAvatar(user);
+    } else if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
+      if (user!.photoUrl!.startsWith('http') ||
+          (kIsWeb && user!.photoUrl!.startsWith('blob:'))) {
+        avatarContent = Image.network(
+          user.photoUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => _buildDefaultAvatar(user),
+        );
+      } else {
+        if (kIsWeb) {
+          // On Web, local file paths (C:\...) are invalid. Fallback.
+          avatarContent = _buildDefaultAvatar(user);
+        } else {
+          avatarContent = Image.file(
+            File(user.photoUrl!),
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _buildDefaultAvatar(user),
+          );
+        }
+      }
+    } else {
+      avatarContent = _buildDefaultAvatar(user);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.editProfile),
@@ -337,25 +378,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ],
                       ),
-                      child: ClipOval(
-                        child: _selectedImage != null
-                            ? Image.file(_selectedImage!, fit: BoxFit.cover)
-                            : user?.photoUrl != null
-                            ? (user!.photoUrl!.startsWith('http')
-                                  ? Image.network(
-                                      user!.photoUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) =>
-                                          _buildDefaultAvatar(user),
-                                    )
-                                  : Image.file(
-                                      File(user!.photoUrl!),
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) =>
-                                          _buildDefaultAvatar(user),
-                                    ))
-                            : _buildDefaultAvatar(user),
-                      ),
+                      child: ClipOval(child: avatarContent),
                     ),
                     Positioned(
                       bottom: 0,
