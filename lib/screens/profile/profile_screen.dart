@@ -833,7 +833,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 width: 100,
                                 height: 100,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
+                                errorBuilder: (_, _, _) => Center(
                                   child: Text(
                                     initial,
                                     style: GoogleFonts.outfit(
@@ -860,7 +860,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       width: 100,
                                       height: 100,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Center(
+                                      errorBuilder: (_, _, _) => Center(
                                         child: Text(
                                           initial,
                                           style: GoogleFonts.outfit(

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
@@ -24,7 +23,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bloodTypeController = TextEditingController();
   final _allergiesController = TextEditingController();
 
-  File? _selectedImage;
+  XFile? _selectedImage;
+  Uint8List? _webImageBytes; // For Web Preview
   bool _isPhotoRemoved = false; // New state to track removal
   DateTime? _dateOfBirth;
   bool _isLoading = false;
@@ -66,10 +66,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
 
     if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-        _isPhotoRemoved = false; // Reset removal if new image picked
-      });
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _selectedImage = pickedFile;
+          _webImageBytes = bytes;
+          _isPhotoRemoved = false;
+        });
+      } else {
+        setState(() {
+          _selectedImage = pickedFile;
+          _webImageBytes = null;
+          _isPhotoRemoved = false;
+        });
+      }
     }
   }
 
@@ -155,6 +165,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     Navigator.pop(context);
                     setState(() {
                       _selectedImage = null;
+                      _webImageBytes = null;
                       _isPhotoRemoved = true; // Mark as removed
                     });
                   },
@@ -212,19 +223,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  Future<String> _saveLocalImage(File image, String userId) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final photoDir = Directory('${directory.path}/profile_photos');
-
-    if (!await photoDir.exists()) {
-      await photoDir.create(recursive: true);
-    }
-
-    final String localPath = '${photoDir.path}/$userId.jpg';
-    await image.copy(localPath);
-    return localPath;
-  }
-
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -235,10 +233,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       String? photoUrl;
       if (_selectedImage != null) {
-        photoUrl = await _saveLocalImage(
-          _selectedImage!,
-          authProvider.user!.id,
-        );
+        // Upload image to Firebase Storage
+        photoUrl = await authProvider.uploadProfileImage(_selectedImage!);
       } else if (_isPhotoRemoved) {
         photoUrl = ''; // Pass empty string to remove the photo
       }
@@ -303,10 +299,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     // Determine what to show in the avatar
     Widget avatarContent;
     if (_selectedImage != null) {
-      if (kIsWeb) {
-        avatarContent = Image.network(_selectedImage!.path, fit: BoxFit.cover);
+      if (kIsWeb && _webImageBytes != null) {
+        avatarContent = Image.memory(_webImageBytes!, fit: BoxFit.cover);
       } else {
-        avatarContent = Image.file(_selectedImage!, fit: BoxFit.cover);
+        avatarContent = Image.file(
+          File(_selectedImage!.path),
+          fit: BoxFit.cover,
+        );
       }
     } else if (_isPhotoRemoved) {
       avatarContent = _buildDefaultAvatar(user);

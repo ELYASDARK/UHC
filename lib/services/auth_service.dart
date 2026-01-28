@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart'; // Added
+import 'package:image_picker/image_picker.dart'; // Added
 import '../data/models/user_model.dart';
 
 /// Authentication service handling Firebase Auth and Google Sign-In
@@ -8,6 +10,7 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance; // Added
 
   /// Current Firebase user
   User? get currentUser => _auth.currentUser;
@@ -203,6 +206,23 @@ class AuthService {
     // Update Firebase Auth display name if changed
     if (fullName != null && currentUser != null) {
       await currentUser!.updateDisplayName(fullName);
+    }
+  }
+
+  /// Upload profile image to Firebase Storage
+  Future<String> uploadProfileImage(String uid, XFile imageFile) async {
+    try {
+      final ref = _storage.ref().child('profile_images').child('$uid.jpg');
+
+      // Use putData for cross-platform compatibility (works on Web & Mobile)
+      final metadata = SettableMetadata(contentType: 'image/jpeg');
+      final data = await imageFile.readAsBytes();
+
+      await ref.putData(data, metadata);
+      final downloadUrl = await ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      throw Exception('Failed to upload image: $e');
     }
   }
 

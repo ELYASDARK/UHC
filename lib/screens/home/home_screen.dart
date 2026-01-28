@@ -177,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           width: 56,
                           height: 56,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Center(
+                          errorBuilder: (_, _, _) => Center(
                             child: Text(
                               initial,
                               style: GoogleFonts.outfit(
@@ -204,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 width: 56,
                                 height: 56,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
+                                errorBuilder: (_, _, _) => Center(
                                   child: Text(
                                     initial,
                                     style: GoogleFonts.outfit(

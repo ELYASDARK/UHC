@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart'; // Added
 import '../services/auth_service.dart';
 import '../data/models/user_model.dart';
 
@@ -197,6 +198,17 @@ class AuthProvider with ChangeNotifier {
       _errorMessage = e.toString();
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Upload profile image
+  Future<String?> uploadProfileImage(XFile imageFile) async {
+    if (_currentUser == null) return null;
+    try {
+      return await _authService.uploadProfileImage(_currentUser!.id, imageFile);
+    } catch (e) {
+      debugPrint('Error uploading profile image: $e');
+      throw e;
     }
   }
 
