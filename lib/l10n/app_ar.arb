@@ -1,11 +1,9 @@
 {
   "@@locale": "ar",
   "@@author": "UHC Team",
-  
   "appName": "UHC",
   "appFullName": "المركز الصحي الجامعي",
   "appTagline": "شريكك الصحي في الحرم الجامعي",
-  
   "welcome": "مرحباً",
   "login": "تسجيل الدخول",
   "register": "إنشاء حساب",
@@ -22,14 +20,12 @@
   "alreadyHaveAccount": "لديك حساب بالفعل؟ ",
   "signInWithGoogle": "تسجيل الدخول بحساب جوجل",
   "orContinueWith": "أو المتابعة باستخدام",
-  
   "onboardingTitle1": "حجز المواعيد",
   "onboardingDesc1": "احجز مواعيدك مع أطباء الجامعة بسهولة وسرعة",
   "onboardingTitle2": "تذكيرات ذكية",
   "onboardingDesc2": "لا تفوت أي موعد مع الإشعارات والتذكيرات الذكية",
   "onboardingTitle3": "تتبع صحتك",
   "onboardingDesc3": "احتفظ بجميع سجلاتك الطبية وتاريخ مواعيدك في مكان واحد",
-  
   "skip": "تخطي",
   "next": "التالي",
   "getStarted": "ابدأ الآن",
@@ -55,7 +51,6 @@
   "showLess": "عرض أقل",
   "change": "تغيير",
   "all": "الكل",
-  
   "home": "الرئيسية",
   "doctors": "الأطباء",
   "appointments": "المواعيد",
@@ -63,7 +58,6 @@
   "profile": "الملف الشخصي",
   "alerts": "التنبيهات",
   "history": "السجل",
-  
   "searchDoctors": "البحث عن أطباء...",
   "allDepartments": "الكل",
   "viewAll": "عرض الكل",
@@ -84,7 +78,6 @@
   "howAreYouFeeling": "كيف حالك اليوم؟",
   "noDepartments": "لا توجد أقسام",
   "weeks": "أسابيع",
-  
   "generalMedicine": "الطب العام",
   "dentistry": "طب الأسنان",
   "psychology": "الطب النفسي",
@@ -101,7 +94,6 @@
   "clinicalPsychology": "علم النفس السريري",
   "orthodontics": "تقويم الأسنان",
   "counseling": "الإرشاد النفسي",
-  
   "mdDegree": "بكالوريوس الطب",
   "phdDegree": "دكتوراه",
   "pharmDDegree": "دكتور صيدلة",
@@ -124,11 +116,9 @@
   "boardCertifiedCardiovascularDisease": "معتمد من البورد في أمراض القلب والأوعية الدموية",
   "facc": "عضو الكلية الأمريكية لأمراض القلب",
   "boardCertifiedCardiology": "معتمد من البورد في أمراض القلب",
-  
   "internalMedicine": "الطب الباطني",
   "generalDentistry": "طب الأسنان العام",
   "familyMedicine": "طب الأسرة",
-  
   "upcoming": "القادمة",
   "past": "السابقة",
   "today": "اليوم",
@@ -154,21 +144,18 @@
   "notAvailable": "غير متاح",
   "specialty": "التخصص",
   "qualifications": "المؤهلات",
-  
   "quickActions": "الإجراءات السريعة",
   "departments": "الأقسام",
   "healthTips": "نصائح صحية",
   "emergencyContact": "جهة اتصال الطوارئ",
   "callEmergency": "اتصال طوارئ",
   "nearbyHospitals": "المستشفيات القريبة",
-  
   "stayHydrated": "حافظ على الترطيب",
   "stayHydratedDesc": "اشرب 8 أكواب من الماء يومياً على الأقل",
   "regularExercise": "التمارين المنتظمة",
   "regularExerciseDesc": "30 دقيقة من النشاط اليومي تحافظ على لياقتك",
   "getEnoughSleep": "النوم الكافي",
   "getEnoughSleepDesc": "7-8 ساعات من النوم الجيد ضرورية",
-  
   "aboutDoctor": "عن الطبيب",
   "experience": "الخبرة",
   "yearsExperience": "سنوات",
@@ -183,7 +170,6 @@
   "reviewSubmitted": "تم إرسال التقييم بنجاح",
   "noReviews": "لا توجد تقييمات بعد",
   "averageRating": "متوسط التقييم",
-  
   "appearance": "المظهر",
   "darkMode": "الوضع الداكن",
   "lightMode": "الوضع الفاتح",
@@ -214,7 +200,6 @@
   "playSoundForNotifications": "تشغيل صوت للإشعارات",
   "vibration": "الاهتزاز",
   "vibrateForNotifications": "اهتزاز للإشعارات",
-  "sendTestNotification": "إرسال إشعار تجريبي",
   "manageNotificationPermissionsInSettings": "يمكنك أيضًا إدارة أذونات الإشعارات في إعدادات جهازك",
   "about": "حول التطبيق",
   "privacyPolicy": "سياسة الخصوصية",
@@ -225,7 +210,6 @@
   "version": "الإصدار",
   "rateApp": "تقييم التطبيق",
   "shareApp": "مشاركة التطبيق",
-  
   "editProfile": "تعديل الملف الشخصي",
   "updateProfile": "تحديث الملف الشخصي",
   "changePassword": "تغيير كلمة المرور",
@@ -241,7 +225,6 @@
   "useCamera": "استخدم الكاميرا لالتقاط صورة جديدة",
   "selectFromLibrary": "اختر من مكتبة الصور",
   "deleteCurrentPhoto": "حذف صورة الملف الشخصي الحالية",
-  
   "medicalDocuments": "المستندات الطبية",
   "uploadDocument": "رفع مستند",
   "documentType": "نوع المستند",
@@ -252,7 +235,6 @@
   "deleteDocumentConfirm": "هل أنت متأكد من حذف هذا المستند؟",
   "documentDeleted": "تم حذف المستند",
   "documentUploaded": "تم رفع المستند بنجاح",
-  
   "healthCenterLocation": "موقع المركز الصحي",
   "getDirections": "الحصول على الاتجاهات",
   "callNow": "اتصل الآن",
@@ -281,7 +263,6 @@
   "open": "مفتوح",
   "openNow": "مفتوح الآن",
   "closedNow": "مغلق الآن",
-  
   "january": "يناير",
   "february": "فبراير",
   "march": "مارس",
@@ -294,7 +275,6 @@
   "october": "أكتوبر",
   "november": "نوفمبر",
   "december": "ديسمبر",
-  
   "sendTestNotification": "إرسال إشعار تجريبي",
   "testNotificationSent": "تم إرسال الإشعار التجريبي",
   "clearNotifications": "مسح الإشعارات",
@@ -305,18 +285,15 @@
   "markAllRead": "تحديد الكل كمقروء",
   "markAsRead": "تحديد كمقروء",
   "deleteNotification": "حذف الإشعار",
-  
   "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟",
   "loggingOut": "جاري تسجيل الخروج...",
   "loggedOut": "تم تسجيل الخروج بنجاح",
-  
   "fieldRequired": "هذا الحقل مطلوب",
   "invalidEmail": "الرجاء إدخال بريد إلكتروني صحيح",
   "weakPassword": "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
   "passwordMismatch": "كلمات المرور غير متطابقة",
   "invalidPhone": "الرجاء إدخال رقم هاتف صحيح",
   "invalidDate": "الرجاء إدخال تاريخ صحيح",
-  
   "error": "خطأ",
   "success": "نجاح",
   "warning": "تحذير",
@@ -335,7 +312,6 @@
   "unauthorized": "غير مصرح",
   "notFound": "غير موجود",
   "serverError": "خطأ في الخادم",
-  
   "years": "سنوات",
   "months": "أشهر",
   "days": "أيام",
@@ -343,7 +319,6 @@
   "minutes": "دقائق",
   "ago": "مضى",
   "justNow": "الآن",
-  
   "male": "ذكر",
   "female": "أنثى",
   "other": "آخر",
@@ -354,7 +329,6 @@
   "medicalHistory": "التاريخ الطبي",
   "emergencyContactName": "اسم جهة اتصال الطوارئ",
   "emergencyContactPhone": "هاتف جهة اتصال الطوارئ",
-  
   "fees": "الرسوم",
   "free": "مجاني",
   "paid": "مدفوع",
@@ -362,7 +336,6 @@
   "cash": "نقداً",
   "card": "بطاقة",
   "insurance": "تأمين",
-  
   "admin": "المسؤول",
   "adminDashboard": "لوحة التحكم",
   "manageUsers": "إدارة المستخدمين",
@@ -371,17 +344,14 @@
   "reports": "التقارير",
   "statistics": "الإحصائيات",
   "settings": "الإعدادات",
-  
   "account": "الحساب",
   "security": "الأمان",
   "preferences": "التفضيلات",
   "general": "عام",
-  
   "noDataFound": "لا توجد بيانات",
   "pullToRefresh": "اسحب للتحديث",
   "loadingMore": "جاري تحميل المزيد...",
   "endOfList": "نهاية القائمة",
-  
   "camera": "الكاميرا",
   "gallery": "المعرض",
   "file": "ملف",
@@ -389,7 +359,6 @@
   "share": "مشاركة",
   "copy": "نسخ",
   "copied": "تم النسخ",
-  
   "notes": "ملاحظات",
   "addNote": "إضافة ملاحظة",
   "noNotes": "لا توجد ملاحظات",
@@ -399,13 +368,11 @@
   "diagnosis": "التشخيص",
   "prescription": "الوصفة الطبية",
   "followUp": "المتابعة",
-  
   "viewDetails": "عرض التفاصيل",
   "moreInfo": "مزيد من المعلومات",
   "lessInfo": "معلومات أقل",
   "expand": "توسيع",
   "collapse": "طي",
-  
   "availableTimesFor": "الأوقات المتاحة لـ",
   "appointmentType": "نوع الموعد",
   "regularVisit": "زيارة عادية",
@@ -417,7 +384,6 @@
   "describeSymptoms": "صف أعراضك أو سبب زيارتك...",
   "pleaseSelectDateFirst": "الرجاء اختيار تاريخ أولاً",
   "noAvailableSlotsOnThisDay": "لا توجد مواعيد متاحة في هذا اليوم",
-  
   "appointmentScheduledSuccessfully": "تم جدولة موعدك بنجاح",
   "showQRCodeAtCheckIn": "أظهر رمز QR هذا عند التسجيل",
   "doctor": "الطبيب",
@@ -426,21 +392,17 @@
   "bookingId": "رقم الحجز",
   "backToHome": "العودة للرئيسية",
   "viewMyAppointments": "عرض مواعيدي",
-  
   "noNotificationsDesc": "ستظهر تذكيرات مواعيدك هنا",
-  
   "profileSettings": "إعدادات الملف الشخصي",
   "accountSettings": "إعدادات الحساب",
   "myDocuments": "مستنداتي",
   "healthCenterInfo": "معلومات المركز الصحي",
   "myAppointments": "مواعيدي",
   "myReviews": "تقييماتي",
-  
   "pleaseSelectDate": "الرجاء اختيار تاريخ",
   "pleaseSelectTime": "الرجاء اختيار وقت",
   "pleaseLoginToBook": "الرجاء تسجيل الدخول لحجز موعد",
   "bookingCancellationPolicy": "يمكنك إلغاء أو إعادة جدولة الموعد قبل 24 ساعة من الموعد.",
-  
   "saveChanges": "حفظ التغييرات",
   "tapToChangePhoto": "انقر لتغيير الصورة",
   "enterFullName": "أدخل اسمك الكامل",

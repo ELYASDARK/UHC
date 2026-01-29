@@ -616,9 +616,6 @@ class AppLocalizationsKu extends AppLocalizations {
   String get vibrateForNotifications => 'لەرزاندن بۆ ئاگادارکردنەوەکان';
 
   @override
-  String get sendTestNotification => 'ناردنی ئاگادارکردنەوەی تاقیکردنەوە';
-
-  @override
   String get manageNotificationPermissionsInSettings =>
       'هەروەها دەتوانیت مۆڵەتەکانی ئاگادارکردنەوە لە ڕێکخستنەکانی ئامێرەکەت بەڕێوە ببەیت';
 
@@ -843,6 +840,9 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get december => 'کانوونی یەکەم';
+
+  @override
+  String get sendTestNotification => 'ناردنی ئاگادارکردنەوەی تاقیکردنەوە';
 
   @override
   String get testNotificationSent => 'ئاگادارکردنەوەی تاقیکردنەوە نێردرا';

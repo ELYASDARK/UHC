@@ -208,7 +208,7 @@ class AuthProvider with ChangeNotifier {
       return await _authService.uploadProfileImage(_currentUser!.id, imageFile);
     } catch (e) {
       debugPrint('Error uploading profile image: $e');
-      throw e;
+      rethrow;
     }
   }
 

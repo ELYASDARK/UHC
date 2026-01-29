@@ -9,6 +9,9 @@ import '../../data/models/appointment_model.dart';
 import '../../providers/appointment_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/doctor_provider.dart';
+import 'cancel_dialog.dart';
+import 'reschedule_screen.dart';
 
 /// My appointments screen with tabs
 class MyAppointmentsScreen extends StatefulWidget {
@@ -195,363 +198,67 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
     );
   }
 
-  void _showCancelDialog(AppointmentModel appointment) {
-    final TextEditingController reasonController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel Appointment'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to cancel your appointment with ${appointment.doctorName}?',
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason for cancellation (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Keep Appointment'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await _cancelAppointment(appointment, reasonController.text);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Cancel Appointment'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _cancelAppointment(
-    AppointmentModel appointment,
-    String reason,
-  ) async {
-    final authProvider = context.read<AuthProvider>();
-    final appointmentProvider = context.read<AppointmentProvider>();
-
-    if (authProvider.user == null) return;
-
-    final success = await appointmentProvider.cancelAppointment(
-      appointment.id,
-      reason.isEmpty ? 'User requested cancellation' : reason,
-      authProvider.user!.id,
-    );
-
-    if (mounted) {
-      if (success) {
+  Future<void> _showCancelDialog(AppointmentModel appointment) async {
+    final result = await CancelAppointmentDialog.show(context, appointment);
+    if (result == true) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Appointment cancelled successfully'),
             backgroundColor: AppColors.success,
           ),
         );
-        // Reload appointments
         _loadAppointments();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              appointmentProvider.error ?? 'Failed to cancel appointment',
-            ),
-            backgroundColor: AppColors.error,
-          ),
-        );
       }
     }
   }
 
-  void _showRescheduleDialog(AppointmentModel appointment) {
-    DateTime selectedDate = appointment.appointmentDate;
-    String? selectedTimeSlot = appointment.timeSlot;
-    final reasonController = TextEditingController();
-
-    // Available time slots
-    final timeSlots = [
-      '09:00 - 09:30',
-      '09:30 - 10:00',
-      '10:00 - 10:30',
-      '10:30 - 11:00',
-      '11:00 - 11:30',
-      '11:30 - 12:00',
-      '14:00 - 14:30',
-      '14:30 - 15:00',
-      '15:00 - 15:30',
-      '15:30 - 16:00',
-      '16:00 - 16:30',
-    ];
-
-    showModalBottomSheet(
+  Future<void> _showRescheduleDialog(AppointmentModel appointment) async {
+    // Show loading indicator
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (bottomSheetContext) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Handle
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[400],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    Text(
-                      'Reschedule Appointment',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Select a new date and time for your appointment with ${appointment.doctorName}',
-                      style: GoogleFonts.roboto(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Date Picker
-                    Text(
-                      'Select Date',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime.now().add(
-                            const Duration(days: 1),
-                          ),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 90),
-                          ),
-                          selectableDayPredicate: (day) {
-                            // Only allow weekdays
-                            return day.weekday >= 1 && day.weekday <= 5;
-                          },
-                        );
-                        if (picked != null) {
-                          setModalState(() {
-                            selectedDate = picked;
-                          });
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.calendar_today,
-                              color: AppColors.primary,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                              style: GoogleFonts.roboto(fontSize: 16),
-                            ),
-                            const Spacer(),
-                            const Icon(Icons.arrow_drop_down),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Time Slot Picker
-                    Text(
-                      'Select Time',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 45,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: timeSlots.length,
-                        separatorBuilder: (_, _) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final slot = timeSlots[index];
-                          final isSelected = slot == selectedTimeSlot;
-                          return GestureDetector(
-                            onTap: () {
-                              setModalState(() {
-                                selectedTimeSlot = slot;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : Colors.grey[300]!,
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                slot.split(' - ').first,
-                                style: GoogleFonts.roboto(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.black87,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Reason
-                    TextField(
-                      controller: reasonController,
-                      decoration: InputDecoration(
-                        labelText: 'Reason for rescheduling (optional)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(bottomSheetContext),
-                            child: const Text('Cancel'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: selectedTimeSlot != null
-                                ? () async {
-                                    Navigator.pop(bottomSheetContext);
-                                    await _rescheduleAppointment(
-                                      appointment,
-                                      selectedDate,
-                                      selectedTimeSlot!,
-                                      reasonController.text,
-                                    );
-                                  }
-                                : null,
-                            child: const Text('Confirm'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _rescheduleAppointment(
-    AppointmentModel appointment,
-    DateTime newDate,
-    String newTimeSlot,
-    String reason,
-  ) async {
-    final authProvider = context.read<AuthProvider>();
-    final appointmentProvider = context.read<AppointmentProvider>();
-
-    if (authProvider.user == null) return;
-
-    final success = await appointmentProvider.rescheduleAppointment(
-      appointmentId: appointment.id,
-      newDate: newDate,
-      newTimeSlot: newTimeSlot,
-      doctorId: appointment.doctorId,
-      doctorName: appointment.doctorName,
-      userId: authProvider.user!.id,
-      reason: reason.isEmpty ? null : reason,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
-    if (mounted) {
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Appointment rescheduled successfully'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        // Reload appointments
-        _loadAppointments();
-      } else {
+    try {
+      // Get doctor details first
+      final doctorProvider = context.read<DoctorProvider>();
+      final doctor = await doctorProvider.getDoctorById(appointment.doctorId);
+
+      // Hide loading
+      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
+        if (doctor != null) {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  RescheduleScreen(appointment: appointment, doctor: doctor),
+            ),
+          );
+
+          if (result == true) {
+            _loadAppointments();
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not load doctor details'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Hide loading
+      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              appointmentProvider.error ?? 'Failed to reschedule appointment',
-            ),
+            content: Text('Error: ${e.toString()}'),
             backgroundColor: AppColors.error,
           ),
         );

@@ -310,8 +310,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } else if (_isPhotoRemoved) {
       avatarContent = _buildDefaultAvatar(user);
     } else if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
-      if (user!.photoUrl!.startsWith('http') ||
-          (kIsWeb && user!.photoUrl!.startsWith('blob:'))) {
+      if (user.photoUrl!.startsWith('http') ||
+          (kIsWeb && user.photoUrl!.startsWith('blob:'))) {
         avatarContent = Image.network(
           user.photoUrl!,
           fit: BoxFit.cover,

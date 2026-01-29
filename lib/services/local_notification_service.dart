@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -124,7 +125,7 @@ class LocalNotificationService {
         await androidPlugin.requestExactAlarmsPermission();
       } catch (e) {
         // Exact alarm permission not available or denied, will use inexact scheduling
-        print('Exact alarm permission not granted: $e');
+        debugPrint('Exact alarm permission not granted: $e');
       }
 
       return notificationGranted;
@@ -187,7 +188,7 @@ class LocalNotificationService {
 
     try {
       final scheduledTz = tz.TZDateTime.from(scheduledTime, tz.local);
-      print(
+      debugPrint(
         'Scheduling notification for: $scheduledTz (in ${scheduledTime.difference(DateTime.now()).inSeconds} seconds)',
       );
 
@@ -204,10 +205,10 @@ class LocalNotificationService {
         payload: payload,
       );
 
-      print('Notification scheduled successfully with ID: $id');
+      debugPrint('Notification scheduled successfully with ID: $id');
     } catch (e) {
       // If scheduling fails, show an immediate notification as fallback
-      print('Failed to schedule notification: $e');
+      debugPrint('Failed to schedule notification: $e');
       rethrow;
     }
   }

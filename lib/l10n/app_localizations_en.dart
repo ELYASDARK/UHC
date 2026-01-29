@@ -616,9 +616,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vibrateForNotifications => 'Vibrate for notifications';
 
   @override
-  String get sendTestNotification => 'Send Test Notification';
-
-  @override
   String get manageNotificationPermissionsInSettings =>
       'You can also manage notification permissions in your device settings';
 
@@ -844,6 +841,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get december => 'December';
+
+  @override
+  String get sendTestNotification => 'Send Test Notification';
 
   @override
   String get testNotificationSent => 'Test notification sent';

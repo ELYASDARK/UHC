@@ -613,9 +613,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vibrateForNotifications => 'اهتزاز للإشعارات';
 
   @override
-  String get sendTestNotification => 'إرسال إشعار تجريبي';
-
-  @override
   String get manageNotificationPermissionsInSettings =>
       'يمكنك أيضًا إدارة أذونات الإشعارات في إعدادات جهازك';
 
@@ -840,6 +837,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get december => 'ديسمبر';
+
+  @override
+  String get sendTestNotification => 'إرسال إشعار تجريبي';
 
   @override
   String get testNotificationSent => 'تم إرسال الإشعار التجريبي';

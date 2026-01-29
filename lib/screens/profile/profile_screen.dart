@@ -17,6 +17,7 @@ import '../../services/local_notification_service.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../settings/notification_settings_screen.dart';
 import 'edit_profile_screen.dart';
+import '../documents/medical_documents_screen.dart';
 
 /// Profile and settings screen
 class ProfileScreen extends StatefulWidget {
@@ -428,6 +429,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: l10n.changePassword,
                 subtitle: l10n.newPassword,
                 onTap: () => _showChangePasswordDialog(context, l10n),
+                isDark: isDark,
+              ),
+              _buildSettingTile(
+                icon: Icons.folder_shared_rounded,
+                title: 'Medical Documents',
+                subtitle: 'Manage your medical records',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MedicalDocumentsScreen(),
+                  ),
+                ),
                 isDark: isDark,
               ),
             ], isDark),

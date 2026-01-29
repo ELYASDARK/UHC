@@ -1,11 +1,9 @@
 {
   "@@locale": "ku",
   "@@author": "UHC Team",
-  
   "appName": "UHC",
   "appFullName": "ناوەندی تەندروستی زانکۆ",
   "appTagline": "هاوبەشی تەندروستیت لە کەمپەس",
-  
   "welcome": "بەخێربێیت",
   "login": "چوونەژوورەوە",
   "register": "تۆمارکردن",
@@ -22,14 +20,12 @@
   "alreadyHaveAccount": "هەژمارت هەیە؟ ",
   "signInWithGoogle": "چوونەژوورەوە بە گووگڵ",
   "orContinueWith": "یان بەردەوامبە بە",
-  
   "onboardingTitle1": "نۆرەکردنی چاوپێکەوتن",
   "onboardingDesc1": "چاوپێکەوتنەکانت لەگەڵ پزیشکانی زانکۆ بەئاسانی نۆرە بکە",
   "onboardingTitle2": "بیرهێنانەوە",
   "onboardingDesc2": "هیچ چاوپێکەوتنێک لەدەست مەدە بە ئاگادارکردنەوە زیرەکەکان",
   "onboardingTitle3": "بەدواداچوونی تەندروستی",
   "onboardingDesc3": "هەموو تۆمارە پزیشکییەکان و مێژووی چاوپێکەوتنەکانت لە شوێنێکدا هەڵبگرە",
-  
   "skip": "پەڕینەوە",
   "next": "دواتر",
   "getStarted": "دەستپێبکە",
@@ -55,7 +51,6 @@
   "showLess": "کەمتر پیشاندان",
   "change": "گۆڕین",
   "all": "هەموو",
-  
   "home": "سەرەتا",
   "doctors": "پزیشکەکان",
   "appointments": "چاوپێکەوتنەکان",
@@ -63,7 +58,6 @@
   "profile": "پرۆفایل",
   "alerts": "ئاگاداریەکان",
   "history": "مێژوو",
-  
   "searchDoctors": "گەڕان بەدوای پزیشکدا...",
   "allDepartments": "هەموو",
   "viewAll": "بینینی هەموو",
@@ -84,7 +78,6 @@
   "howAreYouFeeling": "ئەمڕۆ چۆنیت؟",
   "noDepartments": "هیچ بەشێک نییە",
   "weeks": "هەفتە",
-  
   "generalMedicine": "پزیشکی گشتی",
   "dentistry": "پزیشکی ددان",
   "psychology": "دەروونناسی",
@@ -101,7 +94,6 @@
   "clinicalPsychology": "دەروونناسی کلینیکی",
   "orthodontics": "ڕێکخستنی ددان",
   "counseling": "ڕاوێژکاری",
-  
   "mdDegree": "بەکالۆریۆسی پزیشکی",
   "phdDegree": "دکتۆرا",
   "pharmDDegree": "دکتۆری دەرمانسازی",
@@ -124,11 +116,9 @@
   "boardCertifiedCardiovascularDisease": "پەسەندکراوی بۆرد لە نەخۆشییەکانی دڵ و خوێن",
   "facc": "ئەندامی کۆلێژی ئەمریکی لە نەخۆشییەکانی دڵ",
   "boardCertifiedCardiology": "پەسەندکراوی بۆرد لە نەخۆشییەکانی دڵ",
-  
   "internalMedicine": "پزیشکی ناوخۆیی",
   "generalDentistry": "پزیشکی ددان گشتی",
   "familyMedicine": "پزیشکی خێزان",
-  
   "upcoming": "داهاتوو",
   "past": "ڕابردوو",
   "today": "ئەمڕۆ",
@@ -154,21 +144,18 @@
   "notAvailable": "بەردەست نییە",
   "specialty": "پسپۆڕی",
   "qualifications": "بڕوانامەکان",
-  
   "quickActions": "کردارە خێراکان",
   "departments": "بەشەکان",
   "healthTips": "ئامۆژگارییە تەندروستییەکان",
   "emergencyContact": "پەیوەندی فریاکەوتن",
   "callEmergency": "پەیوەندیکردن بە فریاکەوتن",
   "nearbyHospitals": "نەخۆشخانە نزیکەکان",
-  
   "stayHydrated": "ئاو زۆر بخۆرە",
   "stayHydratedDesc": "ڕۆژانە لانیکەم ٨ گڵاس ئاو بخۆرە",
   "regularExercise": "وەرزشی ڕۆژانە",
   "regularExerciseDesc": "٣٠ خولەک چالاکی ڕۆژانە تەندروستیت دەپارێزێت",
   "getEnoughSleep": "خەوی پێویست",
   "getEnoughSleepDesc": "٧-٨ کاتژمێر خەوی باش پێویستە",
-  
   "aboutDoctor": "دەربارەی پزیشک",
   "experience": "ئەزموون",
   "yearsExperience": "ساڵ",
@@ -183,7 +170,6 @@
   "reviewSubmitted": "هەڵسەنگاندن بەسەرکەوتوویی نێردرا",
   "noReviews": "هێشتا هیچ هەڵسەنگاندنێک نییە",
   "averageRating": "ڕێژەی هەڵسەنگاندن",
-  
   "appearance": "ڕوانگە",
   "darkMode": "دۆخی تاریک",
   "lightMode": "دۆخی ڕووناک",
@@ -214,7 +200,6 @@
   "playSoundForNotifications": "لێدانی دەنگ بۆ ئاگادارکردنەوەکان",
   "vibration": "لەرزاندن",
   "vibrateForNotifications": "لەرزاندن بۆ ئاگادارکردنەوەکان",
-  "sendTestNotification": "ناردنی ئاگادارکردنەوەی تاقیکردنەوە",
   "manageNotificationPermissionsInSettings": "هەروەها دەتوانیت مۆڵەتەکانی ئاگادارکردنەوە لە ڕێکخستنەکانی ئامێرەکەت بەڕێوە ببەیت",
   "about": "دەربارە",
   "privacyPolicy": "سیاسەتی تایبەتمەندی",
@@ -225,7 +210,6 @@
   "version": "وەشان",
   "rateApp": "هەڵسەنگاندنی ئەپ",
   "shareApp": "هاوبەشکردنی ئەپ",
-  
   "editProfile": "دەستکاریکردنی پرۆفایل",
   "updateProfile": "نوێکردنەوەی پرۆفایل",
   "changePassword": "گۆڕینی وشەی نهێنی",
@@ -241,7 +225,6 @@
   "useCamera": "کامێرا بەکاربهێنە بۆ وێنەی نوێ",
   "selectFromLibrary": "لە کتێبخانەی وێنە هەڵبژێرە",
   "deleteCurrentPhoto": "سڕینەوەی وێنەی پرۆفایلی ئێستا",
-  
   "medicalDocuments": "بەڵگەنامە پزیشکییەکان",
   "uploadDocument": "بارکردنی بەڵگەنامە",
   "documentType": "جۆری بەڵگەنامە",
@@ -252,7 +235,6 @@
   "deleteDocumentConfirm": "دڵنیای لە سڕینەوەی ئەم بەڵگەنامەیە؟",
   "documentDeleted": "بەڵگەنامە سڕدرایەوە",
   "documentUploaded": "بەڵگەنامە بەسەرکەوتوویی بارکرا",
-  
   "healthCenterLocation": "شوێنی ناوەندی تەندروستی",
   "getDirections": "ئاڕاستەکان وەربگرە",
   "callNow": "ئێستا پەیوەندی بکە",
@@ -281,7 +263,6 @@
   "open": "کراوەیە",
   "openNow": "ئێستا کراوەیە",
   "closedNow": "ئێستا داخراوە",
-  
   "january": "کانوونی دووەم",
   "february": "شوبات",
   "march": "ئازار",
@@ -294,7 +275,6 @@
   "october": "تشرینی یەکەم",
   "november": "تشرینی دووەم",
   "december": "کانوونی یەکەم",
-  
   "sendTestNotification": "ناردنی ئاگادارکردنەوەی تاقیکردنەوە",
   "testNotificationSent": "ئاگادارکردنەوەی تاقیکردنەوە نێردرا",
   "clearNotifications": "پاککردنەوەی ئاگادارکردنەوەکان",
@@ -305,18 +285,15 @@
   "markAllRead": "هەموو وەک خوێندراو دیاری بکە",
   "markAsRead": "وەک خوێندراو دیاری بکە",
   "deleteNotification": "سڕینەوەی ئاگادارکردنەوە",
-  
   "logoutConfirm": "دڵنیای لە چوونەدەرەوە؟",
   "loggingOut": "چوونەدەرەوە...",
   "loggedOut": "بەسەرکەوتوویی چوویتە دەرەوە",
-  
   "fieldRequired": "ئەم خانەیە پێویستە",
   "invalidEmail": "تکایە ئیمەیڵێکی دروست بنووسە",
   "weakPassword": "وشەی نهێنی دەبێت لانی کەم ٦ پیت بێت",
   "passwordMismatch": "وشە نهێنییەکان یەک ناگرنەوە",
   "invalidPhone": "تکایە ژمارەیەکی تەلەفۆنی دروست بنووسە",
   "invalidDate": "تکایە بەرواری دروست بنووسە",
-  
   "error": "هەڵە",
   "success": "سەرکەوتوو",
   "warning": "ئاگاداری",
@@ -335,7 +312,6 @@
   "unauthorized": "ڕێگەپێنەدراو",
   "notFound": "نەدۆزرایەوە",
   "serverError": "هەڵەی سێرڤەر",
-  
   "years": "ساڵ",
   "months": "مانگ",
   "days": "ڕۆژ",
@@ -343,7 +319,6 @@
   "minutes": "خولەک",
   "ago": "پێش ئێستا",
   "justNow": "هەر ئێستا",
-  
   "male": "نێر",
   "female": "مێ",
   "other": "دیکە",
@@ -354,7 +329,6 @@
   "medicalHistory": "مێژووی پزیشکی",
   "emergencyContactName": "ناوی پەیوەندی فریاکەوتن",
   "emergencyContactPhone": "تەلەفۆنی پەیوەندی فریاکەوتن",
-  
   "fees": "کرێ",
   "free": "بەخۆڕایی",
   "paid": "پارەدراو",
@@ -362,7 +336,6 @@
   "cash": "نەقد",
   "card": "کارت",
   "insurance": "بیمە",
-  
   "admin": "بەڕێوەبەر",
   "adminDashboard": "داشبۆردی بەڕێوەبەر",
   "manageUsers": "بەڕێوەبردنی بەکارهێنەران",
@@ -371,17 +344,14 @@
   "reports": "ڕاپۆرتەکان",
   "statistics": "ئامارەکان",
   "settings": "ڕێکخستنەکان",
-  
   "account": "هەژمار",
   "security": "ئاسایش",
   "preferences": "دڵخوازییەکان",
   "general": "گشتی",
-  
   "noDataFound": "هیچ داتایەک نەدۆزرایەوە",
   "pullToRefresh": "بۆ نوێکردنەوە ڕابکێشە",
   "loadingMore": "بارکردنی زیاتر...",
   "endOfList": "کۆتایی لیست",
-  
   "camera": "کامێرا",
   "gallery": "گالێری",
   "file": "فایل",
@@ -389,7 +359,6 @@
   "share": "هاوبەشکردن",
   "copy": "کۆپیکردن",
   "copied": "کۆپیکرا",
-  
   "notes": "تێبینییەکان",
   "addNote": "زیادکردنی تێبینی",
   "noNotes": "هیچ تێبینییەک نییە",
@@ -399,13 +368,11 @@
   "diagnosis": "تەشخیس",
   "prescription": "نوسراوی دەرمان",
   "followUp": "بەدواداچوون",
-  
   "viewDetails": "بینینی وردەکاری",
   "moreInfo": "زانیاری زیاتر",
   "lessInfo": "زانیاری کەمتر",
   "expand": "فراوانکردن",
   "collapse": "پەستاندن",
-  
   "availableTimesFor": "کاتە بەردەستەکان بۆ",
   "appointmentType": "جۆری چاوپێکەوتن",
   "regularVisit": "سەردانی ئاسایی",
@@ -417,7 +384,6 @@
   "describeSymptoms": "نیشانەکانت یان هۆکاری سەردانت باس بکە...",
   "pleaseSelectDateFirst": "تکایە سەرەتا ڕێکەوتێک هەڵبژێرە",
   "noAvailableSlotsOnThisDay": "هیچ کاتێک بەردەست نییە لەم ڕۆژەدا",
-  
   "appointmentScheduledSuccessfully": "چاوپێکەوتنەکەت بە سەرکەوتوویی ڕێکخرا",
   "showQRCodeAtCheckIn": "لە کاتی تۆمارکردندا ئەم کۆدی QR ئە پیشان بدە",
   "doctor": "پزیشک",
@@ -426,21 +392,17 @@
   "bookingId": "ژمارەی نۆرەکردن",
   "backToHome": "گەڕانەوە بۆ سەرەتا",
   "viewMyAppointments": "بینینی چاوپێکەوتنەکانم",
-  
   "noNotificationsDesc": "بیرکردنەوەکانی چاوپێکەوتنەکانت لێرە دەردەکەون",
-  
   "profileSettings": "ڕێکخستنەکانی پڕۆفایل",
   "accountSettings": "ڕێکخستنەکانی هەژمار",
   "myDocuments": "بەڵگەنامەکانم",
   "healthCenterInfo": "زانیاری سەنتەری تەندروستی",
   "myAppointments": "چاوپێکەوتنەکانم",
   "myReviews": "هەڵسەنگاندنەکانم",
-  
   "pleaseSelectDate": "تکایە ڕێکەوتێک هەڵبژێرە",
   "pleaseSelectTime": "تکایە کاتێک هەڵبژێرە",
   "pleaseLoginToBook": "تکایە بۆ نۆرەکردنی چاوپێکەوتن بچۆرە ژوورەوە",
   "bookingCancellationPolicy": "دەتوانیت تا ٢٤ کاتژمێر پێش چاوپێکەوتنەکە هەڵیوەشێنیتەوە یان کاتەکەی بگۆڕیت.",
-  
   "saveChanges": "پاشەکەوتکردنی گۆڕانکارییەکان",
   "tapToChangePhoto": "داگرە بۆ گۆڕینی وێنە",
   "enterFullName": "ناوی تەواوت بنووسە",

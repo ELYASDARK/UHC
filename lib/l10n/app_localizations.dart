@@ -1294,12 +1294,6 @@ abstract class AppLocalizations {
   /// **'Vibrate for notifications'**
   String get vibrateForNotifications;
 
-  /// No description provided for @sendTestNotification.
-  ///
-  /// In en, this message translates to:
-  /// **'Send Test Notification'**
-  String get sendTestNotification;
-
   /// No description provided for @manageNotificationPermissionsInSettings.
   ///
   /// In en, this message translates to:
@@ -1749,6 +1743,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'December'**
   String get december;
+
+  /// No description provided for @sendTestNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Test Notification'**
+  String get sendTestNotification;
 
   /// No description provided for @testNotificationSent.
   ///
