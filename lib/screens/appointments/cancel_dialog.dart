@@ -206,7 +206,11 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                           setState(() => _selectedReason = reason),
                       selectedColor: AppColors.primary,
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : null,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight),
                         fontSize: 12,
                       ),
                     );

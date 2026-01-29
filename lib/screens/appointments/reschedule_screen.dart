@@ -21,6 +21,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   TimeSlot? _selectedTimeSlot;
+  CalendarFormat _calendarFormat = CalendarFormat.month;
   final _reasonController = TextEditingController();
   bool _isLoading = false;
 
@@ -28,6 +29,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   void initState() {
     super.initState();
     _selectedDay = widget.appointment.appointmentDate;
+    _focusedDay = _selectedDay!;
   }
 
   @override
@@ -100,13 +102,15 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
                     child: TableCalendar(
-                      firstDay: DateTime.now().add(const Duration(days: 1)),
+                      firstDay: DateTime.now(),
                       lastDay: DateTime.now().add(const Duration(days: 60)),
                       focusedDay: _focusedDay,
+                      calendarFormat: _calendarFormat,
                       selectedDayPredicate: (day) =>
                           isSameDay(_selectedDay, day),
                       onDaySelected: (selectedDay, focusedDay) {
@@ -114,6 +118,11 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                           _selectedDay = selectedDay;
                           _focusedDay = focusedDay;
                           _selectedTimeSlot = null;
+                        });
+                      },
+                      onFormatChanged: (format) {
+                        setState(() {
+                          _calendarFormat = format;
                         });
                       },
                       calendarStyle: CalendarStyle(
@@ -125,12 +134,29 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                           color: AppColors.primary.withValues(alpha: 0.3),
                           shape: BoxShape.circle,
                         ),
+                        disabledTextStyle: TextStyle(
+                          color: isDark ? Colors.grey[700] : Colors.grey[400],
+                        ),
                       ),
                       headerStyle: const HeaderStyle(
-                        formatButtonVisible: false,
+                        formatButtonVisible: true,
                         titleCentered: true,
                       ),
                       enabledDayPredicate: (day) {
+                        // Allow all future weekdays (Monday-Friday) similar to booking screen logic if needed,
+                        // or stick to slot availability logic.
+                        // The user said "same in image 1" which implies visual style.
+                        // However, logic for "enabled" might be different.
+                        // Booking screen uses:
+                        // final isWeekday = day.weekday >= 1 && day.weekday <= 5;
+                        // return isWeekday && isFuture;
+
+                        // Reschedule screen originally checked:
+                        // final slots = _getAvailableSlots(day);
+                        // return slots.isNotEmpty;
+
+                        // I will KEEP the original reschedule logic as it is safer for data integrity,
+                        // but the visual style is now matched.
                         final slots = _getAvailableSlots(day);
                         return slots.isNotEmpty;
                       },
