@@ -18,6 +18,7 @@ import '../admin/admin_dashboard_screen.dart';
 import '../settings/notification_settings_screen.dart';
 import 'edit_profile_screen.dart';
 import '../documents/medical_documents_screen.dart';
+import 'change_password_screen.dart';
 
 /// Profile and settings screen
 class ProfileScreen extends StatefulWidget {
@@ -427,8 +428,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildSettingTile(
                 icon: Icons.lock,
                 title: l10n.changePassword,
-                subtitle: l10n.newPassword,
-                onTap: () => _showChangePasswordDialog(context, l10n),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ChangePasswordScreen(),
+                  ),
+                ),
                 isDark: isDark,
               ),
               _buildSettingTile(
@@ -679,65 +684,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               'Clear All',
               style: TextStyle(color: AppColors.error),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChangePasswordDialog(BuildContext context, AppLocalizations l10n) {
-    final currentController = TextEditingController();
-    final newController = TextEditingController();
-    final confirmController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.changePassword),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentController,
-              obscureText: true,
-              decoration: InputDecoration(labelText: l10n.currentPassword),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: newController,
-              obscureText: true,
-              decoration: InputDecoration(labelText: l10n.newPassword),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: confirmController,
-              obscureText: true,
-              decoration: InputDecoration(labelText: l10n.confirmPassword),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (newController.text != confirmController.text) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(l10n.passwordMismatch)));
-                return;
-              }
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(l10n.passwordChanged),
-                  backgroundColor: AppColors.success,
-                ),
-              );
-            },
-            child: Text(l10n.change),
           ),
         ],
       ),

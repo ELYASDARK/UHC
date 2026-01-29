@@ -156,6 +156,25 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Change password
+  Future<bool> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    try {
+      // Note: We don't set global loading state here to prevent
+      // navigation disruption (since isAuthenticated checks state).
+      // The UI should handle its own loading indicator.
+
+      await _authService.changePassword(currentPassword, newPassword);
+      return true;
+    } catch (e) {
+      // Just return false/throw so UI can show error
+      debugPrint('Change password error: $e');
+      rethrow;
+    }
+  }
+
   /// Refresh user data without triggering loading state
   Future<void> _refreshUserData(String uid) async {
     try {

@@ -2823,6 +2823,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select New Time'**
   String get selectNewTime;
+
+  /// No description provided for @doctorBioAmandaWhite.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. Amanda White provides medication management and pharmaceutical care consultations.'**
+  String get doctorBioAmandaWhite;
+
+  /// No description provided for @doctorBioLisaBrown.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. Lisa Brown provides counseling for anxiety, depression, and stress management for university students.'**
+  String get doctorBioLisaBrown;
+
+  /// No description provided for @doctorBioJamesWilson.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. James Wilson is an orthodontist specializing in braces and teeth alignment for students.'**
+  String get doctorBioJamesWilson;
+
+  /// No description provided for @doctorBioRobertTaylor.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. Robert Taylor specializes in academic stress, relationships, and personal development counseling.'**
+  String get doctorBioRobertTaylor;
+
+  /// No description provided for @doctorBioDavidLee.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. David Lee specializes in drug interactions and medication optimization for complex cases.'**
+  String get doctorBioDavidLee;
+
+  /// No description provided for @doctorBioSarahJohnson.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. Sarah Johnson specializes in internal medicine with over 10 years of experience in treating chronic conditions.'**
+  String get doctorBioSarahJohnson;
+
+  /// No description provided for @doctorBioEmilyDavis.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. Emily Davis offers comprehensive dental care, including preventive, restorative, and cosmetic dentistry.'**
+  String get doctorBioEmilyDavis;
+
+  /// No description provided for @doctorBioMichaelChen.
+  ///
+  /// In en, this message translates to:
+  /// **'Dr. Michael Chen provides comprehensive family medicine care for patients of all ages.'**
+  String get doctorBioMichaelChen;
 }
 
 class _AppLocalizationsDelegate

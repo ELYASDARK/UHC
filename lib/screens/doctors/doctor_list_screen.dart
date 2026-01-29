@@ -531,7 +531,10 @@ class DoctorDetailScreen extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _buildStatItem(
-                          doctor.experienceDisplay,
+                          LocalizationHelper.formatExperience(
+                            doctor.experienceYears,
+                            AppLocalizations.of(context),
+                          ),
                           AppLocalizations.of(context).experience,
                           Icons.workspace_premium_rounded,
                           isDark,
@@ -577,7 +580,7 @@ class DoctorDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    doctor.bio ?? 'No bio available.',
+                    _getLocalizedBio(doctor, context),
                     style: GoogleFonts.roboto(
                       fontSize: 14,
                       height: 1.6,
@@ -724,5 +727,44 @@ class DoctorDetailScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _getLocalizedBio(DoctorModel doctor, BuildContext context) {
+    // Check for specific doctor to translate bio (Sample Data Hack)
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).languageCode;
+
+    // Only apply custom translations for non-English locales or if we want to force using arb keys
+    // For now, we only override if the locale is NOT English to preserve original English data if desired,
+    // OR we can just return the English key too if the original data might be different.
+    // Let's assume we want to use the ARB strings for these specific doctors in ALL languages for consistency.
+
+    if (doctor.name.contains('Amanda White')) {
+      if (locale == 'ku') return l10n.doctorBioAmandaWhite;
+      if (locale == 'ar') return l10n.doctorBioAmandaWhite;
+    } else if (doctor.name.contains('Lisa Brown')) {
+      if (locale == 'ku') return l10n.doctorBioLisaBrown;
+      if (locale == 'ar') return l10n.doctorBioLisaBrown;
+    } else if (doctor.name.contains('James Wilson')) {
+      if (locale == 'ku') return l10n.doctorBioJamesWilson;
+      if (locale == 'ar') return l10n.doctorBioJamesWilson;
+    } else if (doctor.name.contains('Robert Taylor')) {
+      if (locale == 'ku') return l10n.doctorBioRobertTaylor;
+      if (locale == 'ar') return l10n.doctorBioRobertTaylor;
+    } else if (doctor.name.contains('David Lee')) {
+      if (locale == 'ku') return l10n.doctorBioDavidLee;
+      if (locale == 'ar') return l10n.doctorBioDavidLee;
+    } else if (doctor.name.contains('Sarah Johnson')) {
+      if (locale == 'ku') return l10n.doctorBioSarahJohnson;
+      if (locale == 'ar') return l10n.doctorBioSarahJohnson;
+    } else if (doctor.name.contains('Emily Davis')) {
+      if (locale == 'ku') return l10n.doctorBioEmilyDavis;
+      if (locale == 'ar') return l10n.doctorBioEmilyDavis;
+    } else if (doctor.name.contains('Michael Chen')) {
+      if (locale == 'ku') return l10n.doctorBioMichaelChen;
+      if (locale == 'ar') return l10n.doctorBioMichaelChen;
+    }
+
+    return doctor.bio ?? 'No bio available.';
   }
 }

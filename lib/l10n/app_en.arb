@@ -454,5 +454,13 @@
   "confirmReschedule": "Confirm Reschedule",
   "rescheduleSuccess": "Appointment rescheduled successfully",
   "selectNewDate": "Select New Date",
-  "selectNewTime": "Select New Time"
+  "selectNewTime": "Select New Time",
+  "doctorBioAmandaWhite": "Dr. Amanda White provides medication management and pharmaceutical care consultations.",
+  "doctorBioLisaBrown": "Dr. Lisa Brown provides counseling for anxiety, depression, and stress management for university students.",
+  "doctorBioJamesWilson": "Dr. James Wilson is an orthodontist specializing in braces and teeth alignment for students.",
+  "doctorBioRobertTaylor": "Dr. Robert Taylor specializes in academic stress, relationships, and personal development counseling.",
+  "doctorBioDavidLee": "Dr. David Lee specializes in drug interactions and medication optimization for complex cases.",
+  "doctorBioSarahJohnson": "Dr. Sarah Johnson specializes in internal medicine with over 10 years of experience in treating chronic conditions.",
+  "doctorBioEmilyDavis": "Dr. Emily Davis offers comprehensive dental care, including preventive, restorative, and cosmetic dentistry.",
+  "doctorBioMichaelChen": "Dr. Michael Chen provides comprehensive family medicine care for patients of all ages."
 }

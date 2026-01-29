@@ -15,7 +15,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  UserRole? _filterRole;
+  Set<UserRole> _selectedRoles = {};
 
   @override
   void dispose() {
@@ -39,6 +39,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ],
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Search Bar
           Padding(
@@ -66,17 +67,37 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
 
           // Filter Chips
-          if (_filterRole != null)
+          // Filter Chips
+          if (_selectedRoles.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Chip(
-                    label: Text(_filterRole!.name),
-                    onDeleted: () => setState(() => _filterRole = null),
-                    deleteIconColor: AppColors.primary,
-                  ),
-                ],
+              child: Wrap(
+                spacing: 8,
+                children: _selectedRoles.map((role) {
+                  return Chip(
+                    label: Text(
+                      role.name.toUpperCase(),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    backgroundColor: isDark
+                        ? AppColors.primary.withValues(alpha: 0.2)
+                        : AppColors.primary.withValues(alpha: 0.1),
+                    side: BorderSide(
+                      color: isDark
+                          ? AppColors.primary.withValues(alpha: 0.5)
+                          : AppColors.primary.withValues(alpha: 0.2),
+                    ),
+                    onDeleted: () =>
+                        setState(() => _selectedRoles.remove(role)),
+                    deleteIconColor: isDark
+                        ? Colors.white70
+                        : AppColors.primary,
+                  );
+                }).toList(),
               ),
             ),
 
@@ -107,7 +128,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   final name = (data['fullName'] ?? data['email'] ?? '')
                       .toString()
                       .toLowerCase();
-                  return name.contains(_searchQuery.toLowerCase());
+                  final matchesSearch = name.contains(
+                    _searchQuery.toLowerCase(),
+                  );
+
+                  if (_selectedRoles.isEmpty) return matchesSearch;
+
+                  final roleStr = data['role'] as String? ?? 'student';
+                  final role = UserRole.values.firstWhere(
+                    (r) => r.name == roleStr,
+                    orElse: () => UserRole.student,
+                  );
+                  return matchesSearch && _selectedRoles.contains(role);
                 }).toList();
 
                 return ListView.builder(
@@ -128,11 +160,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   Stream<QuerySnapshot> _getUsersStream() {
-    Query query = _firestore.collection('users');
-    if (_filterRole != null) {
-      query = query.where('role', isEqualTo: _filterRole!.name);
-    }
-    return query.orderBy('createdAt', descending: true).snapshots();
+    // Get all users and filter on client side to avoid composite index issues
+    return _firestore
+        .collection('users')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
   }
 
   Widget _buildUserCard(
@@ -286,39 +318,60 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void _showFilterDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter by Role'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioGroup<UserRole>(
-              groupValue: _filterRole,
-              onChanged: (value) {
-                setState(() => _filterRole = value);
-                Navigator.pop(context);
-              },
-              child: Column(
+      builder: (context) {
+        // Use a local set to track changes inside the dialog
+        final tempSelectedRoles = Set<UserRole>.from(_selectedRoles);
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Filter by Role'),
+              content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: UserRole.values.map((role) {
-                  return RadioListTile<UserRole>(
-                    title: Text(role.name),
-                    value: role,
+                  return CheckboxListTile(
+                    title: Text(role.name.toUpperCase()),
+                    value: tempSelectedRoles.contains(role),
+                    activeColor: AppColors.primary,
+                    onChanged: (bool? selected) {
+                      setState(() {
+                        if (selected == true) {
+                          tempSelectedRoles.add(role);
+                        } else {
+                          tempSelectedRoles.remove(role);
+                        }
+                      });
+                    },
                   );
                 }).toList(),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() => _filterRole = null);
-              Navigator.pop(context);
-            },
-            child: const Text('Clear Filter'),
-          ),
-        ],
-      ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    // Clear all filters
+                    this.setState(() => _selectedRoles.clear());
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Clear All'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    this.setState(() {
+                      _selectedRoles = tempSelectedRoles;
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -386,7 +439,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               _buildDetailRow('Phone', data['phoneNumber'] ?? 'N/A'),
               _buildDetailRow('Blood Type', data['bloodType'] ?? 'N/A'),
               _buildDetailRow('Allergies', data['allergies'] ?? 'N/A'),
-              _buildDetailRow('Date of Birth', data['dateOfBirth'] ?? 'N/A'),
+              _buildDetailRow(
+                'Date of Birth',
+                data['dateOfBirth'] is Timestamp
+                    ? _formatDate((data['dateOfBirth'] as Timestamp).toDate())
+                    : data['dateOfBirth']?.toString() ?? 'N/A',
+              ),
               _buildDetailRow('Role', data['role'] ?? 'patient'),
               _buildDetailRow(
                 'Status',
@@ -477,7 +535,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 }

@@ -1383,4 +1383,36 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get selectNewTime => 'اختيار وقت جديد';
+
+  @override
+  String get doctorBioAmandaWhite =>
+      'د. أماندا وايت تقدم إدارة الأدوية واستشارات الرعاية الصيدلانية.';
+
+  @override
+  String get doctorBioLisaBrown =>
+      'د. ليزا براون تقدم استشارات للقلق والاكتئاب وإدارة التوتر لطلاب الجامعات.';
+
+  @override
+  String get doctorBioJamesWilson =>
+      'د. جيمس ويلسون هو أخصائي تقويم أسنان متخصص في الأقواس وتقويم الأسنان للطلاب.';
+
+  @override
+  String get doctorBioRobertTaylor =>
+      'د. روبرت تايلور متخصص في استشارات الضغط الدراسي، العلاقات، والتطوير الشخصي.';
+
+  @override
+  String get doctorBioDavidLee =>
+      'د. ديفيد لي متخصص في التفاعلات الدوائية وتحسين الأدوية للحالات المعقدة.';
+
+  @override
+  String get doctorBioSarahJohnson =>
+      'د. سارة جونسون متخصصة في الطب الباطني ولديها أكثر من 10 سنوات من الخبرة في علاج الحالات المزمنة.';
+
+  @override
+  String get doctorBioEmilyDavis =>
+      'د. إميلي ديفيس تقدم رعاية شاملة للأسنان، بما في ذلك الوقائية والترميمية والتجميلية.';
+
+  @override
+  String get doctorBioMichaelChen =>
+      'د. مايكل تشن يقدم رعاية طب الأسرة الشاملة للمرضى من جميع الأعمار.';
 }

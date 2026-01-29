@@ -1390,4 +1390,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get selectNewTime => 'Select New Time';
+
+  @override
+  String get doctorBioAmandaWhite =>
+      'Dr. Amanda White provides medication management and pharmaceutical care consultations.';
+
+  @override
+  String get doctorBioLisaBrown =>
+      'Dr. Lisa Brown provides counseling for anxiety, depression, and stress management for university students.';
+
+  @override
+  String get doctorBioJamesWilson =>
+      'Dr. James Wilson is an orthodontist specializing in braces and teeth alignment for students.';
+
+  @override
+  String get doctorBioRobertTaylor =>
+      'Dr. Robert Taylor specializes in academic stress, relationships, and personal development counseling.';
+
+  @override
+  String get doctorBioDavidLee =>
+      'Dr. David Lee specializes in drug interactions and medication optimization for complex cases.';
+
+  @override
+  String get doctorBioSarahJohnson =>
+      'Dr. Sarah Johnson specializes in internal medicine with over 10 years of experience in treating chronic conditions.';
+
+  @override
+  String get doctorBioEmilyDavis =>
+      'Dr. Emily Davis offers comprehensive dental care, including preventive, restorative, and cosmetic dentistry.';
+
+  @override
+  String get doctorBioMichaelChen =>
+      'Dr. Michael Chen provides comprehensive family medicine care for patients of all ages.';
 }

@@ -142,6 +142,10 @@ class LocalNotificationService {
     String? payload,
     bool isAppointment = false,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final soundEnabled = prefs.getBool('notif_sound') ?? true;
+    final vibrationEnabled = prefs.getBool('notif_vibration') ?? true;
+
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
         isAppointment ? _appointmentChannelId : _generalChannelId,
@@ -151,11 +155,13 @@ class LocalNotificationService {
             : Importance.defaultImportance,
         priority: isAppointment ? Priority.high : Priority.defaultPriority,
         icon: '@mipmap/ic_launcher',
+        playSound: soundEnabled,
+        enableVibration: vibrationEnabled,
       ),
-      iOS: const DarwinNotificationDetails(
+      iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: soundEnabled,
       ),
     );
 
@@ -171,6 +177,10 @@ class LocalNotificationService {
     String? payload,
     bool isAppointment = true,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final soundEnabled = prefs.getBool('notif_sound') ?? true;
+    final vibrationEnabled = prefs.getBool('notif_vibration') ?? true;
+
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
         isAppointment ? _appointmentChannelId : _generalChannelId,
@@ -178,11 +188,13 @@ class LocalNotificationService {
         importance: Importance.high,
         priority: Priority.high,
         icon: '@mipmap/ic_launcher',
+        playSound: soundEnabled,
+        enableVibration: vibrationEnabled,
       ),
-      iOS: const DarwinNotificationDetails(
+      iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: soundEnabled,
       ),
     );
 

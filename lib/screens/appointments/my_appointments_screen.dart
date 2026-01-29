@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -547,37 +548,68 @@ class _AppointmentDetailSheet extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // QR Code placeholder
-          if (appointment.isUpcoming)
+          // QR Code
+          if (appointment.isUpcoming) ...[
             Center(
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.qr_code_2_rounded,
-                      size: 100,
-                      color: Colors.grey[400],
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Check-in QR Code',
-                      style: GoogleFonts.roboto(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                      ),
+                    child: QrImageView(
+                      data: 'UHC_APPOINTMENT:${appointment.id}',
+                      version: QrVersions.auto,
+                      size: 160,
+                      backgroundColor: Colors.white,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Booking ID',
+                    style: GoogleFonts.roboto(
+                      fontSize: 12,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                  Text(
+                    appointment.bookingReference ??
+                        appointment.id.substring(0, 8).toUpperCase(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Show this at check-in',
+                    style: GoogleFonts.roboto(
+                      fontSize: 12,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ],
               ),
             ),
+            const SizedBox(height: 24),
+          ],
 
           const SizedBox(height: 24),
 

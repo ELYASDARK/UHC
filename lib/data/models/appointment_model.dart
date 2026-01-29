@@ -22,6 +22,7 @@ class AppointmentModel {
   final String? notes;
   final String? medicalNotes;
   final String? qrCode;
+  final String? bookingReference;
   final bool isCheckedIn;
   final DateTime? checkedInAt;
   final DateTime createdAt;
@@ -46,6 +47,7 @@ class AppointmentModel {
     this.notes,
     this.medicalNotes,
     this.qrCode,
+    this.bookingReference,
     this.isCheckedIn = false,
     this.checkedInAt,
     required this.createdAt,
@@ -79,6 +81,7 @@ class AppointmentModel {
       notes: data['notes'],
       medicalNotes: data['medicalNotes'],
       qrCode: data['qrCode'],
+      bookingReference: data['bookingReference'],
       isCheckedIn: data['isCheckedIn'] ?? false,
       checkedInAt: data['checkedInAt'] != null
           ? (data['checkedInAt'] as Timestamp).toDate()
@@ -107,6 +110,7 @@ class AppointmentModel {
       'notes': notes,
       'medicalNotes': medicalNotes,
       'qrCode': qrCode,
+      'bookingReference': bookingReference,
       'isCheckedIn': isCheckedIn,
       'checkedInAt': checkedInAt != null
           ? Timestamp.fromDate(checkedInAt!)
@@ -135,6 +139,7 @@ class AppointmentModel {
     String? notes,
     String? medicalNotes,
     String? qrCode,
+    String? bookingReference,
     bool? isCheckedIn,
     DateTime? checkedInAt,
     DateTime? createdAt,
@@ -159,6 +164,7 @@ class AppointmentModel {
       notes: notes ?? this.notes,
       medicalNotes: medicalNotes ?? this.medicalNotes,
       qrCode: qrCode ?? this.qrCode,
+      bookingReference: bookingReference ?? this.bookingReference,
       isCheckedIn: isCheckedIn ?? this.isCheckedIn,
       checkedInAt: checkedInAt ?? this.checkedInAt,
       createdAt: createdAt ?? this.createdAt,

@@ -113,6 +113,33 @@ class AuthService {
     }
   }
 
+  /// Change user password
+  Future<void> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    final user = currentUser;
+    if (user == null || user.email == null) {
+      throw Exception('No user logged in or user has no email');
+    }
+
+    try {
+      // Create credential with current password
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      // Re-authenticate
+      await user.reauthenticateWithCredential(credential);
+
+      // Update password
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
   /// Sign out
   Future<void> signOut() async {
     await _googleSignIn.signOut();

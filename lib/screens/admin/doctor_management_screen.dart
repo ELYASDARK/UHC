@@ -15,7 +15,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  Department? _filterDepartment;
+  Set<Department> _selectedDepartments = {};
 
   @override
   void dispose() {
@@ -43,8 +43,10 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Add Doctor'),
         backgroundColor: AppColors.primary,
+        shape: const StadiumBorder(),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Search Bar
           Padding(
@@ -72,17 +74,36 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
           ),
 
           // Filter Chips
-          if (_filterDepartment != null)
+          if (_selectedDepartments.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Chip(
-                    label: Text(_filterDepartment!.name),
-                    onDeleted: () => setState(() => _filterDepartment = null),
-                    deleteIconColor: AppColors.primary,
-                  ),
-                ],
+              child: Wrap(
+                spacing: 8,
+                children: _selectedDepartments.map((dept) {
+                  return Chip(
+                    label: Text(
+                      dept.name.toUpperCase(),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    backgroundColor: isDark
+                        ? AppColors.primary.withValues(alpha: 0.2)
+                        : AppColors.primary.withValues(alpha: 0.1),
+                    side: BorderSide(
+                      color: isDark
+                          ? AppColors.primary.withValues(alpha: 0.5)
+                          : AppColors.primary.withValues(alpha: 0.2),
+                    ),
+                    onDeleted: () =>
+                        setState(() => _selectedDepartments.remove(dept)),
+                    deleteIconColor: isDark
+                        ? Colors.white70
+                        : AppColors.primary,
+                  );
+                }).toList(),
               ),
             ),
 
@@ -115,7 +136,19 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                 final docs = snapshot.data!.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final name = (data['name'] ?? '').toString().toLowerCase();
-                  return name.contains(_searchQuery.toLowerCase());
+                  final matchesSearch = name.contains(
+                    _searchQuery.toLowerCase(),
+                  );
+
+                  if (_selectedDepartments.isEmpty) return matchesSearch;
+
+                  final deptName = data['department'] as String?;
+                  final dept = Department.values.firstWhere(
+                    (d) => d.name == deptName,
+                    orElse: () => Department.generalMedicine,
+                  );
+
+                  return matchesSearch && _selectedDepartments.contains(dept);
                 }).toList();
 
                 return ListView.builder(
@@ -136,11 +169,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   }
 
   Stream<QuerySnapshot> _getDoctorsStream() {
-    Query query = _firestore.collection('doctors');
-    if (_filterDepartment != null) {
-      query = query.where('department', isEqualTo: _filterDepartment!.name);
-    }
-    return query.orderBy('name').snapshots();
+    return _firestore.collection('doctors').orderBy('name').snapshots();
   }
 
   Widget _buildDoctorCard(
@@ -163,12 +192,34 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
-        leading: CircleAvatar(
-          radius: 28,
-          backgroundImage: data['photoUrl'] != null
-              ? NetworkImage(data['photoUrl'])
-              : null,
-          child: data['photoUrl'] == null ? const Icon(Icons.person) : null,
+        leading: Stack(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundImage: data['photoUrl'] != null
+                  ? NetworkImage(data['photoUrl'])
+                  : null,
+              child: data['photoUrl'] == null ? const Icon(Icons.person) : null,
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: (data['isActive'] ?? true)
+                      ? AppColors.success
+                      : Colors.grey,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? AppColors.surfaceDark : Colors.white,
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         title: Text(
           'Dr. ${data['name'] ?? 'Unknown'}',
@@ -176,25 +227,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(data['specialization'] ?? 'General'),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.star, size: 14, color: Colors.amber[600]),
-                const SizedBox(width: 4),
-                Text(
-                  '${data['rating']?.toStringAsFixed(1) ?? '0.0'} • ${data['reviewCount'] ?? 0} reviews',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          children: [Text(data['specialization'] ?? 'General')],
         ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) {
@@ -253,41 +286,59 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   void _showFilterDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter by Department'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioGroup<Department>(
-                groupValue: _filterDepartment,
-                onChanged: (value) {
-                  setState(() => _filterDepartment = value);
-                  Navigator.pop(context);
-                },
+      builder: (context) {
+        final tempSelected = Set<Department>.from(_selectedDepartments);
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Filter by Department'),
+              content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: Department.values.map((dept) {
-                    return RadioListTile<Department>(
+                    return CheckboxListTile(
                       title: Text(dept.name),
-                      value: dept,
+                      value: tempSelected.contains(dept),
+                      activeColor: AppColors.primary,
+                      onChanged: (bool? selected) {
+                        setState(() {
+                          if (selected == true) {
+                            tempSelected.add(dept);
+                          } else {
+                            tempSelected.remove(dept);
+                          }
+                        });
+                      },
                     );
                   }).toList(),
                 ),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() => _filterDepartment = null);
-              Navigator.pop(context);
-            },
-            child: const Text('Clear Filter'),
-          ),
-        ],
-      ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    this.setState(() => _selectedDepartments.clear());
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Clear All'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    this.setState(() {
+                      _selectedDepartments = tempSelected;
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

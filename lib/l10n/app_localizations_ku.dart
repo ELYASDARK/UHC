@@ -1390,4 +1390,36 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get selectNewTime => 'دیاریکردنی کاتێکی نوێ';
+
+  @override
+  String get doctorBioAmandaWhite =>
+      'د. ئاماندا وایت بەڕێوەبردنی دەرمان و ڕاوێژکاری چاودێری دەرمانسازی پێشکەش دەکات.';
+
+  @override
+  String get doctorBioLisaBrown =>
+      'د. لیزا براون ڕاوێژکاری دڵەڕاوکێ، خەمۆکی، و بەڕێوەبردنی فشار بۆ خوێندکارانی زانکۆ پێشکەش دەکات.';
+
+  @override
+  String get doctorBioJamesWilson =>
+      'د. جەیمس ویلسۆن پسپۆڕی ڕێکخستنی ددانە لە بواری تەل و ڕاستکردنەوەی ددان بۆ خوێندکاران.';
+
+  @override
+  String get doctorBioRobertTaylor =>
+      'د. ڕۆبەرت تەیلەر پسپۆڕە لە ڕاوێژکاری فشاری خوێندن، پەیوەندییەکان، و گەشەپێدانی کەسی.';
+
+  @override
+  String get doctorBioDavidLee =>
+      'د. دەیڤید لی پسپۆڕە لە کارلێکی دەرمان و باشترکردنی بەکارهێنانی دەرمان بۆ حاڵەتە ئاڵۆزەکان.';
+
+  @override
+  String get doctorBioSarahJohnson =>
+      'د. سارا جۆنسن پسپۆڕە لە پزیشکی ناوخۆیی بە زیاتر لە ١٠ ساڵ ئەزموون لە چارەسەرکردنی نەخۆشییە درێژخایەنەکان.';
+
+  @override
+  String get doctorBioEmilyDavis =>
+      'د. ئێمیلی دەیڤس چاودێری ددانی گشتگیر پێشکەش دەکات، لەوانە ددانی خۆپارێزی، چاککردنەوە، و جوانکاری.';
+
+  @override
+  String get doctorBioMichaelChen =>
+      'د. مایکڵ چێن چاودێری پزیشکی خێزانی گشتگیر بۆ نەخۆشەکانی هەموو تەمەنەکان پێشکەش دەکات.';
 }

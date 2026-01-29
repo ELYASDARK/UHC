@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -549,6 +550,15 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  String _generateBookingReference() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final random = Random();
+    return List.generate(
+      8,
+      (index) => chars[random.nextInt(chars.length)],
+    ).join();
+  }
+
   Future<void> _submitBooking() async {
     final authProvider = context.read<AuthProvider>();
     final appointmentProvider = context.read<AppointmentProvider>();
@@ -559,8 +569,11 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
+    final bookingReference = _generateBookingReference();
+
     final appointment = AppointmentModel(
       id: '',
+      bookingReference: bookingReference,
       patientId: user.id,
       patientName: user.fullName,
       patientEmail: user.email,
@@ -586,6 +599,7 @@ class _BookingScreenState extends State<BookingScreen> {
         MaterialPageRoute(
           builder: (_) => BookingSuccessScreen(
             appointmentId: appointmentId,
+            bookingReference: bookingReference,
             doctorName: widget.doctor.name,
             date: _selectedDay!,
             timeSlot: _selectedTimeSlot!.display,
@@ -634,6 +648,7 @@ class _BookingScreenState extends State<BookingScreen> {
 /// Booking success screen with QR code
 class BookingSuccessScreen extends StatelessWidget {
   final String appointmentId;
+  final String? bookingReference;
   final String doctorName;
   final DateTime date;
   final String timeSlot;
@@ -641,6 +656,7 @@ class BookingSuccessScreen extends StatelessWidget {
   const BookingSuccessScreen({
     super.key,
     required this.appointmentId,
+    this.bookingReference,
     required this.doctorName,
     required this.date,
     required this.timeSlot,
@@ -774,7 +790,8 @@ class BookingSuccessScreen extends StatelessWidget {
                       context,
                       Icons.confirmation_number,
                       l10n.bookingId,
-                      appointmentId.substring(0, 8).toUpperCase(),
+                      bookingReference ??
+                          appointmentId.substring(0, 8).toUpperCase(),
                     ),
                   ],
                 ),
