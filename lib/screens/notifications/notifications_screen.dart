@@ -235,10 +235,10 @@ class _NotificationCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: notification.isRead
                 ? (isDark ? AppColors.surfaceDark : AppColors.surfaceLight)
-                : iconColor.withOpacity(0.05),
+                : iconColor.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
             border: !notification.isRead
-                ? Border.all(color: iconColor.withOpacity(0.2), width: 1)
+                ? Border.all(color: iconColor.withValues(alpha: 0.2), width: 1)
                 : null,
           ),
           child: Row(
@@ -247,7 +247,7 @@ class _NotificationCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
+                  color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(_getNotificationIcon(), color: iconColor),
@@ -286,7 +286,7 @@ class _NotificationCard extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: iconColor.withOpacity(0.1),
+                          color: iconColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

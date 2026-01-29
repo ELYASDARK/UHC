@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/appointment_model.dart';
 
 /// Repository for appointment-related Firestore operations
@@ -58,7 +59,7 @@ class AppointmentRepository {
 
       return appointments;
     } catch (e) {
-      print('Error getting upcoming appointments: $e');
+      debugPrint('Error getting upcoming appointments: $e');
       return [];
     }
   }
@@ -106,7 +107,7 @@ class AppointmentRepository {
       // Limit to 50
       return appointments.take(50).toList();
     } catch (e) {
-      print('Error getting past appointments: $e');
+      debugPrint('Error getting past appointments: $e');
       return [];
     }
   }
@@ -142,7 +143,7 @@ class AppointmentRepository {
           .toList()
         ..sort((a, b) => a.appointmentDate.compareTo(b.appointmentDate));
     } catch (e) {
-      print('Error getting doctor appointments: $e');
+      debugPrint('Error getting doctor appointments: $e');
       return [];
     }
   }
@@ -302,7 +303,7 @@ class AppointmentRepository {
       return conflictingAppointments.isEmpty;
     } catch (e) {
       // If query fails, assume slot is available to not block booking
-      print('Error checking time slot availability: $e');
+      debugPrint('Error checking time slot availability: $e');
       return true;
     }
   }

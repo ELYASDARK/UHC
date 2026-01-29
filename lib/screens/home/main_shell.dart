@@ -109,7 +109,7 @@ class _MainShellState extends State<MainShell> {
                 color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
@@ -181,7 +181,7 @@ class _MainShellState extends State<MainShell> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.3),
+                  color: AppColors.primary.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),

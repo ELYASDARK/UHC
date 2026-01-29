@@ -290,23 +290,24 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         title: const Text('Filter by Role'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: UserRole.values.map((role) {
-            return ListTile(
-              title: Text(role.name),
-              leading: Radio<UserRole>(
-                value: role,
-                groupValue: _filterRole,
-                onChanged: (value) {
-                  setState(() => _filterRole = value);
-                  Navigator.pop(context);
-                },
-              ),
-              onTap: () {
-                setState(() => _filterRole = role);
+          children: [
+            RadioGroup<UserRole>(
+              groupValue: _filterRole,
+              onChanged: (value) {
+                setState(() => _filterRole = value);
                 Navigator.pop(context);
               },
-            );
-          }).toList(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: UserRole.values.map((role) {
+                  return RadioListTile<UserRole>(
+                    title: Text(role.name),
+                    value: role,
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -446,34 +447,15 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         title: const Text('Change User Role'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: UserRole.values.map((role) {
-            return ListTile(
-              title: Text(role.name),
-              leading: Radio<UserRole>(
-                value: role,
-                groupValue: currentRole,
-                onChanged: (value) async {
-                  if (value != null) {
-                    await _firestore.collection('users').doc(id).update({
-                      'role': value.name,
-                    });
-                    if (mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Role updated'),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
-                    }
-                  }
-                },
-              ),
-              onTap: () async {
-                await _firestore.collection('users').doc(id).update({
-                  'role': role.name,
-                });
-                if (mounted) {
+          children: [
+            RadioGroup<UserRole>(
+              groupValue: currentRole,
+              onChanged: (value) async {
+                if (value != null) {
+                  await _firestore.collection('users').doc(id).update({
+                    'role': value.name,
+                  });
+                  if (!context.mounted) return;
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -483,8 +465,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   );
                 }
               },
-            );
-          }).toList(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: UserRole.values.map((role) {
+                  return RadioListTile<UserRole>(
+                    title: Text(role.name),
+                    value: role,
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         ),
       ),
     );

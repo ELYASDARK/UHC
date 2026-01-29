@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/doctor_model.dart';
 
 /// Repository for doctor-related Firestore operations
@@ -22,7 +23,7 @@ class DoctorRepository {
       doctors.sort((a, b) => b.rating.compareTo(a.rating));
       return doctors;
     } catch (e) {
-      print('Error getting all doctors: $e');
+      debugPrint('Error getting all doctors: $e');
       return [];
     }
   }
@@ -51,7 +52,7 @@ class DoctorRepository {
       doctors.sort((a, b) => b.rating.compareTo(a.rating));
       return doctors;
     } catch (e) {
-      print('Error getting doctors by department: $e');
+      debugPrint('Error getting doctors by department: $e');
       return [];
     }
   }

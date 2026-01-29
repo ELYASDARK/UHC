@@ -3,6 +3,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/doctor_model.dart';
 import '../../data/repositories/appointment_repository.dart';
+import '../booking/booking_screen.dart';
 
 class DoctorScheduleScreen extends StatefulWidget {
   final DoctorModel doctor;
@@ -498,13 +499,10 @@ class _BookingConfirmationSheet extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      // TODO: Navigate to full booking screen
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Booking flow will be implemented in Phase 6',
-                          ),
-                          behavior: SnackBarBehavior.floating,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BookingScreen(doctor: doctor),
                         ),
                       );
                     },

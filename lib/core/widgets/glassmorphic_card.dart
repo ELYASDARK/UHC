@@ -33,8 +33,8 @@ class GlassmorphicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final defaultColor = isDark
-        ? AppColors.glassDark.withOpacity(0.3)
-        : AppColors.glassLight.withOpacity(0.7);
+        ? AppColors.glassDark.withValues(alpha: 0.3)
+        : AppColors.glassLight.withValues(alpha: 0.7);
 
     return GestureDetector(
       onTap: onTap,
@@ -55,8 +55,8 @@ class GlassmorphicCard extends StatelessWidget {
                     border ??
                     Border.all(
                       color: isDark
-                          ? Colors.white.withOpacity(0.1)
-                          : Colors.white.withOpacity(0.5),
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.white.withValues(alpha: 0.5),
                       width: 1.5,
                     ),
               ),
@@ -114,7 +114,9 @@ class GradientCard extends StatelessWidget {
               boxShadow ??
               [
                 BoxShadow(
-                  color: (colors?.first ?? AppColors.primary).withOpacity(0.3),
+                  color: (colors?.first ?? AppColors.primary).withValues(
+                    alpha: 0.3,
+                  ),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),

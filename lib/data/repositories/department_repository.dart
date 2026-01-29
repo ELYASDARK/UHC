@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/department_model.dart';
 
 /// Repository for department-related Firestore operations
@@ -21,7 +22,7 @@ class DepartmentRepository {
       departments.sort((a, b) => a.name.compareTo(b.name));
       return departments;
     } catch (e) {
-      print('Error getting departments: $e');
+      debugPrint('Error getting departments: $e');
       return [];
     }
   }
@@ -35,7 +36,7 @@ class DepartmentRepository {
       }
       return null;
     } catch (e) {
-      print('Error getting department: $e');
+      debugPrint('Error getting department: $e');
       return null;
     }
   }
@@ -46,7 +47,7 @@ class DepartmentRepository {
       final docRef = await _departmentsRef.add(department.toFirestore());
       return docRef.id;
     } catch (e) {
-      print('Error creating department: $e');
+      debugPrint('Error creating department: $e');
       rethrow;
     }
   }

@@ -311,7 +311,7 @@ class _DoctorCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -365,7 +365,7 @@ class _DoctorCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -423,7 +423,7 @@ class DoctorDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
@@ -443,11 +443,11 @@ class DoctorDetailScreen extends StatelessWidget {
                     imageUrl: doctor.photoUrl ?? '',
                     fit: BoxFit.cover,
                     placeholder: (_, _) => Container(
-                      color: AppColors.primary.withOpacity(0.2),
+                      color: AppColors.primary.withValues(alpha: 0.2),
                       child: const Icon(Icons.person, size: 100),
                     ),
                     errorWidget: (_, _, _) => Container(
-                      color: AppColors.primary.withOpacity(0.2),
+                      color: AppColors.primary.withValues(alpha: 0.2),
                       child: const Icon(Icons.person, size: 100),
                     ),
                   ),
@@ -458,7 +458,7 @@ class DoctorDetailScreen extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.center,
                         colors: [
-                          Colors.black.withOpacity(0.4),
+                          Colors.black.withValues(alpha: 0.4),
                           Colors.transparent,
                         ],
                       ),
@@ -472,7 +472,7 @@ class DoctorDetailScreen extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.7),
+                          Colors.black.withValues(alpha: 0.7),
                         ],
                       ),
                     ),
@@ -499,7 +499,7 @@ class DoctorDetailScreen extends StatelessWidget {
                           ),
                           style: GoogleFonts.roboto(
                             fontSize: 16,
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                           ),
                         ),
                       ],
@@ -612,7 +612,9 @@ class DoctorDetailScreen extends StatelessWidget {
                             AppLocalizations.of(context),
                           ),
                         ),
-                        backgroundColor: AppColors.primary.withOpacity(0.1),
+                        backgroundColor: AppColors.primary.withValues(
+                          alpha: 0.1,
+                        ),
                         labelStyle: GoogleFonts.roboto(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w500,
@@ -685,7 +687,7 @@ class DoctorDetailScreen extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: iconColor, size: 24),

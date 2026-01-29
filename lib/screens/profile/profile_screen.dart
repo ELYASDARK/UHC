@@ -38,8 +38,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
     final authProvider = context.read<AuthProvider>();
+    final prefs = await SharedPreferences.getInstance();
     final user = authProvider.currentUser;
 
     if (mounted) {
@@ -826,7 +826,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -834,7 +834,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   border: Border.all(
                     color: isDark
                         ? Colors.white10
-                        : Colors.grey.withOpacity(0.1),
+                        : Colors.grey.withValues(alpha: 0.1),
                     width: 1.5,
                   ),
                 ),
@@ -910,7 +910,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
+                        color: AppColors.primary.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -972,7 +972,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.1),
+          color: AppColors.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: AppColors.primary, size: 20),

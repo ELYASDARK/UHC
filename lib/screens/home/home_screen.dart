@@ -160,13 +160,15 @@ class _HomeScreenState extends State<HomeScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 15,
                 offset: const Offset(0, 5),
               ),
             ],
             border: Border.all(
-              color: isDark ? Colors.white10 : Colors.grey.withOpacity(0.1),
+              color: isDark
+                  ? Colors.white10
+                  : Colors.grey.withValues(alpha: 0.1),
             ),
           ),
           child: ClipOval(
@@ -279,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -287,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     border: Border.all(
                       color: isDark
                           ? Colors.white10
-                          : Colors.grey.withOpacity(0.1),
+                          : Colors.grey.withValues(alpha: 0.1),
                     ),
                   ),
                   child: Stack(
@@ -357,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   AppLocalizations.of(context).findBestDoctors,
                   style: GoogleFonts.roboto(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     height: 1.4,
                   ),
                 ),
@@ -399,7 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Icon(
@@ -480,7 +482,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -492,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 26),
@@ -612,7 +614,7 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -621,7 +623,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -716,10 +718,13 @@ class _HomeScreenState extends State<HomeScreen> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [tip.color.withOpacity(0.1), tip.color.withOpacity(0.05)],
+          colors: [
+            tip.color.withValues(alpha: 0.1),
+            tip.color.withValues(alpha: 0.05),
+          ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: tip.color.withOpacity(0.2), width: 1),
+        border: Border.all(color: tip.color.withValues(alpha: 0.2), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -729,7 +734,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: tip.color.withOpacity(0.2),
+              color: tip.color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(tip.icon, color: tip.color, size: 22),

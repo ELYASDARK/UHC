@@ -167,8 +167,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      item.color.withOpacity(0.2),
-                      item.color.withOpacity(0.1),
+                      item.color.withValues(alpha: 0.2),
+                      item.color.withValues(alpha: 0.1),
                     ],
                   ),
                   shape: BoxShape.circle,

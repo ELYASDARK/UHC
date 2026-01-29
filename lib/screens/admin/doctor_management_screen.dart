@@ -258,23 +258,24 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: Department.values.map((dept) {
-              return ListTile(
-                title: Text(dept.name),
-                leading: Radio<Department>(
-                  value: dept,
-                  groupValue: _filterDepartment,
-                  onChanged: (value) {
-                    setState(() => _filterDepartment = value);
-                    Navigator.pop(context);
-                  },
-                ),
-                onTap: () {
-                  setState(() => _filterDepartment = dept);
+            children: [
+              RadioGroup<Department>(
+                groupValue: _filterDepartment,
+                onChanged: (value) {
+                  setState(() => _filterDepartment = value);
                   Navigator.pop(context);
                 },
-              );
-            }).toList(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: Department.values.map((dept) {
+                    return RadioListTile<Department>(
+                      title: Text(dept.name),
+                      value: dept,
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
