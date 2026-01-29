@@ -1164,7 +1164,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get pleaseSelectDateFirst => 'الرجاء اختيار تاريخ أولاً';
 
   @override
-  String get noAvailableSlotsOnThisDay => 'لا توجد فترات متاحة في هذا اليوم';
+  String get noAvailableSlotsOnThisDay => 'لا توجد مواعيد متاحة في هذا اليوم';
 
   @override
   String get appointmentScheduledSuccessfully => 'تم جدولة موعدك بنجاح';
