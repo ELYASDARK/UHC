@@ -1164,7 +1164,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get pleaseSelectDateFirst => 'الرجاء اختيار تاريخ أولاً';
 
   @override
-  String get noAvailableSlotsOnThisDay => 'لا توجد مواعيد متاحة في هذا اليوم';
+  String get noAvailableSlotsOnThisDay => 'لا توجد فترات متاحة في هذا اليوم';
 
   @override
   String get appointmentScheduledSuccessfully => 'تم جدولة موعدك بنجاح';
@@ -1256,4 +1256,131 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get nameTooShort => 'يجب أن يكون الاسم حرفين على الأقل';
+
+  @override
+  String get view => 'عرض';
+
+  @override
+  String get labResults => 'نتائج المختبر';
+
+  @override
+  String get medicalRecord => 'سجل طبي';
+
+  @override
+  String get imaging => 'أشعة / تصوير';
+
+  @override
+  String get manageYourMedicalRecords => 'إدارة سجلاتك الطبية';
+
+  @override
+  String get pleaseFillRequiredFields => 'يرجى ملء الحقول المطلوبة';
+
+  @override
+  String get uploadFailed => 'فشل الرفع';
+
+  @override
+  String get updateFailed => 'فشل التحديث';
+
+  @override
+  String get documentUpdated => 'تم تحديث المستند بنجاح';
+
+  @override
+  String get openingDocument => 'جاري فتح المستند...';
+
+  @override
+  String get couldNotOpenDocument => 'لا يمكن فتح المستند';
+
+  @override
+  String get errorOpeningDocument => 'خطأ في فتح المستند';
+
+  @override
+  String get updateDocument => 'تحديث المستند';
+
+  @override
+  String get currentFile => 'الملف الحالي';
+
+  @override
+  String get replace => 'استبدال';
+
+  @override
+  String get noURLProvided => 'خطأ: لم يتم توفير رابط لهذا المستند';
+
+  @override
+  String get errorLoadingDocuments => 'خطأ في تحميل المستندات';
+
+  @override
+  String get uploadMedicalDocumentsDescription =>
+      'قم برفع مستنداتك الطبية لإبقائها منظمة';
+
+  @override
+  String get cancelAppointmentTitle => 'إلغاء الموعد؟';
+
+  @override
+  String get cannotCancel => 'لا يمكن الإلغاء';
+
+  @override
+  String get cancelPolicyMessage =>
+      'لا يمكن إلغاء هذا الموعد لأنه تجاوز فترة الإلغاء المسموحة.';
+
+  @override
+  String get lateCancellationWarning =>
+      'الإلغاء المتأخر قد يؤثر على أولوية حجزك.';
+
+  @override
+  String get reasonForCancellation => 'سبب الإلغاء';
+
+  @override
+  String get reasonScheduleConflict => 'تعارض في الجدول';
+
+  @override
+  String get reasonFeelingBetter => 'أشعر بتحسن';
+
+  @override
+  String get reasonFoundAnotherDoctor => 'وجدت طبيباً آخر';
+
+  @override
+  String get reasonPersonalEmergency => 'طارئ شخصي';
+
+  @override
+  String get reasonTransportationIssues => 'مشاكل في المواصلات';
+
+  @override
+  String get pleaseSpecify => 'الرجاء التحديد...';
+
+  @override
+  String get keepAppointment => 'إبقاء الموعد';
+
+  @override
+  String get rescheduleAppointmentTitle => 'إعادة جدولة الموعد';
+
+  @override
+  String get cannotReschedule => 'لا يمكن إعادة الجدولة';
+
+  @override
+  String get reschedulePolicyMessage =>
+      'يمكن إعادة جدولة المواعيد فقط قبل 24 ساعة من الموعد المحدد.';
+
+  @override
+  String get goBack => 'عودة';
+
+  @override
+  String get currentAppointment => 'الموعد الحالي';
+
+  @override
+  String get reasonForReschedule => 'سبب إعادة الجدولة';
+
+  @override
+  String get pleaseProvideReason => 'الرجاء ذكر سبب...';
+
+  @override
+  String get confirmReschedule => 'تأكيد إعادة الجدولة';
+
+  @override
+  String get rescheduleSuccess => 'تم إعادة جدولة الموعد بنجاح';
+
+  @override
+  String get selectNewDate => 'اختيار تاريخ جديد';
+
+  @override
+  String get selectNewTime => 'اختيار وقت جديد';
 }

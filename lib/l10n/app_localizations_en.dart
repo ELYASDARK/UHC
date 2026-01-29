@@ -1263,4 +1263,131 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nameTooShort => 'Name must be at least 2 characters';
+
+  @override
+  String get view => 'View';
+
+  @override
+  String get labResults => 'Lab Results';
+
+  @override
+  String get medicalRecord => 'Medical Record';
+
+  @override
+  String get imaging => 'X-Ray / Imaging';
+
+  @override
+  String get manageYourMedicalRecords => 'Manage your medical records';
+
+  @override
+  String get pleaseFillRequiredFields => 'Please fill required fields';
+
+  @override
+  String get uploadFailed => 'Upload failed';
+
+  @override
+  String get updateFailed => 'Update failed';
+
+  @override
+  String get documentUpdated => 'Document updated successfully';
+
+  @override
+  String get openingDocument => 'Opening document...';
+
+  @override
+  String get couldNotOpenDocument => 'Could not open the document';
+
+  @override
+  String get errorOpeningDocument => 'Error opening document';
+
+  @override
+  String get updateDocument => 'Update Document';
+
+  @override
+  String get currentFile => 'Current File';
+
+  @override
+  String get replace => 'Replace';
+
+  @override
+  String get noURLProvided => 'Error: No URL provided for this document';
+
+  @override
+  String get errorLoadingDocuments => 'Error loading documents';
+
+  @override
+  String get uploadMedicalDocumentsDescription =>
+      'Upload your medical documents to keep them organized';
+
+  @override
+  String get cancelAppointmentTitle => 'Cancel Appointment?';
+
+  @override
+  String get cannotCancel => 'Cannot Cancel';
+
+  @override
+  String get cancelPolicyMessage =>
+      'This appointment cannot be cancelled as it is past the cancellation window.';
+
+  @override
+  String get lateCancellationWarning =>
+      'Late cancellation may affect your booking priority.';
+
+  @override
+  String get reasonForCancellation => 'Reason for Cancellation';
+
+  @override
+  String get reasonScheduleConflict => 'Schedule conflict';
+
+  @override
+  String get reasonFeelingBetter => 'Feeling better';
+
+  @override
+  String get reasonFoundAnotherDoctor => 'Found another doctor';
+
+  @override
+  String get reasonPersonalEmergency => 'Personal emergency';
+
+  @override
+  String get reasonTransportationIssues => 'Transportation issues';
+
+  @override
+  String get pleaseSpecify => 'Please specify...';
+
+  @override
+  String get keepAppointment => 'Keep';
+
+  @override
+  String get rescheduleAppointmentTitle => 'Reschedule Appointment';
+
+  @override
+  String get cannotReschedule => 'Cannot Reschedule';
+
+  @override
+  String get reschedulePolicyMessage =>
+      'Appointments can only be rescheduled at least 24 hours before the scheduled time.';
+
+  @override
+  String get goBack => 'Go Back';
+
+  @override
+  String get currentAppointment => 'Current Appointment';
+
+  @override
+  String get reasonForReschedule => 'Reason for Reschedule';
+
+  @override
+  String get pleaseProvideReason => 'Please provide a reason...';
+
+  @override
+  String get confirmReschedule => 'Confirm Reschedule';
+
+  @override
+  String get rescheduleSuccess => 'Appointment rescheduled successfully';
+
+  @override
+  String get selectNewDate => 'Select New Date';
+
+  @override
+  String get selectNewTime => 'Select New Time';
 }

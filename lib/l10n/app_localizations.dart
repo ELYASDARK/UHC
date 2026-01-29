@@ -2577,6 +2577,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Name must be at least 2 characters'**
   String get nameTooShort;
+
+  /// No description provided for @view.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get view;
+
+  /// No description provided for @labResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Lab Results'**
+  String get labResults;
+
+  /// No description provided for @medicalRecord.
+  ///
+  /// In en, this message translates to:
+  /// **'Medical Record'**
+  String get medicalRecord;
+
+  /// No description provided for @imaging.
+  ///
+  /// In en, this message translates to:
+  /// **'X-Ray / Imaging'**
+  String get imaging;
+
+  /// No description provided for @manageYourMedicalRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage your medical records'**
+  String get manageYourMedicalRecords;
+
+  /// No description provided for @pleaseFillRequiredFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fill required fields'**
+  String get pleaseFillRequiredFields;
+
+  /// No description provided for @uploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload failed'**
+  String get uploadFailed;
+
+  /// No description provided for @updateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed'**
+  String get updateFailed;
+
+  /// No description provided for @documentUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Document updated successfully'**
+  String get documentUpdated;
+
+  /// No description provided for @openingDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening document...'**
+  String get openingDocument;
+
+  /// No description provided for @couldNotOpenDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the document'**
+  String get couldNotOpenDocument;
+
+  /// No description provided for @errorOpeningDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Error opening document'**
+  String get errorOpeningDocument;
+
+  /// No description provided for @updateDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Document'**
+  String get updateDocument;
+
+  /// No description provided for @currentFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Current File'**
+  String get currentFile;
+
+  /// No description provided for @replace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get replace;
+
+  /// No description provided for @noURLProvided.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: No URL provided for this document'**
+  String get noURLProvided;
+
+  /// No description provided for @errorLoadingDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading documents'**
+  String get errorLoadingDocuments;
+
+  /// No description provided for @uploadMedicalDocumentsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload your medical documents to keep them organized'**
+  String get uploadMedicalDocumentsDescription;
+
+  /// No description provided for @cancelAppointmentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Appointment?'**
+  String get cancelAppointmentTitle;
+
+  /// No description provided for @cannotCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot Cancel'**
+  String get cannotCancel;
+
+  /// No description provided for @cancelPolicyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This appointment cannot be cancelled as it is past the cancellation window.'**
+  String get cancelPolicyMessage;
+
+  /// No description provided for @lateCancellationWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Late cancellation may affect your booking priority.'**
+  String get lateCancellationWarning;
+
+  /// No description provided for @reasonForCancellation.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for Cancellation'**
+  String get reasonForCancellation;
+
+  /// No description provided for @reasonScheduleConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule conflict'**
+  String get reasonScheduleConflict;
+
+  /// No description provided for @reasonFeelingBetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Feeling better'**
+  String get reasonFeelingBetter;
+
+  /// No description provided for @reasonFoundAnotherDoctor.
+  ///
+  /// In en, this message translates to:
+  /// **'Found another doctor'**
+  String get reasonFoundAnotherDoctor;
+
+  /// No description provided for @reasonPersonalEmergency.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal emergency'**
+  String get reasonPersonalEmergency;
+
+  /// No description provided for @reasonTransportationIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Transportation issues'**
+  String get reasonTransportationIssues;
+
+  /// No description provided for @pleaseSpecify.
+  ///
+  /// In en, this message translates to:
+  /// **'Please specify...'**
+  String get pleaseSpecify;
+
+  /// No description provided for @keepAppointment.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get keepAppointment;
+
+  /// No description provided for @rescheduleAppointmentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reschedule Appointment'**
+  String get rescheduleAppointmentTitle;
+
+  /// No description provided for @cannotReschedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot Reschedule'**
+  String get cannotReschedule;
+
+  /// No description provided for @reschedulePolicyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Appointments can only be rescheduled at least 24 hours before the scheduled time.'**
+  String get reschedulePolicyMessage;
+
+  /// No description provided for @goBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Go Back'**
+  String get goBack;
+
+  /// No description provided for @currentAppointment.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Appointment'**
+  String get currentAppointment;
+
+  /// No description provided for @reasonForReschedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for Reschedule'**
+  String get reasonForReschedule;
+
+  /// No description provided for @pleaseProvideReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Please provide a reason...'**
+  String get pleaseProvideReason;
+
+  /// No description provided for @confirmReschedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Reschedule'**
+  String get confirmReschedule;
+
+  /// No description provided for @rescheduleSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Appointment rescheduled successfully'**
+  String get rescheduleSuccess;
+
+  /// No description provided for @selectNewDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select New Date'**
+  String get selectNewDate;
+
+  /// No description provided for @selectNewTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Select New Time'**
+  String get selectNewTime;
 }
 
 class _AppLocalizationsDelegate

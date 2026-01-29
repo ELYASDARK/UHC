@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../data/models/doctor_model.dart';
 import '../../data/models/appointment_model.dart';
 import '../../providers/appointment_provider.dart';
+import 'package:uhc/l10n/app_localizations.dart';
 
 /// Reschedule appointment screen
 class RescheduleScreen extends StatefulWidget {
@@ -66,12 +67,13 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canReschedule = _canReschedule();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reschedule Appointment'),
+        title: Text(l10n.rescheduleAppointmentTitle),
         centerTitle: true,
       ),
       body: !canReschedule
@@ -86,7 +88,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                   const SizedBox(height: 24),
 
                   Text(
-                    'Select New Date',
+                    l10n.selectNewDate,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -143,20 +145,6 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                         titleCentered: true,
                       ),
                       enabledDayPredicate: (day) {
-                        // Allow all future weekdays (Monday-Friday) similar to booking screen logic if needed,
-                        // or stick to slot availability logic.
-                        // The user said "same in image 1" which implies visual style.
-                        // However, logic for "enabled" might be different.
-                        // Booking screen uses:
-                        // final isWeekday = day.weekday >= 1 && day.weekday <= 5;
-                        // return isWeekday && isFuture;
-
-                        // Reschedule screen originally checked:
-                        // final slots = _getAvailableSlots(day);
-                        // return slots.isNotEmpty;
-
-                        // I will KEEP the original reschedule logic as it is safer for data integrity,
-                        // but the visual style is now matched.
                         final slots = _getAvailableSlots(day);
                         return slots.isNotEmpty;
                       },
@@ -167,7 +155,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                   // Time Slots
                   if (_selectedDay != null) ...[
                     Text(
-                      'Select New Time',
+                      l10n.selectNewTime,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -179,7 +167,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
                   // Reason
                   Text(
-                    'Reason for Reschedule',
+                    l10n.reasonForReschedule,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -189,7 +177,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                     controller: _reasonController,
                     maxLines: 3,
                     decoration: InputDecoration(
-                      hintText: 'Please provide a reason...',
+                      hintText: l10n.pleaseProvideReason,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -224,7 +212,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text('Confirm Reschedule'),
+                          : Text(l10n.confirmReschedule),
                     ),
                   ),
                 ],
@@ -234,6 +222,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   }
 
   Widget _buildCurrentAppointmentCard(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -249,7 +238,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
               const Icon(Icons.event, color: AppColors.warning),
               const SizedBox(width: 8),
               Text(
-                'Current Appointment',
+                l10n.currentAppointment,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.warning,
@@ -258,17 +247,20 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text('Doctor: Dr. ${widget.appointment.doctorName}'),
+          Text('${l10n.doctor}: Dr. ${widget.appointment.doctorName}'),
           const SizedBox(height: 4),
-          Text('Date: ${_formatDate(widget.appointment.appointmentDate)}'),
+          Text(
+            '${l10n.date}: ${_formatDate(widget.appointment.appointmentDate)}',
+          ),
           const SizedBox(height: 4),
-          Text('Time: ${widget.appointment.timeSlot}'),
+          Text('${l10n.time}: ${widget.appointment.timeSlot}'),
         ],
       ),
     );
   }
 
   Widget _buildTimeSlots(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     final slots = _getAvailableSlots(_selectedDay!);
 
     if (slots.isEmpty) {
@@ -278,7 +270,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           color: isDark ? AppColors.surfaceDark : Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Center(child: Text('No available slots on this day')),
+        child: Center(child: Text(l10n.noAvailableSlotsOnThisDay)),
       );
     }
 
@@ -316,6 +308,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   }
 
   Widget _buildPolicyViolation(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -332,14 +325,14 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Cannot Reschedule',
+              l10n.cannotReschedule,
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Text(
-              'Appointments can only be rescheduled at least 24 hours before the scheduled time.',
+              l10n.reschedulePolicyMessage,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: isDark
@@ -352,7 +345,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Go Back'),
+                child: Text(l10n.goBack),
               ),
             ),
           ],
@@ -362,6 +355,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   }
 
   Future<void> _confirmReschedule() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _isLoading = true);
 
     try {
@@ -378,8 +372,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Appointment rescheduled successfully'),
+          SnackBar(
+            content: Text(l10n.rescheduleSuccess),
             backgroundColor: AppColors.success,
           ),
         );
@@ -389,7 +383,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text('${l10n.error}: ${e.toString()}'),
             backgroundColor: AppColors.error,
           ),
         );

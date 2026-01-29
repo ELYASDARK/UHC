@@ -433,8 +433,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _buildSettingTile(
                 icon: Icons.folder_shared_rounded,
-                title: 'Medical Documents',
-                subtitle: 'Manage your medical records',
+                title: l10n.medicalDocuments,
+                subtitle: l10n.manageYourMedicalRecords,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(

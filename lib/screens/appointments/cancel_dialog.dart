@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/appointment_model.dart';
 import '../../providers/appointment_provider.dart';
+import 'package:uhc/l10n/app_localizations.dart';
 
 /// Cancel appointment dialog with policy restrictions
 class CancelAppointmentDialog extends StatefulWidget {
@@ -30,13 +31,13 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
   String? _selectedReason;
   bool _isLoading = false;
 
-  final List<String> _predefinedReasons = [
-    'Schedule conflict',
-    'Feeling better',
-    'Found another doctor',
-    'Personal emergency',
-    'Transportation issues',
-    'Other',
+  List<String> _getReasons(AppLocalizations l10n) => [
+    l10n.reasonScheduleConflict,
+    l10n.reasonFeelingBetter,
+    l10n.reasonFoundAnotherDoctor,
+    l10n.reasonPersonalEmergency,
+    l10n.reasonTransportationIssues,
+    l10n.other,
   ];
 
   @override
@@ -65,9 +66,11 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canCancel = _canCancel();
     final isLateCancel = _isLateCancel();
+    final reasons = _getReasons(l10n);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -94,7 +97,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
               const SizedBox(height: 20),
 
               Text(
-                canCancel ? 'Cancel Appointment?' : 'Cannot Cancel',
+                canCancel ? l10n.cancelAppointmentTitle : l10n.cannotCancel,
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -103,7 +106,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
 
               if (!canCancel) ...[
                 Text(
-                  'This appointment cannot be cancelled as it is past the cancellation window.',
+                  l10n.cancelPolicyMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: isDark
@@ -119,7 +122,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('OK'),
+                    child: Text(l10n.ok),
                   ),
                 ),
               ] else ...[
@@ -145,7 +148,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Late cancellation may affect your booking priority.',
+                            l10n.lateCancellationWarning,
                             style: TextStyle(
                               fontSize: 12,
                               color: isDark
@@ -169,7 +172,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                     children: [
                       _buildDetailRow(
                         Icons.person,
-                        'Dr. ${widget.appointment.doctorName}',
+                        '${l10n.doctor}: ${widget.appointment.doctorName}',
                       ),
                       const SizedBox(height: 8),
                       _buildDetailRow(
@@ -188,7 +191,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
 
                 // Reason Selection
                 Text(
-                  'Reason for Cancellation',
+                  l10n.reasonForCancellation,
                   style: Theme.of(
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -197,7 +200,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: _predefinedReasons.map((reason) {
+                  children: reasons.map((reason) {
                     final isSelected = _selectedReason == reason;
                     return ChoiceChip(
                       label: Text(reason),
@@ -217,13 +220,13 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                   }).toList(),
                 ),
 
-                if (_selectedReason == 'Other') ...[
+                if (_selectedReason == l10n.other) ...[
                   const SizedBox(height: 12),
                   TextField(
                     controller: _reasonController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Please specify...',
+                      hintText: l10n.pleaseSpecify,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -242,7 +245,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text('Keep'),
+                        child: Text(l10n.keepAppointment),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -265,7 +268,7 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text('Cancel'),
+                            : Text(l10n.cancel),
                       ),
                     ),
                   ],
@@ -289,11 +292,12 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
   }
 
   Future<void> _confirmCancel() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _isLoading = true);
 
     try {
       final provider = context.read<AppointmentProvider>();
-      final reason = _selectedReason == 'Other'
+      final reason = _selectedReason == l10n.other
           ? _reasonController.text
           : _selectedReason;
 

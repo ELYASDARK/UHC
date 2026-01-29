@@ -1263,4 +1263,131 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get nameTooShort => 'ناو دەبێت لانی کەم ٢ پیت بێت';
+
+  @override
+  String get view => 'بینین';
+
+  @override
+  String get labResults => 'ئەنجامی پشکنین';
+
+  @override
+  String get medicalRecord => 'تۆماری پزیشکی';
+
+  @override
+  String get imaging => 'تیشک / وێنەگرتن';
+
+  @override
+  String get manageYourMedicalRecords => 'بەڕێوەبردنی تۆمارە پزیشکییەکانت';
+
+  @override
+  String get pleaseFillRequiredFields => 'تکایە خانە پێویستەکان پڕبکەرەوە';
+
+  @override
+  String get uploadFailed => 'بارکردن سەرکەوتوو نەبوو';
+
+  @override
+  String get updateFailed => 'نوێکردنەوە سەرکەوتوو نەبوو';
+
+  @override
+  String get documentUpdated => 'بەڵگەنامە بەسەرکەوتوویی نوێکرایەوە';
+
+  @override
+  String get openingDocument => 'کردنەوەی بەڵگەنامە...';
+
+  @override
+  String get couldNotOpenDocument => 'بەڵگەنامەکە ناکرێتەوە';
+
+  @override
+  String get errorOpeningDocument => 'هەڵە لە کردنەوەی بەڵگەنامە';
+
+  @override
+  String get updateDocument => 'نوێکردنەوەی بەڵگەنامە';
+
+  @override
+  String get currentFile => 'فایلی ئێستا';
+
+  @override
+  String get replace => 'گۆڕین';
+
+  @override
+  String get noURLProvided => 'هەڵە: هیچ بەستەرێک بۆ ئەم بەڵگەنامەیە نییە';
+
+  @override
+  String get errorLoadingDocuments => 'هەڵە لە بارکردنی بەڵگەنامەکان';
+
+  @override
+  String get uploadMedicalDocumentsDescription =>
+      'بەڵگەنامە پزیشکییەکانت باربکە بۆ ڕێکخستنیان';
+
+  @override
+  String get cancelAppointmentTitle => 'هەڵوەشاندنەوەی چاوپێکەوتن؟';
+
+  @override
+  String get cannotCancel => 'ناکرێت هەڵبوەشێنرێتەوە';
+
+  @override
+  String get cancelPolicyMessage =>
+      'ئەم چاوپێکەوتنە ناکرێت هەڵبوەشێنرێتەوە چونکە کاتی ڕێگەپێدراو تێپەڕیوە.';
+
+  @override
+  String get lateCancellationWarning =>
+      'هەڵوەشاندنەوەی درەنگ ڕەنگە کاریگەری هەبێت لەسەر لەپێشینەی نۆرەکردنت.';
+
+  @override
+  String get reasonForCancellation => 'هۆکاری هەڵوەشاندنەوە';
+
+  @override
+  String get reasonScheduleConflict => 'تێکهەڵچوونی کات';
+
+  @override
+  String get reasonFeelingBetter => 'باشتربوونی تەندروستی';
+
+  @override
+  String get reasonFoundAnotherDoctor => 'پزیشکێکی تر دۆزرایەوە';
+
+  @override
+  String get reasonPersonalEmergency => 'حاڵەتی لەناکاو';
+
+  @override
+  String get reasonTransportationIssues => 'کێشەی هاتووچۆ';
+
+  @override
+  String get pleaseSpecify => 'تکایە ڕوونی بکەرەوە...';
+
+  @override
+  String get keepAppointment => 'هێشتنەوەی نۆرە';
+
+  @override
+  String get rescheduleAppointmentTitle => 'گۆڕینی کاتی چاوپێکەوتن';
+
+  @override
+  String get cannotReschedule => 'ناکرێت کات بگۆڕدرێت';
+
+  @override
+  String get reschedulePolicyMessage =>
+      'گۆڕینی کاتی چاوپێکەوتن تەنها ٢٤ کاتژمێر پێش کاتی دیاریکراو دەکرێت.';
+
+  @override
+  String get goBack => 'گەڕانەوە';
+
+  @override
+  String get currentAppointment => 'چاوپێکەوتنی ئێستا';
+
+  @override
+  String get reasonForReschedule => 'هۆکاری گۆڕینی کات';
+
+  @override
+  String get pleaseProvideReason => 'تکایە هۆکارێک بنووسە...';
+
+  @override
+  String get confirmReschedule => 'پەسەندکردنی گۆڕینی کات';
+
+  @override
+  String get rescheduleSuccess => 'کاتی چاوپێکەوتن بەسەرکەوتوویی گۆڕدرا';
+
+  @override
+  String get selectNewDate => 'دیاریکردنی بەروارێکی نوێ';
+
+  @override
+  String get selectNewTime => 'دیاریکردنی کاتێکی نوێ';
 }
