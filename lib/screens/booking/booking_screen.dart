@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:lottie/lottie.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/doctor_model.dart';
 import '../../data/models/appointment_model.dart';
@@ -31,6 +32,7 @@ class _BookingScreenState extends State<BookingScreen> {
   AppointmentType _appointmentType = AppointmentType.regularCheckup;
   final _notesController = TextEditingController();
   int _currentStep = 0;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -108,7 +110,7 @@ class _BookingScreenState extends State<BookingScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: details.onStepContinue,
+                    onPressed: _isLoading ? null : details.onStepContinue,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -117,11 +119,22 @@ class _BookingScreenState extends State<BookingScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
-                      _currentStep == 2
-                          ? AppLocalizations.of(context).confirmBooking
-                          : AppLocalizations.of(context).continueText,
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            _currentStep == 2
+                                ? AppLocalizations.of(context).confirmBooking
+                                : AppLocalizations.of(context).continueText,
+                          ),
                   ),
                 ),
                 if (_currentStep > 0) ...[
@@ -477,7 +490,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'You can cancel or reschedule up to 24 hours before the appointment.',
+                    AppLocalizations.of(context).bookingCancellationPolicy,
                     style: TextStyle(
                       color: isDark
                           ? AppColors.textSecondaryDark
@@ -520,11 +533,11 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _onStepContinue() {
     if (_currentStep == 0 && _selectedDay == null) {
-      _showError('Please select a date');
+      _showError(AppLocalizations.of(context).pleaseSelectDate);
       return;
     }
     if (_currentStep == 1 && _selectedTimeSlot == null) {
-      _showError('Please select a time slot');
+      _showError(AppLocalizations.of(context).pleaseSelectTime);
       return;
     }
     if (_currentStep < 2) {
@@ -560,74 +573,77 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _submitBooking() async {
-    final authProvider = context.read<AuthProvider>();
-    final appointmentProvider = context.read<AppointmentProvider>();
-    final user = authProvider.user;
+    if (_isLoading) return;
 
-    if (user == null) {
-      _showError('Please login to book an appointment');
-      return;
-    }
+    setState(() {
+      _isLoading = true;
+    });
 
-    final bookingReference = _generateBookingReference();
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final appointmentProvider = context.read<AppointmentProvider>();
+      final user = authProvider.user;
 
-    final appointment = AppointmentModel(
-      id: '',
-      bookingReference: bookingReference,
-      patientId: user.id,
-      patientName: user.fullName,
-      patientEmail: user.email,
-      doctorId: widget.doctor.id,
-      doctorName: widget.doctor.name,
-      department: widget.doctor.department.name,
-      appointmentDate: _selectedDay!,
-      timeSlot: _selectedTimeSlot!.display,
-      type: _appointmentType,
-      status: AppointmentStatus.pending,
-      notes: _notesController.text.isEmpty ? null : _notesController.text,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+      if (user == null) {
+        _showError(AppLocalizations.of(context).pleaseLoginToBook);
+        return;
+      }
 
-    final appointmentId = await appointmentProvider.bookAppointment(
-      appointment,
-    );
+      final bookingReference = _generateBookingReference();
 
-    if (appointmentId != null && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BookingSuccessScreen(
-            appointmentId: appointmentId,
-            bookingReference: bookingReference,
-            doctorName: widget.doctor.name,
-            date: _selectedDay!,
-            timeSlot: _selectedTimeSlot!.display,
-          ),
-        ),
+      final appointment = AppointmentModel(
+        id: '',
+        bookingReference: bookingReference,
+        patientId: user.id,
+        patientName: user.fullName,
+        patientEmail: user.email,
+        doctorId: widget.doctor.id,
+        doctorName: widget.doctor.name,
+        department: widget.doctor.department.name,
+        appointmentDate: _selectedDay!,
+        timeSlot: _selectedTimeSlot!.display,
+        type: _appointmentType,
+        status: AppointmentStatus.pending,
+        notes: _notesController.text.isEmpty ? null : _notesController.text,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
-    } else if (mounted) {
-      _showError(appointmentProvider.error ?? 'Failed to book appointment');
+
+      final appointmentId = await appointmentProvider.bookAppointment(
+        appointment,
+      );
+
+      if (appointmentId != null && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BookingSuccessScreen(
+              appointmentId: appointmentId,
+              bookingReference: bookingReference,
+              doctorName: widget.doctor.name,
+              date: _selectedDay!,
+              timeSlot: _selectedTimeSlot!.display,
+            ),
+          ),
+        );
+      } else if (mounted) {
+        _showError(
+          appointmentProvider.error ??
+              AppLocalizations.of(context).bookingFailed,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   String _formatDate(DateTime date) {
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}, ${date.year}';
+    final locale = Localizations.localeOf(context).toString();
+    return DateFormat.yMMMMEEEEd(locale).format(date);
   }
 
   String _getTypeName(AppointmentType type) {

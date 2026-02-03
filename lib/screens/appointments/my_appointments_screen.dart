@@ -17,8 +17,13 @@ import 'reschedule_screen.dart';
 /// My appointments screen with tabs
 class MyAppointmentsScreen extends StatefulWidget {
   final int initialTabIndex; // 0 = Upcoming, 1 = Past
+  final VoidCallback? onBookNow; // Callback to switch to Doctors tab
 
-  const MyAppointmentsScreen({super.key, this.initialTabIndex = 0});
+  const MyAppointmentsScreen({
+    super.key,
+    this.initialTabIndex = 0,
+    this.onBookNow,
+  });
 
   @override
   MyAppointmentsScreenState createState() => MyAppointmentsScreenState();
@@ -171,6 +176,20 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
                     : AppColors.textSecondaryLight,
               ),
             ),
+            if (isUpcoming && widget.onBookNow != null) ...[
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: widget.onBookNow,
+                icon: const Icon(Icons.search),
+                label: const Text('Find a Doctor'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       );

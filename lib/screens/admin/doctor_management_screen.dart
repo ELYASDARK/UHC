@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/doctor_model.dart';
+import 'doctor_form_dialog.dart';
 
 /// Doctor management screen for admin
 class DoctorManagementScreen extends StatefulWidget {
@@ -39,7 +40,12 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showDoctorDialog(context),
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => const DoctorFormDialog(),
+          );
+        },
         icon: const Icon(Icons.add),
         label: const Text('Add Doctor'),
         backgroundColor: AppColors.primary,
@@ -196,10 +202,16 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundImage: data['photoUrl'] != null
+              backgroundImage:
+                  data['photoUrl'] != null &&
+                      (data['photoUrl'] as String).isNotEmpty
                   ? NetworkImage(data['photoUrl'])
                   : null,
-              child: data['photoUrl'] == null ? const Icon(Icons.person) : null,
+              child:
+                  data['photoUrl'] == null ||
+                      (data['photoUrl'] as String).isEmpty
+                  ? const Icon(Icons.person)
+                  : null,
             ),
             Positioned(
               right: 0,
@@ -233,7 +245,10 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
           onSelected: (value) {
             switch (value) {
               case 'edit':
-                _showDoctorDialog(context, id: id, data: data);
+                showDialog(
+                  context: context,
+                  builder: (context) => DoctorFormDialog(id: id, data: data),
+                );
                 break;
               case 'delete':
                 _confirmDelete(id, data['name'] ?? 'this doctor');
@@ -339,150 +354,6 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
           },
         );
       },
-    );
-  }
-
-  void _showDoctorDialog(
-    BuildContext context, {
-    String? id,
-    Map<String, dynamic>? data,
-  }) {
-    final isEditing = id != null;
-    final nameController = TextEditingController(text: data?['name'] ?? '');
-    final specializationController = TextEditingController(
-      text: data?['specialization'] ?? '',
-    );
-    final bioController = TextEditingController(text: data?['bio'] ?? '');
-    final experienceController = TextEditingController(
-      text: data?['yearsExperience']?.toString() ?? '',
-    );
-    final feeController = TextEditingController(
-      text: data?['consultationFee']?.toString() ?? '',
-    );
-    Department selectedDepartment = Department.values.firstWhere(
-      (d) => d.name == data?['department'],
-      orElse: () => Department.generalMedicine,
-    );
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(isEditing ? 'Edit Doctor' : 'Add Doctor'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Full Name *'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: specializationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Specialization *',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<Department>(
-                  initialValue: selectedDepartment,
-                  decoration: const InputDecoration(labelText: 'Department'),
-                  items: Department.values
-                      .map(
-                        (d) => DropdownMenuItem(value: d, child: Text(d.name)),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => selectedDepartment = value);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: experienceController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Years Experience',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: feeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Consultation Fee (\$)',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: bioController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Bio'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.isEmpty ||
-                    specializationController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Name and specialization are required'),
-                    ),
-                  );
-                  return;
-                }
-
-                final doctorData = {
-                  'name': nameController.text,
-                  'specialization': specializationController.text,
-                  'department': selectedDepartment.name,
-                  'bio': bioController.text,
-                  'yearsExperience':
-                      int.tryParse(experienceController.text) ?? 0,
-                  'consultationFee': double.tryParse(feeController.text) ?? 0.0,
-                  'isActive': data?['isActive'] ?? true,
-                  'rating': data?['rating'] ?? 0.0,
-                  'reviewCount': data?['reviewCount'] ?? 0,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                };
-
-                if (isEditing) {
-                  await _firestore
-                      .collection('doctors')
-                      .doc(id)
-                      .update(doctorData);
-                } else {
-                  doctorData['createdAt'] = FieldValue.serverTimestamp();
-                  doctorData['weeklySchedule'] = {};
-                  await _firestore.collection('doctors').add(doctorData);
-                }
-
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isEditing ? 'Doctor updated' : 'Doctor added',
-                      ),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
-              },
-              child: Text(isEditing ? 'Update' : 'Add'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

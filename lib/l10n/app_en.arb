@@ -462,5 +462,37 @@
   "doctorBioDavidLee": "Dr. David Lee specializes in drug interactions and medication optimization for complex cases.",
   "doctorBioSarahJohnson": "Dr. Sarah Johnson specializes in internal medicine with over 10 years of experience in treating chronic conditions.",
   "doctorBioEmilyDavis": "Dr. Emily Davis offers comprehensive dental care, including preventive, restorative, and cosmetic dentistry.",
-  "doctorBioMichaelChen": "Dr. Michael Chen provides comprehensive family medicine care for patients of all ages."
+  "doctorBioMichaelChen": "Dr. Michael Chen provides comprehensive family medicine care for patients of all ages.",
+  "developerTesting": "Developer Testing",
+  "scheduleTestNotification": "Schedule Test Notification (30s)",
+  "testNotificationBody": "This is a test notification to verify the system is working!",
+  "scheduledTestNotificationTitle": "Scheduled Test Notification",
+  "scheduledTestNotificationBody": "This notification was scheduled 30 seconds ago.",
+  "testNotificationScheduled": "Notification scheduled for 30 seconds from now!",
+  "pleaseLoginFirst": "Please login first",
+  "testNotificationTitle": "Test Notification 🔔",
+  "checkEmail": "Check Your Email",
+  "backToLogin": "Back to Login",
+  "resetEmailSentMessage": "We have sent a password reset link to {email}",
+  "@resetEmailSentMessage": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "enterEmailHint": "Enter your email",
+  "sendResetLink": "Send Reset Link",
+  "resetPasswordSubtitle": "Enter your email and we'll send you a link to reset your password",
+  "welcomeBack": "Welcome Back",
+  "loginSubtitle": "Sign in to continue to {appName}",
+  "@loginSubtitle": {
+    "placeholders": {
+      "appName": {
+        "type": "String"
+      }
+    }
+  },
+  "enterPasswordHint": "Enter your password",
+  "or": "OR"
 }

@@ -1422,4 +1422,66 @@ class AppLocalizationsKu extends AppLocalizations {
   @override
   String get doctorBioMichaelChen =>
       'د. مایکڵ چێن چاودێری پزیشکی خێزانی گشتگیر بۆ نەخۆشەکانی هەموو تەمەنەکان پێشکەش دەکات.';
+
+  @override
+  String get developerTesting => 'Developer Testing';
+
+  @override
+  String get scheduleTestNotification => 'Schedule Test Notification (30s)';
+
+  @override
+  String get testNotificationBody =>
+      'This is a test notification to verify the system is working!';
+
+  @override
+  String get scheduledTestNotificationTitle => 'Scheduled Test Notification';
+
+  @override
+  String get scheduledTestNotificationBody =>
+      'This notification was scheduled 30 seconds ago.';
+
+  @override
+  String get testNotificationScheduled =>
+      'Notification scheduled for 30 seconds from now!';
+
+  @override
+  String get pleaseLoginFirst => 'Please login first';
+
+  @override
+  String get testNotificationTitle => 'Test Notification 🔔';
+
+  @override
+  String get checkEmail => 'تەماشای ئیمەیڵەکەت بکە';
+
+  @override
+  String get backToLogin => 'گەڕانەوە بۆ چوونەژوورەوە';
+
+  @override
+  String resetEmailSentMessage(String email) {
+    return 'لینکێکی گۆڕینی وشەی تێپەڕمان نارد بۆ $email';
+  }
+
+  @override
+  String get enterEmailHint => 'ئیمەیڵەکەت بنووسە';
+
+  @override
+  String get sendResetLink => 'ناردنی لینکی گۆڕین';
+
+  @override
+  String get resetPasswordSubtitle =>
+      'ئیمەیڵەکەت بنووسە و لینکێکت بۆ دەنێرین بۆ گۆڕینی وشەی تێپەڕ';
+
+  @override
+  String get welcomeBack => 'بەخێربێیتەوە';
+
+  @override
+  String loginSubtitle(String appName) {
+    return 'چوونەژوورەوە بکە بۆ بەردەوامبوون بۆ $appName';
+  }
+
+  @override
+  String get enterPasswordHint => 'وشەی تێپەڕ بنووسە';
+
+  @override
+  String get or => 'یان';
 }

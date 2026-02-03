@@ -231,6 +231,24 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Upload profile image from bytes
+  Future<String?> uploadProfileImageBytes(
+    Uint8List imageBytes,
+    String fileName,
+  ) async {
+    if (_currentUser == null) return null;
+    try {
+      return await _authService.uploadProfileImageBytes(
+        _currentUser!.id,
+        imageBytes,
+        fileName,
+      );
+    } catch (e) {
+      debugPrint('Error uploading profile image bytes: $e');
+      rethrow;
+    }
+  }
+
   /// Update notification preferences
   Future<bool> updateNotificationPreferences(
     Map<String, dynamic> settings,
@@ -259,7 +277,12 @@ class AuthProvider with ChangeNotifier {
 
   /// Sign out
   Future<void> signOut() async {
-    await _authService.signOut();
+    try {
+      await _authService.signOut();
+    } catch (e) {
+      debugPrint('Sign out error: $e');
+    }
+    // Always clear local state
     _currentUser = null;
     _state = AuthState.unauthenticated;
     notifyListeners();

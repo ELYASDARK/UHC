@@ -20,6 +20,7 @@ class CustomTextField extends StatefulWidget {
   final FocusNode? focusNode;
   final TextInputAction? textInputAction;
   final bool autofocus;
+  final bool readOnly;
 
   const CustomTextField({
     super.key,
@@ -39,6 +40,7 @@ class CustomTextField extends StatefulWidget {
     this.focusNode,
     this.textInputAction,
     this.autofocus = false,
+    this.readOnly = false,
   });
 
   @override
@@ -84,9 +86,11 @@ class _CustomTextFieldState extends State<CustomTextField> {
           enabled: widget.enabled,
           maxLines: widget.maxLines,
           maxLength: widget.maxLength,
+
           focusNode: widget.focusNode,
           textInputAction: widget.textInputAction,
           autofocus: widget.autofocus,
+          readOnly: widget.readOnly,
           style: GoogleFonts.roboto(
             fontSize: 16,
             color: isDark

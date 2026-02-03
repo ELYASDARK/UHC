@@ -1,5 +1,4 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart'; // For kIsWeb
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -127,7 +126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                'Privacy Policy',
+                AppLocalizations.of(context).privacyPolicy,
                 style: GoogleFonts.poppins(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -140,17 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
                   Text(
-                    'Last updated: January 2025\n\n'
-                    '1. Introduction\n'
-                    'Welcome to UHC App. We respect your privacy and are committed to protecting your personal data.\n\n'
-                    '2. Data We Collect\n'
-                    'We collect information you provide directly to us, such as when you create an account, update your profile, or book appointments.\n\n'
-                    '3. How We Use Your Data\n'
-                    'We use your data to provide, maintain, and improve our services, including processing appointments and sending notifications.\n\n'
-                    '4. Data Security\n'
-                    'We implement appropriate security measures to protect your personal information.\n\n'
-                    '5. Contact Us\n'
-                    'If you have any questions about this Privacy Policy, please contact support@uhc.edu.',
+                    LegalText.privacyPolicy,
                     style: GoogleFonts.roboto(fontSize: 14, height: 1.5),
                   ),
                   const SizedBox(height: 40),
@@ -189,7 +178,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                'Terms of Service',
+                AppLocalizations.of(context).termsOfService,
                 style: GoogleFonts.poppins(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -202,16 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
                   Text(
-                    '1. Acceptance of Terms\n'
-                    'By accessing or using our app, you agree to be bound by these Terms of Service.\n\n'
-                    '2. User Accounts\n'
-                    'You are responsible for maintaining the confidentiality of your account credentials.\n\n'
-                    '3. Appointments\n'
-                    'Appointment bookings are subject to availability. Cancellations must be made at least 24 hours in advance.\n\n'
-                    '4. Code of Conduct\n'
-                    'You agree to use the service for lawful purposes only and respect university policies.\n\n'
-                    '5. Modifications\n'
-                    'We reserve the right to modify these terms at any time.',
+                    LegalText.termsOfService,
                     style: GoogleFonts.roboto(fontSize: 14, height: 1.5),
                   ),
                   const SizedBox(height: 40),
@@ -285,43 +265,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircleAvatar(
-              radius: 30,
-              backgroundColor: AppColors.surfaceLight,
-              child: Icon(
-                Icons.info_outline,
-                size: 30,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'UHC App',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Version 1.0.0 (Build 100)',
-              style: GoogleFonts.roboto(color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '© 2025 University Health Center\nAll rights reserved.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12),
-            ),
-          ],
+        content: FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snapshot) {
+            String versionText;
+            if (snapshot.hasData) {
+              versionText =
+                  'Version ${snapshot.data!.version} (Build ${snapshot.data!.buildNumber})';
+            } else if (snapshot.hasError) {
+              versionText = 'Version Info Unavailable';
+            } else {
+              versionText = 'Loading...';
+            }
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircleAvatar(
+                  radius: 30,
+                  backgroundColor: AppColors.surfaceLight,
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 30,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  AppLocalizations.of(context).appName,
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  versionText,
+                  style: GoogleFonts.roboto(color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '© 2025 University Health Center\nAll rights reserved.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12),
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            child: Text(AppLocalizations.of(context).ok),
           ),
         ],
       ),
@@ -474,9 +469,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildSettingTile(
                 icon: Icons.info_rounded,
                 title: l10n.version,
-                trailing: Text(
-                  '1.0.0',
-                  style: GoogleFonts.roboto(color: Colors.grey),
+                trailing: FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      return Text(
+                        snapshot.data!.version,
+                        style: GoogleFonts.roboto(color: Colors.grey),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
                 onTap: () => _showVersionInfo(context),
                 isDark: isDark,
@@ -486,22 +489,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Developer Testing section - only visible to admin
             if (user?.isAdmin == true) ...[
               const SizedBox(height: 20),
-              _buildSection('Developer Testing', [
+              _buildSection(l10n.developerTesting, [
                 _buildSettingTile(
                   icon: Icons.notification_add,
-                  title: 'Send Test Notification',
+                  title: l10n.sendTestNotification,
                   onTap: () => _sendTestNotification(context),
                   isDark: isDark,
                 ),
                 _buildSettingTile(
                   icon: Icons.schedule,
-                  title: 'Schedule Notification (30 sec)',
+                  title: l10n.scheduleTestNotification,
                   onTap: () => _scheduleTestNotification(context),
                   isDark: isDark,
                 ),
                 _buildSettingTile(
                   icon: Icons.delete_sweep,
-                  title: 'Clear All Notifications',
+                  title: l10n.clearAll,
                   onTap: () => _clearAllNotifications(context),
                   isDark: isDark,
                 ),
@@ -509,10 +512,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               // Admin section - only visible to admin
               const SizedBox(height: 20),
-              _buildSection('Admin', [
+              _buildSection(l10n.admin, [
                 _buildSettingTile(
                   icon: Icons.admin_panel_settings,
-                  title: 'Admin Dashboard',
+                  title: l10n.adminDashboard,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -551,11 +554,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _sendTestNotification(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
     final notificationProvider = context.read<NotificationProvider>();
+    final l10n = AppLocalizations.of(context);
 
     if (authProvider.user == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please login first')));
+      ).showSnackBar(SnackBar(content: Text(l10n.pleaseLoginFirst)));
       return;
     }
 
@@ -566,9 +570,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final testNotification = NotificationModel(
         id: '',
         userId: authProvider.user!.id,
-        title: 'Test Notification 🔔',
-        body:
-            'This is a test notification to verify the system is working! Created at ${DateTime.now().toString().substring(11, 19)}',
+        title: l10n.testNotificationTitle,
+        body: l10n.testNotificationBody,
         type: NotificationType.appointmentConfirmation,
         createdAt: DateTime.now(),
         scheduledFor: null,
@@ -583,8 +586,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Test notification sent! Check the Alerts tab.'),
+          SnackBar(
+            content: Text(l10n.testNotificationSent),
             backgroundColor: AppColors.success,
           ),
         );
@@ -593,7 +596,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('${l10n.error}: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -603,6 +606,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _scheduleTestNotification(BuildContext context) async {
     final localNotificationService = LocalNotificationService();
+    final l10n = AppLocalizations.of(context);
 
     // Schedule notification for 30 seconds from now
     final scheduledTime = DateTime.now().add(const Duration(seconds: 30));
@@ -610,9 +614,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await localNotificationService.scheduleNotification(
         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        title: 'Scheduled Test Notification 📅',
-        body:
-            'This notification was scheduled 30 seconds ago. You can close the app and still receive it!',
+        title: l10n.scheduledTestNotificationTitle,
+        body: l10n.scheduledTestNotificationBody,
         scheduledTime: scheduledTime,
         isAppointment: true,
       );
@@ -620,10 +623,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '✅ Notification scheduled for 30 seconds from now!\n'
-              'Close the app to test - you will still receive it.',
-            ),
+            content: Text(l10n.testNotificationScheduled),
             backgroundColor: AppColors.success,
             duration: const Duration(seconds: 5),
           ),
@@ -633,7 +633,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('${l10n.error}: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -644,20 +644,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _clearAllNotifications(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
     final notificationProvider = context.read<NotificationProvider>();
+    final l10n = AppLocalizations.of(context);
 
     if (authProvider.user == null) return;
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Clear Notifications'),
-        content: const Text(
-          'Are you sure you want to delete all notifications?',
-        ),
+        title: Text(l10n.clearNotifications),
+        content: Text(l10n.clearNotificationsConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () async {
@@ -673,16 +672,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('All notifications cleared'),
+                  SnackBar(
+                    content: Text(l10n.notificationsCleared),
                     backgroundColor: AppColors.success,
                   ),
                 );
               }
             },
-            child: const Text(
-              'Clear All',
-              style: TextStyle(color: AppColors.error),
+            child: Text(
+              l10n.clearAll,
+              style: const TextStyle(color: AppColors.error),
             ),
           ),
         ],
@@ -785,61 +784,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 child: ClipOval(
-                  child: photoUrl != null
+                  child: photoUrl != null && photoUrl.isNotEmpty
                       ? (photoUrl.startsWith('http')
                             ? Image.network(
                                 photoUrl,
                                 width: 100,
                                 height: 100,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Center(
-                                  child: Text(
-                                    initial,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 40,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ),
+                                errorBuilder: (_, _, _) =>
+                                    _buildDefaultAvatar(initial, isDark),
                               )
-                            : (kIsWeb
-                                  ? Center(
-                                      child: Text(
-                                        initial,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 40,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    )
-                                  : Image.file(
-                                      File(photoUrl),
-                                      width: 100,
-                                      height: 100,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => Center(
-                                        child: Text(
-                                          initial,
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 40,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                      ),
-                                    )))
-                      : Center(
-                          child: Text(
-                            initial,
-                            style: GoogleFonts.outfit(
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
+                            // Web or Mobile with local path (not supported without dart:io)
+                            // See: https://github.com/flutter/flutter/issues/33646
+                            : _buildDefaultAvatar(initial, isDark))
+                      : _buildDefaultAvatar(initial, isDark),
                 ),
               ),
               Positioned(
@@ -879,6 +837,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ],
     ).animate().fadeIn(duration: 400.ms);
+  }
+
+  Widget _buildDefaultAvatar(String initial, bool isDark) {
+    return Center(
+      child: Text(
+        initial,
+        style: GoogleFonts.outfit(
+          fontSize: 40,
+          fontWeight: FontWeight.bold,
+          color: isDark ? Colors.white : AppColors.primary,
+        ),
+      ),
+    );
   }
 
   Widget _buildSection(String title, List<Widget> children, bool isDark) {
@@ -957,9 +928,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text(l10n.cancel),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              authProvider.signOut();
+              await authProvider.signOut();
             },
             child: Text(
               l10n.logout,
@@ -970,4 +941,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+}
+
+class LegalText {
+  static const String privacyPolicy =
+      'Last updated: January 2025\n\n'
+      '1. Introduction\n'
+      'Welcome to UHC App. We respect your privacy and are committed to protecting your personal data.\n\n'
+      '2. Data We Collect\n'
+      'We collect information you provide directly to us, such as when you create an account, update your profile, or book appointments.\n\n'
+      '3. How We Use Your Data\n'
+      'We use your data to provide, maintain, and improve our services, including processing appointments and sending notifications.\n\n'
+      '4. Data Security\n'
+      'We implement appropriate security measures to protect your personal information.\n\n'
+      '5. Contact Us\n'
+      'If you have any questions about this Privacy Policy, please contact support@uhc.edu.';
+
+  static const String termsOfService =
+      '1. Acceptance of Terms\n'
+      'By accessing or using our app, you agree to be bound by these Terms of Service.\n\n'
+      '2. User Accounts\n'
+      'You are responsible for maintaining the confidentiality of your account credentials.\n\n'
+      '3. Appointments\n'
+      'Appointment bookings are subject to availability. Cancellations must be made at least 24 hours in advance.\n\n'
+      '4. Code of Conduct\n'
+      'You agree to use the service for lawful purposes only and respect university policies.\n\n'
+      '5. Modifications\n'
+      'We reserve the right to modify these terms at any time.';
 }

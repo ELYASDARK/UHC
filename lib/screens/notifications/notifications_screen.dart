@@ -90,7 +90,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       notification: n,
                       isDark: isDark,
                       onTap: () => _onNotificationTap(n),
-                      onDismiss: () => _onNotificationDismiss(n),
+                      onConfirmDismiss: () => _onConfirmNotificationDismiss(n),
                     )
                     .animate(delay: Duration(milliseconds: index * 50))
                     .fadeIn(duration: 300.ms);
@@ -111,37 +111,67 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  Future<void> _onNotificationDismiss(NotificationModel notification) async {
+  Future<bool> _onConfirmNotificationDismiss(
+    NotificationModel notification,
+  ) async {
     final notificationProvider = context.read<NotificationProvider>();
-    await notificationProvider.deleteNotification(notification.id);
+    final l10n = AppLocalizations.of(context);
+    try {
+      // The user requested: wait for deleteNotification to return true
+      await notificationProvider.deleteNotification(notification.id);
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.error), backgroundColor: AppColors.error),
+        );
+      }
+      return false;
+    }
   }
 
   Widget _buildEmptyState(bool isDark) {
     final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.notifications_off_outlined,
-            size: 80,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.noNotifications,
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return RefreshIndicator(
+          onRefresh: _loadNotifications,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.notifications_off_outlined,
+                      size: 80,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n.noNotifications,
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.noNotificationsDesc,
+                      style: GoogleFonts.roboto(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.noNotificationsDesc,
-            style: GoogleFonts.roboto(fontSize: 14, color: Colors.grey),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -150,13 +180,13 @@ class _NotificationCard extends StatelessWidget {
   final NotificationModel notification;
   final bool isDark;
   final VoidCallback? onTap;
-  final VoidCallback? onDismiss;
+  final Future<bool> Function()? onConfirmDismiss;
 
   const _NotificationCard({
     required this.notification,
     required this.isDark,
     this.onTap,
-    this.onDismiss,
+    this.onConfirmDismiss,
   });
 
   IconData _getNotificationIcon() {
@@ -216,7 +246,16 @@ class _NotificationCard extends StatelessWidget {
     return Dismissible(
       key: Key(notification.id),
       direction: DismissDirection.endToStart,
-      onDismissed: (_) => onDismiss?.call(),
+      confirmDismiss: (_) async {
+        if (onConfirmDismiss != null) {
+          return await onConfirmDismiss!();
+        }
+        return false;
+      },
+      onDismissed:
+          (
+            _,
+          ) {}, // Handled in confirmDismiss implies the item is removed from data source, causing rebuild
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),

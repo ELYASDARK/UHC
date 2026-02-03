@@ -93,6 +93,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
+    if (_dateOfBirth == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your date of birth'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
       final success = await authProvider.registerWithEmail(
@@ -123,22 +133,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _isGoogleLoading = true;
     });
 
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.signInWithGoogle();
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.signInWithGoogle();
 
-    setState(() {
-      _isGoogleLoading = false;
-    });
-
-    if (success && mounted) {
-      widget.onRegisterSuccess();
-    } else if (mounted && authProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage!),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (success && mounted) {
+        widget.onRegisterSuccess();
+      } else if (mounted && authProvider.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage!),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
+      }
     }
   }
 
@@ -232,12 +246,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           prefixIcon: Icons.phone_outlined,
                           textInputAction: TextInputAction.next,
                           validator: (value) {
-                            // Optional or required depending on logic, mostly optional in screenshots
-                            // But usually good to validate if entered
-                            if (value != null &&
-                                value.isNotEmpty &&
-                                value.length < 5) {
-                              return 'Invalid phone number';
+                            if (value == null || value.isEmpty) {
+                              return 'Phone number is required';
+                            }
+                            // Regex for digits only, 10-15 chars
+                            final phoneRegex = RegExp(r'^[0-9]{10,15}$');
+                            if (!phoneRegex.hasMatch(value)) {
+                              return 'Enter a valid phone number (10-15 digits)';
                             }
                             return null;
                           },
@@ -250,28 +265,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     // Date of Birth field
                     GestureDetector(
-                      onTap: _selectDateOfBirth,
-                      child: AbsorbPointer(
-                        child: CustomTextField(
-                          label: 'Date of Birth',
-                          hintText: 'Select your date of birth',
-                          // We'll use a controller updated by the date picker
-                          controller: TextEditingController(
-                            text: _dateOfBirth != null
-                                ? _formatDate(_dateOfBirth!)
-                                : '',
+                          onTap: _selectDateOfBirth,
+                          child: AbsorbPointer(
+                            child: CustomTextField(
+                              label: 'Date of Birth',
+                              hintText: 'Select your date of birth',
+                              // We'll use a controller updated by the date picker
+                              controller: TextEditingController(
+                                text: _dateOfBirth != null
+                                    ? _formatDate(_dateOfBirth!)
+                                    : '',
+                              ),
+                              prefixIcon: Icons.cake_outlined,
+                              suffix: const Icon(
+                                Icons.calendar_today,
+                                size: 20,
+                              ),
+                              validator: (value) {
+                                if (_dateOfBirth == null) {
+                                  return 'Date of birth is required';
+                                }
+                                return null;
+                              },
+                              readOnly: true, // Prevents keyboard from showing
+                            ),
                           ),
-                          prefixIcon: Icons.cake_outlined,
-                          suffix: const Icon(Icons.calendar_today, size: 20),
-                          validator: (value) {
-                            // Making it optional for now, or required?
-                            // User request implies adding them, usually DOB is good for health apps.
-                            // Let's make it optional to avoid friction unless user wants strict.
-                            return null;
-                          },
-                        ),
-                      ),
-                    ).animate(delay: 250.ms).fadeIn(duration: 400.ms).slideX(begin: 0.1),
+                        )
+                        .animate(delay: 250.ms)
+                        .fadeIn(duration: 400.ms)
+                        .slideX(begin: 0.1),
 
                     const SizedBox(height: 20),
 

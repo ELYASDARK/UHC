@@ -20,6 +20,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onHistoryTap; // New: for past appointments
   final VoidCallback? onNotificationsTap;
   final VoidCallback? onBookNowTap;
+  final VoidCallback? onDepartmentsTap; // New callback
   final Function(String departmentKey)? onDepartmentTap;
 
   const HomeScreen({
@@ -29,6 +30,7 @@ class HomeScreen extends StatefulWidget {
     this.onHistoryTap,
     this.onNotificationsTap,
     this.onBookNowTap,
+    this.onDepartmentsTap,
     this.onDepartmentTap,
   });
 
@@ -40,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _departmentRepository = DepartmentRepository();
   List<DepartmentModel> _departments = [];
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -48,6 +51,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadDepartments() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
     try {
       final departments = await _departmentRepository.getAllDepartments();
       if (mounted) {
@@ -87,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _error = AppLocalizations.of(context).connectionError;
         });
       }
     }
@@ -102,36 +113,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with greeting
-              _buildHeader(context, userName, photoUrl, isDark),
+        child: RefreshIndicator(
+          onRefresh: _loadDepartments,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with greeting
+                _buildHeader(context, userName, photoUrl, isDark),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Quick booking card
-              _buildQuickBookingCard(context, isDark),
+                // Quick booking card
+                _buildQuickBookingCard(context, isDark),
 
-              const SizedBox(height: 28),
+                const SizedBox(height: 28),
 
-              // Quick actions
-              _buildQuickActions(context, isDark),
+                // Quick actions
+                _buildQuickActions(context, isDark),
 
-              const SizedBox(height: 28),
+                const SizedBox(height: 28),
 
-              // Departments section
-              _buildDepartmentsSection(context, isDark),
+                // Departments section
+                _buildDepartmentsSection(context, isDark),
 
-              const SizedBox(height: 28),
+                const SizedBox(height: 28),
 
-              // Health tips
-              _buildHealthTipsSection(context, isDark),
+                // Health tips
+                _buildHealthTipsSection(context, isDark),
 
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -535,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             TextButton(
-              onPressed: widget.onDoctorsTap,
+              onPressed: widget.onDepartmentsTap, // Use new callback
               child: Text(
                 AppLocalizations.of(context).viewAll,
                 style: GoogleFonts.plusJakartaSans(
@@ -552,6 +567,25 @@ class _HomeScreenState extends State<HomeScreen> {
           height: 110,
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _error!,
+                        style: GoogleFonts.roboto(
+                          fontSize: 12,
+                          color: AppColors.error,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _loadDepartments,
+                        child: Text(AppLocalizations.of(context).retry),
+                      ),
+                    ],
+                  ),
+                )
               : _departments.isEmpty
               ? Center(child: Text(AppLocalizations.of(context).noDepartments))
               : ListView.separated(
@@ -597,11 +631,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Shorten department names for better display
-  String _shortenDepartmentName(String name) {
-    if (name == 'General Medicine') {
-      return 'General';
+  String _shortenDepartmentName(DepartmentModel dept, AppLocalizations l10n) {
+    // Robust check using the key instead of the translated name
+    if (dept.departmentKey == 'generalMedicine') {
+      // If English, return shortened 'General'. For others, use translation.
+      if (Localizations.localeOf(context).languageCode == 'en') {
+        return 'General';
+      }
     }
-    return name;
+    return LocalizationHelper.translateDepartment(dept.name, l10n);
   }
 
   Widget _buildDepartmentCard(DepartmentModel dept, bool isDark) {
@@ -634,12 +672,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              _shortenDepartmentName(
-                LocalizationHelper.translateDepartment(
-                  dept.name,
-                  AppLocalizations.of(context),
-                ),
-              ),
+              _shortenDepartmentName(dept, AppLocalizations.of(context)),
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,

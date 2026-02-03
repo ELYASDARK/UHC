@@ -1415,4 +1415,66 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get doctorBioMichaelChen =>
       'د. مايكل تشن يقدم رعاية طب الأسرة الشاملة للمرضى من جميع الأعمار.';
+
+  @override
+  String get developerTesting => 'اختبار المطور';
+
+  @override
+  String get scheduleTestNotification => 'جدولة إشعار اختبار (30 ثانية)';
+
+  @override
+  String get testNotificationBody =>
+      'هذا إشعار اختبار للتحقق من أن النظام يعمل!';
+
+  @override
+  String get scheduledTestNotificationTitle => 'إشعار اختبار مجدول';
+
+  @override
+  String get scheduledTestNotificationBody =>
+      'تم جدولة هذا الإشعار قبل 30 ثانية.';
+
+  @override
+  String get testNotificationScheduled =>
+      'تم جدولة الإشعار لمدة 30 ثانية من الآن!';
+
+  @override
+  String get pleaseLoginFirst => 'الرجاء تسجيل الدخول أولاً';
+
+  @override
+  String get testNotificationTitle => 'إشعار اختبار 🔔';
+
+  @override
+  String get checkEmail => 'تحقق من بريدك الإلكتروني';
+
+  @override
+  String get backToLogin => 'العودة لتسجيل الدخول';
+
+  @override
+  String resetEmailSentMessage(String email) {
+    return 'لقد أرسلنا رابط إعادة تعيين كلمة المرور إلى $email';
+  }
+
+  @override
+  String get enterEmailHint => 'أدخل بريدك الإلكتروني';
+
+  @override
+  String get sendResetLink => 'إرسال رابط إعادة التعيين';
+
+  @override
+  String get resetPasswordSubtitle =>
+      'أدخل بريدك الإلكتروني وسنرسل لك رابطاً لإعادة تعيين كلمة المرور';
+
+  @override
+  String get welcomeBack => 'مرحباً بعودتك';
+
+  @override
+  String loginSubtitle(String appName) {
+    return 'قم بتسجيل الدخول للمتابعة إلى $appName';
+  }
+
+  @override
+  String get enterPasswordHint => 'أدخل كلمة المرور';
+
+  @override
+  String get or => 'أو';
 }

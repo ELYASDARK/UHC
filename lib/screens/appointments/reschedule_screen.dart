@@ -59,9 +59,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   }
 
   bool _canReschedule() {
-    // Check 24-hour policy
-    final appointmentTime = widget.appointment.appointmentDate;
-    final hoursUntil = appointmentTime.difference(DateTime.now()).inHours;
+    // Check 24-hour policy using UTC to avoid timezone issues
+    final appointmentTime = widget.appointment.appointmentDate.toUtc();
+    final now = DateTime.now().toUtc();
+    final hoursUntil = appointmentTime.difference(now).inHours;
     return hoursUntil >= 24;
   }
 
@@ -370,14 +371,25 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         reason: _reasonController.text.isEmpty ? null : _reasonController.text,
       );
 
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.rescheduleSuccess),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        Navigator.pop(context, true);
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.rescheduleSuccess),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pop(context, true);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to reschedule. The slot might be taken.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

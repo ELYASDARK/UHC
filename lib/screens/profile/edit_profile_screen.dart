@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -57,28 +56,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(
-      source: source,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 80,
-    );
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 80,
+      );
 
-    if (pickedFile != null) {
-      if (kIsWeb) {
+      if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
         setState(() {
           _selectedImage = pickedFile;
           _webImageBytes = bytes;
           _isPhotoRemoved = false;
         });
-      } else {
-        setState(() {
-          _selectedImage = pickedFile;
-          _webImageBytes = null;
-          _isPhotoRemoved = false;
-        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).error),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     }
   }
@@ -232,9 +235,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final authProvider = context.read<AuthProvider>();
 
       String? photoUrl;
-      if (_selectedImage != null) {
-        // Upload image to Firebase Storage
-        photoUrl = await authProvider.uploadProfileImage(_selectedImage!);
+      if (_webImageBytes != null && _selectedImage != null) {
+        final fileName = _selectedImage!.name;
+        // Upload image bytes to Firebase Storage
+        photoUrl = await authProvider.uploadProfileImageBytes(
+          _webImageBytes!,
+          fileName,
+        );
       } else if (_isPhotoRemoved) {
         photoUrl = ''; // Pass empty string to remove the photo
       }
@@ -297,41 +304,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final l10n = AppLocalizations.of(context);
 
     // Determine what to show in the avatar
-    Widget avatarContent;
-    if (_selectedImage != null) {
-      if (kIsWeb && _webImageBytes != null) {
-        avatarContent = Image.memory(_webImageBytes!, fit: BoxFit.cover);
-      } else {
-        avatarContent = Image.file(
-          File(_selectedImage!.path),
-          fit: BoxFit.cover,
-        );
-      }
-    } else if (_isPhotoRemoved) {
-      avatarContent = _buildDefaultAvatar(user);
-    } else if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
-      if (user.photoUrl!.startsWith('http') ||
-          (kIsWeb && user.photoUrl!.startsWith('blob:'))) {
-        avatarContent = Image.network(
-          user.photoUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _buildDefaultAvatar(user),
-        );
-      } else {
-        if (kIsWeb) {
-          // On Web, local file paths (C:\...) are invalid. Fallback.
-          avatarContent = _buildDefaultAvatar(user);
-        } else {
-          avatarContent = Image.file(
-            File(user.photoUrl!),
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => _buildDefaultAvatar(user),
-          );
-        }
-      }
-    } else {
-      avatarContent = _buildDefaultAvatar(user);
-    }
+    Widget avatarContent = _buildAvatarContent(user);
 
     return Scaffold(
       appBar: AppBar(
@@ -534,6 +507,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildAvatarContent(UserModel? user) {
+    // 1. New Image Selected
+    if (_webImageBytes != null) {
+      return Image.memory(
+        _webImageBytes!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(user),
+      );
+    }
+
+    // 2. Image Removed
+    if (_isPhotoRemoved) {
+      return _buildDefaultAvatar(user);
+    }
+
+    // 3. Existing Network URL
+    if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
+      return Image.network(
+        user.photoUrl!,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            color: AppColors.backgroundLight,
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => _buildDefaultAvatar(user),
+      );
+    }
+
+    // 4. No Image (Default)
+    return _buildDefaultAvatar(user);
   }
 
   Widget _buildDefaultAvatar(UserModel? user) {

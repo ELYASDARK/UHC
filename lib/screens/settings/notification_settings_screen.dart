@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../core/constants/app_colors.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/local_notification_service.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -63,6 +66,7 @@ class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
   NotificationSettings _settings = NotificationSettings();
   bool _isLoading = true;
+  bool _areNotificationsEnabled = true;
   final LocalNotificationService _notificationService =
       LocalNotificationService();
 
@@ -70,10 +74,41 @@ class _NotificationSettingsScreenState
   void initState() {
     super.initState();
     _loadSettings();
+    _checkPermissions();
+  }
+
+  Future<void> _checkPermissions() async {
+    bool enabled = true;
+    final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+    if (Theme.of(context).platform == TargetPlatform.android) {
+      final androidImplementation = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      if (androidImplementation != null) {
+        enabled =
+            await androidImplementation.areNotificationsEnabled() ?? false;
+      }
+    } else if (Theme.of(context).platform == TargetPlatform.iOS) {
+      // For iOS, we rely on the service to check/request
+      enabled = await _notificationService.requestPermissions();
+    }
+
+    if (mounted) {
+      setState(() {
+        _areNotificationsEnabled = enabled;
+      });
+    }
   }
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Try to get from auth provider first if available, otherwise prefs
+    // Note: Here we stick to prefs as the source of truth for local toggle state,
+    // but the backend sync ensures eventual consistency.
+
     setState(() {
       _settings = NotificationSettings(
         appointmentReminders:
@@ -91,8 +126,22 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _saveSetting(String key, bool value) async {
+    // 1. Save locally
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
+
+    // 2. Sync to backend
+    if (mounted) {
+      try {
+        await context.read<AuthProvider>().updateNotificationPreferences({
+          key: value,
+        });
+      } catch (e) {
+        debugPrint('Failed to sync setting $key: $e');
+        // We don't block the UI or show error for background sync failures usually,
+        // unless critical.
+      }
+    }
   }
 
   @override
@@ -107,6 +156,53 @@ class _NotificationSettingsScreenState
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Permission Warning Banner
+                if (!_areNotificationsEnabled)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.notifications_off_outlined,
+                          color: AppColors.warning,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'System notifications are disabled',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Tap here to enable them in settings.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Appointment Notifications Section
                 _buildSectionHeader(
                   l10n.appointmentNotifications,
@@ -340,29 +436,16 @@ class _NotificationSettingsScreenState
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    // Use AppColors for cleaner look
     return SwitchListTile(
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       value: value,
       onChanged: onChanged,
-      thumbColor: WidgetStateProperty.resolveWith<Color>((states) {
-        if (states.contains(WidgetState.selected)) {
-          return Colors.white; // Active thumb - white
-        }
-        return const Color(0xFF1A1A1A); // Inactive thumb - black
-      }),
-      trackColor: WidgetStateProperty.resolveWith<Color>((states) {
-        if (states.contains(WidgetState.selected)) {
-          return const Color(0xFF42A5F5); // Active track - blue
-        }
-        return const Color(0xFFF5F5F5); // Inactive track - white/very light
-      }),
-      trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
-        if (states.contains(WidgetState.selected)) {
-          return Colors.transparent; // No outline when active
-        }
-        return const Color(0xFFBDBDBD); // Gray outline when inactive
-      }),
+      activeThumbColor: AppColors.primary,
+      activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
+      inactiveThumbColor: Colors.grey[400],
+      inactiveTrackColor: Colors.grey[200],
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
@@ -383,24 +466,10 @@ class _NotificationSettingsScreenState
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 11)),
         value: value,
         onChanged: onChanged,
-        thumbColor: WidgetStateProperty.resolveWith<Color>((states) {
-          if (states.contains(WidgetState.selected)) {
-            return Colors.white; // Active thumb - white
-          }
-          return const Color(0xFF1A1A1A); // Inactive thumb - black
-        }),
-        trackColor: WidgetStateProperty.resolveWith<Color>((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const Color(0xFF42A5F5); // Active track - blue
-          }
-          return const Color(0xFFF5F5F5); // Inactive track - white/very light
-        }),
-        trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
-          if (states.contains(WidgetState.selected)) {
-            return Colors.transparent; // No outline when active
-          }
-          return const Color(0xFFBDBDBD); // Gray outline when inactive
-        }),
+        activeThumbColor: AppColors.primary,
+        activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
+        inactiveThumbColor: Colors.grey[400],
+        inactiveTrackColor: Colors.grey[200],
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       ),
     );

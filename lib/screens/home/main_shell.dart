@@ -10,6 +10,7 @@ import '../doctors/doctor_list_screen.dart';
 import '../appointments/my_appointments_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
+import '../departments/department_browsing_screen.dart';
 
 /// Main navigation shell with bottom navigation
 class MainShell extends StatefulWidget {
@@ -85,6 +86,14 @@ class _MainShellState extends State<MainShell> {
             },
             onNotificationsTap: () => _onTabTapped(3),
             onBookNowTap: () => _onTabTapped(1),
+            onDepartmentsTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const DepartmentBrowsingScreen(),
+                ),
+              );
+            },
             onDepartmentTap: _onDepartmentTapped,
           ),
           DoctorListScreen(

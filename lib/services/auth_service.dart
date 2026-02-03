@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -142,8 +143,12 @@ class AuthService {
 
   /// Sign out
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
-    await _auth.signOut();
+    try {
+      await _googleSignIn.signOut();
+    } catch (e) {
+      // Ignore google sign out errors (common on web if not signed in via google)
+      await _auth.signOut();
+    }
   }
 
   /// Create user document in Firestore
@@ -250,6 +255,34 @@ class AuthService {
       return downloadUrl;
     } catch (e) {
       throw Exception('Failed to upload image: $e');
+    }
+  }
+
+  /// Upload profile image from bytes (for Web/Optimized flows)
+  Future<String> uploadProfileImageBytes(
+    String uid,
+    Uint8List data,
+    String fileName,
+  ) async {
+    try {
+      // Determine content type based on extension or default to jpeg
+      final extension = fileName.split('.').last.toLowerCase();
+      String contentType = 'image/jpeg';
+      if (extension == 'png') contentType = 'image/png';
+      if (extension == 'webp') contentType = 'image/webp';
+
+      final ref = _storage
+          .ref()
+          .child('profile_images')
+          .child('$uid.${extension == 'jpg' ? 'jpg' : extension}');
+
+      final metadata = SettableMetadata(contentType: contentType);
+
+      await ref.putData(data, metadata);
+      final downloadUrl = await ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      throw Exception('Failed to upload image bytes: $e');
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/user_model.dart';
 import 'doctor_management_screen.dart';
@@ -36,53 +37,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Load user count
-      final usersSnapshot = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: UserRole.student.name)
-          .count()
-          .get();
-      _totalUsers = usersSnapshot.count ?? 0;
-
-      // Load doctor count
-      final doctorsSnapshot = await _firestore
-          .collection('doctors')
-          .count()
-          .get();
-      _totalDoctors = doctorsSnapshot.count ?? 0;
-
-      // Load appointment stats
-      final appointmentsSnapshot = await _firestore
-          .collection('appointments')
-          .count()
-          .get();
-      _totalAppointments = appointmentsSnapshot.count ?? 0;
-
-      // Pending appointments
-      final pendingSnapshot = await _firestore
-          .collection('appointments')
-          .where('status', isEqualTo: 'pending')
-          .count()
-          .get();
-      _pendingAppointments = pendingSnapshot.count ?? 0;
-
-      // Today's appointments
       final now = DateTime.now();
       final startOfDay = DateTime(now.year, now.month, now.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
 
-      final todaySnapshot = await _firestore
-          .collection('appointments')
-          .where(
-            'appointmentDate',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-          )
-          .where('appointmentDate', isLessThan: Timestamp.fromDate(endOfDay))
-          .count()
-          .get();
-      _todayAppointments = todaySnapshot.count ?? 0;
+      // Define all futures to run in parallel
+      final futures = [
+        // 0: Total Users (Students)
+        _firestore
+            .collection('users')
+            .where('role', isEqualTo: UserRole.student.name)
+            .count()
+            .get(),
+        // 1: Total Doctors
+        _firestore.collection('doctors').count().get(),
+        // 2: Total Appointments
+        _firestore.collection('appointments').count().get(),
+        // 3: Pending Appointments
+        _firestore
+            .collection('appointments')
+            .where('status', isEqualTo: 'pending')
+            .count()
+            .get(),
+        // 4: Today's Appointments
+        _firestore
+            .collection('appointments')
+            .where(
+              'appointmentDate',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+            )
+            .where('appointmentDate', isLessThan: Timestamp.fromDate(endOfDay))
+            .count()
+            .get(),
+      ];
 
-      // Calculate monthly revenue (mock calculation)
+      // Wait for all futures to complete
+      final results = await Future.wait(futures);
+
+      _totalUsers = results[0].count ?? 0;
+      _totalDoctors = results[1].count ?? 0;
+      _totalAppointments = results[2].count ?? 0;
+      _pendingAppointments = results[3].count ?? 0;
+      _todayAppointments = results[4].count ?? 0;
+
+      // Calculate monthly revenue (mock calculation based on total appointments)
       _monthlyRevenue = _totalAppointments * 50.0;
     } catch (e) {
       debugPrint('Error loading dashboard stats: $e');
@@ -104,7 +102,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadDashboardStats,
+            onPressed: () {
+              if (!_isLoading) _loadDashboardStats();
+            },
           ),
         ],
       ),
@@ -150,6 +150,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildStatsGrid(bool isDark) {
+    // Number formatters
+    final numberFormat = NumberFormat.compact(); // 1.2K, 1M, etc.
+    final currencyFormat = NumberFormat.simpleCurrency(decimalDigits: 0);
+
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -161,42 +165,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _buildStatCard(
           isDark: isDark,
           title: 'Total Users',
-          value: _totalUsers.toString(),
+          value: numberFormat.format(_totalUsers),
           icon: Icons.people,
           color: AppColors.primary,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Total Doctors',
-          value: _totalDoctors.toString(),
+          value: numberFormat.format(_totalDoctors),
           icon: Icons.medical_services,
           color: AppColors.secondary,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Appointments',
-          value: _totalAppointments.toString(),
+          value: numberFormat.format(_totalAppointments),
           icon: Icons.calendar_today,
           color: AppColors.tertiary,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Pending',
-          value: _pendingAppointments.toString(),
+          value: numberFormat.format(_pendingAppointments),
           icon: Icons.pending_actions,
           color: AppColors.warning,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Today',
-          value: _todayAppointments.toString(),
+          value: numberFormat.format(_todayAppointments),
           icon: Icons.today,
           color: AppColors.success,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Revenue',
-          value: '\$${_monthlyRevenue.toStringAsFixed(0)}',
+          value: currencyFormat.format(_monthlyRevenue),
           icon: Icons.attach_money,
           color: AppColors.info,
         ),

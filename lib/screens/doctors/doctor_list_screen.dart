@@ -155,8 +155,16 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
               onRefresh: _loadData,
               child: _isLoading
                   ? _buildLoadingList()
+                  : _doctors.isEmpty
+                  ? _buildEmptyState(
+                      isDark,
+                      message: AppLocalizations.of(context).noDataFound,
+                    )
                   : _filteredDoctors.isEmpty
-                  ? _buildEmptyState(isDark)
+                  ? _buildEmptyState(
+                      isDark,
+                      message: AppLocalizations.of(context).noDataFound,
+                    ) // You might want a different message for "no matches"
                   : _buildDoctorList(isDark),
             ),
           ),
@@ -225,38 +233,41 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
+  Widget _buildEmptyState(bool isDark, {String? message}) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off_rounded,
-            size: 80,
-            color: isDark ? Colors.grey[600] : Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            AppLocalizations.of(context).noDataFound,
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimaryLight,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 80,
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            AppLocalizations.of(context).tryAgain,
-            style: GoogleFonts.roboto(
-              fontSize: 14,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
+            const SizedBox(height: 16),
+            Text(
+              message ?? AppLocalizations.of(context).noDataFound,
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              AppLocalizations.of(context).tryAgain,
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -265,6 +276,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _filteredDoctors.length,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final doctor = _filteredDoctors[index];
@@ -729,40 +741,34 @@ class DoctorDetailScreen extends StatelessWidget {
     );
   }
 
+  static final Map<String, String Function(AppLocalizations)>
+  _bioLocalizationMap = {
+    'Amanda White': (l10n) => l10n.doctorBioAmandaWhite,
+    'Lisa Brown': (l10n) => l10n.doctorBioLisaBrown,
+    'James Wilson': (l10n) => l10n.doctorBioJamesWilson,
+    'Robert Taylor': (l10n) => l10n.doctorBioRobertTaylor,
+    'David Lee': (l10n) => l10n.doctorBioDavidLee,
+    'Sarah Johnson': (l10n) => l10n.doctorBioSarahJohnson,
+    'Emily Davis': (l10n) => l10n.doctorBioEmilyDavis,
+    'Michael Chen': (l10n) => l10n.doctorBioMichaelChen,
+  };
+
   String _getLocalizedBio(DoctorModel doctor, BuildContext context) {
-    // Check for specific doctor to translate bio (Sample Data Hack)
     final l10n = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).languageCode;
 
-    // Only apply custom translations for non-English locales or if we want to force using arb keys
-    // For now, we only override if the locale is NOT English to preserve original English data if desired,
-    // OR we can just return the English key too if the original data might be different.
-    // Let's assume we want to use the ARB strings for these specific doctors in ALL languages for consistency.
+    // Use default bio for English, or if no localized bio exists
+    // You can adjust this logic to ALWAYS prefer localized if available
+    if (locale == 'en') {
+      return doctor.bio ?? 'No bio available.';
+    }
 
-    if (doctor.name.contains('Amanda White')) {
-      if (locale == 'ku') return l10n.doctorBioAmandaWhite;
-      if (locale == 'ar') return l10n.doctorBioAmandaWhite;
-    } else if (doctor.name.contains('Lisa Brown')) {
-      if (locale == 'ku') return l10n.doctorBioLisaBrown;
-      if (locale == 'ar') return l10n.doctorBioLisaBrown;
-    } else if (doctor.name.contains('James Wilson')) {
-      if (locale == 'ku') return l10n.doctorBioJamesWilson;
-      if (locale == 'ar') return l10n.doctorBioJamesWilson;
-    } else if (doctor.name.contains('Robert Taylor')) {
-      if (locale == 'ku') return l10n.doctorBioRobertTaylor;
-      if (locale == 'ar') return l10n.doctorBioRobertTaylor;
-    } else if (doctor.name.contains('David Lee')) {
-      if (locale == 'ku') return l10n.doctorBioDavidLee;
-      if (locale == 'ar') return l10n.doctorBioDavidLee;
-    } else if (doctor.name.contains('Sarah Johnson')) {
-      if (locale == 'ku') return l10n.doctorBioSarahJohnson;
-      if (locale == 'ar') return l10n.doctorBioSarahJohnson;
-    } else if (doctor.name.contains('Emily Davis')) {
-      if (locale == 'ku') return l10n.doctorBioEmilyDavis;
-      if (locale == 'ar') return l10n.doctorBioEmilyDavis;
-    } else if (doctor.name.contains('Michael Chen')) {
-      if (locale == 'ku') return l10n.doctorBioMichaelChen;
-      if (locale == 'ar') return l10n.doctorBioMichaelChen;
+    // Identify doctor by name content - ideally this should be by ID
+    // We check if the doctor's name contains any of the keys in our map
+    for (final entry in _bioLocalizationMap.entries) {
+      if (doctor.name.contains(entry.key)) {
+        return entry.value(l10n);
+      }
     }
 
     return doctor.bio ?? 'No bio available.';

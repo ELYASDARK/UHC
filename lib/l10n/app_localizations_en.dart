@@ -1422,4 +1422,66 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get doctorBioMichaelChen =>
       'Dr. Michael Chen provides comprehensive family medicine care for patients of all ages.';
+
+  @override
+  String get developerTesting => 'Developer Testing';
+
+  @override
+  String get scheduleTestNotification => 'Schedule Test Notification (30s)';
+
+  @override
+  String get testNotificationBody =>
+      'This is a test notification to verify the system is working!';
+
+  @override
+  String get scheduledTestNotificationTitle => 'Scheduled Test Notification';
+
+  @override
+  String get scheduledTestNotificationBody =>
+      'This notification was scheduled 30 seconds ago.';
+
+  @override
+  String get testNotificationScheduled =>
+      'Notification scheduled for 30 seconds from now!';
+
+  @override
+  String get pleaseLoginFirst => 'Please login first';
+
+  @override
+  String get testNotificationTitle => 'Test Notification 🔔';
+
+  @override
+  String get checkEmail => 'Check Your Email';
+
+  @override
+  String get backToLogin => 'Back to Login';
+
+  @override
+  String resetEmailSentMessage(String email) {
+    return 'We have sent a password reset link to $email';
+  }
+
+  @override
+  String get enterEmailHint => 'Enter your email';
+
+  @override
+  String get sendResetLink => 'Send Reset Link';
+
+  @override
+  String get resetPasswordSubtitle =>
+      'Enter your email and we\'ll send you a link to reset your password';
+
+  @override
+  String get welcomeBack => 'Welcome Back';
+
+  @override
+  String loginSubtitle(String appName) {
+    return 'Sign in to continue to $appName';
+  }
+
+  @override
+  String get enterPasswordHint => 'Enter your password';
+
+  @override
+  String get or => 'OR';
 }

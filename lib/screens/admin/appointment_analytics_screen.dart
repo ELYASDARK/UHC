@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 
 /// Appointment analytics screen for admin
@@ -85,7 +86,8 @@ class _AppointmentAnalyticsScreenState
         // Daily appointments
         final date = (data['appointmentDate'] as Timestamp?)?.toDate();
         if (date != null) {
-          final dayKey = '${date.month}/${date.day}';
+          // Use DateFormat for consistent "MM/dd" format
+          final dayKey = DateFormat('MM/dd').format(date);
           _dailyAppointments[dayKey] = (_dailyAppointments[dayKey] ?? 0) + 1;
         }
       }
@@ -433,7 +435,11 @@ class _AppointmentAnalyticsScreenState
       return _buildEmptyState('No data available');
     }
 
-    final maxValue = _dailyAppointments.values.reduce((a, b) => a > b ? a : b);
+    // Determine max value safely
+    final maxValue = _dailyAppointments.values.isNotEmpty
+        ? _dailyAppointments.values.reduce((a, b) => a > b ? a : b)
+        : 1; // Default to 1 to avoid division by zero if empty (though guarded above)
+
     final sortedEntries = _dailyAppointments.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
@@ -453,7 +459,9 @@ class _AppointmentAnalyticsScreenState
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: sortedEntries.take(7).map((entry) {
+          // Calculate height with division safety
           final height = maxValue > 0 ? (entry.value / maxValue) * 120 : 0.0;
+
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),

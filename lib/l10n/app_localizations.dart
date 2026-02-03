@@ -2871,6 +2871,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dr. Michael Chen provides comprehensive family medicine care for patients of all ages.'**
   String get doctorBioMichaelChen;
+
+  /// No description provided for @developerTesting.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer Testing'**
+  String get developerTesting;
+
+  /// No description provided for @scheduleTestNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule Test Notification (30s)'**
+  String get scheduleTestNotification;
+
+  /// No description provided for @testNotificationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a test notification to verify the system is working!'**
+  String get testNotificationBody;
+
+  /// No description provided for @scheduledTestNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled Test Notification'**
+  String get scheduledTestNotificationTitle;
+
+  /// No description provided for @scheduledTestNotificationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This notification was scheduled 30 seconds ago.'**
+  String get scheduledTestNotificationBody;
+
+  /// No description provided for @testNotificationScheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification scheduled for 30 seconds from now!'**
+  String get testNotificationScheduled;
+
+  /// No description provided for @pleaseLoginFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Please login first'**
+  String get pleaseLoginFirst;
+
+  /// No description provided for @testNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Notification 🔔'**
+  String get testNotificationTitle;
+
+  /// No description provided for @checkEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Check Your Email'**
+  String get checkEmail;
+
+  /// No description provided for @backToLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Login'**
+  String get backToLogin;
+
+  /// No description provided for @resetEmailSentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'We have sent a password reset link to {email}'**
+  String resetEmailSentMessage(String email);
+
+  /// No description provided for @enterEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email'**
+  String get enterEmailHint;
+
+  /// No description provided for @sendResetLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Reset Link'**
+  String get sendResetLink;
+
+  /// No description provided for @resetPasswordSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email and we\'ll send you a link to reset your password'**
+  String get resetPasswordSubtitle;
+
+  /// No description provided for @welcomeBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome Back'**
+  String get welcomeBack;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to continue to {appName}'**
+  String loginSubtitle(String appName);
+
+  /// No description provided for @enterPasswordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password'**
+  String get enterPasswordHint;
+
+  /// No description provided for @or.
+  ///
+  /// In en, this message translates to:
+  /// **'OR'**
+  String get or;
 }
 
 class _AppLocalizationsDelegate

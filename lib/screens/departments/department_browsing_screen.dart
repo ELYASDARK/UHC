@@ -1,65 +1,186 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_colors.dart';
-import '../../data/models/doctor_model.dart';
-import '../../providers/doctor_provider.dart';
+import '../../core/utils/localization_helper.dart';
+import '../../core/widgets/loading_skeleton.dart';
+import '../../data/models/department_model.dart';
+import '../../data/repositories/department_repository.dart';
+import '../../l10n/app_localizations.dart';
 import '../doctors/doctor_list_screen.dart';
 
-class DepartmentBrowsingScreen extends StatelessWidget {
+class DepartmentBrowsingScreen extends StatefulWidget {
   const DepartmentBrowsingScreen({super.key});
 
   @override
+  State<DepartmentBrowsingScreen> createState() =>
+      _DepartmentBrowsingScreenState();
+}
+
+class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
+  final _departmentRepository = DepartmentRepository();
+  List<DepartmentModel> _departments = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDepartments();
+  }
+
+  Future<void> _loadDepartments() async {
+    // Only set loading to true if we don't have data yet
+    if (_departments.isEmpty) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final departments = await _departmentRepository.getAllDepartments();
+      if (mounted) {
+        setState(() {
+          _departments = departments;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = AppLocalizations.of(context).connectionError;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Departments'), centerTitle: true),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Choose a Department',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Find doctors and specialists by department',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
+      appBar: AppBar(
+        title: Text(
+          AppLocalizations.of(context).departments,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+      ),
+      body: _error != null && _departments.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_error!, style: const TextStyle(color: AppColors.error)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadDepartments,
+                    child: Text(AppLocalizations.of(context).retry),
+                  ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadDepartments,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context).departments,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontFamily: GoogleFonts.poppins().fontFamily,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      AppLocalizations.of(context).findBestDoctors,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                        fontFamily: GoogleFonts.roboto().fontFamily,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Department Cards Grid
+                    if (_isLoading && _departments.isEmpty)
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 0.85,
+                        children: List.generate(
+                          6,
+                          (index) => const CardSkeleton(height: 180),
+                        ),
+                      )
+                    else if (_departments.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          child: Text(
+                            AppLocalizations.of(context).noDepartments,
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 0.85,
+                        children: _departments.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final dept = entry.value;
+                          return _DepartmentCard(
+                                department: dept,
+                                isDark: isDark,
+                              )
+                              .animate(
+                                delay: Duration(milliseconds: index * 50),
+                              )
+                              .fadeIn(duration: 400.ms)
+                              .slideY(begin: 0.1);
+                        }).toList(),
+                      ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Department Cards Grid
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.9,
-              children: Department.values.map((dept) {
-                return _DepartmentCard(department: dept);
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
 
 class _DepartmentCard extends StatelessWidget {
-  final Department department;
+  final DepartmentModel department;
+  final bool isDark;
 
-  const _DepartmentCard({required this.department});
+  const _DepartmentCard({required this.department, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
+    final color = _getColorFromHex(department.colorHex);
+    final l10n = AppLocalizations.of(context);
+
     return GestureDetector(
       onTap: () => _navigateToDepartment(context),
       child: Container(
@@ -67,12 +188,12 @@ class _DepartmentCard extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: _getDepartmentGradient(),
+            colors: [color, Color.lerp(color, Colors.black, 0.2) ?? color],
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: _getDepartmentColor().withValues(alpha: 0.3),
+              color: color.withValues(alpha: 0.3),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -119,24 +240,29 @@ class _DepartmentCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
-                      _getDepartmentIcon(),
+                      _getIconFromName(department.iconName),
                       color: Colors.white,
-                      size: 32,
+                      size: 28,
                     ),
                   ),
                   const Spacer(),
                   Text(
-                    _getDepartmentName(),
-                    style: const TextStyle(
+                    LocalizationHelper.translateDepartment(
+                      department.name,
+                      l10n,
+                    ),
+                    style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _getDepartmentDescription(),
-                    style: TextStyle(
+                    department.description,
+                    style: GoogleFonts.roboto(
                       color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 12,
                     ),
@@ -147,8 +273,8 @@ class _DepartmentCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'View Doctors',
-                        style: TextStyle(
+                        l10n.viewAll, // "View Doctors" or similar
+                        style: GoogleFonts.poppins(
                           color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -172,89 +298,57 @@ class _DepartmentCard extends StatelessWidget {
   }
 
   void _navigateToDepartment(BuildContext context) {
-    // Load doctors by department
-    context.read<DoctorProvider>().loadDoctorsByDepartment(department);
-
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorListScreen(initialDepartment: department),
+        builder: (context) =>
+            DoctorListScreen(initialDepartmentKey: department.departmentKey),
       ),
     );
   }
 
-  Color _getDepartmentColor() {
-    switch (department) {
-      case Department.generalMedicine:
-        return AppColors.generalMedicine;
-      case Department.dentistry:
-        return AppColors.dentistry;
-      case Department.psychology:
-        return AppColors.psychology;
-      case Department.pharmacy:
-        return AppColors.pharmacy;
-      case Department.cardiology:
-        return const Color(0xFFE91E63);
+  Color _getColorFromHex(String hexColor) {
+    try {
+      var hex = hexColor.replaceAll('#', '');
+
+      // Handle incomplete hex codes
+      if (hex.length == 3) {
+        hex = '${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}';
+      }
+      if (hex.length == 4) {
+        hex =
+            '${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}';
+      }
+
+      if (hex.length == 6) {
+        return Color(int.parse('0xFF$hex'));
+      } else if (hex.length == 8) {
+        return Color(int.parse('0x$hex'));
+      }
+
+      return AppColors.primary;
+    } catch (e) {
+      return AppColors.primary;
     }
   }
 
-  List<Color> _getDepartmentGradient() {
-    switch (department) {
-      case Department.generalMedicine:
-        return [const Color(0xFF2196F3), const Color(0xFF1565C0)];
-      case Department.dentistry:
-        return [const Color(0xFF9C27B0), const Color(0xFF6A1B9A)];
-      case Department.psychology:
-        return [const Color(0xFF4CAF50), const Color(0xFF2E7D32)];
-      case Department.pharmacy:
-        return [const Color(0xFFFF5722), const Color(0xFFD84315)];
-      case Department.cardiology:
-        return [const Color(0xFFE91E63), const Color(0xFFC2185B)];
-    }
-  }
-
-  IconData _getDepartmentIcon() {
-    switch (department) {
-      case Department.generalMedicine:
-        return Icons.medical_services_outlined;
-      case Department.dentistry:
-        return Icons.medical_information_outlined;
-      case Department.psychology:
-        return Icons.psychology_outlined;
-      case Department.pharmacy:
-        return Icons.local_pharmacy_outlined;
-      case Department.cardiology:
-        return Icons.favorite_outlined;
-    }
-  }
-
-  String _getDepartmentName() {
-    switch (department) {
-      case Department.generalMedicine:
-        return 'General Medicine';
-      case Department.dentistry:
-        return 'Dentistry';
-      case Department.psychology:
-        return 'Psychology';
-      case Department.pharmacy:
-        return 'Pharmacy';
-      case Department.cardiology:
-        return 'Cardiology';
-    }
-  }
-
-  String _getDepartmentDescription() {
-    switch (department) {
-      case Department.generalMedicine:
-        return 'General health check-ups and consultations';
-      case Department.dentistry:
-        return 'Dental care and oral health services';
-      case Department.psychology:
-        return 'Mental health and counseling services';
-      case Department.pharmacy:
-        return 'Medication and pharmaceutical services';
-      case Department.cardiology:
-        return 'Heart and cardiovascular care services';
+  IconData _getIconFromName(String iconName) {
+    switch (iconName.toLowerCase()) {
+      case 'medical_services':
+        return Icons.local_hospital_rounded;
+      case 'dentistry':
+        return Icons.sentiment_satisfied_alt_rounded;
+      case 'psychology':
+        return Icons.psychology_rounded;
+      case 'local_pharmacy':
+        return Icons.medication_rounded;
+      case 'favorite':
+      case 'cardiology':
+        return Icons.favorite_rounded;
+      case 'face':
+        return Icons.face_rounded;
+      default:
+        return Icons.medical_services_rounded;
     }
   }
 }

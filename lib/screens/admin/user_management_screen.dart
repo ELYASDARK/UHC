@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/user_model.dart';
 
@@ -66,7 +67,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             ),
           ),
 
-          // Filter Chips
           // Filter Chips
           if (_selectedRoles.isNotEmpty)
             Padding(
@@ -442,7 +442,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               _buildDetailRow(
                 'Date of Birth',
                 data['dateOfBirth'] is Timestamp
-                    ? _formatDate((data['dateOfBirth'] as Timestamp).toDate())
+                    ? DateFormat.yMMMd().format(
+                        (data['dateOfBirth'] as Timestamp).toDate(),
+                      )
                     : data['dateOfBirth']?.toString() ?? 'N/A',
               ),
               _buildDetailRow('Role', data['role'] ?? 'patient'),
@@ -503,37 +505,36 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Change User Role'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioGroup<UserRole>(
-              groupValue: currentRole,
-              onChanged: (value) async {
-                if (value != null) {
-                  await _firestore.collection('users').doc(id).update({
-                    'role': value.name,
-                  });
-                  if (!context.mounted) return;
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Role updated'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
-              },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: UserRole.values.map((role) {
-                  return RadioListTile<UserRole>(
-                    title: Text(role.name),
-                    value: role,
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: UserRole.values.map((role) {
+                return RadioListTile<UserRole>(
+                  title: Text(role.name.toUpperCase()),
+                  value: role,
+                  // ignore: deprecated_member_use
+                  groupValue: currentRole,
+                  // ignore: deprecated_member_use
+                  onChanged: (value) async {
+                    if (value != null) {
+                      await _firestore.collection('users').doc(id).update({
+                        'role': value.name,
+                      });
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Role updated'),
+                          backgroundColor: AppColors.success,
+                        ),
+                      );
+                    }
+                  },
+                );
+              }).toList(),
+            );
+          },
         ),
         actions: [
           TextButton(
@@ -543,9 +544,5 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
   }
 }

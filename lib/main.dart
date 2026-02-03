@@ -1,4 +1,7 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,14 +30,44 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Set preferred orientation
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
-  // Initialize local notification service
-  await LocalNotificationService().initialize();
+  // Set system UI overlay style
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
 
-  // Initialize FCM service
-  await FCMService().initialize();
+  try {
+    // Initialize Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // Initialize local notification service
+    try {
+      await LocalNotificationService().initialize();
+    } catch (e) {
+      debugPrint('Failed to initialize local notifications: $e');
+    }
+
+    // Initialize FCM service
+    try {
+      await FCMService().initialize();
+    } catch (e) {
+      debugPrint('Failed to initialize FCM: $e');
+    }
+  } catch (e) {
+    debugPrint('Failed to initialize Firebase: $e');
+    // Continue running app even if Firebase fails,
+    // though some features won't work
+  }
 
   runApp(const UHCApp());
 }
@@ -60,6 +93,16 @@ class UHCApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             navigatorKey: navigatorKey,
 
+            // Custom Scroll Behavior for Web/Desktop
+            scrollBehavior: const MaterialScrollBehavior().copyWith(
+              dragDevices: {
+                PointerDeviceKind.mouse,
+                PointerDeviceKind.touch,
+                PointerDeviceKind.stylus,
+                PointerDeviceKind.unknown,
+              },
+            ),
+
             // Theme
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
@@ -70,6 +113,9 @@ class UHCApp extends StatelessWidget {
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: [
               AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
               // Use fallback delegates that handle Kurdish RTL
               FallbackLocalizationsDelegate(),
               FallbackCupertinoLocalizationsDelegate(),

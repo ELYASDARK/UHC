@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
@@ -18,12 +19,36 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigateAfterDelay();
+    // Set system UI overlay style for immersive experience
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: AppColors.primaryDark,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+    );
+    _initializeApp();
   }
 
-  Future<void> _navigateAfterDelay() async {
-    await Future.delayed(const Duration(milliseconds: 3000));
+  Future<void> _initializeApp() async {
+    // Wait for both minimum delay and initialization tasks
+    await Future.wait([
+      Future.delayed(
+        const Duration(milliseconds: 2000),
+      ), // Minimum delay for safety
+      _performInitialization(),
+    ]);
+
+    if (!mounted) return;
+
     widget.onComplete();
+  }
+
+  Future<void> _performInitialization() async {
+    // Simulate initialization tasks (e.g., fetching configs, checking user data)
+    // This is where you would put actual async initialization logic
+    await Future.delayed(const Duration(milliseconds: 1000));
   }
 
   @override
