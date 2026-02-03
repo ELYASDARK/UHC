@@ -5,6 +5,7 @@ A comprehensive Flutter mobile application for managing university health center
 ![Flutter](https://img.shields.io/badge/Flutter-3.x-blue.svg)
 ![Firebase](https://img.shields.io/badge/Firebase-Enabled-orange.svg)
 ![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Web-green.svg)
+![Languages](https://img.shields.io/badge/Languages-English%20%7C%20Arabic%20%7C%20Kurdish-blueviolet.svg)
 
 ## Features
 
@@ -16,6 +17,7 @@ A comprehensive Flutter mobile application for managing university health center
 - **Notifications**: Push notifications and in-app reminders for appointments
 - **Profile Management**: Edit profile, change password, upload photo
 - **Dark Mode**: Toggle between light and dark themes
+- **Multi-Language Support**: Full localization in English, Arabic, and Kurdish
 
 ### 👨‍⚕️ Doctor Features
 - View scheduled appointments
@@ -28,6 +30,19 @@ A comprehensive Flutter mobile application for managing university health center
 - **User Management**: View users, change roles, toggle status
 - **Analytics**: Appointment statistics with charts and trends
 - **Reports**: Generate CSV reports (appointments, doctors, users, revenue)
+- **Sample Data Management**: Seed sample doctors, appointments, and departments for testing
+
+### 🏥 Departments
+- General Medicine
+- Pediatrics
+- Dermatology
+- Psychiatry
+- Rehabilitation
+- Pharmacy
+- Orthopedics
+- Laboratory
+- Radiology
+- Cardiology
 
 ## Tech Stack
 
@@ -39,6 +54,7 @@ A comprehensive Flutter mobile application for managing university health center
 | Local Storage | SharedPreferences |
 | Notifications | flutter_local_notifications, Firebase Cloud Messaging |
 | UI | Material Design 3, Google Fonts |
+| Localization | ARB files, flutter_localizations (EN, AR, KU) |
 
 ## Project Structure
 
@@ -50,6 +66,10 @@ lib/
 ├── data/
 │   ├── models/          # Data models (User, Doctor, Appointment)
 │   └── repositories/    # Data repositories
+├── l10n/                # Localization files (EN, AR, KU)
+│   ├── app_en.arb       # English translations
+│   ├── app_ar.arb       # Arabic translations
+│   └── app_ku.arb       # Kurdish translations
 ├── providers/           # State management providers
 ├── screens/
 │   ├── admin/           # Admin dashboard, doctor/user management
@@ -62,9 +82,8 @@ lib/
 │   ├── location/        # Health center map
 │   ├── notifications/   # Notification center
 │   ├── onboarding/      # First-time user onboarding
-│   ├── profile/         # User profile management
+│   ├── profile/         # User profile, settings, and account management
 │   ├── reviews/         # Doctor ratings and reviews
-│   ├── settings/        # App settings
 │   └── splash/          # Splash screen
 └── services/            # FCM, local notifications
 ```
@@ -152,6 +171,54 @@ flutter build ios --release
 # Web
 flutter build web --release
 ```
+
+## Changelog
+
+### v1.2.0 (February 2026)
+
+#### 🌍 Localization
+- **Multi-Language Support**: Added full localization for English, Arabic, and Kurdish
+- **Doctor Bios**: Translated all doctor biographies into Kurdish and Arabic
+- **Appointment Screens**: Localized cancellation dialogs and rescheduling screens
+- **Kurdish Localization**: Implemented custom Kurdish material localizations
+
+#### 🏥 Departments
+- **Cardiology Department**: Added new Cardiology department with full support across all screens
+  - Updated `doctor_model.dart` Department enum
+  - Integrated into emergency request screen
+  - Added to department browsing screen
+
+#### 👤 Profile & UI Improvements
+- **Profile Screen Refinement**:
+  - Developer Testing and Admin sections now only visible to admin users
+  - Moved "Account" section (Edit Profile, Change Password) from Settings to Profile screen
+  - Removed redundant Settings screen navigation
+- **Dialog Size Consistency**: Fixed AlertDialog sizes for Add Doctor/Edit Doctor to be consistent
+- **FAB Enhancement**: Added "Appointments" text label to floating action button with proper placement
+
+#### 🔔 Notifications
+- **Android 12+ Compatibility**: Fixed exact alarm permission handling
+- **Production Ready**: Removed test notification code, keeping only production features
+- **Scheduling Improvements**: Enhanced appointment reminder scheduling and cancellation
+
+#### 🔧 Technical Improvements
+- **Deprecated Code Fixes**:
+  - Replaced `value` with `initialValue` in DropdownButtonFormField
+  - Updated deprecated `withOpacity` calls to `withValues`
+  - Fixed deprecated RadioListTile properties
+  - Replaced underscore parameters with explicit names in errorBuilder callbacks
+- **Sample Data System**: Added admin functionality to seed sample doctors, appointments, and departments
+- **Gradle Updates**: Updated Android Gradle plugin and enabled core library desugaring
+- **Asset Fixes**: Corrected font asset paths in pubspec.yaml
+
+### v1.1.0 (January 2026)
+- Initial feature-complete release
+- Firebase integration (Auth, Firestore, Storage, Cloud Messaging)
+- Complete appointment booking workflow
+- Admin dashboard with analytics
+- Doctor management system
+
+---
 
 ## Contributing
 
