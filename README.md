@@ -97,6 +97,7 @@ lib/
   - Authentication (Email, Google)
   - Cloud Firestore
   - Cloud Messaging
+  - Firebase Storage
 
 ### Installation
 
