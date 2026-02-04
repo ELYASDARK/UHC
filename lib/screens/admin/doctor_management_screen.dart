@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/doctor_model.dart';
+import '../../services/doctor_functions_service.dart';
 import 'doctor_form_dialog.dart';
 
 /// Doctor management screen for admin
@@ -15,6 +16,7 @@ class DoctorManagementScreen extends StatefulWidget {
 class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _searchController = TextEditingController();
+  final _doctorFunctionsService = DoctorFunctionsService();
   String _searchQuery = '';
   Set<Department> _selectedDepartments = {};
 
@@ -251,7 +253,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                 );
                 break;
               case 'delete':
-                _confirmDelete(id, data['name'] ?? 'this doctor');
+                _confirmDelete(id, data['name'] ?? 'this doctor', data);
                 break;
               case 'toggle':
                 _toggleDoctorStatus(id, data['isActive'] ?? true);
@@ -357,12 +359,55 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
     );
   }
 
-  Future<void> _confirmDelete(String id, String name) async {
+  Future<void> _confirmDelete(
+    String id,
+    String name,
+    Map<String, dynamic> data,
+  ) async {
+    final hasAuthAccount =
+        data['userId'] != null &&
+        !data['userId'].toString().startsWith('sample_');
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Doctor'),
-        content: Text('Are you sure you want to delete Dr. $name?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete Dr. $name?'),
+            if (hasAuthAccount) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber,
+                      color: AppColors.warning,
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This will also delete the doctor\'s login account.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -378,14 +423,41 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
     );
 
     if (confirmed == true) {
-      await _firestore.collection('doctors').doc(id).delete();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Doctor deleted'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+      try {
+        if (hasAuthAccount) {
+          // Use Cloud Function to delete auth account, user doc, and doctor doc
+          await _doctorFunctionsService.deleteDoctorAccount(doctorId: id);
+        } else {
+          // Just delete the doctor document
+          await _firestore.collection('doctors').doc(id).delete();
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Doctor deleted successfully'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } on DoctorFunctionException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.userMessage),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting doctor: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     }
   }
