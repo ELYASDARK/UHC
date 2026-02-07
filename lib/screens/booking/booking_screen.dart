@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -34,9 +36,111 @@ class _BookingScreenState extends State<BookingScreen> {
   int _currentStep = 0;
   bool _isLoading = false;
 
+  // Real-time updates for doctor schedule
+  late DoctorModel _doctor;
+  StreamSubscription<DocumentSnapshot>? _doctorSubscription;
+
+  // Track booked slots to prevent double-booking
+  Set<String> _bookedSlots = {};
+  StreamSubscription<QuerySnapshot>? _appointmentsSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _doctor = widget.doctor;
+    _subscribeToDoctor();
+  }
+
+  /// Subscribe to real-time updates for the doctor's schedule
+  void _subscribeToDoctor() {
+    _doctorSubscription = FirebaseFirestore.instance
+        .collection('doctors')
+        .doc(widget.doctor.id)
+        .snapshots()
+        .listen((snapshot) {
+          if (snapshot.exists && mounted) {
+            setState(() {
+              _doctor = DoctorModel.fromFirestore(snapshot);
+              // Reset selected time slot if it's no longer available
+              if (_selectedDay != null && _selectedTimeSlot != null) {
+                final availableSlots = _getAvailableSlots(_selectedDay!);
+                final slotStillExists = availableSlots.any(
+                  (s) => s.startTime == _selectedTimeSlot!.startTime,
+                );
+                if (!slotStillExists) {
+                  _selectedTimeSlot = null;
+                }
+              }
+            });
+          }
+        });
+  }
+
+  /// Fetch booked appointments for the selected date to prevent double-booking
+  Future<void> _fetchBookedAppointments(DateTime date) async {
+    _appointmentsSubscription?.cancel();
+
+    // Create start and end of the selected day for filtering
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+    try {
+      // One-time fetch instead of subscription to avoid performance issues
+      final snapshot = await FirebaseFirestore.instance
+          .collection('appointments')
+          .where('doctorId', isEqualTo: widget.doctor.id)
+          .get();
+
+      if (!mounted) return;
+
+      final bookedSlots = snapshot.docs
+          .where((doc) {
+            final data = doc.data();
+            // Filter by status
+            final status = data['status'] as String? ?? '';
+            if (status != 'pending' && status != 'confirmed') {
+              return false;
+            }
+            // Filter by date
+            final appointmentDate = (data['appointmentDate'] as Timestamp?)
+                ?.toDate();
+            if (appointmentDate == null) return false;
+            return (appointmentDate.isAfter(startOfDay) &&
+                    appointmentDate.isBefore(endOfDay)) ||
+                appointmentDate.year == startOfDay.year &&
+                    appointmentDate.month == startOfDay.month &&
+                    appointmentDate.day == startOfDay.day;
+          })
+          .map((doc) {
+            final data = doc.data();
+            return data['timeSlot'] as String? ?? '';
+          })
+          .where((slot) => slot.isNotEmpty)
+          .toSet();
+
+      if (!mounted) return;
+
+      setState(() {
+        _bookedSlots = bookedSlots;
+
+        // Reset selected time slot if it's now booked by someone else
+        if (_selectedTimeSlot != null &&
+            _bookedSlots.contains(_selectedTimeSlot!.startTime)) {
+          _selectedTimeSlot = null;
+        }
+      });
+    } catch (error) {
+      // Silently handle errors - booking can still proceed
+      // The server-side check will catch any conflicts
+      debugPrint('Error fetching booked slots: $error');
+    }
+  }
+
   @override
   void dispose() {
     _notesController.dispose();
+    _doctorSubscription?.cancel();
+    _appointmentsSubscription?.cancel();
     super.dispose();
   }
 
@@ -55,14 +159,24 @@ class _BookingScreenState extends State<BookingScreen> {
 
   List<TimeSlot> _getAvailableSlots(DateTime date) {
     final dayName = _getDayName(date);
-    final doctorSlots = widget.doctor.weeklySchedule[dayName];
+    final doctorSlots = _doctor.weeklySchedule[dayName];
 
-    // If doctor has specific slots, use them
+    // If doctor has specific slots for this day, use them
     if (doctorSlots != null && doctorSlots.isNotEmpty) {
       return doctorSlots;
     }
 
-    // Otherwise, return default time slots for weekdays
+    // Check if doctor has ANY schedule set
+    final hasAnySchedule = _doctor.weeklySchedule.values.any(
+      (slots) => slots.isNotEmpty,
+    );
+
+    // If doctor has a schedule but this day is not in it, return empty
+    if (hasAnySchedule) {
+      return [];
+    }
+
+    // Fallback: No schedule set at all, return default time slots for weekdays
     if (date.weekday >= 1 && date.weekday <= 5) {
       return [
         TimeSlot(startTime: '09:00', endTime: '09:30'),
@@ -213,7 +327,10 @@ class _BookingScreenState extends State<BookingScreen> {
             _selectedDay = selectedDay;
             _focusedDay = focusedDay;
             _selectedTimeSlot = null;
+            _bookedSlots = {}; // Clear stale data while fetching new
           });
+          // Fetch booked appointments for the selected date
+          _fetchBookedAppointments(selectedDay);
         },
         onFormatChanged: (format) {
           setState(() {
@@ -221,16 +338,41 @@ class _BookingScreenState extends State<BookingScreen> {
           });
         },
         calendarStyle: CalendarStyle(
+          // Enabled days: black text
+          defaultTextStyle: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
+          // Weekend days (if enabled): same as default
+          weekendTextStyle: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w500,
+          ),
+          // Disabled days: gray text
+          disabledTextStyle: TextStyle(
+            color: isDark ? Colors.grey[600] : Colors.grey[400],
+          ),
+          // Selected day styling
           selectedDecoration: const BoxDecoration(
             color: AppColors.primary,
             shape: BoxShape.circle,
           ),
+          selectedTextStyle: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+          // Today styling
           todayDecoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.3),
             shape: BoxShape.circle,
           ),
-          disabledTextStyle: TextStyle(
-            color: isDark ? Colors.grey[700] : Colors.grey[400],
+          todayTextStyle: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+          // Outside days (other months): lighter color
+          outsideTextStyle: TextStyle(
+            color: isDark ? Colors.grey[700] : Colors.grey[300],
           ),
         ),
         headerStyle: const HeaderStyle(
@@ -238,12 +380,32 @@ class _BookingScreenState extends State<BookingScreen> {
           titleCentered: true,
         ),
         enabledDayPredicate: (day) {
-          // Allow all future weekdays (Monday-Friday)
-          final isWeekday = day.weekday >= 1 && day.weekday <= 5;
+          // Check if this day is in the future
           final isFuture = day.isAfter(
             DateTime.now().subtract(const Duration(days: 1)),
           );
-          return isWeekday && isFuture;
+          if (!isFuture) return false;
+
+          // Get the day name and check if doctor has slots for this day
+          final dayName = _getDayName(day);
+          final doctorSlots = _doctor.weeklySchedule[dayName];
+
+          // Enable the day if doctor has specific slots for this day
+          if (doctorSlots != null && doctorSlots.isNotEmpty) {
+            return true;
+          }
+
+          // Fallback: allow weekdays if no schedule is set
+          final hasAnySchedule = _doctor.weeklySchedule.values.any(
+            (slots) => slots.isNotEmpty,
+          );
+          if (!hasAnySchedule) {
+            // No schedule set at all, default to weekdays
+            return day.weekday >= 1 && day.weekday <= 5;
+          }
+
+          // Doctor has a schedule but this day is not in it
+          return false;
         },
       ),
     );
@@ -284,7 +446,8 @@ class _BookingScreenState extends State<BookingScreen> {
           runSpacing: 10,
           children: slots.map((slot) {
             final isPast = _isSlotPast(_selectedDay!, slot.startTime);
-            final isAvailable = slot.isAvailable && !isPast;
+            final isBooked = _bookedSlots.contains(slot.startTime);
+            final isAvailable = slot.isAvailable && !isPast && !isBooked;
             final isSelected = _selectedTimeSlot == slot;
 
             return GestureDetector(

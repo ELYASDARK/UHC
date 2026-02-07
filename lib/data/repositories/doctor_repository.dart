@@ -19,8 +19,8 @@ class DoctorRepository {
           .map((doc) => DoctorModel.fromFirestore(doc))
           .where((d) => d.isAvailable)
           .toList();
-      // Sort in-memory by rating
-      doctors.sort((a, b) => b.rating.compareTo(a.rating));
+      // Sort in-memory by name
+      doctors.sort((a, b) => a.name.compareTo(b.name));
       return doctors;
     } catch (e) {
       debugPrint('Error getting all doctors: $e');
@@ -49,7 +49,7 @@ class DoctorRepository {
           .map((doc) => DoctorModel.fromFirestore(doc))
           .where((d) => d.isAvailable)
           .toList();
-      doctors.sort((a, b) => b.rating.compareTo(a.rating));
+      doctors.sort((a, b) => a.name.compareTo(b.name));
       return doctors;
     } catch (e) {
       debugPrint('Error getting doctors by department: $e');
@@ -88,19 +88,6 @@ class DoctorRepository {
     await _doctorsRef.doc(doctorId).delete();
   }
 
-  /// Update doctor rating
-  Future<void> updateDoctorRating(
-    String doctorId,
-    double newRating,
-    int totalReviews,
-  ) async {
-    await _doctorsRef.doc(doctorId).update({
-      'rating': newRating,
-      'totalReviews': totalReviews,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
-    });
-  }
-
   /// Toggle doctor availability (admin)
   Future<void> toggleAvailability(String doctorId, bool isAvailable) async {
     await _doctorsRef.doc(doctorId).update({
@@ -116,7 +103,7 @@ class DoctorRepository {
           .map((doc) => DoctorModel.fromFirestore(doc))
           .where((d) => d.isAvailable)
           .toList();
-      doctors.sort((a, b) => b.rating.compareTo(a.rating));
+      doctors.sort((a, b) => a.name.compareTo(b.name));
       return doctors;
     });
   }
@@ -131,7 +118,7 @@ class DoctorRepository {
               .map((doc) => DoctorModel.fromFirestore(doc))
               .where((d) => d.isAvailable)
               .toList();
-          doctors.sort((a, b) => b.rating.compareTo(a.rating));
+          doctors.sort((a, b) => a.name.compareTo(b.name));
           return doctors;
         });
   }

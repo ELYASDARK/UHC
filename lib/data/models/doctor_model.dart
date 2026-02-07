@@ -15,9 +15,6 @@ class DoctorModel {
   final String specialization;
   final String? bio;
   final int experienceYears;
-  final double rating;
-  final int totalReviews;
-  final int totalPatients;
   final List<String> qualifications;
   final List<String> languages;
   final bool isAvailable;
@@ -35,9 +32,6 @@ class DoctorModel {
     required this.specialization,
     this.bio,
     this.experienceYears = 0,
-    this.rating = 0.0,
-    this.totalReviews = 0,
-    this.totalPatients = 0,
     this.qualifications = const [],
     this.languages = const ['English'],
     this.isAvailable = true,
@@ -88,9 +82,6 @@ class DoctorModel {
       specialization: data['specialization'] ?? '',
       bio: data['bio'],
       experienceYears: data['experienceYears'] ?? 0,
-      rating: (data['rating'] ?? 0.0).toDouble(),
-      totalReviews: data['totalReviews'] ?? 0,
-      totalPatients: data['totalPatients'] ?? 0,
       qualifications: List<String>.from(data['qualifications'] ?? []),
       languages: List<String>.from(data['languages'] ?? ['English']),
       isAvailable: data['isAvailable'] ?? true,
@@ -115,9 +106,6 @@ class DoctorModel {
       'specialization': specialization,
       'bio': bio,
       'experienceYears': experienceYears,
-      'rating': rating,
-      'totalReviews': totalReviews,
-      'totalPatients': totalPatients,
       'qualifications': qualifications,
       'languages': languages,
       'isAvailable': isAvailable,
@@ -137,9 +125,6 @@ class DoctorModel {
     String? specialization,
     String? bio,
     int? experienceYears,
-    double? rating,
-    int? totalReviews,
-    int? totalPatients,
     List<String>? qualifications,
     List<String>? languages,
     bool? isAvailable,
@@ -157,9 +142,6 @@ class DoctorModel {
       specialization: specialization ?? this.specialization,
       bio: bio ?? this.bio,
       experienceYears: experienceYears ?? this.experienceYears,
-      rating: rating ?? this.rating,
-      totalReviews: totalReviews ?? this.totalReviews,
-      totalPatients: totalPatients ?? this.totalPatients,
       qualifications: qualifications ?? this.qualifications,
       languages: languages ?? this.languages,
       isAvailable: isAvailable ?? this.isAvailable,

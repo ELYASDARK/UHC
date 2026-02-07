@@ -47,7 +47,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDepartments();
+    // Defer loading to after first frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDepartments();
+    });
   }
 
   Future<void> _loadDepartments() async {
@@ -113,11 +116,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: SafeArea(
+        bottom: false, // Allow content to go behind bottom nav bar
         child: RefreshIndicator(
           onRefresh: _loadDepartments,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              100,
+            ), // Standard top padding, extra bottom for nav bar
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

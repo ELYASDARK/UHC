@@ -160,7 +160,12 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                 }).toList();
 
                 return ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.only(
+                    top: 16,
+                    left: 16,
+                    right: 16,
+                    bottom: 60, // Extra padding for FAB
+                  ),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
                     final doc = docs[index];

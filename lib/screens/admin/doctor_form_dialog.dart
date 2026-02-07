@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/doctor_model.dart';
 import '../../services/doctor_functions_service.dart';
+import 'doctor_schedule_dialog.dart';
 
 class DoctorFormDialog extends StatefulWidget {
   final String? id;
@@ -42,6 +42,77 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
   late TextEditingController _passwordController;
   late TextEditingController _phoneController;
   bool _obscurePassword = true;
+  late TextEditingController _qualificationInputController;
+  List<String> _qualifications = [];
+
+  /// Generate default weekly schedule with 30-minute slots
+  Map<String, dynamic> _generateDefaultSchedule() {
+    // Helper to create time slots from time ranges
+    List<Map<String, dynamic>> createSlots(List<List<int>> ranges) {
+      final slots = <Map<String, dynamic>>[];
+      for (final range in ranges) {
+        final startHour = range[0];
+        final startMin = range[1];
+        final endHour = range[2];
+        final endMin = range[3];
+
+        // Convert to total minutes
+        int currentMinutes = startHour * 60 + startMin;
+        final endMinutes = endHour * 60 + endMin;
+
+        // Create 30-minute slots
+        while (currentMinutes < endMinutes) {
+          final slotStartHour = currentMinutes ~/ 60;
+          final slotStartMin = currentMinutes % 60;
+          final slotEndMinutes = currentMinutes + 30;
+          final slotEndHour = slotEndMinutes ~/ 60;
+          final slotEndMin = slotEndMinutes % 60;
+
+          slots.add({
+            'startTime':
+                '${slotStartHour.toString().padLeft(2, '0')}:${slotStartMin.toString().padLeft(2, '0')}',
+            'endTime':
+                '${slotEndHour.toString().padLeft(2, '0')}:${slotEndMin.toString().padLeft(2, '0')}',
+            'isAvailable': true,
+          });
+
+          currentMinutes += 30;
+        }
+      }
+      return slots;
+    }
+
+    return {
+      // Monday: 09:00-12:00, 14:00-16:30
+      'monday': createSlots([
+        [9, 0, 12, 0],
+        [14, 0, 16, 30],
+      ]),
+      // Tuesday: 09:00-11:30, 14:00-15:30
+      'tuesday': createSlots([
+        [9, 0, 11, 30],
+        [14, 0, 15, 30],
+      ]),
+      // Wednesday: 09:00-12:00, 14:00-16:00
+      'wednesday': createSlots([
+        [9, 0, 12, 0],
+        [14, 0, 16, 0],
+      ]),
+      // Thursday: 09:00-11:00, 14:00-16:00
+      'thursday': createSlots([
+        [9, 0, 11, 0],
+        [14, 0, 16, 0],
+      ]),
+      // Friday: 09:00-11:30 (afternoon closed)
+      'friday': createSlots([
+        [9, 0, 11, 30],
+      ]),
+      // Saturday: Closed
+      'saturday': <Map<String, dynamic>>[],
+      // Sunday: Closed
+      'sunday': <Map<String, dynamic>>[],
+    };
+  }
 
   @override
   void initState() {
@@ -52,7 +123,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
     );
     _bioController = TextEditingController(text: widget.data?['bio'] ?? '');
     _experienceController = TextEditingController(
-      text: widget.data?['yearsExperience']?.toString() ?? '',
+      text: widget.data?['experienceYears']?.toString() ?? '',
     );
     _feeController = TextEditingController(
       text: widget.data?['consultationFee']?.toString() ?? '',
@@ -65,23 +136,17 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
     _phoneController = TextEditingController(
       text: widget.data?['phoneNumber'] ?? '',
     );
+    _qualificationInputController = TextEditingController();
+
+    // Load existing qualifications
+    if (widget.data?['qualifications'] != null) {
+      _qualifications = List<String>.from(widget.data!['qualifications']);
+    }
 
     _selectedDepartment = Department.values.firstWhere(
       (d) => d.name == widget.data?['department'],
       orElse: () => Department.generalMedicine,
     );
-
-    // Generate a random password for new doctors
-    if (widget.id == null) {
-      _passwordController.text = _generateRandomPassword();
-    }
-  }
-
-  String _generateRandomPassword() {
-    const chars =
-        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = Random.secure();
-    return List.generate(12, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
   @override
@@ -95,7 +160,18 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
+    _qualificationInputController.dispose();
     super.dispose();
+  }
+
+  void _addQualification() {
+    final text = _qualificationInputController.text.trim();
+    if (text.isNotEmpty && !_qualifications.contains(text)) {
+      setState(() {
+        _qualifications.add(text);
+        _qualificationInputController.clear();
+      });
+    }
   }
 
   Future<void> _pickImage() async {
@@ -295,32 +371,17 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                           decoration: InputDecoration(
                             labelText: 'Password *',
                             prefixIcon: const Icon(Icons.lock_outlined),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.refresh),
-                                  tooltip: 'Generate new password',
-                                  onPressed: () {
-                                    setState(() {
-                                      _passwordController.text =
-                                          _generateRandomPassword();
-                                    });
-                                  },
-                                ),
-                              ],
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
                             ),
                             helperText: 'Share this password with the doctor',
                           ),
@@ -396,8 +457,68 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                     }
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
+                // Qualifications Section
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _qualificationInputController,
+                        decoration: const InputDecoration(
+                          labelText: 'Add Qualification',
+                          hintText: 'e.g., MD, MBBS, PhD',
+                        ),
+                        onFieldSubmitted: (value) => _addQualification(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _addQualification,
+                      icon: const Icon(Icons.add_circle),
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_qualifications.isNotEmpty)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _qualifications.map((q) {
+                      return Chip(
+                        label: Text(
+                          q,
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        backgroundColor: isDark
+                            ? AppColors.primary.withValues(alpha: 0.1)
+                            : Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(
+                            color: AppColors.primary.withValues(alpha: 0.5),
+                            width: 1.5,
+                          ),
+                        ),
+                        deleteIcon: Icon(
+                          Icons.close,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
+                        onDeleted: () {
+                          setState(() {
+                            _qualifications.remove(q);
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+
+                const SizedBox(height: 8),
                 TextFormField(
                   controller: _experienceController,
                   keyboardType: TextInputType.number,
@@ -437,17 +558,52 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                   maxLines: 3,
                   decoration: const InputDecoration(labelText: 'Bio'),
                 ),
+                const SizedBox(height: 16),
 
                 if (isEditing) ...[
                   const SizedBox(height: 24),
                   OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Schedule management coming soon'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                    onPressed: () async {
+                      // Capture context-dependent objects before async gap
+                      final navigator = Navigator.of(context);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                      // Fetch fresh schedule data from Firestore
+                      try {
+                        final doc = await _firestore
+                            .collection('doctors')
+                            .doc(widget.id)
+                            .get();
+
+                        Map<String, dynamic>? schedule;
+                        if (doc.exists) {
+                          final rawSchedule = doc.data()?['weeklySchedule'];
+                          if (rawSchedule is Map<String, dynamic>) {
+                            schedule = rawSchedule;
+                          } else if (rawSchedule is Map) {
+                            schedule = Map<String, dynamic>.from(rawSchedule);
+                          }
+                        }
+
+                        if (mounted) {
+                          showDialog(
+                            context: navigator.context,
+                            builder: (dialogContext) => DoctorScheduleDialog(
+                              doctorId: widget.id!,
+                              currentSchedule: schedule,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          scaffoldMessenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Error loading schedule: $e'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
                     },
                     icon: const Icon(Icons.calendar_month),
                     label: const Text('Manage Schedule'),
@@ -500,7 +656,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           specialization: _specializationController.text.trim(),
           department: _selectedDepartment.name,
           bio: _bioController.text.trim(),
-          yearsExperience: int.tryParse(_experienceController.text),
+          experienceYears: int.tryParse(_experienceController.text),
           consultationFee: double.tryParse(_feeController.text),
           photoUrl: _photoUrlController.text.isNotEmpty
               ? _photoUrlController.text.trim()
@@ -508,6 +664,8 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           phoneNumber: _phoneController.text.isNotEmpty
               ? _phoneController.text.trim()
               : null,
+          qualifications: _qualifications,
+          weeklySchedule: _generateDefaultSchedule(),
         );
 
         if (mounted) {
@@ -561,7 +719,9 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                             ),
                           ],
                         ),
-                        const Divider(),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
                             const Icon(Icons.lock, size: 16),
@@ -610,8 +770,9 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           'photoUrl': _photoUrlController.text.isNotEmpty
               ? _photoUrlController.text.trim()
               : null,
-          'yearsExperience': int.tryParse(_experienceController.text) ?? 0,
+          'experienceYears': int.tryParse(_experienceController.text) ?? 0,
           'consultationFee': double.tryParse(_feeController.text) ?? 0.0,
+          'qualifications': _qualifications,
           'isActive': widget.data?['isActive'] ?? true,
           'updatedAt': FieldValue.serverTimestamp(),
         };

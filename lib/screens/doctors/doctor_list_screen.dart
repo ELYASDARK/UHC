@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -38,6 +40,10 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   List<DepartmentModel> _departments = [];
   String? _error;
 
+  // Stream subscriptions for real-time updates
+  StreamSubscription<List<DoctorModel>>? _doctorsSubscription;
+  StreamSubscription<List<DepartmentModel>>? _departmentsSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -47,42 +53,67 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     } else if (widget.initialDepartment != null) {
       _selectedDepartmentName = widget.initialDepartment!.name;
     }
-    _loadData();
+    _subscribeToData();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _doctorsSubscription?.cancel();
+    _departmentsSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  /// Subscribe to real-time updates from Firestore
+  void _subscribeToData() {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
-    try {
-      final results = await Future.wait([
-        _doctorRepository.getAllDoctors(),
-        _departmentRepository.getAllDepartments(),
-      ]);
+    // Subscribe to doctors stream
+    _doctorsSubscription?.cancel();
+    _doctorsSubscription = _doctorRepository.streamDoctors().listen(
+      (doctors) {
+        if (mounted) {
+          setState(() {
+            _doctors = doctors;
+            _isLoading = false;
+          });
+        }
+      },
+      onError: (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _error = 'Failed to load doctors. Pull to retry.';
+          });
+        }
+      },
+    );
 
+    // Load departments (they don't change often, so one-time fetch is fine)
+    _loadDepartments();
+  }
+
+  /// Load departments (one-time fetch, as they don't change often)
+  Future<void> _loadDepartments() async {
+    try {
+      final departments = await _departmentRepository.getAllDepartments();
       if (mounted) {
         setState(() {
-          _isLoading = false;
-          _doctors = results[0] as List<DoctorModel>;
-          _departments = results[1] as List<DepartmentModel>;
+          _departments = departments;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = 'Failed to load data. Pull to retry.';
-        });
-      }
+      debugPrint('Error loading departments: $e');
     }
+  }
+
+  /// Refresh data - used for pull-to-refresh
+  Future<void> _refreshData() async {
+    // Cancel existing subscription and resubscribe
+    _subscribeToData();
   }
 
   List<DoctorModel> get _filteredDoctors {
@@ -152,7 +183,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
           // Doctor list
           Expanded(
             child: RefreshIndicator(
-              onRefresh: _loadData,
+              onRefresh: _refreshData,
               child: _isLoading
                   ? _buildLoadingList()
                   : _doctors.isEmpty

@@ -32,7 +32,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       'id': 'doctors',
       'title': 'Doctors Report',
       'icon': Icons.medical_services,
-      'description': 'Doctor list with specialization and ratings',
+      'description': 'Doctor list with specialization and department',
     },
     {
       'id': 'users',
@@ -447,7 +447,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     final buffer = StringBuffer();
     buffer.writeln(
-      'ID,Name,Specialization,Department,Experience (Years),Consultation Fee,Rating,Review Count,Active',
+      'ID,Name,Specialization,Department,Experience (Years),Consultation Fee,Active',
     );
 
     for (final doc in snapshot.docs) {
@@ -457,10 +457,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
         '${_escapeCsv(data['name'] ?? '')},'
         '${_escapeCsv(data['specialization'] ?? '')},'
         '${_escapeCsv(data['department'] ?? '')},'
-        '${data['yearsExperience'] ?? 0},'
+        '${data['experienceYears'] ?? 0},'
         '${data['consultationFee'] ?? 0},'
-        '${data['rating']?.toStringAsFixed(1) ?? '0.0'},'
-        '${data['reviewCount'] ?? 0},'
         '${data['isActive'] ?? true}',
       );
     }

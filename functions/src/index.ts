@@ -13,10 +13,12 @@ interface CreateDoctorData {
     specialization: string;
     department: string;
     bio?: string;
-    yearsExperience?: number;
+    experienceYears?: number;
     consultationFee?: number;
     photoUrl?: string;
     phoneNumber?: string;
+    qualifications?: string[];
+    weeklySchedule?: Record<string, unknown[]>;
 }
 
 /**
@@ -95,6 +97,17 @@ export const createDoctorAccount = functions.https.onCall(
                 language: 'en',
             });
 
+            // Use provided schedule or default to empty arrays
+            const defaultSchedule = {
+                monday: [],
+                tuesday: [],
+                wednesday: [],
+                thursday: [],
+                friday: [],
+                saturday: [],
+                sunday: [],
+            };
+
             // Create doctor document
             const doctorDoc = await db.collection('doctors').add({
                 userId: userRecord.uid,
@@ -104,24 +117,13 @@ export const createDoctorAccount = functions.https.onCall(
                 department: data.department || 'generalMedicine',
                 specialization: data.specialization,
                 bio: data.bio || '',
-                experienceYears: data.yearsExperience || 0,
+                experienceYears: data.experienceYears || 0,
                 consultationFee: data.consultationFee || 0,
-                rating: 0.0,
-                totalReviews: 0,
-                totalPatients: 0,
-                qualifications: [],
+                qualifications: data.qualifications || [],
                 languages: ['English'],
                 isAvailable: true,
                 isActive: true,
-                weeklySchedule: {
-                    monday: [],
-                    tuesday: [],
-                    wednesday: [],
-                    thursday: [],
-                    friday: [],
-                    saturday: [],
-                    sunday: [],
-                },
+                weeklySchedule: data.weeklySchedule || defaultSchedule,
                 createdAt: now,
                 updatedAt: now,
             });

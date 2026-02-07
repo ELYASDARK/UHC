@@ -30,13 +30,13 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set preferred orientation
+  // Set preferred orientation (fast operation)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Set system UI overlay style
+  // Set system UI overlay style (fast operation)
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -44,32 +44,43 @@ void main() async {
     ),
   );
 
+  // Initialize only Firebase core before app starts - it's required for auth
   try {
-    // Initialize Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-
-    // Initialize local notification service
-    try {
-      await LocalNotificationService().initialize();
-    } catch (e) {
-      debugPrint('Failed to initialize local notifications: $e');
-    }
-
-    // Initialize FCM service
-    try {
-      await FCMService().initialize();
-    } catch (e) {
-      debugPrint('Failed to initialize FCM: $e');
-    }
   } catch (e) {
     debugPrint('Failed to initialize Firebase: $e');
-    // Continue running app even if Firebase fails,
-    // though some features won't work
   }
 
+  // Start app immediately - show UI first
   runApp(const UHCApp());
+
+  // Defer non-critical initialization after first frame is rendered
+  // This prevents blocking the main thread during startup
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await _initializeServicesAsync();
+  });
+}
+
+/// Initialize non-critical services asynchronously after app starts
+Future<void> _initializeServicesAsync() async {
+  // Small delay to allow UI to stabilize first
+  await Future.delayed(const Duration(milliseconds: 500));
+
+  // Initialize local notification service
+  try {
+    await LocalNotificationService().initialize();
+  } catch (e) {
+    debugPrint('Failed to initialize local notifications: $e');
+  }
+
+  // Initialize FCM service
+  try {
+    await FCMService().initialize();
+  } catch (e) {
+    debugPrint('Failed to initialize FCM: $e');
+  }
 }
 
 class UHCApp extends StatelessWidget {

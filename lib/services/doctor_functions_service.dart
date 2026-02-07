@@ -18,10 +18,12 @@ class DoctorFunctionsService {
     required String specialization,
     required String department,
     String? bio,
-    int? yearsExperience,
+    int? experienceYears,
     double? consultationFee,
     String? photoUrl,
     String? phoneNumber,
+    List<String>? qualifications,
+    Map<String, dynamic>? weeklySchedule,
   }) async {
     try {
       final callable = _functions.httpsCallable('createDoctorAccount');
@@ -32,10 +34,12 @@ class DoctorFunctionsService {
         'specialization': specialization,
         'department': department,
         'bio': bio,
-        'yearsExperience': yearsExperience,
+        'experienceYears': experienceYears,
         'consultationFee': consultationFee,
         'photoUrl': photoUrl,
         'phoneNumber': phoneNumber,
+        'qualifications': qualifications ?? [],
+        'weeklySchedule': weeklySchedule,
       });
 
       return Map<String, dynamic>.from(result.data);

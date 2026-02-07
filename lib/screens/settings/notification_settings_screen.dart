@@ -442,10 +442,6 @@ class _NotificationSettingsScreenState
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       value: value,
       onChanged: onChanged,
-      activeThumbColor: AppColors.primary,
-      activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
-      inactiveThumbColor: Colors.grey[400],
-      inactiveTrackColor: Colors.grey[200],
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
@@ -466,10 +462,6 @@ class _NotificationSettingsScreenState
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 11)),
         value: value,
         onChanged: onChanged,
-        activeThumbColor: AppColors.primary,
-        activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
-        inactiveThumbColor: Colors.grey[400],
-        inactiveTrackColor: Colors.grey[200],
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       ),
     );
