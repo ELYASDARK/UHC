@@ -175,6 +175,37 @@ flutter build web --release
 
 ## Changelog
 
+### v1.3.0 (February 2026)
+
+#### ⚡ Performance Optimizations
+- **Lazy Loading for Navigation Screens**: Implemented lazy loading in `MainShell` to prevent simultaneous initialization of all screens
+  - Added `_visitedScreens` tracking set to defer screen building
+  - Screens are now only built when first accessed via tab navigation
+  - Reduced startup frame drops from 449+ to under 50 frames
+  - Eliminated ANR (Application Not Responding) errors during startup
+
+- **Deferred Service Initialization**: Restructured app startup for faster initial render
+  - Only Firebase Core is initialized before `runApp()`
+  - LocalNotificationService and FCMService are now initialized asynchronously after the first frame
+  - Used `WidgetsBinding.instance.addPostFrameCallback()` for non-blocking initialization
+
+- **Deferred Data Loading**: Optimized data fetching in screens
+  - HomeScreen's `_loadDepartments()` now deferred to after first frame render
+  - Prevents data loading from blocking UI during initial render
+
+#### 🔒 Booking System Fixes
+- **Booked Time Slots Prevention**: Fixed critical bug where booked time slots were still selectable
+  - Fixed field name mismatch: `'dateTime'` → `'appointmentDate'` in Firestore query
+  - Booked slots now correctly appear grayed out with strikethrough text
+  - Prevents double-booking by blocking selection of already-booked time slots
+  - Added immediate clearing of stale booked slots data when selecting new dates
+
+#### 🔧 Technical Improvements
+- **Firestore Query Optimization**: Changed from real-time subscription to one-time fetch for booked appointments
+  - Reduces unnecessary Firestore read operations
+  - Improves performance on booking screen
+  - Added local filtering for date and status
+
 ### v1.2.0 (February 2026)
 
 #### 🌍 Localization
