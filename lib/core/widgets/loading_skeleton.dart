@@ -232,7 +232,7 @@ class SkeletonList extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: itemCount,
-      separatorBuilder: (_, _) => SizedBox(height: spacing),
+      separatorBuilder: (context, index) => SizedBox(height: spacing),
       itemBuilder: itemBuilder,
     );
   }

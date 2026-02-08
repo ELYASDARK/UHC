@@ -82,16 +82,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           return RefreshIndicator(
             onRefresh: _loadNotifications,
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
               itemCount: provider.notifications.length,
               itemBuilder: (context, index) {
                 final n = provider.notifications[index];
                 return _NotificationCard(
-                      notification: n,
-                      isDark: isDark,
-                      onTap: () => _onNotificationTap(n),
-                      onConfirmDismiss: () => _onConfirmNotificationDismiss(n),
-                    )
+                  notification: n,
+                  isDark: isDark,
+                  onTap: () => _onNotificationTap(n),
+                  onConfirmDismiss: () => _onConfirmNotificationDismiss(n),
+                )
                     .animate(delay: Duration(milliseconds: index * 50))
                     .fadeIn(duration: 300.ms);
               },
@@ -252,10 +252,9 @@ class _NotificationCard extends StatelessWidget {
         }
         return false;
       },
-      onDismissed:
-          (
-            _,
-          ) {}, // Handled in confirmDismiss implies the item is removed from data source, causing rebuild
+      onDismissed: (
+        _,
+      ) {}, // Handled in confirmDismiss implies the item is removed from data source, causing rebuild
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),

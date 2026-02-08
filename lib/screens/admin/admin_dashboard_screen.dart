@@ -126,8 +126,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Text(
                       'Quick Actions',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 12),
                     _buildQuickActions(isDark),
@@ -137,8 +137,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Text(
                       'Recent Activity',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 12),
                     _buildRecentActivity(isDark),
@@ -396,7 +396,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: snapshot.data!.docs.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final doc = snapshot.data!.docs[index];
               final data = doc.data() as Map<String, dynamic>;

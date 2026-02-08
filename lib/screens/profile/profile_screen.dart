@@ -340,7 +340,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         child: Column(
           children: [
             // Profile header
@@ -353,178 +353,197 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 32),
 
             // Settings sections
-            _buildSection(l10n.appearance, [
-              _buildSettingTile(
-                icon: Icons.dark_mode_rounded,
-                title: l10n.darkMode,
-                trailing: Switch(
-                  value: themeProvider.isDarkMode,
-                  onChanged: (_) => themeProvider.toggleTheme(),
-                ),
-                isDark: isDark,
-              ),
-              _buildSettingTile(
-                icon: Icons.language_rounded,
-                title: l10n.language,
-                subtitle: localeProvider.languageName,
-                onTap: () => _showLanguageDialog(context, l10n),
-                isDark: isDark,
-              ),
-            ], isDark),
+            _buildSection(
+                l10n.appearance,
+                [
+                  _buildSettingTile(
+                    icon: Icons.dark_mode_rounded,
+                    title: l10n.darkMode,
+                    trailing: Switch(
+                      value: themeProvider.isDarkMode,
+                      onChanged: (_) => themeProvider.toggleTheme(),
+                    ),
+                    isDark: isDark,
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.language_rounded,
+                    title: l10n.language,
+                    subtitle: localeProvider.languageName,
+                    onTap: () => _showLanguageDialog(context, l10n),
+                    isDark: isDark,
+                  ),
+                ],
+                isDark),
 
             const SizedBox(height: 20),
 
-            _buildSection(l10n.notificationSettings, [
-              _buildSettingTile(
-                icon: Icons.notifications_rounded,
-                title: l10n.pushNotifications,
-                trailing: Switch(
-                  value: _pushNotificationsEnabled,
-                  onChanged: _togglePushNotifications,
-                ),
-                isDark: isDark,
-              ),
-              _buildSettingTile(
-                icon: Icons.email_rounded,
-                title: l10n.emailNotifications,
-                trailing: Switch(
-                  value: _emailNotificationsEnabled,
-                  onChanged: _toggleEmailNotifications,
-                ),
-                isDark: isDark,
-              ),
-              _buildSettingTile(
-                icon: Icons.notifications_active_rounded,
-                title: l10n.notifications,
-                subtitle: l10n.notificationSettings,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const NotificationSettingsScreen(),
+            _buildSection(
+                l10n.notificationSettings,
+                [
+                  _buildSettingTile(
+                    icon: Icons.notifications_rounded,
+                    title: l10n.pushNotifications,
+                    trailing: Switch(
+                      value: _pushNotificationsEnabled,
+                      onChanged: _togglePushNotifications,
+                    ),
+                    isDark: isDark,
                   ),
-                ),
-                isDark: isDark,
-              ),
-            ], isDark),
+                  _buildSettingTile(
+                    icon: Icons.email_rounded,
+                    title: l10n.emailNotifications,
+                    trailing: Switch(
+                      value: _emailNotificationsEnabled,
+                      onChanged: _toggleEmailNotifications,
+                    ),
+                    isDark: isDark,
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.notifications_active_rounded,
+                    title: l10n.notifications,
+                    subtitle: l10n.notificationSettings,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationSettingsScreen(),
+                      ),
+                    ),
+                    isDark: isDark,
+                  ),
+                ],
+                isDark),
 
             // Account section
             const SizedBox(height: 20),
-            _buildSection(l10n.account, [
-              _buildSettingTile(
-                icon: Icons.person,
-                title: l10n.editProfile,
-                subtitle: l10n.updateProfile,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-                ),
-                isDark: isDark,
-              ),
-              _buildSettingTile(
-                icon: Icons.lock,
-                title: l10n.changePassword,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ChangePasswordScreen(),
+            _buildSection(
+                l10n.account,
+                [
+                  _buildSettingTile(
+                    icon: Icons.person,
+                    title: l10n.editProfile,
+                    subtitle: l10n.updateProfile,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen()),
+                    ),
+                    isDark: isDark,
                   ),
-                ),
-                isDark: isDark,
-              ),
-              _buildSettingTile(
-                icon: Icons.folder_shared_rounded,
-                title: l10n.medicalDocuments,
-                subtitle: l10n.manageYourMedicalRecords,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MedicalDocumentsScreen(),
+                  _buildSettingTile(
+                    icon: Icons.lock,
+                    title: l10n.changePassword,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChangePasswordScreen(),
+                      ),
+                    ),
+                    isDark: isDark,
                   ),
-                ),
-                isDark: isDark,
-              ),
-            ], isDark),
+                  _buildSettingTile(
+                    icon: Icons.folder_shared_rounded,
+                    title: l10n.medicalDocuments,
+                    subtitle: l10n.manageYourMedicalRecords,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MedicalDocumentsScreen(),
+                      ),
+                    ),
+                    isDark: isDark,
+                  ),
+                ],
+                isDark),
 
             const SizedBox(height: 20),
 
-            _buildSection(l10n.about, [
-              _buildSettingTile(
-                icon: Icons.privacy_tip_rounded,
-                title: l10n.privacyPolicy,
-                onTap: () => _showPrivacyPolicy(context),
-                isDark: isDark,
-              ),
-              _buildSettingTile(
-                icon: Icons.description_rounded,
-                title: l10n.termsOfService,
-                onTap: () => _showTermsOfService(context),
-                isDark: isDark,
-              ),
-              _buildSettingTile(
-                icon: Icons.help_rounded,
-                title: l10n.helpAndSupport,
-                onTap: () => _showHelpSupport(context),
-                isDark: isDark,
-              ),
-              _buildSettingTile(
-                icon: Icons.info_rounded,
-                title: l10n.version,
-                trailing: FutureBuilder<PackageInfo>(
-                  future: PackageInfo.fromPlatform(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      return Text(
-                        snapshot.data!.version,
-                        style: GoogleFonts.roboto(color: Colors.grey),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-                onTap: () => _showVersionInfo(context),
-                isDark: isDark,
-              ),
-            ], isDark),
+            _buildSection(
+                l10n.about,
+                [
+                  _buildSettingTile(
+                    icon: Icons.privacy_tip_rounded,
+                    title: l10n.privacyPolicy,
+                    onTap: () => _showPrivacyPolicy(context),
+                    isDark: isDark,
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.description_rounded,
+                    title: l10n.termsOfService,
+                    onTap: () => _showTermsOfService(context),
+                    isDark: isDark,
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.help_rounded,
+                    title: l10n.helpAndSupport,
+                    onTap: () => _showHelpSupport(context),
+                    isDark: isDark,
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.info_rounded,
+                    title: l10n.version,
+                    trailing: FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          return Text(
+                            snapshot.data!.version,
+                            style: GoogleFonts.roboto(color: Colors.grey),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                    onTap: () => _showVersionInfo(context),
+                    isDark: isDark,
+                  ),
+                ],
+                isDark),
 
             // Developer Testing section - only visible to admin
             if (user?.isAdmin == true) ...[
               const SizedBox(height: 20),
-              _buildSection(l10n.developerTesting, [
-                _buildSettingTile(
-                  icon: Icons.notification_add,
-                  title: l10n.sendTestNotification,
-                  onTap: () => _sendTestNotification(context),
-                  isDark: isDark,
-                ),
-                _buildSettingTile(
-                  icon: Icons.schedule,
-                  title: l10n.scheduleTestNotification,
-                  onTap: () => _scheduleTestNotification(context),
-                  isDark: isDark,
-                ),
-                _buildSettingTile(
-                  icon: Icons.delete_sweep,
-                  title: l10n.clearAll,
-                  onTap: () => _clearAllNotifications(context),
-                  isDark: isDark,
-                ),
-              ], isDark),
+              _buildSection(
+                  l10n.developerTesting,
+                  [
+                    _buildSettingTile(
+                      icon: Icons.notification_add,
+                      title: l10n.sendTestNotification,
+                      onTap: () => _sendTestNotification(context),
+                      isDark: isDark,
+                    ),
+                    _buildSettingTile(
+                      icon: Icons.schedule,
+                      title: l10n.scheduleTestNotification,
+                      onTap: () => _scheduleTestNotification(context),
+                      isDark: isDark,
+                    ),
+                    _buildSettingTile(
+                      icon: Icons.delete_sweep,
+                      title: l10n.clearAll,
+                      onTap: () => _clearAllNotifications(context),
+                      isDark: isDark,
+                    ),
+                  ],
+                  isDark),
 
               // Admin section - only visible to admin
               const SizedBox(height: 20),
-              _buildSection(l10n.admin, [
-                _buildSettingTile(
-                  icon: Icons.admin_panel_settings,
-                  title: l10n.adminDashboard,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AdminDashboardScreen(),
+              _buildSection(
+                  l10n.admin,
+                  [
+                    _buildSettingTile(
+                      icon: Icons.admin_panel_settings,
+                      title: l10n.adminDashboard,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminDashboardScreen(),
+                        ),
+                      ),
+                      isDark: isDark,
                     ),
-                  ),
-                  isDark: isDark,
-                ),
-              ], isDark),
+                  ],
+                  isDark),
             ],
 
             const SizedBox(height: 32),
@@ -786,17 +805,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: ClipOval(
                   child: photoUrl != null && photoUrl.isNotEmpty
                       ? (photoUrl.startsWith('http')
-                            ? Image.network(
-                                photoUrl,
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) =>
-                                    _buildDefaultAvatar(initial, isDark),
-                              )
-                            // Web or Mobile with local path (not supported without dart:io)
-                            // See: https://github.com/flutter/flutter/issues/33646
-                            : _buildDefaultAvatar(initial, isDark))
+                          ? Image.network(
+                              photoUrl,
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  _buildDefaultAvatar(initial, isDark),
+                            )
+                          // Web or Mobile with local path (not supported without dart:io)
+                          // See: https://github.com/flutter/flutter/issues/33646
+                          : _buildDefaultAvatar(initial, isDark))
                       : _buildDefaultAvatar(initial, isDark),
                 ),
               ),
@@ -944,8 +963,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 class LegalText {
-  static const String privacyPolicy =
-      'Last updated: January 2025\n\n'
+  static const String privacyPolicy = 'Last updated: January 2025\n\n'
       '1. Introduction\n'
       'Welcome to UHC App. We respect your privacy and are committed to protecting your personal data.\n\n'
       '2. Data We Collect\n'
@@ -957,8 +975,7 @@ class LegalText {
       '5. Contact Us\n'
       'If you have any questions about this Privacy Policy, please contact support@uhc.edu.';
 
-  static const String termsOfService =
-      '1. Acceptance of Terms\n'
+  static const String termsOfService = '1. Acceptance of Terms\n'
       'By accessing or using our app, you agree to be bound by these Terms of Service.\n\n'
       '2. User Accounts\n'
       'You are responsible for maintaining the confidentiality of your account credentials.\n\n'

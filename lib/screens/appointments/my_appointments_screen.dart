@@ -134,10 +134,10 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
 
     if (isLoading) {
       return ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: 3,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (_, _) => const AppointmentCardSkeleton(),
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) => const AppointmentCardSkeleton(),
       );
     }
 
@@ -198,18 +198,18 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
     return RefreshIndicator(
       onRefresh: _loadAppointments,
       child: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: appointments.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final appointment = appointments[index];
           return _AppointmentCard(
-                appointment: appointment,
-                isDark: isDark,
-                onTap: () => _showAppointmentDetail(appointment),
-                onCancel: () => _showCancelDialog(appointment),
-                onReschedule: () => _showRescheduleDialog(appointment),
-              )
+            appointment: appointment,
+            isDark: isDark,
+            onTap: () => _showAppointmentDetail(appointment),
+            onCancel: () => _showCancelDialog(appointment),
+            onReschedule: () => _showRescheduleDialog(appointment),
+          )
               .animate(delay: Duration(milliseconds: index * 100))
               .fadeIn(duration: 400.ms)
               .slideX(begin: 0.05);
@@ -494,9 +494,8 @@ class _AppointmentCard extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: appointment.canReschedule
-                          ? onReschedule
-                          : null,
+                      onPressed:
+                          appointment.canReschedule ? onReschedule : null,
                       child: Text(l10n.reschedule),
                     ),
                   ),

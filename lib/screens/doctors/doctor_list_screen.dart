@@ -187,16 +187,16 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
               child: _isLoading
                   ? _buildLoadingList()
                   : _doctors.isEmpty
-                  ? _buildEmptyState(
-                      isDark,
-                      message: AppLocalizations.of(context).noDataFound,
-                    )
-                  : _filteredDoctors.isEmpty
-                  ? _buildEmptyState(
-                      isDark,
-                      message: AppLocalizations.of(context).noDataFound,
-                    ) // You might want a different message for "no matches"
-                  : _buildDoctorList(isDark),
+                      ? _buildEmptyState(
+                          isDark,
+                          message: AppLocalizations.of(context).noDataFound,
+                        )
+                      : _filteredDoctors.isEmpty
+                          ? _buildEmptyState(
+                              isDark,
+                              message: AppLocalizations.of(context).noDataFound,
+                            ) // You might want a different message for "no matches"
+                          : _buildDoctorList(isDark),
             ),
           ),
         ],
@@ -223,7 +223,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: chipItems.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final (deptKey, label) = chipItems[index];
           final isSelected = _selectedDepartmentName == deptKey;
@@ -237,8 +237,8 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
               color: isSelected
                   ? Colors.white
                   : (isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight),
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight),
             ),
             selectedColor: AppColors.primary,
             backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
@@ -257,9 +257,9 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
 
   Widget _buildLoadingList() {
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: 4,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) => const DoctorCardSkeleton(),
     );
   }
@@ -305,17 +305,17 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
 
   Widget _buildDoctorList(bool isDark) {
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       itemCount: _filteredDoctors.length,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final doctor = _filteredDoctors[index];
         return _DoctorCard(
-              doctor: doctor,
-              isDark: isDark,
-              onTap: () => _navigateToDetail(doctor),
-            )
+          doctor: doctor,
+          isDark: isDark,
+          onTap: () => _navigateToDetail(doctor),
+        )
             .animate(delay: Duration(milliseconds: index * 100))
             .fadeIn(duration: 400.ms)
             .slideX(begin: 0.05);
@@ -370,11 +370,11 @@ class _DoctorCard extends StatelessWidget {
                 width: 80,
                 height: 80,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => Container(
+                placeholder: (context, url) => Container(
                   color: Colors.grey[300],
                   child: const Icon(Icons.person, size: 40),
                 ),
-                errorWidget: (_, _, _) => Container(
+                errorWidget: (context, url, error) => Container(
                   color: Colors.grey[300],
                   child: const Icon(Icons.person, size: 40),
                 ),
@@ -485,11 +485,11 @@ class DoctorDetailScreen extends StatelessWidget {
                   CachedNetworkImage(
                     imageUrl: doctor.photoUrl ?? '',
                     fit: BoxFit.cover,
-                    placeholder: (_, _) => Container(
+                    placeholder: (context, url) => Container(
                       color: AppColors.primary.withValues(alpha: 0.2),
                       child: const Icon(Icons.person, size: 100),
                     ),
-                    errorWidget: (_, _, _) => Container(
+                    errorWidget: (context, url, error) => Container(
                       color: AppColors.primary.withValues(alpha: 0.2),
                       child: const Icon(Icons.person, size: 100),
                     ),
@@ -744,8 +744,7 @@ class DoctorDetailScreen extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color:
-                    valueColor ??
+                color: valueColor ??
                     (isDark
                         ? AppColors.textPrimaryDark
                         : AppColors.textPrimaryLight),
@@ -773,7 +772,7 @@ class DoctorDetailScreen extends StatelessWidget {
   }
 
   static final Map<String, String Function(AppLocalizations)>
-  _bioLocalizationMap = {
+      _bioLocalizationMap = {
     'Amanda White': (l10n) => l10n.doctorBioAmandaWhite,
     'Lisa Brown': (l10n) => l10n.doctorBioLisaBrown,
     'James Wilson': (l10n) => l10n.doctorBioJamesWilson,

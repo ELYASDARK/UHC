@@ -76,9 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // First add departments in the specified order
         for (final key in orderedKeys) {
-          final dept = departments
-              .where((d) => d.departmentKey == key)
-              .firstOrNull;
+          final dept =
+              departments.where((d) => d.departmentKey == key).firstOrNull;
           if (dept != null) {
             sortedDepartments.add(dept);
           }
@@ -169,9 +168,8 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isDark,
   ) {
     // Get user initial for the avatar
-    final initial = userName.isNotEmpty
-        ? userName.substring(0, 1).toUpperCase()
-        : 'U';
+    final initial =
+        userName.isNotEmpty ? userName.substring(0, 1).toUpperCase() : 'U';
 
     return Row(
       children: [
@@ -190,20 +188,31 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
             border: Border.all(
-              color: isDark
-                  ? Colors.white10
-                  : Colors.grey.withValues(alpha: 0.1),
+              color:
+                  isDark ? Colors.white10 : Colors.grey.withValues(alpha: 0.1),
             ),
           ),
           child: ClipOval(
             child: photoUrl != null
                 ? (photoUrl.startsWith('http')
-                      ? Image.network(
-                          photoUrl,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Center(
+                    ? Image.network(
+                        photoUrl,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Center(
+                          child: Text(
+                            initial,
+                            style: GoogleFonts.outfit(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      )
+                    : (kIsWeb
+                        ? Center(
                             child: Text(
                               initial,
                               style: GoogleFonts.outfit(
@@ -212,35 +221,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: AppColors.primary,
                               ),
                             ),
-                          ),
-                        )
-                      : (kIsWeb
-                            ? Center(
-                                child: Text(
-                                  initial,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
-                                  ),
+                          )
+                        : Image.file(
+                            File(photoUrl),
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Center(
+                              child: Text(
+                                initial,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
                                 ),
-                              )
-                            : Image.file(
-                                File(photoUrl),
-                                width: 56,
-                                height: 56,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => Center(
-                                  child: Text(
-                                    initial,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ),
-                              )))
+                              ),
+                            ),
+                          )))
                 : Center(
                     child: Text(
                       initial,
@@ -276,17 +274,17 @@ class _HomeScreenState extends State<HomeScreen> {
               ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.2),
               const SizedBox(height: 4),
               Text(
-                    AppLocalizations.of(context).howAreYouFeeling,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  )
+                AppLocalizations.of(context).howAreYouFeeling,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
                   .animate(delay: 200.ms)
                   .fadeIn(duration: 400.ms)
                   .slideX(begin: -0.2),
@@ -298,59 +296,58 @@ class _HomeScreenState extends State<HomeScreen> {
         Consumer<NotificationProvider>(
           builder: (context, notificationProvider, _) {
             return Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.surfaceDark : Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                    border: Border.all(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white10
+                      : Colors.grey.withValues(alpha: 0.1),
+                ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    onPressed: widget.onNotificationsTap,
+                    icon: Icon(
+                      Icons.notifications_none_rounded,
+                      size: 26,
                       color: isDark
-                          ? Colors.white10
-                          : Colors.grey.withValues(alpha: 0.1),
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
                     ),
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      IconButton(
-                        onPressed: widget.onNotificationsTap,
-                        icon: Icon(
-                          Icons.notifications_none_rounded,
-                          size: 26,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
-                        ),
-                      ),
-                      if (notificationProvider.unreadCount > 0)
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: AppColors.error,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isDark
-                                    ? AppColors.surfaceDark
-                                    : Colors.white,
-                                width: 1.5,
-                              ),
-                            ),
+                  if (notificationProvider.unreadCount > 0)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isDark ? AppColors.surfaceDark : Colors.white,
+                            width: 1.5,
                           ),
                         ),
-                    ],
-                  ),
-                )
+                      ),
+                    ),
+                ],
+              ),
+            )
                 .animate(delay: 300.ms)
                 .fadeIn()
                 .scale(begin: const Offset(0.8, 0.8));
@@ -448,9 +445,8 @@ class _HomeScreenState extends State<HomeScreen> {
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: isDark
-                ? AppColors.textPrimaryDark
-                : AppColors.textPrimaryLight,
+            color:
+                isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           ),
         ),
         const SizedBox(height: 16),
@@ -577,36 +573,40 @@ class _HomeScreenState extends State<HomeScreen> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _error!,
-                        style: GoogleFonts.roboto(
-                          fontSize: 12,
-                          color: AppColors.error,
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _error!,
+                            style: GoogleFonts.roboto(
+                              fontSize: 12,
+                              color: AppColors.error,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _loadDepartments,
+                            child: Text(AppLocalizations.of(context).retry),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _departments.isEmpty
+                      ? Center(
+                          child:
+                              Text(AppLocalizations.of(context).noDepartments))
+                      : ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          // Show max 4 departments on home, click View All for more
+                          itemCount:
+                              _departments.length > 4 ? 4 : _departments.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            final dept = _departments[index];
+                            return _buildDepartmentCard(dept, isDark);
+                          },
                         ),
-                      ),
-                      TextButton(
-                        onPressed: _loadDepartments,
-                        child: Text(AppLocalizations.of(context).retry),
-                      ),
-                    ],
-                  ),
-                )
-              : _departments.isEmpty
-              ? Center(child: Text(AppLocalizations.of(context).noDepartments))
-              : ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  // Show max 4 departments on home, click View All for more
-                  itemCount: _departments.length > 4 ? 4 : _departments.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final dept = _departments[index];
-                    return _buildDepartmentCard(dept, isDark);
-                  },
-                ),
         ),
       ],
     ).animate(delay: 500.ms).fadeIn(duration: 500.ms);
@@ -730,9 +730,8 @@ class _HomeScreenState extends State<HomeScreen> {
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: isDark
-                ? AppColors.textPrimaryDark
-                : AppColors.textPrimaryLight,
+            color:
+                isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           ),
         ),
         const SizedBox(height: 12),
@@ -741,7 +740,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: tips.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            separatorBuilder: (context, index) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
               final tip = tips[index];
               return _buildHealthTipCard(tip, isDark);
