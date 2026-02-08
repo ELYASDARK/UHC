@@ -30,7 +30,6 @@ A comprehensive Flutter mobile application for managing university health center
 - **User Management**: View users, change roles, toggle status
 - **Analytics**: Appointment statistics with charts and trends
 - **Reports**: Generate CSV reports (appointments, doctors, users, revenue)
-- **Sample Data Management**: Seed sample doctors, appointments, and departments for testing
 
 ### 🏥 Departments
 - General Medicine
@@ -50,7 +49,7 @@ A comprehensive Flutter mobile application for managing university health center
 |----------|------------|
 | Framework | Flutter 3.x |
 | State Management | Provider |
-| Backend | Firebase (Auth, Firestore, Storage, Cloud Messaging) |
+| Backend | Firebase (Auth, Firestore, Storage, Cloud Messaging, Cloud Functions) |
 | Local Storage | SharedPreferences |
 | Notifications | flutter_local_notifications, Firebase Cloud Messaging |
 | UI | Material Design 3, Google Fonts |
@@ -86,7 +85,21 @@ lib/
 │   ├── reviews/         # Doctor ratings and reviews
 │   └── splash/          # Splash screen
 └── services/            # FCM, local notifications
+└── functions/           # Firebase Cloud Functions (TypeScript)
 ```
+
+## Firebase Cloud Functions
+
+The project uses Firebase Cloud Functions (TypeScript) for secure administrative tasks that require privileged access:
+
+| Function Name | Description | Access Level |
+|---------------|-------------|--------------|
+| `createDoctorAccount` | Creates a new Doctor account in Firebase Auth and Firestore with the 'doctor' role. | Admin Only |
+| `updateDoctorEmail` | Updates a doctor's email address in both Auth and Firestore. | Admin Only |
+| `deleteDoctorAccount` | Completely removes a doctor's account from Auth and Firestore. | Admin Only |
+| `resetDoctorPassword` | Securely resets a doctor's password without requiring old password. | Admin Only |
+
+> **Note**: These functions ensure that critical operations like creating accounts with specific roles are handled securely on the backend, preventing unauthorized privilege escalation.
 
 ## Getting Started
 
@@ -98,6 +111,7 @@ lib/
   - Cloud Firestore
   - Cloud Messaging
   - Firebase Storage
+  - Firebase Cloud Functions
 
 ### Installation
 
