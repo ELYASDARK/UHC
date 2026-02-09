@@ -17,7 +17,7 @@ class DoctorRepository {
       final snapshot = await _doctorsRef.get();
       final doctors = snapshot.docs
           .map((doc) => DoctorModel.fromFirestore(doc))
-          .where((d) => d.isAvailable)
+          .where((d) => d.isActive) // Only show active doctors
           .toList();
       // Sort in-memory by name
       doctors.sort((a, b) => a.name.compareTo(b.name));
@@ -47,7 +47,7 @@ class DoctorRepository {
           .get();
       final doctors = snapshot.docs
           .map((doc) => DoctorModel.fromFirestore(doc))
-          .where((d) => d.isAvailable)
+          .where((d) => d.isActive) // Only show active doctors
           .toList();
       doctors.sort((a, b) => a.name.compareTo(b.name));
       return doctors;
@@ -101,7 +101,7 @@ class DoctorRepository {
     return _doctorsRef.snapshots().map((snapshot) {
       final doctors = snapshot.docs
           .map((doc) => DoctorModel.fromFirestore(doc))
-          .where((d) => d.isAvailable)
+          .where((d) => d.isActive) // Only show active doctors
           .toList();
       doctors.sort((a, b) => a.name.compareTo(b.name));
       return doctors;
@@ -114,12 +114,12 @@ class DoctorRepository {
         .where('department', isEqualTo: department.name)
         .snapshots()
         .map((snapshot) {
-          final doctors = snapshot.docs
-              .map((doc) => DoctorModel.fromFirestore(doc))
-              .where((d) => d.isAvailable)
-              .toList();
-          doctors.sort((a, b) => a.name.compareTo(b.name));
-          return doctors;
-        });
+      final doctors = snapshot.docs
+          .map((doc) => DoctorModel.fromFirestore(doc))
+          .where((d) => d.isActive) // Only show active doctors
+          .toList();
+      doctors.sort((a, b) => a.name.compareTo(b.name));
+      return doctors;
+    });
   }
 }

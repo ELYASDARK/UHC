@@ -16,8 +16,8 @@ class DoctorModel {
   final String? bio;
   final int experienceYears;
   final List<String> qualifications;
-  final List<String> languages;
   final bool isAvailable;
+  final bool isActive; // Admin-controlled activation status
   final Map<String, List<TimeSlot>> weeklySchedule;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -33,8 +33,8 @@ class DoctorModel {
     this.bio,
     this.experienceYears = 0,
     this.qualifications = const [],
-    this.languages = const ['English'],
     this.isAvailable = true,
+    this.isActive = true,
     this.weeklySchedule = const {},
     required this.createdAt,
     required this.updatedAt,
@@ -66,9 +66,8 @@ class DoctorModel {
     if (data['weeklySchedule'] != null) {
       final scheduleData = data['weeklySchedule'] as Map<String, dynamic>;
       scheduleData.forEach((day, slots) {
-        schedule[day] = (slots as List)
-            .map((s) => TimeSlot.fromMap(s))
-            .toList();
+        schedule[day] =
+            (slots as List).map((s) => TimeSlot.fromMap(s)).toList();
       });
     }
 
@@ -83,8 +82,8 @@ class DoctorModel {
       bio: data['bio'],
       experienceYears: data['experienceYears'] ?? 0,
       qualifications: List<String>.from(data['qualifications'] ?? []),
-      languages: List<String>.from(data['languages'] ?? ['English']),
       isAvailable: data['isAvailable'] ?? true,
+      isActive: data['isActive'] ?? true,
       weeklySchedule: schedule,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -107,8 +106,8 @@ class DoctorModel {
       'bio': bio,
       'experienceYears': experienceYears,
       'qualifications': qualifications,
-      'languages': languages,
       'isAvailable': isAvailable,
+      'isActive': isActive,
       'weeklySchedule': scheduleMap,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -126,8 +125,8 @@ class DoctorModel {
     String? bio,
     int? experienceYears,
     List<String>? qualifications,
-    List<String>? languages,
     bool? isAvailable,
+    bool? isActive,
     Map<String, List<TimeSlot>>? weeklySchedule,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -143,8 +142,8 @@ class DoctorModel {
       bio: bio ?? this.bio,
       experienceYears: experienceYears ?? this.experienceYears,
       qualifications: qualifications ?? this.qualifications,
-      languages: languages ?? this.languages,
       isAvailable: isAvailable ?? this.isAvailable,
+      isActive: isActive ?? this.isActive,
       weeklySchedule: weeklySchedule ?? this.weeklySchedule,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

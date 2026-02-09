@@ -6,6 +6,7 @@ import '../../data/models/user_model.dart';
 import 'doctor_management_screen.dart';
 import 'user_management_screen.dart';
 import 'appointment_analytics_screen.dart';
+import 'reports_screen.dart';
 
 /// Admin dashboard with overview and navigation
 class AdminDashboardScreen extends StatefulWidget {
@@ -308,17 +309,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         _buildActionCard(
           isDark: isDark,
-          title: 'Future Update',
-          icon: Icons.update,
+          title: 'Reports',
+          icon: Icons.description,
           color: Colors.purple,
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('This feature is coming soon!'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReportsScreen()),
+          ),
         ),
       ],
     );

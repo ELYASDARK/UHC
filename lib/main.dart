@@ -154,26 +154,23 @@ class _AppNavigatorState extends State<AppNavigator> {
 
   bool _showSplash = true;
   bool _onboardingComplete = false;
-  bool _onboardingChecked = false;
 
   // Auth flow: 0 = login, 1 = register, 2 = forgot password
   int _authScreen = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkOnboarding();
-  }
-
-  Future<void> _checkOnboarding() async {
+  /// Called when splash screen animation/delay completes
+  /// This ensures onboarding is checked BEFORE we leave the splash
+  Future<void> _onSplashComplete() async {
+    // Check onboarding status before leaving splash
     final prefs = await SharedPreferences.getInstance();
     final complete = prefs.getBool(_onboardingKey) ?? false;
-    if (mounted) {
-      setState(() {
-        _onboardingComplete = complete;
-        _onboardingChecked = true;
-      });
-    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _onboardingComplete = complete;
+      _showSplash = false;
+    });
   }
 
   Future<void> _completeOnboarding() async {
@@ -186,27 +183,16 @@ class _AppNavigatorState extends State<AppNavigator> {
     }
   }
 
-  void _onSplashComplete() {
-    setState(() {
-      _showSplash = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
 
-    // Show splash screen first
+    // Show splash screen first (onboarding check happens when splash completes)
     if (_showSplash) {
       return SplashScreen(onComplete: _onSplashComplete);
     }
 
-    // Wait for onboarding check
-    if (!_onboardingChecked) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    // Show onboarding if not complete
+    // Show onboarding if not complete (checked during splash completion)
     if (!_onboardingComplete) {
       return OnboardingScreen(onComplete: _completeOnboarding);
     }

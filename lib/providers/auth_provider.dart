@@ -47,6 +47,19 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
 
       _currentUser = await _authService.getUserData(uid);
+
+      // Check if user is active
+      if (_currentUser != null && !_currentUser!.isActive) {
+        // User is deactivated - sign them out
+        await _authService.signOut();
+        _currentUser = null;
+        _state = AuthState.error;
+        _errorMessage =
+            'Your account has been deactivated. Please contact support.';
+        notifyListeners();
+        return;
+      }
+
       _state = AuthState.authenticated;
     } catch (e) {
       _state = AuthState.error;
@@ -71,6 +84,12 @@ class AuthProvider with ChangeNotifier {
       );
 
       await _loadUserData(credential.user!.uid);
+
+      // Check if login was blocked due to deactivation
+      if (_state == AuthState.error) {
+        return false;
+      }
+
       return true;
     } catch (e) {
       _state = AuthState.error;
@@ -122,6 +141,12 @@ class AuthProvider with ChangeNotifier {
 
       if (credential?.user != null) {
         await _loadUserData(credential!.user!.uid);
+
+        // Check if login was blocked due to deactivation
+        if (_state == AuthState.error) {
+          return false;
+        }
+
         return true;
       } else {
         _state = AuthState.unauthenticated;

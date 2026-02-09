@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/user_model.dart';
+import 'user_form_dialog.dart';
 
 /// User management screen for admin
 class UserManagementScreen extends StatefulWidget {
@@ -93,9 +94,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ),
                     onDeleted: () =>
                         setState(() => _selectedRoles.remove(role)),
-                    deleteIconColor: isDark
-                        ? Colors.white70
-                        : AppColors.primary,
+                    deleteIconColor:
+                        isDark ? Colors.white70 : AppColors.primary,
                   );
                 }).toList(),
               ),
@@ -125,6 +125,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                 final docs = snapshot.data!.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
+
+                  // Exclude doctors - they are managed in Doctor Management
+                  final roleStr = data['role'] as String? ?? 'student';
+                  if (roleStr == 'doctor') return false;
+
                   final name = (data['fullName'] ?? data['email'] ?? '')
                       .toString()
                       .toLowerCase();
@@ -134,7 +139,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                   if (_selectedRoles.isEmpty) return matchesSearch;
 
-                  final roleStr = data['role'] as String? ?? 'student';
                   final role = UserRole.values.firstWhere(
                     (r) => r.name == roleStr,
                     orElse: () => UserRole.student,
@@ -156,6 +160,27 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddUserDialog(),
+        backgroundColor: AppColors.primary,
+        icon: const Icon(Icons.person_add, color: Colors.white),
+        label: const Text('Add User', style: TextStyle(color: Colors.white)),
+        shape: const StadiumBorder(),
+      ),
+    );
+  }
+
+  void _showAddUserDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => const UserFormDialog(),
+    );
+  }
+
+  void _showEditUserDialog(String id, Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (context) => UserFormDialog(id: id, data: data),
     );
   }
 
@@ -257,6 +282,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               case 'view':
                 _showUserDetails(context, data, isDark);
                 break;
+              case 'edit':
+                _showEditUserDialog(id, data);
+                break;
               case 'toggle':
                 _toggleUserStatus(id, isActive);
                 break;
@@ -273,6 +301,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   Icon(Icons.visibility, size: 18),
                   SizedBox(width: 8),
                   Text('View Details'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  Icon(Icons.edit, size: 18),
+                  SizedBox(width: 8),
+                  Text('Edit'),
                 ],
               ),
             ),
@@ -328,7 +366,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               title: const Text('Filter by Role'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: UserRole.values.map((role) {
+                // Exclude doctor from filter options
+                children: UserRole.values
+                    .where((role) => role != UserRole.doctor)
+                    .map((role) {
                   return CheckboxListTile(
                     title: Text(role.name.toUpperCase()),
                     value: tempSelectedRoles.contains(role),
@@ -509,7 +550,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           builder: (context, setState) {
             return Column(
               mainAxisSize: MainAxisSize.min,
-              children: UserRole.values.map((role) {
+              // Exclude doctor from role change options
+              children: UserRole.values
+                  .where((role) => role != UserRole.doctor)
+                  .map((role) {
                 return RadioListTile<UserRole>(
                   title: Text(role.name.toUpperCase()),
                   value: role,

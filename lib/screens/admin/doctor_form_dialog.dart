@@ -44,6 +44,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
   bool _obscurePassword = true;
   late TextEditingController _qualificationInputController;
   List<String> _qualifications = [];
+  DateTime? _selectedDateOfBirth;
 
   /// Generate default weekly schedule with 30-minute slots
   Map<String, dynamic> _generateDefaultSchedule() {
@@ -143,10 +144,60 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
       _qualifications = List<String>.from(widget.data!['qualifications']);
     }
 
+    // Load existing date of birth from user document (not doctor)
+    _loadDateOfBirthFromUser();
+
     _selectedDepartment = Department.values.firstWhere(
       (d) => d.name == widget.data?['department'],
       orElse: () => Department.generalMedicine,
     );
+  }
+
+  /// Load dateOfBirth - first from users collection, then fallback to doctors collection
+  Future<void> _loadDateOfBirthFromUser() async {
+    // First try to get from users collection
+    if (widget.data?['userId'] != null) {
+      try {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(widget.data!['userId'])
+            .get();
+
+        if (userDoc.exists && userDoc.data()?['dateOfBirth'] != null) {
+          final dob = userDoc.data()!['dateOfBirth'];
+          if (mounted) {
+            setState(() {
+              if (dob is DateTime) {
+                _selectedDateOfBirth = dob;
+              } else if (dob.toDate != null) {
+                _selectedDateOfBirth = dob.toDate() as DateTime;
+              }
+            });
+          }
+          return; // Found in users collection, done
+        }
+      } catch (_) {
+        // Continue to fallback
+      }
+    }
+
+    // Fallback: check doctors collection (for existing data)
+    if (widget.data?['dateOfBirth'] != null) {
+      try {
+        final dob = widget.data!['dateOfBirth'];
+        if (mounted) {
+          setState(() {
+            if (dob is DateTime) {
+              _selectedDateOfBirth = dob;
+            } else if (dob.toDate != null) {
+              _selectedDateOfBirth = dob.toDate() as DateTime;
+            }
+          });
+        }
+      } catch (_) {
+        // Ignore parsing errors
+      }
+    }
   }
 
   @override
@@ -174,10 +225,118 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
     }
   }
 
-  Future<void> _pickImage() async {
+  void _showPhotoOptions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasPhoto = _imageBytes != null || _photoUrlController.text.isNotEmpty;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Choose Photo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.camera_alt,
+                  color: AppColors.primary,
+                ),
+              ),
+              title: const Text('Take Photo'),
+              subtitle: Text(
+                'Use camera to take a new photo',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromSource(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.photo_library,
+                  color: AppColors.primary,
+                ),
+              ),
+              title: const Text('Choose from Gallery'),
+              subtitle: Text(
+                'Select from your photo library',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromSource(ImageSource.gallery);
+              },
+            ),
+            if (hasPhoto)
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.delete,
+                    color: AppColors.error,
+                  ),
+                ),
+                title: const Text('Remove Photo'),
+                subtitle: Text(
+                  'Delete current profile photo',
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _imageBytes = null;
+                    _photoUrlController.text = '';
+                  });
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromSource(ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         maxWidth: 512,
         maxHeight: 512,
         imageQuality: 70,
@@ -252,23 +411,22 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                   child: Stack(
                     children: [
                       GestureDetector(
-                        onTap: _pickImage,
+                        onTap: _showPhotoOptions,
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: Colors.grey[200],
                           backgroundImage: _imageBytes != null
                               ? MemoryImage(_imageBytes!)
                               : _photoUrlController.text.isNotEmpty
-                              ? NetworkImage(_photoUrlController.text)
-                                    as ImageProvider
-                              : null,
-                          child:
-                              _imageBytes == null &&
+                                  ? NetworkImage(_photoUrlController.text)
+                                      as ImageProvider
+                                  : null,
+                          child: _imageBytes == null &&
                                   _photoUrlController.text.isEmpty
                               ? Icon(
-                                  Icons.add_a_photo,
-                                  size: 40,
-                                  color: Colors.grey[600],
+                                  Icons.person,
+                                  size: 50,
+                                  color: Colors.grey[500],
                                 )
                               : null,
                         ),
@@ -277,21 +435,30 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                         const Positioned.fill(
                           child: Center(child: CircularProgressIndicator()),
                         ),
-                      if (_photoUrlController.text.isNotEmpty ||
-                          _imageBytes != null)
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: CircleAvatar(
-                            radius: 18,
-                            backgroundColor: AppColors.primary,
-                            child: IconButton(
-                              icon: const Icon(Icons.edit, size: 18),
+                      // Camera icon - always visible
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: GestureDetector(
+                          onTap: _showPhotoOptions,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 18,
                               color: Colors.white,
-                              onPressed: _pickImage,
                             ),
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),
@@ -518,6 +685,48 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                     }).toList(),
                   ),
 
+                const SizedBox(height: 12),
+
+                // Date of Birth field
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDateOfBirth ?? DateTime(1980, 1, 1),
+                      firstDate: DateTime(1940),
+                      lastDate: DateTime.now(),
+                      helpText: 'Select Date of Birth',
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDateOfBirth = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Date of Birth',
+                      prefixIcon: const Icon(Icons.calendar_today),
+                      suffixIcon: _selectedDateOfBirth != null
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() => _selectedDateOfBirth = null);
+                              },
+                            )
+                          : null,
+                    ),
+                    child: Text(
+                      _selectedDateOfBirth != null
+                          ? '${_selectedDateOfBirth!.day}/${_selectedDateOfBirth!.month}/${_selectedDateOfBirth!.year}'
+                          : 'Select date',
+                      style: TextStyle(
+                        color: _selectedDateOfBirth != null
+                            ? null
+                            : Theme.of(context).hintColor,
+                      ),
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _experienceController,
@@ -558,7 +767,8 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                   maxLines: 3,
                   decoration: const InputDecoration(labelText: 'Bio'),
                 ),
-                const SizedBox(height: 16),
+
+                const SizedBox(height: 8),
 
                 if (isEditing) ...[
                   const SizedBox(height: 24),
@@ -666,6 +876,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
               : null,
           qualifications: _qualifications,
           weeklySchedule: _generateDefaultSchedule(),
+          dateOfBirth: _selectedDateOfBirth,
         );
 
         if (mounted) {
@@ -781,6 +992,17 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
             .collection('doctors')
             .doc(widget.id)
             .update(doctorData);
+
+        // Update dateOfBirth in the user document (not doctor)
+        if (widget.data?['userId'] != null) {
+          await _firestore
+              .collection('users')
+              .doc(widget.data!['userId'])
+              .update({
+            'dateOfBirth': _selectedDateOfBirth,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
 
         if (mounted) {
           Navigator.pop(context);

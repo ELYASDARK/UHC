@@ -48,7 +48,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
             builder: (context) => const DoctorFormDialog(),
           );
         },
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.person_add),
         label: const Text('Add Doctor'),
         backgroundColor: AppColors.primary,
         shape: const StadiumBorder(),
@@ -107,9 +107,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                     ),
                     onDeleted: () =>
                         setState(() => _selectedDepartments.remove(dept)),
-                    deleteIconColor: isDark
-                        ? Colors.white70
-                        : AppColors.primary,
+                    deleteIconColor:
+                        isDark ? Colors.white70 : AppColors.primary,
                   );
                 }).toList(),
               ),
@@ -209,13 +208,11 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundImage:
-                  data['photoUrl'] != null &&
+              backgroundImage: data['photoUrl'] != null &&
                       (data['photoUrl'] as String).isNotEmpty
                   ? NetworkImage(data['photoUrl'])
                   : null,
-              child:
-                  data['photoUrl'] == null ||
+              child: data['photoUrl'] == null ||
                       (data['photoUrl'] as String).isEmpty
                   ? const Icon(Icons.person)
                   : null,
@@ -251,6 +248,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         trailing: PopupMenuButton<String>(
           onSelected: (value) {
             switch (value) {
+              case 'view':
+                _showDoctorDetails(context, id, data);
+                break;
               case 'edit':
                 showDialog(
                   context: context,
@@ -266,6 +266,16 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
             }
           },
           itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'view',
+              child: Row(
+                children: [
+                  Icon(Icons.visibility, size: 18),
+                  SizedBox(width: 8),
+                  Text('View Details'),
+                ],
+              ),
+            ),
             const PopupMenuItem(
               value: 'edit',
               child: Row(
@@ -369,8 +379,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
     String name,
     Map<String, dynamic> data,
   ) async {
-    final hasAuthAccount =
-        data['userId'] != null &&
+    final hasAuthAccount = data['userId'] != null &&
         !data['userId'].toString().startsWith('sample_');
 
     final confirmed = await showDialog<bool>(
@@ -481,5 +490,331 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         ),
       );
     }
+  }
+
+  /// Show doctor details in a bottom sheet
+  Future<void> _showDoctorDetails(
+    BuildContext context,
+    String id,
+    Map<String, dynamic> data,
+  ) async {
+    // Capture context values before async gap
+    final capturedContext = context;
+    final isDark = Theme.of(capturedContext).brightness == Brightness.dark;
+    final name = data['name'] ?? 'Unknown';
+    final email = data['email'] ?? 'N/A';
+    final phone = data['phoneNumber'] ?? 'N/A';
+    final department = data['department'] ?? 'N/A';
+    final specialization = data['specialization'] ?? 'N/A';
+    final experienceYears = data['experienceYears'] ?? 0;
+    final consultationFee = data['consultationFee'] ?? 0;
+    final bio = data['bio'] ?? 'N/A';
+    final qualifications =
+        (data['qualifications'] as List<dynamic>?)?.cast<String>() ?? [];
+    final isActive = data['isActive'] ?? true;
+    final photoUrl = data['photoUrl'] as String?;
+    final userId = data['userId'] as String?;
+
+    // Fetch dateOfBirth - first check users collection, then fallback to doctors collection
+    String dateOfBirth = 'N/A';
+
+    // First try to get from users collection
+    if (userId != null) {
+      try {
+        final userDoc = await _firestore.collection('users').doc(userId).get();
+        if (userDoc.exists && userDoc.data()?['dateOfBirth'] != null) {
+          final dob = userDoc.data()!['dateOfBirth'];
+          if (dob is DateTime) {
+            dateOfBirth = '${dob.day}/${dob.month}/${dob.year}';
+          } else if (dob.toDate != null) {
+            final date = dob.toDate() as DateTime;
+            dateOfBirth = '${date.day}/${date.month}/${date.year}';
+          }
+        }
+      } catch (_) {
+        // Continue to fallback
+      }
+    }
+
+    // Fallback: check doctors collection (for existing data)
+    if (dateOfBirth == 'N/A' && data['dateOfBirth'] != null) {
+      try {
+        final dob = data['dateOfBirth'];
+        if (dob is DateTime) {
+          dateOfBirth = '${dob.day}/${dob.month}/${dob.year}';
+        } else if (dob.toDate != null) {
+          final date = dob.toDate() as DateTime;
+          dateOfBirth = '${date.day}/${date.month}/${date.year}';
+        }
+      } catch (_) {
+        dateOfBirth = 'N/A';
+      }
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      // ignore: use_build_context_synchronously
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      // Doctor Photo
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.1),
+                        backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                            ? NetworkImage(photoUrl)
+                            : null,
+                        child: photoUrl == null || photoUrl.isEmpty
+                            ? Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : 'D',
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : null,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Doctor Name
+                      Text(
+                        'Dr. $name',
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      // Specialization
+                      Text(
+                        specialization,
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 16,
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Details Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.grey[800]?.withValues(alpha: 0.3)
+                              : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildDetailRow('Email', email, isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow('Phone', phone, isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow(
+                                'Date of Birth', dateOfBirth, isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow('Department',
+                                _formatDepartment(department), isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow(
+                                'Experience', '$experienceYears years', isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow(
+                                'Consultation Fee',
+                                '\$${consultationFee.toStringAsFixed(0)}',
+                                isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow(
+                              'Status',
+                              isActive ? 'Active' : 'Inactive',
+                              isDark,
+                              valueColor:
+                                  isActive ? AppColors.success : Colors.grey,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Bio Section
+                      if (bio != 'N/A' && bio.toString().isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Biography',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.grey[800]?.withValues(alpha: 0.3)
+                                : Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            bio.toString(),
+                            style: TextStyle(
+                              color:
+                                  isDark ? Colors.grey[300] : Colors.grey[700],
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      // Qualifications Section
+                      if (qualifications.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Qualifications',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.grey[800]?.withValues(alpha: 0.3)
+                                : Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: qualifications
+                                .map((q) => Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.check_circle,
+                                              size: 16,
+                                              color: AppColors.primary),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              q,
+                                              style: TextStyle(
+                                                color: isDark
+                                                    ? Colors.grey[300]
+                                                    : Colors.grey[700],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, bool isDark,
+      {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: valueColor ?? (isDark ? Colors.white : Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider(bool isDark) {
+    return Divider(
+      color: isDark ? Colors.grey[700] : Colors.grey[200],
+      height: 1,
+    );
+  }
+
+  String _formatDepartment(String department) {
+    // Convert camelCase to Title Case with spaces
+    return department
+        .replaceAllMapped(
+          RegExp(r'([a-z])([A-Z])'),
+          (match) => '${match.group(1)} ${match.group(2)}',
+        )
+        .split(' ')
+        .map((word) => word.isNotEmpty
+            ? '${word[0].toUpperCase()}${word.substring(1)}'
+            : word)
+        .join(' ');
   }
 }
