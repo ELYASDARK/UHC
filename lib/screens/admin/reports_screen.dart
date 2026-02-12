@@ -32,7 +32,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       'id': 'doctors',
       'title': 'Doctors Report',
       'icon': Icons.medical_services,
-      'description': 'Doctor list with specialization and department',
+      'description': 'Doctor list with specialization, department, and status',
     },
     {
       'id': 'users',
@@ -44,7 +44,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       'id': 'revenue',
       'title': 'Revenue Report',
       'icon': Icons.attach_money,
-      'description': 'Financial summary based on appointments',
+      'description':
+          'Financial summary based on completed appointments (estimated)',
     },
   ];
 
@@ -440,14 +441,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<String> _generateDoctorsReport() async {
-    final snapshot = await _firestore
-        .collection('doctors')
-        .orderBy('name')
-        .get();
+    final snapshot =
+        await _firestore.collection('doctors').orderBy('name').get();
 
     final buffer = StringBuffer();
     buffer.writeln(
-      'ID,Name,Specialization,Department,Experience (Years),Consultation Fee,Active',
+      'ID,Name,Email,Specialization,Department,Experience (Years),Bio,Available,Active',
     );
 
     for (final doc in snapshot.docs) {
@@ -455,10 +454,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
       buffer.writeln(
         '${doc.id},'
         '${_escapeCsv(data['name'] ?? '')},'
+        '${_escapeCsv(data['email'] ?? '')},'
         '${_escapeCsv(data['specialization'] ?? '')},'
         '${_escapeCsv(data['department'] ?? '')},'
         '${data['experienceYears'] ?? 0},'
-        '${data['consultationFee'] ?? 0},'
+        '${_escapeCsv(data['bio'] ?? '')},'
+        '${data['isAvailable'] ?? true},'
         '${data['isActive'] ?? true}',
       );
     }

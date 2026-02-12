@@ -35,8 +35,8 @@ class _SplashScreenState extends State<SplashScreen> {
     // Wait for both minimum delay and initialization tasks
     await Future.wait([
       Future.delayed(
-        const Duration(milliseconds: 2000),
-      ), // Minimum delay for safety
+        const Duration(milliseconds: 4000),
+      ), // Minimum delay for app to fully load
       _performInitialization(),
     ]);
 
@@ -70,25 +70,25 @@ class _SplashScreenState extends State<SplashScreen> {
             children: [
               // Logo with animation
               Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(35),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 30,
-                          offset: const Offset(0, 15),
-                        ),
-                      ],
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(35),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 30,
+                      offset: const Offset(0, 15),
                     ),
-                    child: const Icon(
-                      Icons.local_hospital_rounded,
-                      size: 80,
-                      color: AppColors.primary,
-                    ),
-                  )
+                  ],
+                ),
+                child: const Icon(
+                  Icons.local_hospital_rounded,
+                  size: 80,
+                  color: AppColors.primary,
+                ),
+              )
                   .animate()
                   .scale(
                     begin: const Offset(0.5, 0.5),
@@ -101,15 +101,15 @@ class _SplashScreenState extends State<SplashScreen> {
 
               // App name
               Text(
-                    AppLocalizations.of(context).appFullName,
-                    style: GoogleFonts.poppins(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 1,
-                    ),
-                    textAlign: TextAlign.center,
-                  )
+                AppLocalizations.of(context).appFullName,
+                style: GoogleFonts.poppins(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 1,
+                ),
+                textAlign: TextAlign.center,
+              )
                   .animate(delay: 300.ms)
                   .fadeIn(duration: 500.ms)
                   .slideY(begin: 0.3),
@@ -118,13 +118,13 @@ class _SplashScreenState extends State<SplashScreen> {
 
               // Tagline
               Text(
-                    AppLocalizations.of(context).appTagline,
-                    style: GoogleFonts.roboto(
-                      fontSize: 16,
-                      color: Colors.white.withValues(alpha: 0.9),
-                      letterSpacing: 0.5,
-                    ),
-                  )
+                AppLocalizations.of(context).appTagline,
+                style: GoogleFonts.roboto(
+                  fontSize: 16,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  letterSpacing: 0.5,
+                ),
+              )
                   .animate(delay: 500.ms)
                   .fadeIn(duration: 500.ms)
                   .slideY(begin: 0.3),

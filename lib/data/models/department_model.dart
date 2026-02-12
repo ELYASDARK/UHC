@@ -8,12 +8,11 @@ class DepartmentModel {
   final String description;
   final String iconName;
   final String colorHex;
-  final Map<String, String> workingHours;
+  final Map<String, dynamic> workingHours;
   final bool isActive;
   final int doctorCount;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final bool isSampleData;
 
   DepartmentModel({
     required this.id,
@@ -27,7 +26,6 @@ class DepartmentModel {
     this.doctorCount = 0,
     required this.createdAt,
     required this.updatedAt,
-    this.isSampleData = false,
   });
 
   /// Generate a key from the name if not explicitly provided
@@ -43,6 +41,43 @@ class DepartmentModel {
             .join('');
   }
 
+  /// Get working hours for a day as a display string.
+  /// Handles both legacy string format ("8:00 AM - 5:00 PM")
+  /// and new structured format ({start: "08:00", end: "18:00"}).
+  String getWorkingHoursDisplay(String day) {
+    final value = workingHours[day.toLowerCase()];
+    if (value == null) return '';
+    if (value is String) return value;
+    if (value is Map) {
+      final start = value['start'] ?? '';
+      final end = value['end'] ?? '';
+      if (start.isEmpty && end.isEmpty) return '';
+      return '$start - $end';
+    }
+    return value.toString();
+  }
+
+  /// Parse workingHours from Firestore, safely handling both formats:
+  /// - Legacy string: { "monday": "8:00 AM - 5:00 PM" }
+  /// - Structured map: { "monday": { "start": "08:00", "end": "18:00" } }
+  static Map<String, dynamic> _parseWorkingHours(dynamic raw) {
+    if (raw == null) return {};
+    if (raw is! Map) return {};
+    final result = <String, dynamic>{};
+    for (final entry in raw.entries) {
+      final key = entry.key.toString();
+      final value = entry.value;
+      if (value is String) {
+        result[key] = value;
+      } else if (value is Map) {
+        result[key] = Map<String, dynamic>.from(value);
+      } else {
+        result[key] = value.toString();
+      }
+    }
+    return result;
+  }
+
   factory DepartmentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return DepartmentModel(
@@ -52,12 +87,11 @@ class DepartmentModel {
       description: data['description'] ?? '',
       iconName: data['iconName'] ?? 'medical_services',
       colorHex: data['colorHex'] ?? '#2196F3',
-      workingHours: Map<String, String>.from(data['workingHours'] ?? {}),
+      workingHours: _parseWorkingHours(data['workingHours']),
       isActive: data['isActive'] ?? true,
       doctorCount: data['doctorCount'] ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      isSampleData: data['isSampleData'] ?? false,
     );
   }
 
@@ -73,7 +107,6 @@ class DepartmentModel {
       'doctorCount': doctorCount,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
-      'isSampleData': isSampleData,
     };
   }
 
@@ -84,12 +117,11 @@ class DepartmentModel {
     String? description,
     String? iconName,
     String? colorHex,
-    Map<String, String>? workingHours,
+    Map<String, dynamic>? workingHours,
     bool? isActive,
     int? doctorCount,
     DateTime? createdAt,
     DateTime? updatedAt,
-    bool? isSampleData,
   }) {
     return DepartmentModel(
       id: id ?? this.id,
@@ -103,7 +135,6 @@ class DepartmentModel {
       doctorCount: doctorCount ?? this.doctorCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      isSampleData: isSampleData ?? this.isSampleData,
     );
   }
 }

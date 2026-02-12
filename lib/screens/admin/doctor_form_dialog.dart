@@ -786,12 +786,33 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                             .get();
 
                         Map<String, dynamic>? schedule;
+                        Map<String, dynamic>? deptWorkingHours;
+
                         if (doc.exists) {
                           final rawSchedule = doc.data()?['weeklySchedule'];
                           if (rawSchedule is Map<String, dynamic>) {
                             schedule = rawSchedule;
                           } else if (rawSchedule is Map) {
                             schedule = Map<String, dynamic>.from(rawSchedule);
+                          }
+
+                          // Fetch department working hours
+                          final deptName = doc.data()?['department'] ??
+                              _selectedDepartment.name;
+                          final deptQuery = await _firestore
+                              .collection('departments')
+                              .where('key', isEqualTo: deptName)
+                              .limit(1)
+                              .get();
+                          if (deptQuery.docs.isNotEmpty) {
+                            final rawHours =
+                                deptQuery.docs.first.data()['workingHours'];
+                            if (rawHours is Map<String, dynamic>) {
+                              deptWorkingHours = rawHours;
+                            } else if (rawHours is Map) {
+                              deptWorkingHours =
+                                  Map<String, dynamic>.from(rawHours);
+                            }
                           }
                         }
 
@@ -801,6 +822,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                             builder: (dialogContext) => DoctorScheduleDialog(
                               doctorId: widget.id!,
                               currentSchedule: schedule,
+                              departmentWorkingHours: deptWorkingHours,
                             ),
                           );
                         }

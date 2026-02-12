@@ -379,8 +379,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
     String name,
     Map<String, dynamic> data,
   ) async {
-    final hasAuthAccount = data['userId'] != null &&
-        !data['userId'].toString().startsWith('sample_');
+    final hasAuthAccount =
+        data['userId'] != null && data['userId'].toString().isNotEmpty;
 
     final confirmed = await showDialog<bool>(
       context: context,

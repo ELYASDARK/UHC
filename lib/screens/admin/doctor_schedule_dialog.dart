@@ -126,10 +126,14 @@ class DoctorScheduleDialog extends StatefulWidget {
   final String doctorId;
   final Map<String, dynamic>? currentSchedule;
 
+  /// Department working hours: {day: {start: 'HH:mm', end: 'HH:mm'}}
+  final Map<String, dynamic>? departmentWorkingHours;
+
   const DoctorScheduleDialog({
     super.key,
     required this.doctorId,
     this.currentSchedule,
+    this.departmentWorkingHours,
   });
 
   @override
@@ -187,30 +191,109 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
         _schedule[day] = DaySchedule();
         _dayEnabled[day] = false;
       }
+
+      // Force-disable days the department has closed
+      if (_isDeptClosed(day)) {
+        _dayEnabled[day] = false;
+      }
     }
   }
 
+  /// Parse 'HH:mm' string to TimeOfDay
+  TimeOfDay _parseTime(String s) {
+    final parts = s.replaceAll(RegExp(r'[^0-9:]'), '').split(':');
+    if (parts.length == 2) {
+      return TimeOfDay(
+        hour: int.tryParse(parts[0]) ?? 0,
+        minute: int.tryParse(parts[1]) ?? 0,
+      );
+    }
+    return const TimeOfDay(hour: 0, minute: 0);
+  }
+
+  int _toMin(TimeOfDay t) => t.hour * 60 + t.minute;
+
+  /// Check if the department is closed on this day
+  bool _isDeptClosed(String day) {
+    final wh = widget.departmentWorkingHours;
+    if (wh == null) return false; // No dept hours data = no restriction
+    return _getDeptHours(day) == null;
+  }
+
+  /// Get department working hours for a given day (or null if closed/not set)
+  ({TimeOfDay start, TimeOfDay end})? _getDeptHours(String day) {
+    final wh = widget.departmentWorkingHours;
+    if (wh == null) return null;
+    final dayData = wh[day];
+    if (dayData is Map) {
+      // Check enabled flag (new format has it; old format without it = enabled)
+      final isEnabled =
+          dayData.containsKey('enabled') ? (dayData['enabled'] == true) : true;
+      if (!isEnabled) return null;
+
+      final start = dayData['start']?.toString();
+      final end = dayData['end']?.toString();
+      if (start != null && end != null && start.isNotEmpty && end.isNotEmpty) {
+        return (start: _parseTime(start), end: _parseTime(end));
+      }
+    }
+    return null;
+  }
+
   Future<void> _addTimeSlot(String day) async {
+    final deptHours = _getDeptHours(day);
+
+    // Default initial times
+    TimeOfDay initialStart = const TimeOfDay(hour: 9, minute: 0);
+    if (deptHours != null) {
+      initialStart = deptHours.start;
+    }
+
     // Pick start time
     final startTime = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(hour: 9, minute: 0),
+      initialTime: initialStart,
       helpText: 'Select Start Time',
     );
 
     if (startTime == null || !mounted) return;
 
+    // Validate against department hours
+    if (deptHours != null) {
+      if (_toMin(startTime) < _toMin(deptHours.start) ||
+          _toMin(startTime) >= _toMin(deptHours.end)) {
+        _showError(
+          'Start time must be between '
+          '${_fmtTime(deptHours.start)} and ${_fmtTime(deptHours.end)}',
+        );
+        return;
+      }
+    }
+
     // Pick end time (default 30 min later)
+    final defaultEnd = TimeOfDay(
+      hour: startTime.hour + (startTime.minute >= 30 ? 1 : 0),
+      minute: (startTime.minute + 30) % 60,
+    );
     final endTime = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(
-        hour: startTime.hour + (startTime.minute >= 30 ? 1 : 0),
-        minute: (startTime.minute + 30) % 60,
-      ),
+      initialTime: defaultEnd,
       helpText: 'Select End Time',
     );
 
     if (endTime == null || !mounted) return;
+
+    // Validate against department hours
+    if (deptHours != null) {
+      if (_toMin(endTime) > _toMin(deptHours.end) ||
+          _toMin(endTime) <= _toMin(deptHours.start)) {
+        _showError(
+          'End time must be between '
+          '${_fmtTime(deptHours.start)} and ${_fmtTime(deptHours.end)}',
+        );
+        return;
+      }
+    }
 
     final newSlot = TimeSlot(startTime: startTime, endTime: endTime);
 
@@ -239,6 +322,9 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
     });
   }
 
+  String _fmtTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
   void _removeTimeSlot(String day, int index) {
     setState(() {
       _schedule[day]!.slots.removeAt(index);
@@ -261,8 +347,24 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.error),
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: AppColors.error, size: 22),
+            const SizedBox(width: 8),
+            const Text('Invalid Time', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -405,23 +507,36 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
                         ),
                       ),
                       Text(
-                        isEnabled
-                            ? '${daySchedule.slots.length} time slot(s)'
-                            : 'Day off',
+                        _isDeptClosed(day)
+                            ? 'Dept. closed'
+                            : (isEnabled
+                                ? '${daySchedule.slots.length} time slot(s)'
+                                : 'Day off'),
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          fontStyle: isEnabled
-                              ? FontStyle.normal
-                              : FontStyle.italic,
+                          color: _isDeptClosed(day)
+                              ? AppColors.error.withValues(alpha: 0.7)
+                              : (isDark ? Colors.grey[400] : Colors.grey[600]),
+                          fontStyle:
+                              isEnabled ? FontStyle.normal : FontStyle.italic,
                         ),
                       ),
+                      if (isEnabled && _getDeptHours(day) != null)
+                        Text(
+                          'Dept: ${_fmtTime(_getDeptHours(day)!.start)} – ${_fmtTime(_getDeptHours(day)!.end)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.primary.withValues(alpha: 0.7),
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 Switch(
                   value: isEnabled,
-                  onChanged: (value) => _toggleDay(day, value),
+                  onChanged: _isDeptClosed(day)
+                      ? null
+                      : (value) => _toggleDay(day, value),
                 ),
               ],
             ),

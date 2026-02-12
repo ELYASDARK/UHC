@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/user_model.dart';
+import 'department_management_screen.dart';
 import 'doctor_management_screen.dart';
 import 'user_management_screen.dart';
 import 'appointment_analytics_screen.dart';
@@ -315,6 +316,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const ReportsScreen()),
+          ),
+        ),
+        _buildActionCard(
+          isDark: isDark,
+          title: 'Departments',
+          icon: Icons.business,
+          color: Colors.teal,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const DepartmentManagementScreen(),
+            ),
           ),
         ),
       ],

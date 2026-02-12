@@ -94,21 +94,21 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
                   children: [
                     Text(
                       AppLocalizations.of(context).departments,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontFamily: GoogleFonts.poppins().fontFamily,
-                          ),
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontFamily: GoogleFonts.poppins().fontFamily,
+                              ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       AppLocalizations.of(context).findBestDoctors,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                        fontFamily: GoogleFonts.roboto().fontFamily,
-                      ),
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                            fontFamily: GoogleFonts.roboto().fontFamily,
+                          ),
                     ),
                     const SizedBox(height: 24),
 
@@ -120,7 +120,7 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
-                        childAspectRatio: 0.85,
+                        childAspectRatio: 0.78,
                         children: List.generate(
                           6,
                           (index) => const CardSkeleton(height: 180),
@@ -147,14 +147,14 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
-                        childAspectRatio: 0.85,
+                        childAspectRatio: 0.78,
                         children: _departments.asMap().entries.map((entry) {
                           final index = entry.key;
                           final dept = entry.value;
                           return _DepartmentCard(
-                                department: dept,
-                                isDark: isDark,
-                              )
+                            department: dept,
+                            isDark: isDark,
+                          )
                               .animate(
                                 delay: Duration(milliseconds: index * 50),
                               )
@@ -229,7 +229,7 @@ class _DepartmentCard extends StatelessWidget {
 
             // Content
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -269,7 +269,7 @@ class _DepartmentCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Text(
