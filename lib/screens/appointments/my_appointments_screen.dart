@@ -410,8 +410,11 @@ class _AppointmentCard extends StatelessWidget {
                     appointment.statusDisplay,
                     style: GoogleFonts.roboto(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: _statusColor,
+                      fontWeight: FontWeight.w600,
+                      color: (appointment.status == AppointmentStatus.pending &&
+                              !isDark)
+                          ? Colors.orange.shade900
+                          : _statusColor,
                     ),
                   ),
                 ),

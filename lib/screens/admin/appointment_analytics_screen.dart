@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/loading_skeleton.dart';
 
 /// Appointment analytics screen for admin
 class AppointmentAnalyticsScreen extends StatefulWidget {
@@ -120,7 +121,7 @@ class _AppointmentAnalyticsScreenState
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? _buildAnalyticsSkeleton(isDark)
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -216,54 +217,44 @@ class _AppointmentAnalyticsScreenState
   }
 
   Widget _buildSummaryCards(bool isDark) {
-    return Column(
+    final width = MediaQuery.of(context).size.width;
+    final crossAxisCount = width > 900 ? 4 : 2;
+
+    return GridView.count(
+      crossAxisCount: crossAxisCount,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.6,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildSummaryCard(
-                isDark: isDark,
-                title: 'Total',
-                value: _totalAppointments.toString(),
-                icon: Icons.calendar_today,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSummaryCard(
-                isDark: isDark,
-                title: 'Completed',
-                value: _completedAppointments.toString(),
-                icon: Icons.check_circle,
-                color: AppColors.success,
-              ),
-            ),
-          ],
+        _buildSummaryCard(
+          isDark: isDark,
+          title: 'Total',
+          value: _totalAppointments.toString(),
+          icon: Icons.calendar_today,
+          color: AppColors.primary,
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildSummaryCard(
-                isDark: isDark,
-                title: 'Cancelled',
-                value: _cancelledAppointments.toString(),
-                icon: Icons.cancel,
-                color: AppColors.error,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSummaryCard(
-                isDark: isDark,
-                title: 'Rate',
-                value: '${_completionRate.toStringAsFixed(0)}%',
-                icon: Icons.trending_up,
-                color: AppColors.info,
-              ),
-            ),
-          ],
+        _buildSummaryCard(
+          isDark: isDark,
+          title: 'Completed',
+          value: _completedAppointments.toString(),
+          icon: Icons.check_circle,
+          color: AppColors.success,
+        ),
+        _buildSummaryCard(
+          isDark: isDark,
+          title: 'Cancelled',
+          value: _cancelledAppointments.toString(),
+          icon: Icons.cancel,
+          color: AppColors.error,
+        ),
+        _buildSummaryCard(
+          isDark: isDark,
+          title: 'Rate',
+          value: '${_completionRate.toStringAsFixed(0)}%',
+          icon: Icons.trending_up,
+          color: AppColors.info,
         ),
       ],
     );
@@ -537,5 +528,54 @@ class _AppointmentAnalyticsScreenState
       default:
         return Colors.grey;
     }
+  }
+
+  Widget _buildAnalyticsSkeleton(bool isDark) {
+    final width = MediaQuery.of(context).size.width;
+    final crossAxisCount = width > 900 ? 4 : 2;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Period selector skeleton
+          LoadingSkeleton(height: 48, borderRadius: 12),
+          const SizedBox(height: 24),
+
+          // Summary cards skeleton
+          GridView.count(
+            crossAxisCount: crossAxisCount,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.6,
+            children: List.generate(
+              4,
+              (index) => LoadingSkeleton(height: 100, borderRadius: 16),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Status distribution skeleton
+          const LoadingSkeleton(width: 160, height: 22),
+          const SizedBox(height: 12),
+          LoadingSkeleton(height: 140, borderRadius: 16),
+          const SizedBox(height: 24),
+
+          // Department skeleton
+          const LoadingSkeleton(width: 130, height: 22),
+          const SizedBox(height: 12),
+          LoadingSkeleton(height: 80, borderRadius: 16),
+          const SizedBox(height: 24),
+
+          // Daily trend skeleton
+          const LoadingSkeleton(width: 110, height: 22),
+          const SizedBox(height: 12),
+          LoadingSkeleton(height: 200, borderRadius: 16),
+        ],
+      ),
+    );
   }
 }

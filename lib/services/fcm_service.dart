@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 /// Background message handler - must be top-level function
 @pragma('vm:entry-point')
@@ -36,33 +38,37 @@ class FCMService {
 
   /// Initialize FCM and local notifications
   Future<void> initialize() async {
-    // Request permission
-    await _requestPermission();
+    try {
+      // Request permission
+      await _requestPermission();
 
-    // Initialize local notifications
-    await _initializeLocalNotifications();
+      // Initialize local notifications
+      await _initializeLocalNotifications();
 
-    // Create notification channel for Android
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(_channel);
+      // Create notification channel for Android
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_channel);
 
-    // Handle foreground messages
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      // Handle foreground messages
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-    // Handle notification tap when app is in background
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+      // Handle notification tap when app is in background
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
 
-    // Check if app was opened from terminated state via notification
-    final initialMessage = await _messaging.getInitialMessage();
-    if (initialMessage != null) {
-      _handleMessageOpenedApp(initialMessage);
+      // Check if app was opened from terminated state via notification
+      final initialMessage = await _messaging.getInitialMessage();
+      if (initialMessage != null) {
+        _handleMessageOpenedApp(initialMessage);
+      }
+
+      // Set background message handler
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    } catch (e, stack) {
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'FCM Service Initialization Failed');
     }
-
-    // Set background message handler
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   }
 
   /// Request notification permission
@@ -168,16 +174,13 @@ class FCMService {
     final token = await getToken();
     if (token != null) {
       // Save to users collection (legacy support)
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .update({
-            'fcmTokens': FieldValue.arrayUnion([token]),
-            'lastTokenUpdate': FieldValue.serverTimestamp(),
-          })
-          .catchError((_) {
-            // User doc might not exist yet, ignore error
-          });
+      await _firestore.collection('users').doc(userId).update({
+        'fcmTokens': FieldValue.arrayUnion([token]),
+        'lastTokenUpdate': FieldValue.serverTimestamp(),
+      }).catchError((e, stack) {
+        FirebaseCrashlytics.instance
+            .recordError(e, stack, reason: 'Failed to update user FCM token');
+      });
 
       // Save to user_tokens collection (for Cloud Functions)
       await _firestore.collection('user_tokens').doc(userId).set({
@@ -189,14 +192,13 @@ class FCMService {
 
     // Listen for token refresh
     _messaging.onTokenRefresh.listen((newToken) async {
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .update({
-            'fcmTokens': FieldValue.arrayUnion([newToken]),
-            'lastTokenUpdate': FieldValue.serverTimestamp(),
-          })
-          .catchError((_) {});
+      await _firestore.collection('users').doc(userId).update({
+        'fcmTokens': FieldValue.arrayUnion([newToken]),
+        'lastTokenUpdate': FieldValue.serverTimestamp(),
+      }).catchError((e, stack) {
+        FirebaseCrashlytics.instance.recordError(e, stack,
+            reason: 'Failed to update refreshed FCM token');
+      });
 
       // Update user_tokens collection
       await _firestore.collection('user_tokens').doc(userId).set({
@@ -211,13 +213,12 @@ class FCMService {
   Future<void> removeTokenFromDatabase(String userId) async {
     final token = await getToken();
     if (token != null) {
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .update({
-            'fcmTokens': FieldValue.arrayRemove([token]),
-          })
-          .catchError((_) {});
+      await _firestore.collection('users').doc(userId).update({
+        'fcmTokens': FieldValue.arrayRemove([token]),
+      }).catchError((e, stack) {
+        FirebaseCrashlytics.instance.recordError(e, stack,
+            reason: 'Failed to update refreshed FCM token');
+      });
 
       // Remove from user_tokens collection
       await _firestore

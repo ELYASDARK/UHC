@@ -392,6 +392,8 @@ class _DoctorCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           doctor.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,

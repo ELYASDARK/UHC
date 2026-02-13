@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../services/fcm_service.dart';
 import '../data/repositories/notification_repository.dart';
 import '../data/models/notification_model.dart';
@@ -38,8 +39,10 @@ class NotificationProvider extends ChangeNotifier {
       _fcmService.onMessageTapped.listen((message) {
         _handleNotificationTap(message);
       });
-    } catch (e) {
+    } catch (e, stack) {
       _error = e.toString();
+      FirebaseCrashlytics.instance.recordError(e, stack,
+          reason: 'NotificationProvider Error: initialize');
       notifyListeners();
     }
   }
@@ -55,8 +58,10 @@ class NotificationProvider extends ChangeNotifier {
       _notifications = await _notificationRepo.getUserNotifications(userId);
       _unreadCount = await _notificationRepo.getUnreadCount(userId);
       _error = null;
-    } catch (e) {
+    } catch (e, stack) {
       _error = e.toString();
+      FirebaseCrashlytics.instance.recordError(e, stack,
+          reason: 'NotificationProvider Error: loadNotifications');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -74,8 +79,10 @@ class NotificationProvider extends ChangeNotifier {
         _unreadCount = (_unreadCount > 0) ? _unreadCount - 1 : 0;
         notifyListeners();
       }
-    } catch (e) {
+    } catch (e, stack) {
       _error = e.toString();
+      FirebaseCrashlytics.instance.recordError(e, stack,
+          reason: 'NotificationProvider Error: markAsRead');
       notifyListeners();
     }
   }
@@ -85,13 +92,14 @@ class NotificationProvider extends ChangeNotifier {
     try {
       await _notificationRepo.markAllAsRead(userId);
 
-      _notifications = _notifications
-          .map((n) => n.copyWith(isRead: true))
-          .toList();
+      _notifications =
+          _notifications.map((n) => n.copyWith(isRead: true)).toList();
       _unreadCount = 0;
       notifyListeners();
-    } catch (e) {
+    } catch (e, stack) {
       _error = e.toString();
+      FirebaseCrashlytics.instance.recordError(e, stack,
+          reason: 'NotificationProvider Error: markAllAsRead');
       notifyListeners();
     }
   }
@@ -109,8 +117,10 @@ class NotificationProvider extends ChangeNotifier {
         _unreadCount = (_unreadCount > 0) ? _unreadCount - 1 : 0;
       }
       notifyListeners();
-    } catch (e) {
+    } catch (e, stack) {
       _error = e.toString();
+      FirebaseCrashlytics.instance.recordError(e, stack,
+          reason: 'NotificationProvider Error: deleteNotification');
       notifyListeners();
     }
   }
@@ -142,8 +152,10 @@ class NotificationProvider extends ChangeNotifier {
       await _fcmService.initialize();
       await _fcmService.saveTokenToDatabase(userId);
       await _fcmService.subscribeUserToTopics(userId);
-    } catch (e) {
+    } catch (e, stack) {
       _error = e.toString();
+      FirebaseCrashlytics.instance.recordError(e, stack,
+          reason: 'NotificationProvider Error: enablePushNotifications');
       notifyListeners();
     }
   }
@@ -153,8 +165,10 @@ class NotificationProvider extends ChangeNotifier {
     try {
       await _fcmService.removeTokenFromDatabase(userId);
       await _fcmService.unsubscribeUserFromTopics(userId);
-    } catch (e) {
+    } catch (e, stack) {
       _error = e.toString();
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'NotificationProvider Error');
       notifyListeners();
     }
   }

@@ -8,6 +8,7 @@ import 'doctor_management_screen.dart';
 import 'user_management_screen.dart';
 import 'appointment_analytics_screen.dart';
 import 'reports_screen.dart';
+import '../../core/widgets/loading_skeleton.dart';
 
 /// Admin dashboard with overview and navigation
 class AdminDashboardScreen extends StatefulWidget {
@@ -111,7 +112,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? _buildDashboardSkeleton(isDark)
           : RefreshIndicator(
               onRefresh: _loadDashboardStats,
               child: SingleChildScrollView(
@@ -155,9 +156,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     // Number formatters
     final numberFormat = NumberFormat.compact(); // 1.2K, 1M, etc.
     final currencyFormat = NumberFormat.simpleCurrency(decimalDigits: 0);
+    final width = MediaQuery.of(context).size.width;
+    final crossAxisCount = width > 1200 ? 6 : (width > 600 ? 3 : 2);
 
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: crossAxisCount,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 12,
@@ -268,8 +271,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildQuickActions(bool isDark) {
+    final width = MediaQuery.of(context).size.width;
+    final crossAxisCount = width > 1200 ? 4 : (width > 600 ? 3 : 2);
+
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: crossAxisCount,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 12,
@@ -377,7 +383,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return _buildRecentActivitySkeleton(isDark);
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -513,5 +519,98 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } else {
       return '${diff.inDays}d ago';
     }
+  }
+
+  Widget _buildDashboardSkeleton(bool isDark) {
+    final width = MediaQuery.of(context).size.width;
+    final statsCrossAxisCount = width > 1200 ? 6 : (width > 600 ? 3 : 2);
+    final actionsCrossAxisCount = width > 1200 ? 4 : (width > 600 ? 3 : 2);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stats Grid Skeleton
+          GridView.count(
+            crossAxisCount: statsCrossAxisCount,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.4,
+            children: List.generate(
+              6,
+              (index) => LoadingSkeleton(
+                height: 100,
+                borderRadius: 16,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Quick Actions Skeleton
+          const LoadingSkeleton(width: 150, height: 24),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: actionsCrossAxisCount,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 2.5,
+            children: List.generate(
+              4,
+              (index) => LoadingSkeleton(
+                height: 60,
+                borderRadius: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Recent Activity Skeleton
+          const LoadingSkeleton(width: 150, height: 24),
+          const SizedBox(height: 12),
+          _buildRecentActivitySkeleton(isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentActivitySkeleton(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: List.generate(
+          3,
+          (index) => Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              children: [
+                const LoadingSkeleton(width: 40, height: 40, borderRadius: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      LoadingSkeleton(width: 120, height: 16),
+                      SizedBox(height: 8),
+                      LoadingSkeleton(width: 80, height: 12),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const LoadingSkeleton(width: 60, height: 20, borderRadius: 12),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

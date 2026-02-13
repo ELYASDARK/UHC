@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
@@ -49,8 +50,20 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // Pass all uncaught "fatal" errors from the framework to Crashlytics
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+    // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
   } catch (e) {
     debugPrint('Failed to initialize Firebase: $e');
+    // If Firebase fails, we can't use Crashlytics to report it, but we should clear the error logic
+    // or maybe show a fallback UI (though runAPP hasn't happened yet).
+    // Printing to console is the best fallback here.
   }
 
   // Start app immediately - show UI first
@@ -71,15 +84,25 @@ Future<void> _initializeServicesAsync() async {
   // Initialize local notification service
   try {
     await LocalNotificationService().initialize();
-  } catch (e) {
+  } catch (e, stack) {
     debugPrint('Failed to initialize local notifications: $e');
+    // Report non-fatal error to Crashlytics if Firebase is initialized
+    try {
+      FirebaseCrashlytics.instance.recordError(e, stack,
+          reason: 'LocalNotificationService Initialization');
+    } catch (_) {}
   }
 
   // Initialize FCM service
   try {
     await FCMService().initialize();
-  } catch (e) {
+  } catch (e, stack) {
     debugPrint('Failed to initialize FCM: $e');
+    // Report non-fatal error to Crashlytics if Firebase is initialized
+    try {
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'FCMService Initialization');
+    } catch (_) {}
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/user_model.dart';
 import 'user_form_dialog.dart';
+import '../../core/widgets/loading_skeleton.dart';
 
 /// User management screen for admin
 class UserManagementScreen extends StatefulWidget {
@@ -107,7 +108,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               stream: _getUsersStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return SkeletonList(
+                    itemBuilder: (context, index) =>
+                        const CardSkeleton(height: 80),
+                  );
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -118,6 +122,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         Icon(Icons.people, size: 64, color: Colors.grey[400]),
                         const SizedBox(height: 16),
                         const Text('No users found'),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddUserDialog(),
+                          icon: const Icon(Icons.person_add),
+                          label: const Text('Add User'),
+                        ),
                       ],
                     ),
                   );
@@ -280,7 +290,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           onSelected: (value) {
             switch (value) {
               case 'view':
-                _showUserDetails(context, data, isDark);
+                _showUserDetails(context, id, data, isDark);
                 break;
               case 'edit':
                 _showEditUserDialog(id, data);
@@ -418,6 +428,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   void _showUserDetails(
     BuildContext context,
+    String id,
     Map<String, dynamic> data,
     bool isDark,
   ) {
@@ -492,6 +503,59 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               _buildDetailRow(
                 'Status',
                 (data['isActive'] ?? true) ? 'Active' : 'Inactive',
+              ),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _toggleUserStatus(id, data['isActive'] ?? true);
+                      },
+                      icon: Icon(
+                        (data['isActive'] ?? true)
+                            ? Icons.block
+                            : Icons.check_circle,
+                        color: (data['isActive'] ?? true)
+                            ? AppColors.error
+                            : AppColors.success,
+                      ),
+                      label: Text(
+                        (data['isActive'] ?? true) ? 'Deactivate' : 'Activate',
+                        style: TextStyle(
+                          color: (data['isActive'] ?? true)
+                              ? AppColors.error
+                              : AppColors.success,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: BorderSide(
+                          color: (data['isActive'] ?? true)
+                              ? AppColors.error
+                              : AppColors.success,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showEditUserDialog(id, data);
+                      },
+                      icon: const Icon(Icons.edit, color: Colors.white),
+                      label: const Text('Edit'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

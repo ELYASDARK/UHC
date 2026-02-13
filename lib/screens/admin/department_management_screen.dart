@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_colors.dart';
 import 'department_form_dialog.dart';
+import '../../core/widgets/loading_skeleton.dart';
 
 /// Department management screen for admin
 class DepartmentManagementScreen extends StatefulWidget {
@@ -255,7 +256,10 @@ class _DepartmentManagementScreenState
               stream: _getDepartmentsStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return SkeletonList(
+                    itemBuilder: (context, index) =>
+                        const CardSkeleton(height: 100),
+                  );
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -270,13 +274,17 @@ class _DepartmentManagementScreenState
                         ),
                         const SizedBox(height: 16),
                         const Text('No departments found'),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tap "Add Department" to create one',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 13,
-                          ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) =>
+                                  const DepartmentFormDialog(),
+                            );
+                          },
+                          icon: const Icon(Icons.add_business),
+                          label: const Text('Add Department'),
                         ),
                       ],
                     ),
@@ -941,6 +949,61 @@ class _DepartmentManagementScreenState
                       const SizedBox(height: 32),
                     ],
                   ),
+                ),
+              ),
+
+              // Actions
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _toggleDepartmentStatus(id, isActive);
+                        },
+                        icon: Icon(
+                          isActive ? Icons.block : Icons.check_circle,
+                          color: isActive ? AppColors.error : AppColors.success,
+                        ),
+                        label: Text(
+                          isActive ? 'Deactivate' : 'Activate',
+                          style: TextStyle(
+                            color:
+                                isActive ? AppColors.error : AppColors.success,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(
+                            color:
+                                isActive ? AppColors.error : AppColors.success,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          showDialog(
+                            context: context,
+                            builder: (context) =>
+                                DepartmentFormDialog(id: id, data: data),
+                          );
+                        },
+                        icon: const Icon(Icons.edit, color: Colors.white),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

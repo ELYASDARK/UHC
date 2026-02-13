@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../data/models/doctor_model.dart';
 import '../../services/doctor_functions_service.dart';
 import 'doctor_form_dialog.dart';
+import '../../core/widgets/loading_skeleton.dart';
 
 /// Doctor management screen for admin
 class DoctorManagementScreen extends StatefulWidget {
@@ -120,7 +121,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
               stream: _getDoctorsStream(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return SkeletonList(
+                    itemBuilder: (context, index) => const DoctorCardSkeleton(),
+                  );
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -135,6 +138,17 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                         ),
                         const SizedBox(height: 16),
                         const Text('No doctors found'),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => const DoctorFormDialog(),
+                            );
+                          },
+                          icon: const Icon(Icons.person_add),
+                          label: const Text('Add Doctor'),
+                        ),
                       ],
                     ),
                   );
@@ -763,6 +777,61 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                       const SizedBox(height: 32),
                     ],
                   ),
+                ),
+              ),
+
+              // Actions
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _toggleDoctorStatus(id, isActive);
+                        },
+                        icon: Icon(
+                          isActive ? Icons.block : Icons.check_circle,
+                          color: isActive ? AppColors.error : AppColors.success,
+                        ),
+                        label: Text(
+                          isActive ? 'Deactivate' : 'Activate',
+                          style: TextStyle(
+                            color:
+                                isActive ? AppColors.error : AppColors.success,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(
+                            color:
+                                isActive ? AppColors.error : AppColors.success,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          showDialog(
+                            context: context,
+                            builder: (context) =>
+                                DoctorFormDialog(id: id, data: data),
+                          );
+                        },
+                        icon: const Icon(Icons.edit, color: Colors.white),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

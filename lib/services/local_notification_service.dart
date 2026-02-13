@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -59,10 +60,8 @@ class LocalNotificationService {
 
   /// Create Android notification channels
   Future<void> _createNotificationChannels() async {
-    final androidPlugin = _notifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidPlugin != null) {
       // Appointment reminders channel
@@ -96,10 +95,8 @@ class LocalNotificationService {
 
   /// Request notification permissions (iOS)
   Future<bool> requestPermissions() async {
-    final iosPlugin = _notifications
-        .resolvePlatformSpecificImplementation<
-          IOSFlutterLocalNotificationsPlugin
-        >();
+    final iosPlugin = _notifications.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
 
     if (iosPlugin != null) {
       return await iosPlugin.requestPermissions(
@@ -110,10 +107,8 @@ class LocalNotificationService {
           false;
     }
 
-    final androidPlugin = _notifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
 
     if (androidPlugin != null) {
       // Request notification permission
@@ -150,9 +145,8 @@ class LocalNotificationService {
       android: AndroidNotificationDetails(
         isAppointment ? _appointmentChannelId : _generalChannelId,
         isAppointment ? _appointmentChannelName : _generalChannelName,
-        importance: isAppointment
-            ? Importance.high
-            : Importance.defaultImportance,
+        importance:
+            isAppointment ? Importance.high : Importance.defaultImportance,
         priority: isAppointment ? Priority.high : Priority.defaultPriority,
         icon: '@mipmap/ic_launcher',
         playSound: soundEnabled,
@@ -218,9 +212,11 @@ class LocalNotificationService {
       );
 
       debugPrint('Notification scheduled successfully with ID: $id');
-    } catch (e) {
+    } catch (e, stack) {
       // If scheduling fails, show an immediate notification as fallback
       debugPrint('Failed to schedule notification: $e');
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'Scheduling Notification Failed');
       rethrow;
     }
   }
