@@ -87,6 +87,8 @@
 - **User Management** — View all users, assign roles, toggle account status
 - **Analytics** — Interactive charts for appointment trends and department performance
 - **Reports** — Export CSV reports for appointments, doctors, users, and revenue
+- **Sample Data Seeder** — Quickly populate the database with demo data for testing
+
 </details>
 
 <details>
