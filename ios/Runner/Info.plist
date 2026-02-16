@@ -75,5 +75,20 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<!-- Google Sign-In URL Scheme -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.705258727806-oa6fteng23b4fh4ui119pbnes4ccrj4b</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Allow Google Sign-In to open Google's auth page -->
+	<key>GIDClientID</key>
+	<string>705258727806-oa6fteng23b4fh4ui119pbnes4ccrj4b.apps.googleusercontent.com</string>
 </dict>
 </plist>

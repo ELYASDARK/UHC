@@ -379,10 +379,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               Text(
                 l10n.tapToChangePhoto,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
               ),
               const SizedBox(height: 32),
 
@@ -484,21 +484,119 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         children: [
                           Text(
                             l10n.emailAddress,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: isDark
-                                      ? AppColors.textSecondaryDark
-                                      : AppColors.textSecondaryLight,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
                           ),
                           Text(
                             user?.email ?? l10n.notAvailable,
-                            style: Theme.of(context).textTheme.bodyMedium
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
                     ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Google Account (linked info)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.surfaceDark
+                      : AppColors.backgroundLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: context.read<AuthProvider>().isGoogleLinked
+                            ? AppColors.success.withValues(alpha: 0.1)
+                            : AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        context.read<AuthProvider>().isGoogleLinked
+                            ? Icons.check_circle_rounded
+                            : Icons.link_off_rounded,
+                        color: context.read<AuthProvider>().isGoogleLinked
+                            ? AppColors.success
+                            : AppColors.warning,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Google Account',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
+                          ),
+                          const SizedBox(height: 2),
+                          if (context.read<AuthProvider>().isGoogleLinked)
+                            Text(
+                              context.read<AuthProvider>().googleEmail ??
+                                  'Linked',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w500),
+                            )
+                          else
+                            Text(
+                              'Not linked',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: AppColors.warning,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (!context.read<AuthProvider>().isGoogleLinked)
+                      TextButton(
+                        onPressed: () async {
+                          final authProvider = context.read<AuthProvider>();
+                          final success = await authProvider.linkWithGoogle();
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                success
+                                    ? 'Google account linked!'
+                                    : authProvider.errorMessage ??
+                                        'Failed to link',
+                              ),
+                              backgroundColor:
+                                  success ? AppColors.success : AppColors.error,
+                            ),
+                          );
+                          if (success) setState(() {});
+                        },
+                        child: const Text('Link Now'),
+                      ),
                   ],
                 ),
               ),

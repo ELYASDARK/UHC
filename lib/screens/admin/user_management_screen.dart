@@ -432,130 +432,194 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     Map<String, dynamic> data,
     bool isDark,
   ) {
+    final isActive = data['isActive'] ?? true;
+    final photoUrl = data['photoUrl'] as String?;
+    final fullName = data['fullName'] ?? 'Unknown';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(24),
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.75,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              // Drag handle
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 24),
-              Center(
-                child: CircleAvatar(
-                  radius: 50,
-                  backgroundImage: data['photoUrl'] != null
-                      ? NetworkImage(data['photoUrl'])
-                      : null,
-                  child: data['photoUrl'] == null
-                      ? Text(
-                          (data['fullName'] ?? 'U')[0].toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Center(
-                child: Text(
-                  data['fullName'] ?? 'Unknown',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildDetailRow('Email', data['email'] ?? 'N/A'),
-              _buildDetailRow('Phone', data['phoneNumber'] ?? 'N/A'),
-              _buildDetailRow('Blood Type', data['bloodType'] ?? 'N/A'),
-              _buildDetailRow('Allergies', data['allergies'] ?? 'N/A'),
-              _buildDetailRow(
-                'Date of Birth',
-                data['dateOfBirth'] is Timestamp
-                    ? DateFormat.yMMMd().format(
-                        (data['dateOfBirth'] as Timestamp).toDate(),
-                      )
-                    : data['dateOfBirth']?.toString() ?? 'N/A',
-              ),
-              _buildDetailRow('Role', data['role'] ?? 'patient'),
-              _buildDetailRow(
-                'Status',
-                (data['isActive'] ?? true) ? 'Active' : 'Inactive',
-              ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _toggleUserStatus(id, data['isActive'] ?? true);
-                      },
-                      icon: Icon(
-                        (data['isActive'] ?? true)
-                            ? Icons.block
-                            : Icons.check_circle,
-                        color: (data['isActive'] ?? true)
-                            ? AppColors.error
-                            : AppColors.success,
+
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      // User Photo
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.1),
+                        backgroundImage: photoUrl != null && photoUrl.isNotEmpty
+                            ? NetworkImage(photoUrl)
+                            : null,
+                        child: photoUrl == null || photoUrl.isEmpty
+                            ? Text(
+                                fullName.isNotEmpty
+                                    ? fullName[0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : null,
                       ),
-                      label: Text(
-                        (data['isActive'] ?? true) ? 'Deactivate' : 'Activate',
+
+                      const SizedBox(height: 16),
+
+                      // User Name
+                      Text(
+                        fullName,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      // Role subtitle
+                      Text(
+                        (data['role'] ?? 'patient').toString().toUpperCase(),
                         style: TextStyle(
-                          color: (data['isActive'] ?? true)
-                              ? AppColors.error
-                              : AppColors.success,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 1.2,
                         ),
                       ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        side: BorderSide(
-                          color: (data['isActive'] ?? true)
-                              ? AppColors.error
-                              : AppColors.success,
+
+                      const SizedBox(height: 24),
+
+                      // Details Card
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? Colors.grey[800]?.withValues(alpha: 0.3)
+                              : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            _buildDetailRow(
+                                'Email', data['email'] ?? 'N/A', isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow('Google Email',
+                                data['googleEmail'] ?? 'N/A', isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow(
+                                'Phone', data['phoneNumber'] ?? 'N/A', isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow('Blood Type',
+                                data['bloodType'] ?? 'N/A', isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow('Allergies',
+                                data['allergies'] ?? 'N/A', isDark),
+                            _buildDivider(isDark),
+                            _buildDetailRow(
+                              'Date of Birth',
+                              data['dateOfBirth'] is Timestamp
+                                  ? DateFormat.yMMMd().format(
+                                      (data['dateOfBirth'] as Timestamp)
+                                          .toDate(),
+                                    )
+                                  : data['dateOfBirth']?.toString() ?? 'N/A',
+                              isDark,
+                            ),
+                            _buildDivider(isDark),
+                            _buildDetailRow(
+                              'Status',
+                              isActive ? 'Active' : 'Inactive',
+                              isDark,
+                              valueColor:
+                                  isActive ? AppColors.success : Colors.grey,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Actions
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _toggleUserStatus(id, isActive);
+                        },
+                        icon: Icon(
+                          isActive ? Icons.block : Icons.check_circle,
+                          color: isActive ? AppColors.error : AppColors.success,
+                        ),
+                        label: Text(
+                          isActive ? 'Deactivate' : 'Activate',
+                          style: TextStyle(
+                            color:
+                                isActive ? AppColors.error : AppColors.success,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(
+                            color:
+                                isActive ? AppColors.error : AppColors.success,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _showEditUserDialog(id, data);
-                      },
-                      icon: const Icon(Icons.edit, color: Colors.white),
-                      label: const Text('Edit'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showEditUserDialog(id, data);
+                        },
+                        icon: const Icon(Icons.edit, color: Colors.white),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -564,30 +628,35 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String value, bool isDark,
+      {Color? valueColor}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
+          Text(
+            label,
+            style: TextStyle(
+              color: isDark ? Colors.grey[400] : Colors.grey[600],
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w500),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: valueColor ?? (isDark ? Colors.white : Colors.black87),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDivider(bool isDark) {
+    return Divider(
+      color: isDark ? Colors.grey[700] : Colors.grey[200],
+      height: 1,
     );
   }
 

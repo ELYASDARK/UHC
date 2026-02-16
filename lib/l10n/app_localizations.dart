@@ -1228,6 +1228,18 @@ abstract class AppLocalizations {
   /// **'Get notified 1 hour before'**
   String get getNotified1HourBefore;
 
+  /// No description provided for @weekReminder1.
+  ///
+  /// In en, this message translates to:
+  /// **'1 Week Reminder'**
+  String get weekReminder1;
+
+  /// No description provided for @getNotified1WeekBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'Get notified 1 week before'**
+  String get getNotified1WeekBefore;
+
   /// No description provided for @updatesAndTips.
   ///
   /// In en, this message translates to:

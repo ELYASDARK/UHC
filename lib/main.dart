@@ -21,7 +21,7 @@ import 'services/fcm_service.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/auth/register_screen.dart';
+import 'screens/auth/link_google_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/home/main_shell.dart';
 
@@ -178,8 +178,11 @@ class _AppNavigatorState extends State<AppNavigator> {
   bool _showSplash = true;
   bool _onboardingComplete = false;
 
-  // Auth flow: 0 = login, 1 = register, 2 = forgot password
+  // Auth flow: 0 = login, 1 = forgot password
   int _authScreen = 0;
+
+  // Tracks if Google was just linked this session (avoids flicker)
+  bool _googleLinked = false;
 
   /// Called when splash screen animation/delay completes
   /// This ensures onboarding is checked BEFORE we leave the splash
@@ -222,24 +225,26 @@ class _AppNavigatorState extends State<AppNavigator> {
 
     // Check auth state
     if (authProvider.isAuthenticated) {
+      // Check if Google is linked — show link screen if not
+      if (!authProvider.isGoogleLinked && !_googleLinked) {
+        return LinkGoogleScreen(
+          onLinked: () {
+            if (mounted) setState(() => _googleLinked = true);
+          },
+        );
+      }
       return const MainShell();
     }
 
     // Auth screens
     switch (_authScreen) {
       case 1:
-        return RegisterScreen(
-          onLoginTap: () => setState(() => _authScreen = 0),
-          onRegisterSuccess: () {},
-        );
-      case 2:
         return ForgotPasswordScreen(
           onBackTap: () => setState(() => _authScreen = 0),
         );
       default:
         return LoginScreen(
-          onRegisterTap: () => setState(() => _authScreen = 1),
-          onForgotPasswordTap: () => setState(() => _authScreen = 2),
+          onForgotPasswordTap: () => setState(() => _authScreen = 1),
           onLoginSuccess: () {},
         );
     }

@@ -579,6 +579,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get getNotified1HourBefore => 'احصل على إشعار قبل ساعة واحدة';
 
   @override
+  String get weekReminder1 => 'تذكير-١ أسبوع';
+
+  @override
+  String get getNotified1WeekBefore => 'احصل على إشعار قبل أسبوع واحد';
+
+  @override
   String get updatesAndTips => 'التحديثات والنصائح';
 
   @override

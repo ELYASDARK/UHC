@@ -189,6 +189,8 @@
   "getNotified24HoursBefore": "ئاگادارکردنەوە ٢٤ کاتژمێر پێشتر",
   "hourReminder1": "بیرهێنانەوە-١ کاتژمێر",
   "getNotified1HourBefore": "ئاگادارکردنەوە ١ کاتژمێر پێشتر",
+  "weekReminder1": "بیرهێنانەوە-١ هەفتە",
+  "getNotified1WeekBefore": "ئاگادارکردنەوە ١ هەفتە پێشتر",
   "updatesAndTips": "نوێکاری و ئامۆژگاری",
   "healthTipsNotification": "ئامۆژگاری تەندروستی",
   "dailyHealthTipsAndWellnessAdvice": "ئامۆژگاری ڕۆژانەی تەندروستی و چاکترین",

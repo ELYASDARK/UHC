@@ -21,6 +21,7 @@ class UserModel {
   final bool isActive;
   final Map<String, dynamic>? notificationSettings;
   final String language;
+  final String? googleEmail;
 
   UserModel({
     required this.id,
@@ -39,6 +40,7 @@ class UserModel {
     this.isActive = true,
     this.notificationSettings,
     this.language = 'en',
+    this.googleEmail,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -65,6 +67,7 @@ class UserModel {
       isActive: data['isActive'] ?? true,
       notificationSettings: data['notificationSettings'],
       language: data['language'] ?? 'en',
+      googleEmail: data['googleEmail'],
     );
   }
 
@@ -74,9 +77,8 @@ class UserModel {
       'fullName': fullName,
       'photoUrl': photoUrl,
       'phoneNumber': phoneNumber,
-      'dateOfBirth': dateOfBirth != null
-          ? Timestamp.fromDate(dateOfBirth!)
-          : null,
+      'dateOfBirth':
+          dateOfBirth != null ? Timestamp.fromDate(dateOfBirth!) : null,
       'bloodType': bloodType,
       'allergies': allergies,
       'role': role.name,
@@ -87,6 +89,7 @@ class UserModel {
       'isActive': isActive,
       'notificationSettings': notificationSettings,
       'language': language,
+      'googleEmail': googleEmail,
     };
   }
 
@@ -107,6 +110,7 @@ class UserModel {
     bool? isActive,
     Map<String, dynamic>? notificationSettings,
     String? language,
+    String? googleEmail,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -125,6 +129,7 @@ class UserModel {
       isActive: isActive ?? this.isActive,
       notificationSettings: notificationSettings ?? this.notificationSettings,
       language: language ?? this.language,
+      googleEmail: googleEmail ?? this.googleEmail,
     );
   }
 

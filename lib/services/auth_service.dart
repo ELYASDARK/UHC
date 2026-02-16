@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -74,27 +75,33 @@ class AuthService {
   /// Sign in with Google
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      // Trigger the authentication flow
+      if (kIsWeb) {
+        // On web, use Firebase Auth popup directly (no client ID meta tag needed)
+        final provider = GoogleAuthProvider();
+        final userCredential = await _auth.signInWithPopup(provider);
+        if (userCredential.user != null) {
+          await _createOrUpdateUserDocument(userCredential.user!);
+        }
+        return userCredential;
+      }
+
+      // On mobile, use google_sign_in package
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
         return null; // User cancelled the sign-in
       }
 
-      // Obtain the auth details from the request
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // Create a new credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Sign in to Firebase with the Google credential
       final userCredential = await _auth.signInWithCredential(credential);
 
-      // Create or update user document
       if (userCredential.user != null) {
         await _createOrUpdateUserDocument(userCredential.user!);
       }
@@ -102,6 +109,95 @@ class AuthService {
       return userCredential;
     } catch (e) {
       throw Exception('Google sign-in failed: $e');
+    }
+  }
+
+  /// Check if current user has Google provider linked
+  bool get isGoogleLinked {
+    final user = currentUser;
+    if (user == null) return false;
+    return user.providerData.any((info) => info.providerId == 'google.com');
+  }
+
+  /// Get the linked Google email from Firebase Auth provider data
+  String? get googleEmail {
+    final user = currentUser;
+    if (user == null) return null;
+    try {
+      final googleInfo = user.providerData.firstWhere(
+        (info) => info.providerId == 'google.com',
+      );
+      return googleInfo.email;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Link current user's account with Google
+  Future<UserCredential> linkWithGoogle() async {
+    final user = currentUser;
+    if (user == null) {
+      throw Exception('No user logged in');
+    }
+
+    try {
+      if (kIsWeb) {
+        // On web, use Firebase Auth popup for linking
+        final provider = GoogleAuthProvider();
+        final userCredential = await user.linkWithPopup(provider);
+
+        // Save Google email to Firestore
+        if (userCredential.user != null) {
+          final googleInfo = userCredential.user!.providerData.firstWhere(
+            (info) => info.providerId == 'google.com',
+            orElse: () => userCredential.user!.providerData.first,
+          );
+          await _firestore.collection('users').doc(user.uid).update({
+            'updatedAt': Timestamp.fromDate(DateTime.now()),
+            'googleEmail': googleInfo.email,
+          });
+        }
+        return userCredential;
+      }
+
+      // On mobile, use google_sign_in package
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw Exception('Google sign-in cancelled');
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await user.linkWithCredential(credential);
+
+      if (userCredential.user != null) {
+        final googleInfo = userCredential.user!.providerData.firstWhere(
+          (info) => info.providerId == 'google.com',
+          orElse: () => userCredential.user!.providerData.first,
+        );
+        await _firestore.collection('users').doc(user.uid).update({
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+          'googleEmail': googleInfo.email,
+        });
+      }
+
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'credential-already-in-use') {
+        throw Exception(
+            'This Google account is already linked to another user.');
+      } else if (e.code == 'provider-already-linked') {
+        throw Exception('A Google account is already linked.');
+      }
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw Exception('Failed to link Google account: $e');
     }
   }
 

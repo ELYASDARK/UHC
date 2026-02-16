@@ -189,6 +189,8 @@
   "getNotified24HoursBefore": "احصل على إشعار قبل ٢٤ ساعة",
   "hourReminder1": "تذكير-١ ساعة",
   "getNotified1HourBefore": "احصل على إشعار قبل ساعة واحدة",
+  "weekReminder1": "تذكير-١ أسبوع",
+  "getNotified1WeekBefore": "احصل على إشعار قبل أسبوع واحد",
   "updatesAndTips": "التحديثات والنصائح",
   "healthTipsNotification": "نصائح صحية",
   "dailyHealthTipsAndWellnessAdvice": "نصائح صحية يومية وإرشادات للعافية",

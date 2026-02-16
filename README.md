@@ -87,8 +87,6 @@
 - **User Management** — View all users, assign roles, toggle account status
 - **Analytics** — Interactive charts for appointment trends and department performance
 - **Reports** — Export CSV reports for appointments, doctors, users, and revenue
-- **Sample Data Seeder** — Quickly populate the database with demo data for testing
-
 </details>
 
 <details>
@@ -375,6 +373,21 @@ flutter build web --release
 ---
 
 ## 📝 Changelog
+
+<details>
+<summary><b>v1.5.0</b> — February 2026</summary>
+
+#### 🔧 Admin UI Refinements
+- **Standardized Detail Sheets** — Users, Doctors, and Departments now share a unified, polished bottom sheet design
+- **Improved Consistency** — "View Details" screens now feature consistent styling, layout, and action button placement
+- **Department Status** — "Closed" days are now clearly marked in red with dimmed text in the details view
+
+#### 🔐 Authentication Flow
+- **Enhanced Google Linking** — Added "Sign Out" option to the mandatory link screen, preventing users from getting stuck
+- **Navigation Safety** — Implemented `PopScope` to properly handle back navigation during the linking process
+- **Lint Fixes** — Resolved `use_build_context_synchronously` issues in authentication flows
+
+</details>
 
 <details>
 <summary><b>v1.4.0</b> — February 2026</summary>

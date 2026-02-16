@@ -581,6 +581,12 @@ class AppLocalizationsKu extends AppLocalizations {
   String get getNotified1HourBefore => 'ئاگادارکردنەوە ١ کاتژمێر پێشتر';
 
   @override
+  String get weekReminder1 => 'بیرهێنانەوە-١ هەفتە';
+
+  @override
+  String get getNotified1WeekBefore => 'ئاگادارکردنەوە ١ هەفتە پێشتر';
+
+  @override
   String get updatesAndTips => 'نوێکاری و ئامۆژگاری';
 
   @override

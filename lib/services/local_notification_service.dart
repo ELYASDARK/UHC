@@ -113,7 +113,7 @@ class LocalNotificationService {
     if (androidPlugin != null) {
       // Request notification permission
       final notificationGranted =
-          await androidPlugin.requestNotificationsPermission() ?? false;
+          (await androidPlugin.requestNotificationsPermission()) ?? false;
 
       // Request exact alarm permission for Android 12+ (optional, will use inexact if denied)
       try {
@@ -230,6 +230,7 @@ class LocalNotificationService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool('notif_appointment_reminders') == false) return;
+    if (prefs.getBool('notif_reminder_1w') == false) return;
 
     final reminderTime = appointmentTime.subtract(const Duration(days: 7));
 

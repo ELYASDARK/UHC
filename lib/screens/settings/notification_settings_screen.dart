@@ -10,6 +10,7 @@ import '../../l10n/app_localizations.dart';
 /// Notification settings model
 class NotificationSettings {
   final bool appointmentReminders;
+  final bool reminder1Week;
   final bool reminder24Hours;
   final bool reminder1Hour;
   final bool promotionalNotifications;
@@ -20,6 +21,7 @@ class NotificationSettings {
 
   NotificationSettings({
     this.appointmentReminders = true,
+    this.reminder1Week = true,
     this.reminder24Hours = true,
     this.reminder1Hour = true,
     this.promotionalNotifications = false,
@@ -31,6 +33,7 @@ class NotificationSettings {
 
   NotificationSettings copyWith({
     bool? appointmentReminders,
+    bool? reminder1Week,
     bool? reminder24Hours,
     bool? reminder1Hour,
     bool? promotionalNotifications,
@@ -41,6 +44,7 @@ class NotificationSettings {
   }) {
     return NotificationSettings(
       appointmentReminders: appointmentReminders ?? this.appointmentReminders,
+      reminder1Week: reminder1Week ?? this.reminder1Week,
       reminder24Hours: reminder24Hours ?? this.reminder24Hours,
       reminder1Hour: reminder1Hour ?? this.reminder1Hour,
       promotionalNotifications:
@@ -77,15 +81,20 @@ class _NotificationSettingsScreenState
     _checkPermissions();
   }
 
+  @override
+  void reassemble() {
+    super.reassemble();
+    _loadSettings();
+  }
+
   Future<void> _checkPermissions() async {
     bool enabled = true;
     final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
     if (Theme.of(context).platform == TargetPlatform.android) {
-      final androidImplementation = flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
+      final androidImplementation =
+          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
       if (androidImplementation != null) {
         enabled =
             await androidImplementation.areNotificationsEnabled() ?? false;
@@ -113,6 +122,7 @@ class _NotificationSettingsScreenState
       _settings = NotificationSettings(
         appointmentReminders:
             prefs.getBool('notif_appointment_reminders') ?? true,
+        reminder1Week: prefs.getBool('notif_reminder_1w') ?? true,
         reminder24Hours: prefs.getBool('notif_reminder_24h') ?? true,
         reminder1Hour: prefs.getBool('notif_reminder_1h') ?? true,
         promotionalNotifications: prefs.getBool('notif_promotional') ?? false,
@@ -228,6 +238,21 @@ class _NotificationSettingsScreenState
                       },
                     ),
                     if (_settings.appointmentReminders) ...[
+                      const Divider(height: 1),
+                      _buildSubSwitchTile(
+                        title: l10n.weekReminder1,
+                        subtitle: l10n.getNotified1WeekBefore,
+                        // Cast to dynamic to handle runtime null during hot reload of class definition
+                        value: (_settings.reminder1Week as dynamic) ?? true,
+                        onChanged: (value) async {
+                          setState(() {
+                            _settings = _settings.copyWith(
+                              reminder1Week: value,
+                            );
+                          });
+                          await _saveSetting('notif_reminder_1w', value);
+                        },
+                      ),
                       const Divider(height: 1),
                       _buildSubSwitchTile(
                         title: l10n.hourReminder24,
@@ -402,9 +427,9 @@ class _NotificationSettingsScreenState
           Text(
             title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
           ),
         ],
       ),

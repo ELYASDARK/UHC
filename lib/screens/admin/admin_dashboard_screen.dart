@@ -102,14 +102,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              if (!_isLoading) _loadDashboardStats();
-            },
-          ),
-        ],
       ),
       body: _isLoading
           ? _buildDashboardSkeleton(isDark)

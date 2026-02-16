@@ -716,9 +716,15 @@ class _DepartmentManagementScreenState
       if (value is String) {
         workingHours[entry.key] = value;
       } else if (value is Map) {
-        final start = value['start'] ?? '';
-        final end = value['end'] ?? '';
-        workingHours[entry.key] = '$start - $end';
+        final isEnabled =
+            value.containsKey('enabled') ? (value['enabled'] == true) : true;
+        if (isEnabled) {
+          final start = value['start'] ?? '';
+          final end = value['end'] ?? '';
+          workingHours[entry.key] = '$start - $end';
+        } else {
+          workingHours[entry.key] = 'Closed';
+        }
       }
     }
     final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
@@ -914,6 +920,7 @@ class _DepartmentManagementScreenState
                             children: workingHours.entries.map((entry) {
                               final dayName = entry.key[0].toUpperCase() +
                                   entry.key.substring(1);
+                              final isClosed = entry.value == 'Closed';
                               return Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 4),
@@ -924,18 +931,24 @@ class _DepartmentManagementScreenState
                                     Text(
                                       dayName,
                                       style: TextStyle(
-                                        color: isDark
-                                            ? Colors.grey[400]
-                                            : Colors.grey[600],
+                                        color: isClosed
+                                            ? (isDark
+                                                ? Colors.grey[600]
+                                                : Colors.grey[400])
+                                            : (isDark
+                                                ? Colors.grey[400]
+                                                : Colors.grey[600]),
                                       ),
                                     ),
                                     Text(
                                       entry.value.toString(),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w500,
-                                        color: isDark
-                                            ? Colors.white
-                                            : Colors.black87,
+                                        color: isClosed
+                                            ? Colors.red[400]
+                                            : (isDark
+                                                ? Colors.white
+                                                : Colors.black87),
                                       ),
                                     ),
                                   ],

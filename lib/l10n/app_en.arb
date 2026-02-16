@@ -189,6 +189,8 @@
   "getNotified24HoursBefore": "Get notified 24 hours before",
   "hourReminder1": "Hour Reminder-1",
   "getNotified1HourBefore": "Get notified 1 hour before",
+  "weekReminder1": "1 Week Reminder",
+  "getNotified1WeekBefore": "Get notified 1 week before",
   "updatesAndTips": "Updates & Tips",
   "healthTipsNotification": "Health Tips",
   "dailyHealthTipsAndWellnessAdvice": "Daily health tips and wellness advice",

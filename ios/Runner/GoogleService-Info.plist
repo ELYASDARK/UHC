@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>705258727806-oa6fteng23b4fh4ui119pbnes4ccrj4b.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.705258727806-oa6fteng23b4fh4ui119pbnes4ccrj4b</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>705258727806-8jgkftnm9hhafs7ghvf25tolr83p6tma.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCd_fsuDqeEM4EILkWCvPIkgIR60UzeuEc</string>
+	<key>GCM_SENDER_ID</key>
+	<string>705258727806</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.uhc</string>
+	<key>PROJECT_ID</key>
+	<string>uhca-20800</string>
+	<key>STORAGE_BUCKET</key>
+	<string>uhca-20800.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:705258727806:ios:1fafb2d2e0fd742146eb2f</string>
+	<key>DATABASE_URL</key>
+	<string>https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app</string>
+</dict>
+</plist>

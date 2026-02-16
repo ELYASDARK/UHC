@@ -582,6 +582,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get getNotified1HourBefore => 'Get notified 1 hour before';
 
   @override
+  String get weekReminder1 => '1 Week Reminder';
+
+  @override
+  String get getNotified1WeekBefore => 'Get notified 1 week before';
+
+  @override
   String get updatesAndTips => 'Updates & Tips';
 
   @override

@@ -161,6 +161,32 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Whether the current user has a Google provider linked
+  bool get isGoogleLinked => _authService.isGoogleLinked;
+
+  /// The linked Google email (from Firestore or Firebase Auth fallback)
+  String? get googleEmail =>
+      _currentUser?.googleEmail ?? _authService.googleEmail;
+
+  /// Link the current user's account with Google
+  Future<bool> linkWithGoogle() async {
+    try {
+      _errorMessage = null;
+      await _authService.linkWithGoogle();
+
+      // Refresh user data to pick up updated photo, etc.
+      if (_currentUser != null) {
+        await _refreshUserData(_currentUser!.id);
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Send password reset email
   Future<bool> sendPasswordResetEmail(String email) async {
     try {
