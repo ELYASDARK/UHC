@@ -67,7 +67,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera to take profile photos and scan medical documents.</string>
+	<string>We need access to your camera to take profile photos, scan medical documents, and scan QR codes to confirm appointments.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to upload profile photos and medical records.</string>
 	<key>UIBackgroundModes</key>

@@ -1483,4 +1483,218 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get or => 'أو';
+
+  @override
+  String get goodMorning => 'صباح الخير';
+
+  @override
+  String get goodAfternoon => 'مساء الخير';
+
+  @override
+  String get goodEvening => 'مساء الخير';
+
+  @override
+  String get unavailable => 'غير متوفر';
+
+  @override
+  String get nextAppointment => 'الموعد التالي';
+
+  @override
+  String get todaysAppointments => 'مواعيد اليوم';
+
+  @override
+  String get noAppointmentsToday => 'لا توجد مواعيد اليوم';
+
+  @override
+  String get noUpcomingPatientVisits => 'لا توجد زيارات قادمة للمرضى';
+
+  @override
+  String get schedule => 'الجدول';
+
+  @override
+  String get viewPatientProfile => 'عرض ملف المريض';
+
+  @override
+  String get department => 'القسم';
+
+  @override
+  String get bookingRef => 'رقم الحجز';
+
+  @override
+  String get patientNotes => 'ملاحظات المريض';
+
+  @override
+  String get medicalNotes => 'الملاحظات الطبية';
+
+  @override
+  String get addMedicalNotesHint => 'أضف ملاحظات طبية…';
+
+  @override
+  String get saveNotes => 'حفظ الملاحظات';
+
+  @override
+  String get lastUpdated => 'آخر تحديث:';
+
+  @override
+  String get noShowStatus => 'لم يحضر';
+
+  @override
+  String get appointmentCompleted => 'تم إكمال الموعد';
+
+  @override
+  String get cancelAppointmentDialogTitle => 'إلغاء الموعد';
+
+  @override
+  String get confirmCancel => 'تأكيد الإلغاء';
+
+  @override
+  String get reasonForCancellationHint => 'سبب الإلغاء';
+
+  @override
+  String statusUpdatedTo(String status) {
+    return 'تم تحديث الحالة إلى $status';
+  }
+
+  @override
+  String get thisAppointmentIsCompleted => 'تم إكمال هذا الموعد.';
+
+  @override
+  String get cancelReason => 'سبب الإلغاء';
+
+  @override
+  String get type => 'النوع';
+
+  @override
+  String get noScheduleSet => 'لم يتم تعيين جدول';
+
+  @override
+  String get noScheduleTitle => 'لا يوجد جدول';
+
+  @override
+  String get noTimeSlotsConfigured => 'لم يتم تحديد فترات زمنية\nلهذا اليوم.';
+
+  @override
+  String get booked => 'محجوز';
+
+  @override
+  String get passed => 'انتهى';
+
+  @override
+  String get blocked => 'محظور';
+
+  @override
+  String slotsLabel(int count) {
+    return '$count فترات';
+  }
+
+  @override
+  String bookedCount(int count) {
+    return '$count محجوز';
+  }
+
+  @override
+  String get patientInformation => 'معلومات المريض';
+
+  @override
+  String get studentId => 'الرقم الجامعي';
+
+  @override
+  String get appointmentHistory => 'سجل المواعيد';
+
+  @override
+  String get noAppointmentHistory => 'لا يوجد سجل مواعيد';
+
+  @override
+  String get failedToLoadPatientData => 'فشل تحميل بيانات المريض';
+
+  @override
+  String get specialization => 'التخصص';
+
+  @override
+  String get specializationHint => 'مثال: الطب الباطني';
+
+  @override
+  String get pleaseEnterSpecialization => 'الرجاء إدخال التخصص';
+
+  @override
+  String get yearsOfExperience => 'سنوات الخبرة';
+
+  @override
+  String get yearsOfExperienceHint => 'مثال: ١٠';
+
+  @override
+  String get enterValidNumber => 'أدخل رقماً صحيحاً';
+
+  @override
+  String get bio => 'السيرة الذاتية';
+
+  @override
+  String get bioHint => 'سيرة مهنية مختصرة…';
+
+  @override
+  String get qualificationsLabel => 'المؤهلات';
+
+  @override
+  String get qualificationsHint => 'مثال: MD, MBBS, بورد';
+
+  @override
+  String get noQualificationsAdded => 'لا توجد مؤهلات مضافة بعد';
+
+  @override
+  String get failedToUpdateAvailability => 'فشل تحديث حالة التوفر';
+
+  @override
+  String get name => 'الاسم';
+
+  @override
+  String visitsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count زيارات',
+      one: 'زيارة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get scanQrToConfirm => 'مسح QR للتأكيد';
+
+  @override
+  String get confirmManual => 'تأكيد (يدوي)';
+
+  @override
+  String get confirmWindowExpired => 'انتهت فترة التأكيد';
+
+  @override
+  String get scanPatientQrCode => 'مسح رمز QR الخاص بالمريض';
+
+  @override
+  String get pointCameraAtQr => 'وجّه الكاميرا إلى رمز QR على هاتف المريض';
+
+  @override
+  String get invalidQrCode => 'رمز QR غير صالح لهذا الموعد';
+
+  @override
+  String get manualConfirmUnlocked => 'فشل QR ٥ مرات. التأكيد اليدوي متاح.';
+
+  @override
+  String confirmAvailableInMinutes(int minutes) {
+    return 'متاح بعد $minutes دقيقة';
+  }
+
+  @override
+  String confirmAvailableInHours(int hours) {
+    return 'متاح بعد $hours ساعة';
+  }
+
+  @override
+  String confirmAvailableInDays(int days) {
+    return 'متاح بعد $days يوم';
+  }
+
+  @override
+  String qrScanAttempts(int current, int max) {
+    return 'المحاولات: $current/$max';
+  }
 }

@@ -174,6 +174,9 @@ class AuthProvider with ChangeNotifier {
       _errorMessage = null;
       await _authService.linkWithGoogle();
 
+      // Reload Firebase Auth user so providerData reflects the new link
+      await _authService.currentUser?.reload();
+
       // Refresh user data to pick up updated photo, etc.
       if (_currentUser != null) {
         await _refreshUserData(_currentUser!.id);

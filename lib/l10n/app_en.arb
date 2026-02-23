@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "en",
   "@@author": "UHC Team",
   "appName": "UHC",
@@ -496,5 +496,128 @@
     }
   },
   "enterPasswordHint": "Enter your password",
-  "or": "OR"
+  "or": "OR",
+  "goodMorning": "Good Morning",
+  "goodAfternoon": "Good Afternoon",
+  "goodEvening": "Good Evening",
+  "unavailable": "Unavailable",
+  "nextAppointment": "Next Appointment",
+  "todaysAppointments": "Today's Appointments",
+  "noAppointmentsToday": "No appointments today",
+  "noUpcomingPatientVisits": "No upcoming patient visits",
+  "schedule": "Schedule",
+  "viewPatientProfile": "View patient profile",
+  "department": "Department",
+  "bookingRef": "Booking Ref",
+  "patientNotes": "Patient Notes",
+  "medicalNotes": "Medical Notes",
+  "addMedicalNotesHint": "Add medical notes…",
+  "saveNotes": "Save Notes",
+  "lastUpdated": "Last updated:",
+  "noShowStatus": "No-Show",
+  "appointmentCompleted": "Appointment completed",
+  "cancelAppointmentDialogTitle": "Cancel Appointment",
+  "confirmCancel": "Confirm Cancel",
+  "reasonForCancellationHint": "Reason for cancellation",
+  "statusUpdatedTo": "Status updated to {status}",
+  "@statusUpdatedTo": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "thisAppointmentIsCompleted": "This appointment is completed.",
+  "cancelReason": "Cancel Reason",
+  "type": "Type",
+  "noScheduleSet": "No schedule set",
+  "noScheduleTitle": "No Schedule",
+  "noTimeSlotsConfigured": "You have no time slots configured\nfor this day.",
+  "booked": "Booked",
+  "passed": "Passed",
+  "blocked": "Blocked",
+  "slotsLabel": "{count} slots",
+  "@slotsLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookedCount": "{count} booked",
+  "@bookedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "patientInformation": "Patient Information",
+  "studentId": "Student ID",
+  "appointmentHistory": "Appointment History",
+  "noAppointmentHistory": "No appointment history",
+  "failedToLoadPatientData": "Failed to load patient data",
+  "specialization": "Specialization",
+  "specializationHint": "e.g. Internal Medicine",
+  "pleaseEnterSpecialization": "Please enter a specialization",
+  "yearsOfExperience": "Years of Experience",
+  "yearsOfExperienceHint": "e.g. 10",
+  "enterValidNumber": "Enter a valid number",
+  "bio": "Bio",
+  "bioHint": "Brief professional biography…",
+  "qualificationsLabel": "Qualifications",
+  "qualificationsHint": "e.g. MD, MBBS, Board Certified…",
+  "noQualificationsAdded": "No qualifications added yet",
+  "failedToUpdateAvailability": "Failed to update availability",
+  "name": "Name",
+  "visitsCount": "{count, plural, =1{1 visit} other{{count} visits}}",
+  "@visitsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanQrToConfirm": "Scan QR to Confirm",
+  "confirmManual": "Confirm (Manual)",
+  "confirmWindowExpired": "Confirmation window expired",
+  "scanPatientQrCode": "Scan Patient's QR Code",
+  "pointCameraAtQr": "Point camera at the QR code on patient's phone",
+  "invalidQrCode": "Invalid QR code for this appointment",
+  "manualConfirmUnlocked": "QR failed 5 times. Manual confirm enabled.",
+  "confirmAvailableInMinutes": "Available in {minutes} min",
+  "@confirmAvailableInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmAvailableInHours": "Available in {hours} h",
+  "@confirmAvailableInHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmAvailableInDays": "Available in {days} days",
+  "@confirmAvailableInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "qrScanAttempts": "Attempts: {current}/{max}",
+  "@qrScanAttempts": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  }
 }

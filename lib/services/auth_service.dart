@@ -243,8 +243,9 @@ class AuthService {
       await _googleSignIn.signOut();
     } catch (e) {
       // Ignore google sign out errors (common on web if not signed in via google)
-      await _auth.signOut();
     }
+    // Always sign out of Firebase Auth
+    await _auth.signOut();
   }
 
   /// Create user document in Firestore

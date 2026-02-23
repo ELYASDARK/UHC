@@ -16,6 +16,7 @@ import 'providers/locale_provider.dart';
 import 'providers/appointment_provider.dart';
 import 'providers/doctor_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/doctor_appointment_provider.dart';
 import 'services/local_notification_service.dart';
 import 'services/fcm_service.dart';
 import 'screens/splash/splash_screen.dart';
@@ -23,7 +24,11 @@ import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/link_google_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
-import 'screens/home/main_shell.dart';
+import 'screens/patient/main_shell.dart';
+import 'screens/doctor/doctor_shell.dart';
+import 'data/repositories/doctor_repository.dart';
+import 'data/models/doctor_model.dart';
+import 'data/models/user_model.dart';
 
 /// Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -119,6 +124,7 @@ class UHCApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AppointmentProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => DoctorProvider()),
+        ChangeNotifierProvider(create: (_) => DoctorAppointmentProvider()),
       ],
       child: Consumer2<ThemeProvider, LocaleProvider>(
         builder: (context, themeProvider, localeProvider, _) {
@@ -184,6 +190,39 @@ class _AppNavigatorState extends State<AppNavigator> {
   // Tracks if Google was just linked this session (avoids flicker)
   bool _googleLinked = false;
 
+  // Doctor role state
+  final DoctorRepository _doctorRepository = DoctorRepository();
+  DoctorModel? _doctorModel;
+  bool _doctorLoading = false;
+  bool _doctorFetchFailed = false;
+  String? _lastDoctorUserId;
+
+  /// Fetch the DoctorModel for a doctor-role user.
+  /// Called once per userId; results cached until user changes or retry.
+  Future<void> _fetchDoctorModel(String userId) async {
+    if (_doctorLoading) return;
+    _doctorLoading = true;
+    _doctorFetchFailed = false;
+    _lastDoctorUserId = userId;
+    setState(() {});
+
+    try {
+      final doc = await _doctorRepository.getDoctorByUserId(userId);
+      if (!mounted) return;
+      setState(() {
+        _doctorModel = doc;
+        _doctorLoading = false;
+        _doctorFetchFailed = doc == null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _doctorLoading = false;
+        _doctorFetchFailed = true;
+      });
+    }
+  }
+
   /// Called when splash screen animation/delay completes
   /// This ensures onboarding is checked BEFORE we leave the splash
   Future<void> _onSplashComplete() async {
@@ -233,8 +272,87 @@ class _AppNavigatorState extends State<AppNavigator> {
           },
         );
       }
+
+      // Route doctor role to DoctorShell
+      final currentUser = authProvider.currentUser;
+      if (currentUser?.role == UserRole.doctor) {
+        // Trigger fetch if needed (user changed or first load)
+        if (!_doctorLoading &&
+            _doctorModel == null &&
+            !_doctorFetchFailed &&
+            _lastDoctorUserId != currentUser!.id) {
+          // Schedule fetch after this build frame
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _fetchDoctorModel(currentUser.id);
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // Loading state
+        if (_doctorLoading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // Error state: doctor profile not found or fetch failed
+        if (_doctorFetchFailed || _doctorModel == null) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline,
+                        size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Doctor profile not found',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Your account has the doctor role but no linked doctor profile was found. Contact an administrator.',
+                      style: TextStyle(color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        _doctorFetchFailed = false;
+                        _lastDoctorUserId = null;
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => authProvider.signOut(),
+                      child: const Text('Sign Out'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return DoctorShell(doctor: _doctorModel!);
+      }
+
       return const MainShell();
     }
+
+    // User signed out — clear cached doctor state for fresh fetch on re-login
+    _doctorModel = null;
+    _lastDoctorUserId = null;
+    _doctorFetchFailed = false;
 
     // Auth screens
     switch (_authScreen) {

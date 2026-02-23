@@ -1490,4 +1490,220 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get or => 'یان';
+
+  @override
+  String get goodMorning => 'بەیانیت باش';
+
+  @override
+  String get goodAfternoon => 'نیوەڕۆت باش';
+
+  @override
+  String get goodEvening => 'ئێوارەت باش';
+
+  @override
+  String get unavailable => 'بەردەست نییە';
+
+  @override
+  String get nextAppointment => 'چاوپێکەوتنی داهاتوو';
+
+  @override
+  String get todaysAppointments => 'چاوپێکەوتنەکانی ئەمڕۆ';
+
+  @override
+  String get noAppointmentsToday => 'ئەمڕۆ هیچ چاوپێکەوتنێک نییە';
+
+  @override
+  String get noUpcomingPatientVisits => 'هیچ سەردانێکی داهاتوو نییە';
+
+  @override
+  String get schedule => 'خشتە';
+
+  @override
+  String get viewPatientProfile => 'بینینی پرۆفایلی نەخۆش';
+
+  @override
+  String get department => 'بەش';
+
+  @override
+  String get bookingRef => 'ژمارەی نۆرە';
+
+  @override
+  String get patientNotes => 'تێبینییەکانی نەخۆش';
+
+  @override
+  String get medicalNotes => 'تێبینییە پزیشکییەکان';
+
+  @override
+  String get addMedicalNotesHint => 'تێبینییە پزیشکییەکان زیاد بکە…';
+
+  @override
+  String get saveNotes => 'پاشەکەوتکردنی تێبینی';
+
+  @override
+  String get lastUpdated => 'دوا نوێکردنەوە:';
+
+  @override
+  String get noShowStatus => 'نەهاتوو';
+
+  @override
+  String get appointmentCompleted => 'چاوپێکەوتن تەواو بوو';
+
+  @override
+  String get cancelAppointmentDialogTitle => 'هەڵوەشاندنەوەی چاوپێکەوتن';
+
+  @override
+  String get confirmCancel => 'دڵنیاکردنەوەی هەڵوەشاندنەوە';
+
+  @override
+  String get reasonForCancellationHint => 'هۆکاری هەڵوەشاندنەوە';
+
+  @override
+  String statusUpdatedTo(String status) {
+    return 'دۆخ نوێکرایەوە بۆ $status';
+  }
+
+  @override
+  String get thisAppointmentIsCompleted => 'ئەم چاوپێکەوتنە تەواو بووە.';
+
+  @override
+  String get cancelReason => 'هۆکاری هەڵوەشاندنەوە';
+
+  @override
+  String get type => 'جۆر';
+
+  @override
+  String get noScheduleSet => 'هیچ خشتەیەک دیاری نەکراوە';
+
+  @override
+  String get noScheduleTitle => 'خشتە نییە';
+
+  @override
+  String get noTimeSlotsConfigured => 'هیچ کاتێکت ڕێکنەخراوە\nبۆ ئەم ڕۆژە.';
+
+  @override
+  String get booked => 'نۆرەکراو';
+
+  @override
+  String get passed => 'تێپەڕیوە';
+
+  @override
+  String get blocked => 'بلۆککراو';
+
+  @override
+  String slotsLabel(int count) {
+    return '$count کات';
+  }
+
+  @override
+  String bookedCount(int count) {
+    return '$count نۆرەکراو';
+  }
+
+  @override
+  String get patientInformation => 'زانیاری نەخۆش';
+
+  @override
+  String get studentId => 'ناسنامەی خوێندکار';
+
+  @override
+  String get appointmentHistory => 'مێژووی چاوپێکەوتن';
+
+  @override
+  String get noAppointmentHistory => 'هیچ مێژووی چاوپێکەوتنێک نییە';
+
+  @override
+  String get failedToLoadPatientData => 'داتاکانی نەخۆش بارنەبوو';
+
+  @override
+  String get specialization => 'پسپۆڕی';
+
+  @override
+  String get specializationHint => 'بۆ نموونە: پزیشکی ناوخۆیی';
+
+  @override
+  String get pleaseEnterSpecialization => 'تکایە پسپۆڕی بنووسە';
+
+  @override
+  String get yearsOfExperience => 'ساڵەکانی ئەزموون';
+
+  @override
+  String get yearsOfExperienceHint => 'بۆ نموونە: ١٠';
+
+  @override
+  String get enterValidNumber => 'ژمارەیەکی دروست بنووسە';
+
+  @override
+  String get bio => 'ژیاننامە';
+
+  @override
+  String get bioHint => 'ژیاننامەی پیشەیی کورت…';
+
+  @override
+  String get qualificationsLabel => 'بڕوانامەکان';
+
+  @override
+  String get qualificationsHint => 'بۆ نموونە: MD, MBBS, بۆرد';
+
+  @override
+  String get noQualificationsAdded => 'هێشتا هیچ بڕوانامەیەک زیاد نەکراوە';
+
+  @override
+  String get failedToUpdateAvailability =>
+      'نوێکردنەوەی بەردەستبوون سەرکەوتوو نەبوو';
+
+  @override
+  String get name => 'ناو';
+
+  @override
+  String visitsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سەردان',
+      one: '١ سەردان',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get scanQrToConfirm => 'سکانی QR بۆ دڵنیاکردنەوە';
+
+  @override
+  String get confirmManual => 'دڵنیاکردنەوە (دەستی)';
+
+  @override
+  String get confirmWindowExpired => 'ماوەی دڵنیاکردنەوە تەواو بوو';
+
+  @override
+  String get scanPatientQrCode => 'سکانی QR ی نەخۆش بکە';
+
+  @override
+  String get pointCameraAtQr => 'کامێرا ڕوو لە QR ی لەسەر مۆبایلی نەخۆش بگرە';
+
+  @override
+  String get invalidQrCode => 'QR هەڵەیە بۆ ئەم چاوپێکەوتنە';
+
+  @override
+  String get manualConfirmUnlocked =>
+      'QR ٥ جار شکستی هێنا. دڵنیاکردنەوەی دەستی چالاک کرا.';
+
+  @override
+  String confirmAvailableInMinutes(int minutes) {
+    return 'بەردەستە لە $minutes خولەک';
+  }
+
+  @override
+  String confirmAvailableInHours(int hours) {
+    return 'بەردەستە لە $hours کاتژمێر';
+  }
+
+  @override
+  String confirmAvailableInDays(int days) {
+    return 'بەردەستە لە $days ڕۆژ';
+  }
+
+  @override
+  String qrScanAttempts(int current, int max) {
+    return 'هەوڵەکان: $current/$max';
+  }
 }

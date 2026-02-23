@@ -28,6 +28,21 @@ class DoctorRepository {
     }
   }
 
+  /// Get doctor by Firebase Auth user ID
+  Future<DoctorModel?> getDoctorByUserId(String userId) async {
+    try {
+      final snapshot =
+          await _doctorsRef.where('userId', isEqualTo: userId).limit(1).get();
+      if (snapshot.docs.isNotEmpty) {
+        return DoctorModel.fromFirestore(snapshot.docs.first);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting doctor by userId: $e');
+      return null;
+    }
+  }
+
   /// Get doctor by ID
   Future<DoctorModel?> getDoctorById(String doctorId) async {
     final doc = await _doctorsRef.doc(doctorId).get();

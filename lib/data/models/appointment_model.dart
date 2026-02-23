@@ -31,6 +31,9 @@ class AppointmentModel {
   final String? rescheduleReason;
   final bool reminderSent24h;
   final bool reminderSent1h;
+  final DateTime? medicalNotesUpdatedAt;
+  final String? statusUpdatedBy;
+  final int qrScanFailures;
 
   AppointmentModel({
     required this.id,
@@ -56,6 +59,9 @@ class AppointmentModel {
     this.rescheduleReason,
     this.reminderSent24h = false,
     this.reminderSent1h = false,
+    this.medicalNotesUpdatedAt,
+    this.statusUpdatedBy,
+    this.qrScanFailures = 0,
   });
 
   factory AppointmentModel.fromFirestore(DocumentSnapshot doc) {
@@ -92,6 +98,11 @@ class AppointmentModel {
       rescheduleReason: data['rescheduleReason'],
       reminderSent24h: data['reminderSent24h'] ?? false,
       reminderSent1h: data['reminderSent1h'] ?? false,
+      medicalNotesUpdatedAt: data['medicalNotesUpdatedAt'] != null
+          ? (data['medicalNotesUpdatedAt'] as Timestamp).toDate()
+          : null,
+      statusUpdatedBy: data['statusUpdatedBy'],
+      qrScanFailures: data['qrScanFailures'] ?? 0,
     );
   }
 
@@ -112,15 +123,19 @@ class AppointmentModel {
       'qrCode': qrCode,
       'bookingReference': bookingReference,
       'isCheckedIn': isCheckedIn,
-      'checkedInAt': checkedInAt != null
-          ? Timestamp.fromDate(checkedInAt!)
-          : null,
+      'checkedInAt':
+          checkedInAt != null ? Timestamp.fromDate(checkedInAt!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'cancelReason': cancelReason,
       'rescheduleReason': rescheduleReason,
       'reminderSent24h': reminderSent24h,
       'reminderSent1h': reminderSent1h,
+      'medicalNotesUpdatedAt': medicalNotesUpdatedAt != null
+          ? Timestamp.fromDate(medicalNotesUpdatedAt!)
+          : null,
+      'statusUpdatedBy': statusUpdatedBy,
+      'qrScanFailures': qrScanFailures,
     };
   }
 
@@ -148,6 +163,9 @@ class AppointmentModel {
     String? rescheduleReason,
     bool? reminderSent24h,
     bool? reminderSent1h,
+    DateTime? medicalNotesUpdatedAt,
+    String? statusUpdatedBy,
+    int? qrScanFailures,
   }) {
     return AppointmentModel(
       id: id ?? this.id,
@@ -173,6 +191,10 @@ class AppointmentModel {
       rescheduleReason: rescheduleReason ?? this.rescheduleReason,
       reminderSent24h: reminderSent24h ?? this.reminderSent24h,
       reminderSent1h: reminderSent1h ?? this.reminderSent1h,
+      medicalNotesUpdatedAt:
+          medicalNotesUpdatedAt ?? this.medicalNotesUpdatedAt,
+      statusUpdatedBy: statusUpdatedBy ?? this.statusUpdatedBy,
+      qrScanFailures: qrScanFailures ?? this.qrScanFailures,
     );
   }
 

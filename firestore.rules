@@ -1,45 +1,80 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users collection
+
+    // ── Helper Functions ──
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Resolves a doctor's Firestore doc ID → auth UID via the userId field.
+    // appointment.doctorId stores DoctorModel.id (Firestore doc ID),
+    // NOT DoctorModel.userId (auth UID), so we must look it up.
+    function isDoctorForAppointment(doctorDocId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/doctors/$(doctorDocId)).data.userId == request.auth.uid;
+    }
+
+    // ── Users Collection ──
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
     }
-    
-    // Notifications collection
+
+    // ── Notifications Collection ──
     match /notifications/{notificationId} {
-      allow read: if request.auth != null && 
+      allow read: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
     }
-    
-    // User tokens for FCM
+
+    // ── User Tokens for FCM ──
     match /user_tokens/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
     }
-    
-    // Appointments collection
+
+    // ── Appointments Collection ──
+    // Both patient and doctor can update (status changes, medical notes).
+    // doctorId stores the doctor's Firestore doc ID, not auth UID,
+    // so we resolve via get() on the doctors collection.
     match /appointments/{appointmentId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        (resource.data.patientId == request.auth.uid || 
-         resource.data.doctorId == request.auth.uid);
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        (resource.data.patientId == request.auth.uid ||
+         isDoctorForAppointment(resource.data.doctorId));
+      allow delete: if isAuthenticated() &&
+        (resource.data.patientId == request.auth.uid ||
+         isDoctorForAppointment(resource.data.doctorId));
     }
-    
-    // Doctors collection
+
+    // ── Doctors Collection ──
+    // Anyone authenticated can read doctor profiles.
+    // Only the doctor themselves can update their own profile.
+    // Only admins can create or delete doctor profiles.
     match /doctors/{doctorId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow create, delete: if isAdmin();
     }
-    
-    // Departments collection
+
+    // ── Departments Collection ──
+    // Public read; admin-only write.
     match /departments/{departmentId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
   }
 }

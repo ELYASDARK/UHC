@@ -27,9 +27,8 @@ class AppointmentRepository {
     final now = DateTime.now();
     try {
       // First try by patientId only (no date filter to avoid index)
-      var snapshot = await _appointmentsRef
-          .where('patientId', isEqualTo: userId)
-          .get();
+      var snapshot =
+          await _appointmentsRef.where('patientId', isEqualTo: userId).get();
 
       // If no results and email is provided, try by patientEmail only
       if (snapshot.docs.isEmpty && email != null) {
@@ -42,15 +41,12 @@ class AppointmentRepository {
       final appointments = snapshot.docs
           .map((doc) => AppointmentModel.fromFirestore(doc))
           .where((apt) {
-            final isUpcoming =
-                apt.appointmentDate.isAfter(now) ||
-                apt.appointmentDate.isAtSameMomentAs(now);
-            final isActive =
-                apt.status == AppointmentStatus.pending ||
-                apt.status == AppointmentStatus.confirmed;
-            return isUpcoming && isActive;
-          })
-          .toList();
+        final isUpcoming = apt.appointmentDate.isAfter(now) ||
+            apt.appointmentDate.isAtSameMomentAs(now);
+        final isActive = apt.status == AppointmentStatus.pending ||
+            apt.status == AppointmentStatus.confirmed;
+        return isUpcoming && isActive;
+      }).toList();
 
       // Sort by appointment date
       appointments.sort(
@@ -72,9 +68,8 @@ class AppointmentRepository {
     final now = DateTime.now();
     try {
       // First try by patientId only (no date filter to avoid index)
-      var snapshot = await _appointmentsRef
-          .where('patientId', isEqualTo: userId)
-          .get();
+      var snapshot =
+          await _appointmentsRef.where('patientId', isEqualTo: userId).get();
 
       // If no results and email is provided, try by patientEmail only
       if (snapshot.docs.isEmpty && email != null) {
@@ -91,13 +86,12 @@ class AppointmentRepository {
       final appointments = snapshot.docs
           .map((doc) => AppointmentModel.fromFirestore(doc))
           .where((apt) {
-            final isPastDate = apt.appointmentDate.isBefore(now);
-            final isCancelled = apt.status == AppointmentStatus.cancelled;
-            final isCompleted = apt.status == AppointmentStatus.completed;
-            final isNoShow = apt.status == AppointmentStatus.noShow;
-            return isPastDate || isCancelled || isCompleted || isNoShow;
-          })
-          .toList();
+        final isPastDate = apt.appointmentDate.isBefore(now);
+        final isCancelled = apt.status == AppointmentStatus.cancelled;
+        final isCompleted = apt.status == AppointmentStatus.completed;
+        final isNoShow = apt.status == AppointmentStatus.noShow;
+        return isPastDate || isCancelled || isCompleted || isNoShow;
+      }).toList();
 
       // Sort by appointment date (newest first)
       appointments.sort(
@@ -122,25 +116,21 @@ class AppointmentRepository {
 
     try {
       // Simplified query - only filter by doctorId
-      final snapshot = await _appointmentsRef
-          .where('doctorId', isEqualTo: doctorId)
-          .get();
+      final snapshot =
+          await _appointmentsRef.where('doctorId', isEqualTo: doctorId).get();
 
       // Filter by date and status in-memory
       return snapshot.docs
           .map((doc) => AppointmentModel.fromFirestore(doc))
           .where((apt) {
-            final isOnDate =
-                apt.appointmentDate.isAfter(
-                  startOfDay.subtract(const Duration(seconds: 1)),
-                ) &&
-                apt.appointmentDate.isBefore(endOfDay);
-            final isActive =
-                apt.status == AppointmentStatus.pending ||
-                apt.status == AppointmentStatus.confirmed;
-            return isOnDate && isActive;
-          })
-          .toList()
+        final isOnDate = apt.appointmentDate.isAfter(
+              startOfDay.subtract(const Duration(seconds: 1)),
+            ) &&
+            apt.appointmentDate.isBefore(endOfDay);
+        final isActive = apt.status == AppointmentStatus.pending ||
+            apt.status == AppointmentStatus.confirmed;
+        return isOnDate && isActive;
+      }).toList()
         ..sort((a, b) => a.appointmentDate.compareTo(b.appointmentDate));
     } catch (e) {
       debugPrint('Error getting doctor appointments: $e');
@@ -162,33 +152,45 @@ class AppointmentRepository {
 
   /// Delete all appointments for a user (useful for testing cleanup)
   Future<void> deleteAllUserAppointments(String userId) async {
-    final snapshot = await _appointmentsRef
-        .where('patientId', isEqualTo: userId)
-        .get();
+    final snapshot =
+        await _appointmentsRef.where('patientId', isEqualTo: userId).get();
 
     for (final doc in snapshot.docs) {
       await doc.reference.delete();
     }
   }
 
-  /// Update appointment status
+  /// Update appointment status (with optional statusUpdatedBy tracking)
   Future<void> updateAppointmentStatus(
     String appointmentId,
-    AppointmentStatus status,
-  ) async {
-    await _appointmentsRef.doc(appointmentId).update({
+    AppointmentStatus status, {
+    String? statusUpdatedBy,
+  }) async {
+    final updates = <String, dynamic>{
       'status': status.name,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
-    });
+    };
+    if (statusUpdatedBy != null) {
+      updates['statusUpdatedBy'] = statusUpdatedBy;
+    }
+    await _appointmentsRef.doc(appointmentId).update(updates);
   }
 
   /// Cancel appointment
-  Future<void> cancelAppointment(String appointmentId, String reason) async {
-    await _appointmentsRef.doc(appointmentId).update({
+  Future<void> cancelAppointment(
+    String appointmentId,
+    String reason, {
+    String? statusUpdatedBy,
+  }) async {
+    final updates = <String, dynamic>{
       'status': AppointmentStatus.cancelled.name,
       'cancelReason': reason,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
-    });
+    };
+    if (statusUpdatedBy != null) {
+      updates['statusUpdatedBy'] = statusUpdatedBy;
+    }
+    await _appointmentsRef.doc(appointmentId).update(updates);
   }
 
   /// Reschedule appointment
@@ -210,6 +212,7 @@ class AppointmentRepository {
   Future<void> completeAppointment(
     String appointmentId, {
     String? notes,
+    String? statusUpdatedBy,
   }) async {
     final updates = <String, dynamic>{
       'status': AppointmentStatus.completed.name,
@@ -217,6 +220,10 @@ class AppointmentRepository {
     };
     if (notes != null) {
       updates['medicalNotes'] = notes;
+      updates['medicalNotesUpdatedAt'] = Timestamp.fromDate(DateTime.now());
+    }
+    if (statusUpdatedBy != null) {
+      updates['statusUpdatedBy'] = statusUpdatedBy;
     }
     await _appointmentsRef.doc(appointmentId).update(updates);
   }
@@ -245,9 +252,8 @@ class AppointmentRepository {
       query = query.where('status', isEqualTo: status.name);
     }
 
-    final snapshot = await query
-        .orderBy('appointmentDate', descending: true)
-        .get();
+    final snapshot =
+        await query.orderBy('appointmentDate', descending: true).get();
     return snapshot.docs
         .map((doc) => AppointmentModel.fromFirestore(doc))
         .toList();
@@ -290,8 +296,7 @@ class AppointmentRepository {
         final status = data['status'] as String?;
 
         // Check if appointment is on the same day and is active (pending or confirmed)
-        final isOnSameDay =
-            appointmentDate.isAfter(
+        final isOnSameDay = appointmentDate.isAfter(
               startOfDay.subtract(const Duration(seconds: 1)),
             ) &&
             appointmentDate.isBefore(endOfDay);
@@ -306,5 +311,71 @@ class AppointmentRepository {
       debugPrint('Error checking time slot availability: $e');
       return true;
     }
+  }
+
+  // ─── Doctor-facing methods ───────────────────────────────────────
+
+  /// Get all appointments for a doctor (no date filter)
+  Future<List<AppointmentModel>> getAllDoctorAppointments(
+    String doctorId,
+  ) async {
+    try {
+      final snapshot =
+          await _appointmentsRef.where('doctorId', isEqualTo: doctorId).get();
+      final appointments = snapshot.docs
+          .map((doc) => AppointmentModel.fromFirestore(doc))
+          .toList();
+      appointments.sort(
+        (a, b) => b.appointmentDate.compareTo(a.appointmentDate),
+      );
+      return appointments;
+    } catch (e) {
+      debugPrint('Error getting all doctor appointments: $e');
+      return [];
+    }
+  }
+
+  /// Update medical notes on an appointment
+  Future<void> updateMedicalNotes(
+    String appointmentId,
+    String notes,
+  ) async {
+    await _appointmentsRef.doc(appointmentId).update({
+      'medicalNotes': notes,
+      'medicalNotesUpdatedAt': Timestamp.fromDate(DateTime.now()),
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
+  /// Get all appointments between a patient and a specific doctor
+  Future<List<AppointmentModel>> getPatientAppointmentsWithDoctor(
+    String patientId,
+    String doctorId,
+  ) async {
+    try {
+      // Query by doctorId, then filter by patientId in-memory
+      // (avoids composite index requirement)
+      final snapshot =
+          await _appointmentsRef.where('doctorId', isEqualTo: doctorId).get();
+      final appointments = snapshot.docs
+          .map((doc) => AppointmentModel.fromFirestore(doc))
+          .where((apt) => apt.patientId == patientId)
+          .toList();
+      appointments.sort(
+        (a, b) => b.appointmentDate.compareTo(a.appointmentDate),
+      );
+      return appointments;
+    } catch (e) {
+      debugPrint('Error getting patient appointments with doctor: $e');
+      return [];
+    }
+  }
+
+  /// Atomically increment the QR scan failure counter
+  Future<void> incrementQrScanFailures(String appointmentId) async {
+    await _appointmentsRef.doc(appointmentId).update({
+      'qrScanFailures': FieldValue.increment(1),
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
   }
 }

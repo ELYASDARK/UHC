@@ -2991,6 +2991,390 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OR'**
   String get or;
+
+  /// No description provided for @goodMorning.
+  ///
+  /// In en, this message translates to:
+  /// **'Good Morning'**
+  String get goodMorning;
+
+  /// No description provided for @goodAfternoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Good Afternoon'**
+  String get goodAfternoon;
+
+  /// No description provided for @goodEvening.
+  ///
+  /// In en, this message translates to:
+  /// **'Good Evening'**
+  String get goodEvening;
+
+  /// No description provided for @unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get unavailable;
+
+  /// No description provided for @nextAppointment.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Appointment'**
+  String get nextAppointment;
+
+  /// No description provided for @todaysAppointments.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s Appointments'**
+  String get todaysAppointments;
+
+  /// No description provided for @noAppointmentsToday.
+  ///
+  /// In en, this message translates to:
+  /// **'No appointments today'**
+  String get noAppointmentsToday;
+
+  /// No description provided for @noUpcomingPatientVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'No upcoming patient visits'**
+  String get noUpcomingPatientVisits;
+
+  /// No description provided for @schedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get schedule;
+
+  /// No description provided for @viewPatientProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'View patient profile'**
+  String get viewPatientProfile;
+
+  /// No description provided for @department.
+  ///
+  /// In en, this message translates to:
+  /// **'Department'**
+  String get department;
+
+  /// No description provided for @bookingRef.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking Ref'**
+  String get bookingRef;
+
+  /// No description provided for @patientNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Patient Notes'**
+  String get patientNotes;
+
+  /// No description provided for @medicalNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Medical Notes'**
+  String get medicalNotes;
+
+  /// No description provided for @addMedicalNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add medical notes…'**
+  String get addMedicalNotesHint;
+
+  /// No description provided for @saveNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Notes'**
+  String get saveNotes;
+
+  /// No description provided for @lastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated:'**
+  String get lastUpdated;
+
+  /// No description provided for @noShowStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'No-Show'**
+  String get noShowStatus;
+
+  /// No description provided for @appointmentCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Appointment completed'**
+  String get appointmentCompleted;
+
+  /// No description provided for @cancelAppointmentDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Appointment'**
+  String get cancelAppointmentDialogTitle;
+
+  /// No description provided for @confirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Cancel'**
+  String get confirmCancel;
+
+  /// No description provided for @reasonForCancellationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for cancellation'**
+  String get reasonForCancellationHint;
+
+  /// No description provided for @statusUpdatedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Status updated to {status}'**
+  String statusUpdatedTo(String status);
+
+  /// No description provided for @thisAppointmentIsCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'This appointment is completed.'**
+  String get thisAppointmentIsCompleted;
+
+  /// No description provided for @cancelReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Reason'**
+  String get cancelReason;
+
+  /// No description provided for @type.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get type;
+
+  /// No description provided for @noScheduleSet.
+  ///
+  /// In en, this message translates to:
+  /// **'No schedule set'**
+  String get noScheduleSet;
+
+  /// No description provided for @noScheduleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Schedule'**
+  String get noScheduleTitle;
+
+  /// No description provided for @noTimeSlotsConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'You have no time slots configured\nfor this day.'**
+  String get noTimeSlotsConfigured;
+
+  /// No description provided for @booked.
+  ///
+  /// In en, this message translates to:
+  /// **'Booked'**
+  String get booked;
+
+  /// No description provided for @passed.
+  ///
+  /// In en, this message translates to:
+  /// **'Passed'**
+  String get passed;
+
+  /// No description provided for @blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked'**
+  String get blocked;
+
+  /// No description provided for @slotsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} slots'**
+  String slotsLabel(int count);
+
+  /// No description provided for @bookedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} booked'**
+  String bookedCount(int count);
+
+  /// No description provided for @patientInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Patient Information'**
+  String get patientInformation;
+
+  /// No description provided for @studentId.
+  ///
+  /// In en, this message translates to:
+  /// **'Student ID'**
+  String get studentId;
+
+  /// No description provided for @appointmentHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Appointment History'**
+  String get appointmentHistory;
+
+  /// No description provided for @noAppointmentHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'No appointment history'**
+  String get noAppointmentHistory;
+
+  /// No description provided for @failedToLoadPatientData.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load patient data'**
+  String get failedToLoadPatientData;
+
+  /// No description provided for @specialization.
+  ///
+  /// In en, this message translates to:
+  /// **'Specialization'**
+  String get specialization;
+
+  /// No description provided for @specializationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Internal Medicine'**
+  String get specializationHint;
+
+  /// No description provided for @pleaseEnterSpecialization.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a specialization'**
+  String get pleaseEnterSpecialization;
+
+  /// No description provided for @yearsOfExperience.
+  ///
+  /// In en, this message translates to:
+  /// **'Years of Experience'**
+  String get yearsOfExperience;
+
+  /// No description provided for @yearsOfExperienceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 10'**
+  String get yearsOfExperienceHint;
+
+  /// No description provided for @enterValidNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid number'**
+  String get enterValidNumber;
+
+  /// No description provided for @bio.
+  ///
+  /// In en, this message translates to:
+  /// **'Bio'**
+  String get bio;
+
+  /// No description provided for @bioHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Brief professional biography…'**
+  String get bioHint;
+
+  /// No description provided for @qualificationsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Qualifications'**
+  String get qualificationsLabel;
+
+  /// No description provided for @qualificationsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. MD, MBBS, Board Certified…'**
+  String get qualificationsHint;
+
+  /// No description provided for @noQualificationsAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'No qualifications added yet'**
+  String get noQualificationsAdded;
+
+  /// No description provided for @failedToUpdateAvailability.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update availability'**
+  String get failedToUpdateAvailability;
+
+  /// No description provided for @name.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get name;
+
+  /// No description provided for @visitsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 visit} other{{count} visits}}'**
+  String visitsCount(int count);
+
+  /// No description provided for @scanQrToConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR to Confirm'**
+  String get scanQrToConfirm;
+
+  /// No description provided for @confirmManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm (Manual)'**
+  String get confirmManual;
+
+  /// No description provided for @confirmWindowExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation window expired'**
+  String get confirmWindowExpired;
+
+  /// No description provided for @scanPatientQrCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan Patient\'s QR Code'**
+  String get scanPatientQrCode;
+
+  /// No description provided for @pointCameraAtQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Point camera at the QR code on patient\'s phone'**
+  String get pointCameraAtQr;
+
+  /// No description provided for @invalidQrCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid QR code for this appointment'**
+  String get invalidQrCode;
+
+  /// No description provided for @manualConfirmUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'QR failed 5 times. Manual confirm enabled.'**
+  String get manualConfirmUnlocked;
+
+  /// No description provided for @confirmAvailableInMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Available in {minutes} min'**
+  String confirmAvailableInMinutes(int minutes);
+
+  /// No description provided for @confirmAvailableInHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Available in {hours} h'**
+  String confirmAvailableInHours(int hours);
+
+  /// No description provided for @confirmAvailableInDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Available in {days} days'**
+  String confirmAvailableInDays(int days);
+
+  /// No description provided for @qrScanAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempts: {current}/{max}'**
+  String qrScanAttempts(int current, int max);
 }
 
 class _AppLocalizationsDelegate

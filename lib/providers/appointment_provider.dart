@@ -3,6 +3,7 @@ import '../data/models/appointment_model.dart';
 import '../data/repositories/appointment_repository.dart';
 import '../data/repositories/notification_repository.dart';
 import '../services/local_notification_service.dart';
+import '../data/repositories/doctor_repository.dart';
 
 /// Provider for managing appointments state
 class AppointmentProvider extends ChangeNotifier {
@@ -10,12 +11,14 @@ class AppointmentProvider extends ChangeNotifier {
   final LocalNotificationService _notificationService =
       LocalNotificationService();
   final NotificationRepository _notificationRepo = NotificationRepository();
+  final DoctorRepository _doctorRepo = DoctorRepository();
 
   List<AppointmentModel> _upcomingAppointments = [];
   List<AppointmentModel> _pastAppointments = [];
   AppointmentModel? _selectedAppointment;
   bool _isLoading = false;
   String? _error;
+  Map<String, String?> _doctorPhotos = {};
 
   // Getters
   List<AppointmentModel> get upcomingAppointments => _upcomingAppointments;
@@ -24,6 +27,7 @@ class AppointmentProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   int get upcomingCount => _upcomingAppointments.length;
+  Map<String, String?> get doctorPhotos => _doctorPhotos;
 
   /// Load user's appointments
   Future<void> loadAppointments(String userId, {String? email}) async {
@@ -41,6 +45,7 @@ class AppointmentProvider extends ChangeNotifier {
         userId,
         email: email,
       );
+      await _fetchDoctorPhotos();
       _error = null;
     } catch (e) {
       _error = e.toString();
@@ -377,7 +382,24 @@ class AppointmentProvider extends ChangeNotifier {
     _upcomingAppointments = [];
     _pastAppointments = [];
     _selectedAppointment = null;
+    _doctorPhotos = {};
     _error = null;
     notifyListeners();
+  }
+
+  /// Batch-fetch profile photos for all unique doctors across appointments.
+  Future<void> _fetchDoctorPhotos() async {
+    final allAppointments = [..._upcomingAppointments, ..._pastAppointments];
+    final uniqueIds = allAppointments.map((a) => a.doctorId).toSet();
+    // Only fetch IDs we haven't cached yet
+    final idsToFetch = uniqueIds.where((id) => !_doctorPhotos.containsKey(id));
+    for (final id in idsToFetch) {
+      try {
+        final doctor = await _doctorRepo.getDoctorById(id);
+        _doctorPhotos[id] = doctor?.photoUrl;
+      } catch (_) {
+        _doctorPhotos[id] = null;
+      }
+    }
   }
 }

@@ -1490,4 +1490,221 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get or => 'OR';
+
+  @override
+  String get goodMorning => 'Good Morning';
+
+  @override
+  String get goodAfternoon => 'Good Afternoon';
+
+  @override
+  String get goodEvening => 'Good Evening';
+
+  @override
+  String get unavailable => 'Unavailable';
+
+  @override
+  String get nextAppointment => 'Next Appointment';
+
+  @override
+  String get todaysAppointments => 'Today\'s Appointments';
+
+  @override
+  String get noAppointmentsToday => 'No appointments today';
+
+  @override
+  String get noUpcomingPatientVisits => 'No upcoming patient visits';
+
+  @override
+  String get schedule => 'Schedule';
+
+  @override
+  String get viewPatientProfile => 'View patient profile';
+
+  @override
+  String get department => 'Department';
+
+  @override
+  String get bookingRef => 'Booking Ref';
+
+  @override
+  String get patientNotes => 'Patient Notes';
+
+  @override
+  String get medicalNotes => 'Medical Notes';
+
+  @override
+  String get addMedicalNotesHint => 'Add medical notes…';
+
+  @override
+  String get saveNotes => 'Save Notes';
+
+  @override
+  String get lastUpdated => 'Last updated:';
+
+  @override
+  String get noShowStatus => 'No-Show';
+
+  @override
+  String get appointmentCompleted => 'Appointment completed';
+
+  @override
+  String get cancelAppointmentDialogTitle => 'Cancel Appointment';
+
+  @override
+  String get confirmCancel => 'Confirm Cancel';
+
+  @override
+  String get reasonForCancellationHint => 'Reason for cancellation';
+
+  @override
+  String statusUpdatedTo(String status) {
+    return 'Status updated to $status';
+  }
+
+  @override
+  String get thisAppointmentIsCompleted => 'This appointment is completed.';
+
+  @override
+  String get cancelReason => 'Cancel Reason';
+
+  @override
+  String get type => 'Type';
+
+  @override
+  String get noScheduleSet => 'No schedule set';
+
+  @override
+  String get noScheduleTitle => 'No Schedule';
+
+  @override
+  String get noTimeSlotsConfigured =>
+      'You have no time slots configured\nfor this day.';
+
+  @override
+  String get booked => 'Booked';
+
+  @override
+  String get passed => 'Passed';
+
+  @override
+  String get blocked => 'Blocked';
+
+  @override
+  String slotsLabel(int count) {
+    return '$count slots';
+  }
+
+  @override
+  String bookedCount(int count) {
+    return '$count booked';
+  }
+
+  @override
+  String get patientInformation => 'Patient Information';
+
+  @override
+  String get studentId => 'Student ID';
+
+  @override
+  String get appointmentHistory => 'Appointment History';
+
+  @override
+  String get noAppointmentHistory => 'No appointment history';
+
+  @override
+  String get failedToLoadPatientData => 'Failed to load patient data';
+
+  @override
+  String get specialization => 'Specialization';
+
+  @override
+  String get specializationHint => 'e.g. Internal Medicine';
+
+  @override
+  String get pleaseEnterSpecialization => 'Please enter a specialization';
+
+  @override
+  String get yearsOfExperience => 'Years of Experience';
+
+  @override
+  String get yearsOfExperienceHint => 'e.g. 10';
+
+  @override
+  String get enterValidNumber => 'Enter a valid number';
+
+  @override
+  String get bio => 'Bio';
+
+  @override
+  String get bioHint => 'Brief professional biography…';
+
+  @override
+  String get qualificationsLabel => 'Qualifications';
+
+  @override
+  String get qualificationsHint => 'e.g. MD, MBBS, Board Certified…';
+
+  @override
+  String get noQualificationsAdded => 'No qualifications added yet';
+
+  @override
+  String get failedToUpdateAvailability => 'Failed to update availability';
+
+  @override
+  String get name => 'Name';
+
+  @override
+  String visitsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count visits',
+      one: '1 visit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get scanQrToConfirm => 'Scan QR to Confirm';
+
+  @override
+  String get confirmManual => 'Confirm (Manual)';
+
+  @override
+  String get confirmWindowExpired => 'Confirmation window expired';
+
+  @override
+  String get scanPatientQrCode => 'Scan Patient\'s QR Code';
+
+  @override
+  String get pointCameraAtQr =>
+      'Point camera at the QR code on patient\'s phone';
+
+  @override
+  String get invalidQrCode => 'Invalid QR code for this appointment';
+
+  @override
+  String get manualConfirmUnlocked =>
+      'QR failed 5 times. Manual confirm enabled.';
+
+  @override
+  String confirmAvailableInMinutes(int minutes) {
+    return 'Available in $minutes min';
+  }
+
+  @override
+  String confirmAvailableInHours(int hours) {
+    return 'Available in $hours h';
+  }
+
+  @override
+  String confirmAvailableInDays(int days) {
+    return 'Available in $days days';
+  }
+
+  @override
+  String qrScanAttempts(int current, int max) {
+    return 'Attempts: $current/$max';
+  }
 }
