@@ -709,7 +709,7 @@ class DoctorDetailScreen extends StatelessWidget {
                   ),
                   icon: const Icon(Icons.schedule_rounded),
                   label: Text(
-                    'Schedule',
+                    AppLocalizations.of(context).schedule,
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

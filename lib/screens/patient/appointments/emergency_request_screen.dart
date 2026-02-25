@@ -5,6 +5,7 @@ import '../../../data/models/doctor_model.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/appointment_provider.dart';
+import 'package:uhc/l10n/app_localizations.dart';
 
 /// Emergency appointment request screen
 class EmergencyRequestScreen extends StatefulWidget {
@@ -19,29 +20,21 @@ class EmergencyRequestScreen extends StatefulWidget {
 class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   final _symptomsController = TextEditingController();
   String? _selectedSeverity;
-  String? _selectedDepartment;
+  Department? _selectedDepartment;
   bool _isLoading = false;
   bool _agreeToTerms = false;
 
-  final List<String> _severityLevels = [
-    'Moderate - Need attention soon',
-    'High - Urgent medical attention',
-    'Critical - Immediate care required',
-  ];
-
-  final List<String> _departments = [
-    'General Medicine',
-    'Dentistry',
-    'Psychology',
-    'Pharmacy',
-    'Cardiology',
-  ];
+  List<String> _getSeverityLevels(AppLocalizations l10n) => [
+        l10n.severityModerateDesc,
+        l10n.severityHighDesc,
+        l10n.severityCriticalDesc,
+      ];
 
   @override
   void initState() {
     super.initState();
     if (widget.doctor != null) {
-      _selectedDepartment = _getDepartmentName(widget.doctor!.department);
+      _selectedDepartment = widget.doctor!.department;
     }
   }
 
@@ -51,28 +44,30 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
     super.dispose();
   }
 
-  String _getDepartmentName(Department dept) {
+  String _getDepartmentLocalizedName(Department dept, AppLocalizations l10n) {
     switch (dept) {
       case Department.generalMedicine:
-        return 'General Medicine';
+        return l10n.deptGeneral;
       case Department.dentistry:
-        return 'Dentistry';
+        return l10n.deptDentistry;
       case Department.psychology:
-        return 'Psychology';
+        return l10n.deptPsychology;
       case Department.pharmacy:
-        return 'Pharmacy';
+        return l10n.deptPharmacy;
       case Department.cardiology:
-        return 'Cardiology';
+        return l10n.deptCardiology;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final severityLevels = _getSeverityLevels(l10n);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Emergency Request'),
+        title: Text(l10n.emergencyRequest),
         centerTitle: true,
         backgroundColor: AppColors.error.withValues(alpha: 0.1),
       ),
@@ -108,15 +103,15 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Emergency Request',
-                          style: TextStyle(
+                        Text(
+                          l10n.emergencyRequest,
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: AppColors.error,
                           ),
                         ),
                         Text(
-                          'For life-threatening emergencies, please call 911 immediately.',
+                          l10n.emergencyCall911,
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark
@@ -135,7 +130,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
             // Department Selection (if no doctor selected)
             if (widget.doctor == null) ...[
               Text(
-                'Department',
+                l10n.department,
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -144,16 +139,21 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: _departments.map((dept) {
+                children: Department.values.map((dept) {
                   final isSelected = _selectedDepartment == dept;
                   return ChoiceChip(
-                    label: Text(dept),
+                    label: Text(_getDepartmentLocalizedName(dept, l10n)),
                     selected: isSelected,
                     onSelected: (_) =>
                         setState(() => _selectedDepartment = dept),
                     selectedColor: AppColors.primary,
+                    backgroundColor: isDark ? AppColors.surfaceDark : null,
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : null,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight),
                     ),
                   );
                 }).toList(),
@@ -190,7 +190,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Dr. ${widget.doctor!.name}',
+                            '${l10n.doctor}: Dr. ${widget.doctor!.name}',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text(
@@ -213,21 +213,21 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
 
             // Severity Level
             Text(
-              'Severity Level',
+              l10n.severityLevel,
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            ...(_severityLevels.asMap().entries.map((entry) {
+            ...severityLevels.asMap().entries.map((entry) {
               final index = entry.key;
               final level = entry.value;
               final isSelected = _selectedSeverity == level;
               final color = index == 0
                   ? AppColors.warning
                   : index == 1
-                  ? Colors.orange
-                  : AppColors.error;
+                      ? Colors.orange
+                      : AppColors.error;
 
               return GestureDetector(
                 onTap: () => setState(() => _selectedSeverity = level),
@@ -270,7 +270,11 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                           level,
                           style: TextStyle(
                             fontWeight: isSelected ? FontWeight.bold : null,
-                            color: isSelected ? color : null,
+                            color: isSelected
+                                ? color
+                                : (isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimaryLight),
                           ),
                         ),
                       ),
@@ -278,12 +282,12 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                   ),
                 ),
               );
-            })),
+            }),
             const SizedBox(height: 24),
 
             // Symptoms Description
             Text(
-              'Describe Your Symptoms',
+              l10n.describeYourSymptoms,
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -293,7 +297,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
               controller: _symptomsController,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Please describe your symptoms in detail...',
+                hintText: l10n.describeSymptomsHint,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -306,9 +310,14 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
               value: _agreeToTerms,
               onChanged: (value) =>
                   setState(() => _agreeToTerms = value ?? false),
-              title: const Text(
-                'I understand this is for urgent medical attention and not for routine appointments.',
-                style: TextStyle(fontSize: 13),
+              title: Text(
+                l10n.emergencyTerms,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
+                ),
               ),
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
@@ -337,12 +346,12 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                           color: Colors.white,
                         ),
                       )
-                    : const Row(
+                    : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.emergency),
                           SizedBox(width: 8),
-                          Text('Submit Emergency Request'),
+                          Text(l10n.submitEmergencyRequest),
                         ],
                       ),
               ),
@@ -352,7 +361,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
             // Help Text
             Center(
               child: Text(
-                'You will be notified once a healthcare provider responds.',
+                l10n.emergencyResponseNotification,
                 style: TextStyle(
                   fontSize: 12,
                   color: isDark
@@ -375,11 +384,12 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   }
 
   Future<void> _submitRequest() async {
+    final l10n = AppLocalizations.of(context);
     final user = context.read<AuthProvider>().user;
     if (user == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please login first')));
+      ).showSnackBar(SnackBar(content: Text(l10n.pleaseLoginFirst)));
       return;
     }
 
@@ -396,7 +406,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
         patientEmail: user.email,
         doctorId: widget.doctor?.id ?? '',
         doctorName: widget.doctor?.name ?? 'Any Available',
-        department: _selectedDepartment!,
+        department: _selectedDepartment!.name,
         appointmentDate: DateTime.now(),
         timeSlot: '00:00 - Emergency',
         type: AppointmentType.emergency,
@@ -418,7 +428,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text('${l10n.error}: ${e.toString()}'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -431,6 +441,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   }
 
   void _showSuccessDialog() {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -452,13 +463,13 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Request Submitted',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            Text(
+              l10n.requestSubmitted,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Your emergency request has been submitted. Our medical team will contact you shortly.',
+            Text(
+              l10n.emergencyRequestSuccessMessage,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -469,7 +480,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                   Navigator.pop(context);
                   Navigator.pop(context, true);
                 },
-                child: const Text('OK'),
+                child: Text(l10n.ok),
               ),
             ),
           ],

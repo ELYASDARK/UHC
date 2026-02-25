@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../providers/appointment_provider.dart';
@@ -168,7 +167,7 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              isUpcoming ? 'Book your first appointment!' : 'No history yet',
+              isUpcoming ? l10n.bookFirstAppointment : l10n.noHistoryYet,
               style: GoogleFonts.roboto(
                 fontSize: 14,
                 color: isDark
@@ -181,7 +180,7 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
               ElevatedButton.icon(
                 onPressed: widget.onBookNow,
                 icon: const Icon(Icons.search),
-                label: const Text('Find a Doctor'),
+                label: Text(l10n.findDoctor),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -572,6 +571,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -593,7 +593,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
           const SizedBox(height: 20),
 
           Text(
-            AppStrings.appointmentDetails,
+            l10n.appointmentDetails,
             style: GoogleFonts.poppins(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -632,7 +632,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Booking ID',
+                    l10n.bookingId,
                     style: GoogleFonts.roboto(
                       fontSize: 12,
                       color: isDark
@@ -654,7 +654,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Show this at check-in',
+                    l10n.showQRCodeAtCheckIn,
                     style: GoogleFonts.roboto(
                       fontSize: 12,
                       color: isDark
@@ -671,21 +671,21 @@ class _AppointmentDetailSheet extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Details
-          _buildDetailRow('Doctor', appointment.doctorName, isDark),
-          _buildDetailRow('Department', appointment.department, isDark),
-          _buildDetailRow('Type', appointment.typeDisplay, isDark),
+          _buildDetailRow(l10n.doctor, appointment.doctorName, isDark),
+          _buildDetailRow(l10n.department, appointment.department, isDark),
+          _buildDetailRow(l10n.type, appointment.typeDisplay, isDark),
           _buildDetailRow(
-            'Date',
+            l10n.date,
             '${appointment.appointmentDate.day}/${appointment.appointmentDate.month}/${appointment.appointmentDate.year}',
             isDark,
           ),
-          _buildDetailRow('Time', appointment.timeSlot, isDark),
-          _buildDetailRow('Status', appointment.statusDisplay, isDark),
+          _buildDetailRow(l10n.time, appointment.timeSlot, isDark),
+          _buildDetailRow(l10n.status, appointment.statusDisplay, isDark),
 
           if (appointment.medicalNotes != null) ...[
             const SizedBox(height: 16),
             Text(
-              'Medical Notes',
+              l10n.medicalNotes,
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,

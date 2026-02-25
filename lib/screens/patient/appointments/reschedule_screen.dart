@@ -329,7 +329,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           Text('${l10n.doctor}: Dr. ${widget.appointment.doctorName}'),
           const SizedBox(height: 4),
           Text(
-            '${l10n.date}: ${_formatDate(widget.appointment.appointmentDate)}',
+            '${l10n.date}: ${_formatDate(widget.appointment.appointmentDate, l10n)}',
           ),
           const SizedBox(height: 4),
           Text('${l10n.time}: ${widget.appointment.timeSlot}'),
@@ -488,8 +488,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to reschedule. The slot might be taken.'),
+            SnackBar(
+              content: Text(l10n.rescheduleFailedSlotTaken),
               backgroundColor: AppColors.error,
             ),
           );
@@ -511,20 +511,20 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     }
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+  String _formatDate(DateTime date, AppLocalizations l10n) {
+    final months = [
+      l10n.jan,
+      l10n.feb,
+      l10n.mar,
+      l10n.apr,
+      l10n.mayShort,
+      l10n.jun,
+      l10n.jul,
+      l10n.aug,
+      l10n.sep,
+      l10n.oct,
+      l10n.nov,
+      l10n.dec,
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }

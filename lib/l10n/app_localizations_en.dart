@@ -402,6 +402,81 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noPastAppointments => 'No past appointments';
 
   @override
+  String get bookFirstAppointment => 'Book your first appointment!';
+
+  @override
+  String get noHistoryYet => 'No history yet';
+
+  @override
+  String get findDoctor => 'Find a Doctor';
+
+  @override
+  String get anyAvailable => 'Any Available';
+
+  @override
+  String get emergencyRequest => 'Emergency Request';
+
+  @override
+  String get severityModerateDesc => 'Moderate - Need attention soon';
+
+  @override
+  String get severityHighDesc => 'High - Urgent medical attention';
+
+  @override
+  String get severityCriticalDesc => 'Critical - Immediate care required';
+
+  @override
+  String get deptGeneral => 'General Medicine';
+
+  @override
+  String get deptDentistry => 'Dentistry';
+
+  @override
+  String get deptPsychology => 'Psychology';
+
+  @override
+  String get deptPharmacy => 'Pharmacy';
+
+  @override
+  String get deptCardiology => 'Cardiology';
+
+  @override
+  String get emergencyCall911 =>
+      'For life-threatening emergencies, please call 911 immediately.';
+
+  @override
+  String get severityLevel => 'Severity Level';
+
+  @override
+  String get describeYourSymptoms => 'Describe Your Symptoms';
+
+  @override
+  String get describeSymptomsHint =>
+      'Please describe your symptoms in detail...';
+
+  @override
+  String get emergencyTerms =>
+      'I understand this is for urgent medical attention and not for routine appointments.';
+
+  @override
+  String get submitEmergencyRequest => 'Submit Emergency Request';
+
+  @override
+  String get emergencyResponseNotification =>
+      'You will be notified once a healthcare provider responds.';
+
+  @override
+  String get requestSubmitted => 'Request Submitted';
+
+  @override
+  String get emergencyRequestSuccessMessage =>
+      'Your emergency request has been submitted. Our medical team will contact you shortly.';
+
+  @override
+  String get rescheduleFailedSlotTaken =>
+      'Failed to reschedule. The slot might be taken.';
+
+  @override
   String get appointmentDetails => 'Appointment Details';
 
   @override
@@ -847,6 +922,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get december => 'December';
+
+  @override
+  String get jan => 'Jan';
+
+  @override
+  String get feb => 'Feb';
+
+  @override
+  String get mar => 'Mar';
+
+  @override
+  String get apr => 'Apr';
+
+  @override
+  String get mayShort => 'May';
+
+  @override
+  String get jun => 'Jun';
+
+  @override
+  String get jul => 'Jul';
+
+  @override
+  String get aug => 'Aug';
+
+  @override
+  String get sep => 'Sep';
+
+  @override
+  String get oct => 'Oct';
+
+  @override
+  String get nov => 'Nov';
+
+  @override
+  String get dec => 'Dec';
 
   @override
   String get sendTestNotification => 'Send Test Notification';
@@ -1572,6 +1683,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get type => 'Type';
 
   @override
+  String get status => 'Status';
+
+  @override
   String get noScheduleSet => 'No schedule set';
 
   @override
@@ -1734,4 +1848,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get book => 'Book';
+
+  @override
+  String get emergencyRequestDescDash => 'Request urgent medical attention';
+
+  @override
+  String get findBestDoctorsDash => 'Find the best doctors and book your visit';
+
+  @override
+  String get bookAppointmentNow => 'Book Appointment Now';
+
+  @override
+  String get month => 'Month';
+
+  @override
+  String get noDoctorsFound => 'No doctors found matching your search.';
+
+  @override
+  String get noDoctorsAvailable => 'No doctors available at the moment.';
+
+  @override
+  String get failedToLoadDoctors => 'Failed to load doctors. Pull to retry.';
 }

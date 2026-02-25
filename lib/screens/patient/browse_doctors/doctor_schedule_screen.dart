@@ -141,14 +141,14 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'emergency',
                 child: Row(
                   children: [
                     Icon(Icons.emergency, size: 20, color: AppColors.error),
                     SizedBox(width: 8),
-                    Text('Emergency Request',
-                        style: TextStyle(color: AppColors.error)),
+                    Text(l10n.emergencyRequest,
+                        style: const TextStyle(color: AppColors.error)),
                   ],
                 ),
               ),
@@ -183,6 +183,9 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                 setState(() {
                   _calendarFormat = format;
                 });
+              },
+              availableCalendarFormats: {
+                CalendarFormat.month: l10n.month,
               },
               calendarStyle: CalendarStyle(
                 selectedDecoration: const BoxDecoration(
@@ -457,28 +460,29 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   }
 
   String _formatDate(DateTime date) {
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
+    final l10n = AppLocalizations.of(context);
+    final weekdays = [
+      l10n.monday,
+      l10n.tuesday,
+      l10n.wednesday,
+      l10n.thursday,
+      l10n.friday,
+      l10n.saturday,
+      l10n.sunday,
     ];
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+    final months = [
+      l10n.january,
+      l10n.february,
+      l10n.march,
+      l10n.april,
+      l10n.may,
+      l10n.june,
+      l10n.july,
+      l10n.august,
+      l10n.september,
+      l10n.october,
+      l10n.november,
+      l10n.december,
     ];
     return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}';
   }
@@ -557,7 +561,7 @@ class _BookingConfirmationSheet extends StatelessWidget {
                     context,
                     Icons.calendar_month,
                     l10n.date,
-                    _formatDate(date),
+                    _formatDate(date, l10n),
                   ),
                   const Divider(height: 24),
                   _buildDetailRow(
@@ -661,20 +665,20 @@ class _BookingConfirmationSheet extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
+  String _formatDate(DateTime date, AppLocalizations l10n) {
+    final months = [
+      l10n.jan,
+      l10n.feb,
+      l10n.mar,
+      l10n.apr,
+      l10n.mayShort,
+      l10n.jun,
+      l10n.jul,
+      l10n.aug,
+      l10n.sep,
+      l10n.oct,
+      l10n.nov,
+      l10n.dec,
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }

@@ -874,6 +874,144 @@ abstract class AppLocalizations {
   /// **'No past appointments'**
   String get noPastAppointments;
 
+  /// No description provided for @bookFirstAppointment.
+  ///
+  /// In en, this message translates to:
+  /// **'Book your first appointment!'**
+  String get bookFirstAppointment;
+
+  /// No description provided for @noHistoryYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No history yet'**
+  String get noHistoryYet;
+
+  /// No description provided for @findDoctor.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a Doctor'**
+  String get findDoctor;
+
+  /// No description provided for @anyAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Any Available'**
+  String get anyAvailable;
+
+  /// No description provided for @emergencyRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency Request'**
+  String get emergencyRequest;
+
+  /// No description provided for @severityModerateDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderate - Need attention soon'**
+  String get severityModerateDesc;
+
+  /// No description provided for @severityHighDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'High - Urgent medical attention'**
+  String get severityHighDesc;
+
+  /// No description provided for @severityCriticalDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical - Immediate care required'**
+  String get severityCriticalDesc;
+
+  /// No description provided for @deptGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General Medicine'**
+  String get deptGeneral;
+
+  /// No description provided for @deptDentistry.
+  ///
+  /// In en, this message translates to:
+  /// **'Dentistry'**
+  String get deptDentistry;
+
+  /// No description provided for @deptPsychology.
+  ///
+  /// In en, this message translates to:
+  /// **'Psychology'**
+  String get deptPsychology;
+
+  /// No description provided for @deptPharmacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Pharmacy'**
+  String get deptPharmacy;
+
+  /// No description provided for @deptCardiology.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardiology'**
+  String get deptCardiology;
+
+  /// No description provided for @emergencyCall911.
+  ///
+  /// In en, this message translates to:
+  /// **'For life-threatening emergencies, please call 911 immediately.'**
+  String get emergencyCall911;
+
+  /// No description provided for @severityLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Severity Level'**
+  String get severityLevel;
+
+  /// No description provided for @describeYourSymptoms.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe Your Symptoms'**
+  String get describeYourSymptoms;
+
+  /// No description provided for @describeSymptomsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Please describe your symptoms in detail...'**
+  String get describeSymptomsHint;
+
+  /// No description provided for @emergencyTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'I understand this is for urgent medical attention and not for routine appointments.'**
+  String get emergencyTerms;
+
+  /// No description provided for @submitEmergencyRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Emergency Request'**
+  String get submitEmergencyRequest;
+
+  /// No description provided for @emergencyResponseNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be notified once a healthcare provider responds.'**
+  String get emergencyResponseNotification;
+
+  /// No description provided for @requestSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Submitted'**
+  String get requestSubmitted;
+
+  /// No description provided for @emergencyRequestSuccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your emergency request has been submitted. Our medical team will contact you shortly.'**
+  String get emergencyRequestSuccessMessage;
+
+  /// No description provided for @rescheduleFailedSlotTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to reschedule. The slot might be taken.'**
+  String get rescheduleFailedSlotTaken;
+
   /// No description provided for @appointmentDetails.
   ///
   /// In en, this message translates to:
@@ -1755,6 +1893,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'December'**
   String get december;
+
+  /// No description provided for @jan.
+  ///
+  /// In en, this message translates to:
+  /// **'Jan'**
+  String get jan;
+
+  /// No description provided for @feb.
+  ///
+  /// In en, this message translates to:
+  /// **'Feb'**
+  String get feb;
+
+  /// No description provided for @mar.
+  ///
+  /// In en, this message translates to:
+  /// **'Mar'**
+  String get mar;
+
+  /// No description provided for @apr.
+  ///
+  /// In en, this message translates to:
+  /// **'Apr'**
+  String get apr;
+
+  /// No description provided for @mayShort.
+  ///
+  /// In en, this message translates to:
+  /// **'May'**
+  String get mayShort;
+
+  /// No description provided for @jun.
+  ///
+  /// In en, this message translates to:
+  /// **'Jun'**
+  String get jun;
+
+  /// No description provided for @jul.
+  ///
+  /// In en, this message translates to:
+  /// **'Jul'**
+  String get jul;
+
+  /// No description provided for @aug.
+  ///
+  /// In en, this message translates to:
+  /// **'Aug'**
+  String get aug;
+
+  /// No description provided for @sep.
+  ///
+  /// In en, this message translates to:
+  /// **'Sep'**
+  String get sep;
+
+  /// No description provided for @oct.
+  ///
+  /// In en, this message translates to:
+  /// **'Oct'**
+  String get oct;
+
+  /// No description provided for @nov.
+  ///
+  /// In en, this message translates to:
+  /// **'Nov'**
+  String get nov;
+
+  /// No description provided for @dec.
+  ///
+  /// In en, this message translates to:
+  /// **'Dec'**
+  String get dec;
 
   /// No description provided for @sendTestNotification.
   ///
@@ -3148,6 +3358,12 @@ abstract class AppLocalizations {
   /// **'Type'**
   String get type;
 
+  /// No description provided for @status.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get status;
+
   /// No description provided for @noScheduleSet.
   ///
   /// In en, this message translates to:
@@ -3423,6 +3639,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Book'**
   String get book;
+
+  /// No description provided for @emergencyRequestDescDash.
+  ///
+  /// In en, this message translates to:
+  /// **'Request urgent medical attention'**
+  String get emergencyRequestDescDash;
+
+  /// No description provided for @findBestDoctorsDash.
+  ///
+  /// In en, this message translates to:
+  /// **'Find the best doctors and book your visit'**
+  String get findBestDoctorsDash;
+
+  /// No description provided for @bookAppointmentNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Book Appointment Now'**
+  String get bookAppointmentNow;
+
+  /// No description provided for @month.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get month;
+
+  /// No description provided for @noDoctorsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No doctors found matching your search.'**
+  String get noDoctorsFound;
+
+  /// No description provided for @noDoctorsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No doctors available at the moment.'**
+  String get noDoctorsAvailable;
+
+  /// No description provided for @failedToLoadDoctors.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load doctors. Pull to retry.'**
+  String get failedToLoadDoctors;
 }
 
 class _AppLocalizationsDelegate

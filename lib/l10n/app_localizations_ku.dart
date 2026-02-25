@@ -401,6 +401,82 @@ class AppLocalizationsKu extends AppLocalizations {
   String get noPastAppointments => 'هیچ چاوپێکەوتنێکی ڕابردوو نییە';
 
   @override
+  String get bookFirstAppointment => 'یەکەم نۆرەی خۆت بگرە!';
+
+  @override
+  String get noHistoryYet => 'هێشتا هیچ تۆمارێک نییە';
+
+  @override
+  String get findDoctor => 'پزیشکێک بدۆزەرەوە';
+
+  @override
+  String get anyAvailable => 'هەر دانەیەک بەردەست بێت';
+
+  @override
+  String get emergencyRequest => 'داواکاری باری نائاسایی';
+
+  @override
+  String get severityModerateDesc =>
+      'مامناوەند - پێویستی بە سەرنج هەیە بەم زووانە';
+
+  @override
+  String get severityHighDesc => 'بەرز - چاودێری پزیشکی بەپەلە';
+
+  @override
+  String get severityCriticalDesc =>
+      'مەترسیدار - پێویستی بە چاودێری دەستبەجێ هەیە';
+
+  @override
+  String get deptGeneral => 'پزیشکی گشتی';
+
+  @override
+  String get deptDentistry => 'پزیشکی ددان';
+
+  @override
+  String get deptPsychology => 'دەروونناسی';
+
+  @override
+  String get deptPharmacy => 'دەرمانخانە';
+
+  @override
+  String get deptCardiology => 'نەخۆشییەکانی دڵ';
+
+  @override
+  String get emergencyCall911 =>
+      'بۆ بارە نائاساییەکان کە مەترسییان لەسەر ژیان هەیە، تکایە دەستبەجێ پەیوەندی بە 911 بکەن.';
+
+  @override
+  String get severityLevel => 'ئاستی مەترسی';
+
+  @override
+  String get describeYourSymptoms => 'نیشانەکانت وەسف بکە';
+
+  @override
+  String get describeSymptomsHint => 'تکایە نیشانەکانت بە وردی وەسف بکە...';
+
+  @override
+  String get emergencyTerms =>
+      'تێدەگەم کە ئەمە بۆ چاودێری پزیشکی بەپەلەیە و نەک بۆ چاوپێکەوتنی ڕۆتینی.';
+
+  @override
+  String get submitEmergencyRequest => 'ناردنی داواکاری باری نائاسایی';
+
+  @override
+  String get emergencyResponseNotification =>
+      'کاتێک دابینکەری چاودێری تەندروستی وەڵام دەداتەوە، ئاگادار دەکرێیتەوە.';
+
+  @override
+  String get requestSubmitted => 'داواکاری نێردرا';
+
+  @override
+  String get emergencyRequestSuccessMessage =>
+      'داواکارییە نائاساییەکەت نێردرا. تیمە پزیشکییەکەمان بەم زووانە پەیوەندیت پێوە دەکەن.';
+
+  @override
+  String get rescheduleFailedSlotTaken =>
+      'گۆڕینی کات سەرکەوتوو نەبوو. لەوانەیە کاتەکە گیرابێت.';
+
+  @override
   String get appointmentDetails => 'وردەکاری چاوپێکەوتن';
 
   @override
@@ -846,6 +922,42 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get december => 'کانوونی یەکەم';
+
+  @override
+  String get jan => 'کانوونی دووەم';
+
+  @override
+  String get feb => 'شوبات';
+
+  @override
+  String get mar => 'ئازار';
+
+  @override
+  String get apr => 'نیسان';
+
+  @override
+  String get mayShort => 'ئایار';
+
+  @override
+  String get jun => 'حوزەیران';
+
+  @override
+  String get jul => 'تەممووز';
+
+  @override
+  String get aug => 'ئاب';
+
+  @override
+  String get sep => 'ئەیلوول';
+
+  @override
+  String get oct => 'تشرینی یەکەم';
+
+  @override
+  String get nov => 'تشرینی دووەم';
+
+  @override
+  String get dec => 'کانوونی یەکەم';
 
   @override
   String get sendTestNotification => 'ناردنی ئاگادارکردنەوەی تاقیکردنەوە';
@@ -1451,7 +1563,7 @@ class AppLocalizationsKu extends AppLocalizations {
       'Notification scheduled for 30 seconds from now!';
 
   @override
-  String get pleaseLoginFirst => 'Please login first';
+  String get pleaseLoginFirst => 'تکایە سەرەتا بچۆ ژوورەوە';
 
   @override
   String get testNotificationTitle => 'Test Notification 🔔';
@@ -1570,6 +1682,9 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get type => 'جۆر';
+
+  @override
+  String get status => 'دۆخ';
 
   @override
   String get noScheduleSet => 'هیچ خشتەیەک دیاری نەکراوە';
@@ -1733,4 +1848,29 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get book => 'نۆرەبکە';
+
+  @override
+  String get emergencyRequestDescDash =>
+      'داوای وەرگرتنی چارەسەری پزیشکی بەپەلە بکە';
+
+  @override
+  String get findBestDoctorsDash =>
+      'باشترین پزیشکەکان بدۆزەرەوە و سەردانت نۆرە بکە';
+
+  @override
+  String get bookAppointmentNow => 'ئێستا نۆرە بکه';
+
+  @override
+  String get month => 'مانگ';
+
+  @override
+  String get noDoctorsFound =>
+      'هیچ پزیشکێک نەدۆزرایەوە کە لەگەڵ گەڕانەکەتدا بگونجێت.';
+
+  @override
+  String get noDoctorsAvailable => 'لە ئێستادا هیچ پزیشکێک بەردەست نییە.';
+
+  @override
+  String get failedToLoadDoctors =>
+      'بارکردنی پزیشکەکان سەرکەوتوو نەبوو. ڕایبکێشە بۆ هەوڵدانەوە.';
 }

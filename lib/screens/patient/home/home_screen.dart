@@ -364,6 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildQuickBookingCard(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return GradientCard(
       colors: AppColors.primaryGradient,
       onTap: widget.onBookNowTap,
@@ -383,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  AppLocalizations.of(context).findBestDoctors,
+                  l10n.findBestDoctorsDash,
                   style: GoogleFonts.roboto(
                     fontSize: 14,
                     color: Colors.white.withValues(alpha: 0.9),
@@ -404,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        AppLocalizations.of(context).bookNow,
+                        l10n.bookAppointmentNow,
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -544,6 +545,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmergencyButton(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -587,7 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Emergency Request',
+                    l10n.emergencyRequest,
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -596,7 +598,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Request urgent medical attention',
+                    l10n.emergencyRequestDescDash,
                     style: GoogleFonts.roboto(
                       fontSize: 13,
                       color: isDark

@@ -407,7 +407,7 @@ flutter build web --release
 ## 📝 Changelog
 
 <details>
-<summary><b>v1.5.0</b> — February 2026</summary>
+<summary><b>v1.6.0</b> — February 2026</summary>
 
 #### 🔧 Admin UI Refinements
 - **Standardized Detail Sheets** — Users, Doctors, and Departments now share a unified, polished bottom sheet design
@@ -422,7 +422,7 @@ flutter build web --release
 </details>
 
 <details>
-<summary><b>v1.6.0</b> — February 2026</summary>
+<summary><b>v1.5.0</b> — February 2026</summary>
 
 #### 🎨 Doctor Screen Restyling
 - **Unified Design Language** — All 8 doctor screens now match the patient/staff UI for a consistent cross-role experience

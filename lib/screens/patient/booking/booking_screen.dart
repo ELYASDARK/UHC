@@ -973,7 +973,7 @@ class BookingSuccessScreen extends StatelessWidget {
                       context,
                       Icons.calendar_month,
                       l10n.date,
-                      _formatDate(date),
+                      _formatDate(date, l10n),
                     ),
                     const SizedBox(height: 12),
                     _buildDetailRow(
@@ -1080,29 +1080,29 @@ class BookingSuccessScreen extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    const weekdays = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
+  String _formatDate(DateTime date, AppLocalizations l10n) {
+    final weekdays = [
+      l10n.monday,
+      l10n.tuesday,
+      l10n.wednesday,
+      l10n.thursday,
+      l10n.friday,
+      l10n.saturday,
+      l10n.sunday,
     ];
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+    final months = [
+      l10n.january,
+      l10n.february,
+      l10n.march,
+      l10n.april,
+      l10n.may,
+      l10n.june,
+      l10n.july,
+      l10n.august,
+      l10n.september,
+      l10n.october,
+      l10n.november,
+      l10n.december,
     ];
     return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}, ${date.year}';
   }

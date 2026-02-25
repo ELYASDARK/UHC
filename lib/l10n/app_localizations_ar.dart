@@ -400,6 +400,80 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noPastAppointments => 'لا توجد مواعيد سابقة';
 
   @override
+  String get bookFirstAppointment => 'احجز موعدك الأول!';
+
+  @override
+  String get noHistoryYet => 'لا يوجد سجل بعد';
+
+  @override
+  String get findDoctor => 'البحث عن طبيب';
+
+  @override
+  String get anyAvailable => 'أي متاح';
+
+  @override
+  String get emergencyRequest => 'طلب حالة طوارئ';
+
+  @override
+  String get severityModerateDesc => 'متوسط - يحتاج لاهتمام قريباً';
+
+  @override
+  String get severityHighDesc => 'عالٍ - عناية طبية عاجلة';
+
+  @override
+  String get severityCriticalDesc => 'حرج - مطلوب عناية فورية';
+
+  @override
+  String get deptGeneral => 'الطب العام';
+
+  @override
+  String get deptDentistry => 'طب الأسنان';
+
+  @override
+  String get deptPsychology => 'علم النفس';
+
+  @override
+  String get deptPharmacy => 'الصيدلة';
+
+  @override
+  String get deptCardiology => 'أمراض القلب';
+
+  @override
+  String get emergencyCall911 =>
+      'لحالات الطوارئ المهددة للحياة ، يرجى الاتصال بـ 911 فوراً.';
+
+  @override
+  String get severityLevel => 'مستوى الخطورة';
+
+  @override
+  String get describeYourSymptoms => 'صِف أعراضك';
+
+  @override
+  String get describeSymptomsHint => 'يرجى وصف أعراضك بالتفصيل...';
+
+  @override
+  String get emergencyTerms =>
+      'أفهم أن هذا لعناية طبية عاجلة وليس للمواعيد الروتينية.';
+
+  @override
+  String get submitEmergencyRequest => 'إرسال طلب الطوارئ';
+
+  @override
+  String get emergencyResponseNotification =>
+      'سيتم إعلامك بمجرد استجابة مقدم الرعاية الصحية.';
+
+  @override
+  String get requestSubmitted => 'تم إرسال الطلب';
+
+  @override
+  String get emergencyRequestSuccessMessage =>
+      'تم إرسال طلب الطوارئ الخاص بك. سيتصل بك فريقنا الطبي قريباً.';
+
+  @override
+  String get rescheduleFailedSlotTaken =>
+      'فشل إعادة الجدولة. قد يكون قد تم حجز الموعد بالفعل.';
+
+  @override
   String get appointmentDetails => 'تفاصيل الموعد';
 
   @override
@@ -843,6 +917,42 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get december => 'ديسمبر';
+
+  @override
+  String get jan => 'يناير';
+
+  @override
+  String get feb => 'فبراير';
+
+  @override
+  String get mar => 'مارس';
+
+  @override
+  String get apr => 'أبريل';
+
+  @override
+  String get mayShort => 'مايو';
+
+  @override
+  String get jun => 'يونيو';
+
+  @override
+  String get jul => 'يوليو';
+
+  @override
+  String get aug => 'أغسطس';
+
+  @override
+  String get sep => 'سبتمبر';
+
+  @override
+  String get oct => 'أكتوبر';
+
+  @override
+  String get nov => 'نوفمبر';
+
+  @override
+  String get dec => 'ديسمبر';
 
   @override
   String get sendTestNotification => 'إرسال إشعار تجريبي';
@@ -1565,6 +1675,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get type => 'النوع';
 
   @override
+  String get status => 'الحالة';
+
+  @override
   String get noScheduleSet => 'لم يتم تعيين جدول';
 
   @override
@@ -1724,4 +1837,25 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get book => 'احجز';
+
+  @override
+  String get emergencyRequestDescDash => 'طلب مساعدة طبية عاجلة';
+
+  @override
+  String get findBestDoctorsDash => 'ابحث عن أفضل الأطباء واحجز موعدك';
+
+  @override
+  String get bookAppointmentNow => 'احجز موعد الآن';
+
+  @override
+  String get month => 'شهري';
+
+  @override
+  String get noDoctorsFound => 'لم يتم العثور على أطباء يطابقون بحثك.';
+
+  @override
+  String get noDoctorsAvailable => 'لا يوجد أطباء متاحون في الوقت الحالي.';
+
+  @override
+  String get failedToLoadDoctors => 'فشل تحميل الأطباء. اسحب لإعادة المحاولة.';
 }
