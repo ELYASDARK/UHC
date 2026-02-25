@@ -3375,6 +3375,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Attempts: {current}/{max}'**
   String qrScanAttempts(int current, int max);
+
+  /// No description provided for @doctorScheduleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule -'**
+  String get doctorScheduleTitle;
+
+  /// No description provided for @timeSlotsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} time slots available'**
+  String timeSlotsAvailable(int count);
+
+  /// No description provided for @noAvailableSlots.
+  ///
+  /// In en, this message translates to:
+  /// **'No Available Slots'**
+  String get noAvailableSlots;
+
+  /// No description provided for @doctorNotAvailableSelectAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor is not available on this day.\nPlease select another date.'**
+  String get doctorNotAvailableSelectAnother;
+
+  /// No description provided for @alreadyBooked.
+  ///
+  /// In en, this message translates to:
+  /// **'Already booked'**
+  String get alreadyBooked;
+
+  /// No description provided for @timeHasPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Time has passed'**
+  String get timeHasPassed;
+
+  /// No description provided for @availableForBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Available for booking'**
+  String get availableForBooking;
+
+  /// No description provided for @book.
+  ///
+  /// In en, this message translates to:
+  /// **'Book'**
+  String get book;
 }
 
 class _AppLocalizationsDelegate

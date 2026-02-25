@@ -203,11 +203,11 @@ class AppointmentModel {
   bool get isCompleted => status == AppointmentStatus.completed;
   bool get isCancelled => status == AppointmentStatus.cancelled;
   bool get isUpcoming =>
-      appointmentDate.isAfter(DateTime.now()) &&
+      exactAppointmentTime.isAfter(DateTime.now()) &&
       (status == AppointmentStatus.pending ||
           status == AppointmentStatus.confirmed);
   bool get isPast =>
-      appointmentDate.isBefore(DateTime.now()) ||
+      exactAppointmentTime.isBefore(DateTime.now()) ||
       status == AppointmentStatus.completed ||
       status == AppointmentStatus.cancelled;
 
@@ -239,10 +239,24 @@ class AppointmentModel {
     }
   }
 
+  /// Get exact appointment time combining date and timeSlot
+  DateTime get exactAppointmentTime {
+    final startTimeStr = timeSlot.split(' - ').first;
+    final parts = startTimeStr.split(':');
+    int hour = 0;
+    int minute = 0;
+    if (parts.length == 2) {
+      hour = int.tryParse(parts[0]) ?? 0;
+      minute = int.tryParse(parts[1]) ?? 0;
+    }
+    return DateTime(appointmentDate.year, appointmentDate.month,
+        appointmentDate.day, hour, minute);
+  }
+
   /// Check if the appointment can be cancelled (24 hours before)
   bool get canCancel {
     if (isCancelled || isCompleted) return false;
-    final hoursUntil = appointmentDate.difference(DateTime.now()).inHours;
+    final hoursUntil = exactAppointmentTime.difference(DateTime.now()).inHours;
     return hoursUntil >= 24;
   }
 

@@ -619,5 +619,20 @@
         "type": "int"
       }
     }
-  }
+  },
+  "doctorScheduleTitle": "Schedule -",
+  "timeSlotsAvailable": "{count} time slots available",
+  "@timeSlotsAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noAvailableSlots": "No Available Slots",
+  "doctorNotAvailableSelectAnother": "Doctor is not available on this day.\nPlease select another date.",
+  "alreadyBooked": "Already booked",
+  "timeHasPassed": "Time has passed",
+  "availableForBooking": "Available for booking",
+  "book": "Book"
 }

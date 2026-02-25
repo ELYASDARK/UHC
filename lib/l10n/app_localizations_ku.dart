@@ -1706,4 +1706,31 @@ class AppLocalizationsKu extends AppLocalizations {
   String qrScanAttempts(int current, int max) {
     return 'هەوڵەکان: $current/$max';
   }
+
+  @override
+  String get doctorScheduleTitle => 'خشتە -';
+
+  @override
+  String timeSlotsAvailable(int count) {
+    return '$count کاتی بەردەست';
+  }
+
+  @override
+  String get noAvailableSlots => 'هیچ کاتێکی بەردەست نییە';
+
+  @override
+  String get doctorNotAvailableSelectAnother =>
+      'پزیشک لەم ڕۆژەدا بەردەست نییە.\nتکایە ڕۆژێکی تر هەڵبژێرە.';
+
+  @override
+  String get alreadyBooked => 'پێشتر نۆرەکراوە';
+
+  @override
+  String get timeHasPassed => 'کات تێپەڕیوە';
+
+  @override
+  String get availableForBooking => 'بەردەستە بۆ نۆرەکردن';
+
+  @override
+  String get book => 'نۆرەبکە';
 }

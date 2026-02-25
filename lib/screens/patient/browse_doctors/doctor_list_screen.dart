@@ -14,6 +14,7 @@ import '../../../data/repositories/doctor_repository.dart';
 import '../../../data/repositories/department_repository.dart';
 import '../../../l10n/app_localizations.dart';
 import '../booking/booking_screen.dart';
+import 'doctor_schedule_screen.dart';
 
 /// Doctor list screen with search and filters
 class DoctorListScreen extends StatefulWidget {
@@ -684,33 +685,70 @@ class DoctorDetailScreen extends StatelessWidget {
           color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         ),
         child: SafeArea(
-          child: ElevatedButton.icon(
-            onPressed: () {
-              // Navigate to booking screen
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => BookingScreen(doctor: doctor),
+          child: Row(
+            children: [
+              // View Schedule button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DoctorScheduleScreen(doctor: doctor),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    minimumSize: const Size(0, 56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    side:
+                        const BorderSide(color: AppColors.primary, width: 1.5),
+                  ),
+                  icon: const Icon(Icons.schedule_rounded),
+                  label: Text(
+                    'Schedule',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
               ),
-              elevation: 4,
-            ),
-            icon: const Icon(Icons.calendar_today_rounded),
-            label: Text(
-              AppLocalizations.of(context).bookAppointment,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+              const SizedBox(width: 12),
+              // Book Appointment button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BookingScreen(doctor: doctor),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 4,
+                  ),
+                  icon: const Icon(Icons.calendar_today_rounded),
+                  label: Text(
+                    AppLocalizations.of(context).bookAppointment,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),

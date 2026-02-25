@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -25,12 +26,74 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   final _reasonController = TextEditingController();
   bool _isLoading = false;
+  Set<String> _bookedSlots = {};
 
   @override
   void initState() {
     super.initState();
     _selectedDay = widget.appointment.appointmentDate;
     _focusedDay = _selectedDay!;
+    _fetchBookedAppointments(_selectedDay!);
+  }
+
+  Future<void> _fetchBookedAppointments(DateTime date) async {
+    if (widget.doctor == null) return;
+
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('appointments')
+          .where('doctorId', isEqualTo: widget.doctor!.id)
+          .get();
+
+      if (!mounted) return;
+
+      final bookedSlots = snapshot.docs
+          .where((doc) {
+            final data = doc.data();
+            final status = data['status'] as String? ?? '';
+            if (status != 'pending' && status != 'confirmed') {
+              return false;
+            }
+            if (doc.id == widget.appointment.id) return false;
+
+            final appointmentDate =
+                (data['appointmentDate'] as Timestamp?)?.toDate();
+            if (appointmentDate == null) return false;
+            return (appointmentDate.isAfter(startOfDay) &&
+                    appointmentDate.isBefore(endOfDay)) ||
+                (appointmentDate.year == startOfDay.year &&
+                    appointmentDate.month == startOfDay.month &&
+                    appointmentDate.day == startOfDay.day);
+          })
+          .map((doc) => doc.data()['timeSlot'] as String? ?? '')
+          .where((slot) => slot.isNotEmpty)
+          .toSet();
+
+      if (!mounted) return;
+
+      setState(() {
+        _bookedSlots = bookedSlots;
+        if (_selectedTimeSlot != null &&
+            _bookedSlots.contains(_selectedTimeSlot!.startTime)) {
+          _selectedTimeSlot = null;
+        }
+      });
+    } catch (error) {
+      debugPrint('Error fetching booked slots: $error');
+    }
+  }
+
+  bool _isSlotPast(DateTime date, String startTime) {
+    if (!isSameDay(date, DateTime.now())) return false;
+    final parts = startTime.split(':');
+    if (parts.length != 2) return false;
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = int.tryParse(parts[1]) ?? 0;
+    final slotTime = DateTime(date.year, date.month, date.day, hour, minute);
+    return slotTime.isBefore(DateTime.now());
   }
 
   @override
@@ -58,9 +121,23 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     return widget.doctor!.weeklySchedule[dayName] ?? [];
   }
 
+  DateTime _getExactAppointmentTime() {
+    final date = widget.appointment.appointmentDate;
+    final timeSlot = widget.appointment.timeSlot; // e.g., '14:30 - 15:00'
+    final startTimeStr = timeSlot.split(' - ').first; // '14:30'
+    final parts = startTimeStr.split(':');
+    int hour = 0;
+    int minute = 0;
+    if (parts.length == 2) {
+      hour = int.tryParse(parts[0]) ?? 0;
+      minute = int.tryParse(parts[1]) ?? 0;
+    }
+    return DateTime(date.year, date.month, date.day, hour, minute);
+  }
+
   bool _canReschedule() {
     // Check 24-hour policy using UTC to avoid timezone issues
-    final appointmentTime = widget.appointment.appointmentDate.toUtc();
+    final appointmentTime = _getExactAppointmentTime().toUtc();
     final now = DateTime.now().toUtc();
     final hoursUntil = appointmentTime.difference(now).inHours;
     return hoursUntil >= 24;
@@ -91,8 +168,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                   Text(
                     l10n.selectNewDate,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 12),
 
@@ -121,7 +198,9 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                           _selectedDay = selectedDay;
                           _focusedDay = focusedDay;
                           _selectedTimeSlot = null;
+                          _bookedSlots = {};
                         });
+                        _fetchBookedAppointments(selectedDay);
                       },
                       onFormatChanged: (format) {
                         setState(() {
@@ -158,8 +237,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                     Text(
                       l10n.selectNewTime,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 12),
                     _buildTimeSlots(isDark),
@@ -170,8 +249,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                   Text(
                     l10n.reasonForReschedule,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -190,8 +269,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed:
-                          _selectedDay != null &&
+                      onPressed: _selectedDay != null &&
                               _selectedTimeSlot != null &&
                               !_isLoading
                           ? _confirmReschedule
@@ -241,9 +319,9 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
               Text(
                 l10n.currentAppointment,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.warning,
-                ),
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.warning,
+                    ),
               ),
             ],
           ),
@@ -278,28 +356,54 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: slots.where((s) => s.isAvailable).map((slot) {
+      children: slots.map((slot) {
+        final isPast = _isSlotPast(_selectedDay!, slot.startTime);
+        final isBooked = _bookedSlots.contains(slot.startTime);
+        final isAvailable = slot.isAvailable && !isPast && !isBooked;
         final isSelected = _selectedTimeSlot == slot;
+
         return GestureDetector(
-          onTap: () => setState(() => _selectedTimeSlot = slot),
+          onTap: isAvailable
+              ? () => setState(() => _selectedTimeSlot = slot)
+              : null,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: isSelected
                   ? AppColors.primary
-                  : (isDark ? AppColors.surfaceDark : Colors.white),
+                  : isAvailable
+                      ? (isDark ? AppColors.surfaceDark : Colors.white)
+                      : Colors.grey.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected
                     ? AppColors.primary
-                    : AppColors.primary.withValues(alpha: 0.3),
+                    : isAvailable
+                        ? AppColors.primary.withValues(alpha: 0.3)
+                        : Colors.grey.withValues(alpha: 0.2),
               ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
             ),
             child: Text(
               slot.display,
               style: TextStyle(
-                color: isSelected ? Colors.white : null,
-                fontWeight: isSelected ? FontWeight.bold : null,
+                color: isSelected
+                    ? Colors.white
+                    : isAvailable
+                        ? (isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimaryLight)
+                        : Colors.grey,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                decoration: !isAvailable ? TextDecoration.lineThrough : null,
               ),
             ),
           ),

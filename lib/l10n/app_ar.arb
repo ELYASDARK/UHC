@@ -546,5 +546,13 @@
   "confirmAvailableInMinutes": "متاح بعد {minutes} دقيقة",
   "confirmAvailableInHours": "متاح بعد {hours} ساعة",
   "confirmAvailableInDays": "متاح بعد {days} يوم",
-  "qrScanAttempts": "المحاولات: {current}/{max}"
+  "qrScanAttempts": "المحاولات: {current}/{max}",
+  "doctorScheduleTitle": "جدول -",
+  "timeSlotsAvailable": "{count} مواعيد متاحة",
+  "noAvailableSlots": "لا توجد مواعيد متاحة",
+  "doctorNotAvailableSelectAnother": "الطبيب غير متاح في هذا اليوم.\nالرجاء اختيار تاريخ آخر.",
+  "alreadyBooked": "محجوز بالفعل",
+  "timeHasPassed": "انتهى الوقت",
+  "availableForBooking": "متاح للحجز",
+  "book": "احجز"
 }

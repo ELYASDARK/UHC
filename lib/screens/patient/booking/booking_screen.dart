@@ -20,8 +20,15 @@ import '../main_shell.dart';
 /// Main booking screen with calendar and time selection
 class BookingScreen extends StatefulWidget {
   final DoctorModel doctor;
+  final DateTime? initialDate;
+  final TimeSlot? initialTimeSlot;
 
-  const BookingScreen({super.key, required this.doctor});
+  const BookingScreen({
+    super.key,
+    required this.doctor,
+    this.initialDate,
+    this.initialTimeSlot,
+  });
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -50,6 +57,18 @@ class _BookingScreenState extends State<BookingScreen> {
     super.initState();
     _doctor = widget.doctor;
     _subscribeToDoctor();
+
+    // Pre-select date and time if provided from DoctorScheduleScreen
+    if (widget.initialDate != null) {
+      _selectedDay = widget.initialDate;
+      _focusedDay = widget.initialDate!;
+      _currentStep = 1; // Jump to time selection step
+      _fetchBookedAppointments(widget.initialDate!);
+
+      if (widget.initialTimeSlot != null) {
+        _selectedTimeSlot = widget.initialTimeSlot;
+      }
+    }
   }
 
   /// Subscribe to real-time updates for the doctor's schedule
@@ -448,7 +467,7 @@ class _BookingScreenState extends State<BookingScreen> {
             final isPast = _isSlotPast(_selectedDay!, slot.startTime);
             final isBooked = _bookedSlots.contains(slot.startTime);
             final isAvailable = slot.isAvailable && !isPast && !isBooked;
-            final isSelected = _selectedTimeSlot == slot;
+            final isSelected = _selectedTimeSlot?.startTime == slot.startTime;
 
             return GestureDetector(
               onTap: isAvailable

@@ -398,7 +398,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
         doctorName: widget.doctor?.name ?? 'Any Available',
         department: _selectedDepartment!,
         appointmentDate: DateTime.now(),
-        timeSlot: 'Emergency',
+        timeSlot: '00:00 - Emergency',
         type: AppointmentType.emergency,
         status: AppointmentStatus.pending,
         notes:

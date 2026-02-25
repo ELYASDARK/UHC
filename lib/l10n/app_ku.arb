@@ -546,5 +546,13 @@
   "confirmAvailableInMinutes": "بەردەستە لە {minutes} خولەک",
   "confirmAvailableInHours": "بەردەستە لە {hours} کاتژمێر",
   "confirmAvailableInDays": "بەردەستە لە {days} ڕۆژ",
-  "qrScanAttempts": "هەوڵەکان: {current}/{max}"
+  "qrScanAttempts": "هەوڵەکان: {current}/{max}",
+  "doctorScheduleTitle": "خشتە -",
+  "timeSlotsAvailable": "{count} کاتی بەردەست",
+  "noAvailableSlots": "هیچ کاتێکی بەردەست نییە",
+  "doctorNotAvailableSelectAnother": "پزیشک لەم ڕۆژەدا بەردەست نییە.\nتکایە ڕۆژێکی تر هەڵبژێرە.",
+  "alreadyBooked": "پێشتر نۆرەکراوە",
+  "timeHasPassed": "کات تێپەڕیوە",
+  "availableForBooking": "بەردەستە بۆ نۆرەکردن",
+  "book": "نۆرەبکە"
 }

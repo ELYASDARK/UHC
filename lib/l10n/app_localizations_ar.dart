@@ -1697,4 +1697,31 @@ class AppLocalizationsAr extends AppLocalizations {
   String qrScanAttempts(int current, int max) {
     return 'المحاولات: $current/$max';
   }
+
+  @override
+  String get doctorScheduleTitle => 'جدول -';
+
+  @override
+  String timeSlotsAvailable(int count) {
+    return '$count مواعيد متاحة';
+  }
+
+  @override
+  String get noAvailableSlots => 'لا توجد مواعيد متاحة';
+
+  @override
+  String get doctorNotAvailableSelectAnother =>
+      'الطبيب غير متاح في هذا اليوم.\nالرجاء اختيار تاريخ آخر.';
+
+  @override
+  String get alreadyBooked => 'محجوز بالفعل';
+
+  @override
+  String get timeHasPassed => 'انتهى الوقت';
+
+  @override
+  String get availableForBooking => 'متاح للحجز';
+
+  @override
+  String get book => 'احجز';
 }

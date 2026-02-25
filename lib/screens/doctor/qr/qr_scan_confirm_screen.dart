@@ -9,7 +9,7 @@ import '../../../providers/doctor_appointment_provider.dart';
 
 /// QR scanner screen for confirming appointments.
 ///
-/// Returns a Map<String, dynamic> when popping:
+/// Returns a Map when popping:
 ///   { 'matched': true/false, 'failures': int }
 /// Returns null if the user closes without scanning.
 class QrScanConfirmScreen extends StatefulWidget {

@@ -32,13 +32,13 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
   bool _isLoading = false;
 
   List<String> _getReasons(AppLocalizations l10n) => [
-    l10n.reasonScheduleConflict,
-    l10n.reasonFeelingBetter,
-    l10n.reasonFoundAnotherDoctor,
-    l10n.reasonPersonalEmergency,
-    l10n.reasonTransportationIssues,
-    l10n.other,
-  ];
+        l10n.reasonScheduleConflict,
+        l10n.reasonFeelingBetter,
+        l10n.reasonFoundAnotherDoctor,
+        l10n.reasonPersonalEmergency,
+        l10n.reasonTransportationIssues,
+        l10n.other,
+      ];
 
   @override
   void dispose() {
@@ -48,15 +48,27 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
 
   bool _canCancel() {
     // Check 24-hour policy
-    final appointmentTime = widget.appointment.appointmentDate;
+    final appointmentTime = _getExactAppointmentTime();
     final hoursUntil = appointmentTime.difference(DateTime.now()).inHours;
     return hoursUntil >= 24;
   }
 
+  DateTime _getExactAppointmentTime() {
+    final date = widget.appointment.appointmentDate;
+    final timeSlot = widget.appointment.timeSlot; // e.g., '14:30 - 15:00'
+    final startTimeStr = timeSlot.split(' - ').first; // '14:30'
+    final parts = startTimeStr.split(':');
+    int hour = 0;
+    int minute = 0;
+    if (parts.length == 2) {
+      hour = int.tryParse(parts[0]) ?? 0;
+      minute = int.tryParse(parts[1]) ?? 0;
+    }
+    return DateTime(date.year, date.month, date.day, hour, minute);
+  }
+
   int _getHoursUntilAppointment() {
-    return widget.appointment.appointmentDate
-        .difference(DateTime.now())
-        .inHours;
+    return _getExactAppointmentTime().difference(DateTime.now()).inHours;
   }
 
   bool _isLateCancel() {
@@ -212,8 +224,8 @@ class _CancelAppointmentDialogState extends State<CancelAppointmentDialog> {
                         color: isSelected
                             ? Colors.white
                             : (isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight),
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight),
                         fontSize: 12,
                       ),
                     );

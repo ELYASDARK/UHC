@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -24,6 +25,9 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
   bool _isUploading = false;
   double _uploadProgress = 0;
 
+  // Track upload subscription to cancel on dispose
+  StreamSubscription<TaskSnapshot>? _uploadSubscription;
+
   List<Map<String, dynamic>> _getDocumentTypes(AppLocalizations l10n) {
     return [
       {'id': 'lab_results', 'name': l10n.labResults, 'icon': Icons.science},
@@ -40,6 +44,12 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       {'id': 'imaging', 'name': l10n.imaging, 'icon': Icons.image},
       {'id': 'other', 'name': l10n.other, 'icon': Icons.folder},
     ];
+  }
+
+  @override
+  void dispose() {
+    _uploadSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -78,28 +88,23 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
           // Documents List
           Expanded(
             child: user == null
-                ? const Center(child: Text('Please login'))
+                ? Center(child: Text(l10n.pleaseLoginFirst))
                 : StreamBuilder<QuerySnapshot>(
                     stream: _firestore
                         .collection('medical_documents')
                         .where('userId', isEqualTo: user.id)
+                        .orderBy('uploadedAt', descending: true)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              'Error loading documents: ${snapshot.error}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppColors.error),
-                            ),
-                          ),
-                        );
+                        // Fallback: if the query fails (no index), use unordered
+                        return _buildFallbackList(user.id, isDark, l10n);
                       }
 
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
                       }
 
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -107,33 +112,78 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                       }
 
                       final docs = snapshot.data!.docs;
-                      // Client-side sorting to avoid index requirement
-                      docs.sort((a, b) {
-                        final aTime =
-                            (a.data() as Map<String, dynamic>)['uploadedAt']
-                                as Timestamp?;
-                        final bTime =
-                            (b.data() as Map<String, dynamic>)['uploadedAt']
-                                as Timestamp?;
-                        if (aTime == null) return 1;
-                        if (bTime == null) return -1;
-                        return bTime.compareTo(aTime);
-                      });
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: docs.length,
-                        itemBuilder: (context, index) {
-                          final doc = docs[index];
-                          final data = doc.data() as Map<String, dynamic>;
-                          return _buildDocumentCard(doc.id, data, isDark);
-                        },
-                      );
+                      return _buildDocsList(docs, isDark, l10n);
                     },
                   ),
           ),
         ],
       ),
+    );
+  }
+
+  /// Fallback when Firestore composite index is missing
+  Widget _buildFallbackList(String userId, bool isDark, AppLocalizations l10n) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('medical_documents')
+          .where('userId', isEqualTo: userId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                '${l10n.errorLoadingDocuments}: ${snapshot.error}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState(isDark);
+        }
+
+        final docs = snapshot.data!.docs.toList();
+        // Client-side sort as fallback
+        docs.sort((a, b) {
+          final aTime =
+              (a.data() as Map<String, dynamic>)['uploadedAt'] as Timestamp?;
+          final bTime =
+              (b.data() as Map<String, dynamic>)['uploadedAt'] as Timestamp?;
+
+          // Null means it's a pending write natively, so it is the "newest"
+          if (aTime == null) return -1;
+          if (bTime == null) return 1;
+          return bTime.compareTo(aTime);
+        });
+
+        return _buildDocsList(docs, isDark, l10n);
+      },
+    );
+  }
+
+  Widget _buildDocsList(
+    List<QueryDocumentSnapshot> docs,
+    bool isDark,
+    AppLocalizations l10n,
+  ) {
+    final documentTypes = _getDocumentTypes(l10n);
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: docs.length,
+      itemBuilder: (context, index) {
+        final doc = docs[index];
+        final data = doc.data() as Map<String, dynamic>;
+        return _buildDocumentCard(doc.id, data, isDark, documentTypes);
+      },
     );
   }
 
@@ -168,9 +218,13 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     );
   }
 
-  Widget _buildDocumentCard(String id, Map<String, dynamic> data, bool isDark) {
+  Widget _buildDocumentCard(
+    String id,
+    Map<String, dynamic> data,
+    bool isDark,
+    List<Map<String, dynamic>> documentTypes,
+  ) {
     final l10n = AppLocalizations.of(context);
-    final documentTypes = _getDocumentTypes(l10n);
     final typeInfo = documentTypes.firstWhere(
       (t) => t['id'] == data['type'],
       orElse: () => documentTypes.last,
@@ -297,116 +351,115 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
             right: 20,
             top: 20,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              const SizedBox(height: 20),
-              Text(
-                l10n.uploadDocument,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(height: 20),
+                Text(
+                  l10n.uploadDocument,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: '${l10n.documentName} *',
-                  border: const OutlineInputBorder(),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: '${l10n.documentName} *',
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text('${l10n.documentType} *'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _getDocumentTypes(AppLocalizations.of(context)).map((
-                  type,
-                ) {
-                  final isSelected = selectedType == type['id'];
-                  return ChoiceChip(
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          type['icon'],
-                          size: 16,
-                          color: isSelected
-                              ? Colors.white
-                              : (isDark
+                const SizedBox(height: 16),
+                Text('${l10n.documentType} *'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _getDocumentTypes(l10n).map((type) {
+                    final isSelected = selectedType == type['id'];
+                    return ChoiceChip(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            type['icon'],
+                            size: 16,
+                            color: isSelected
+                                ? Colors.white
+                                : (isDark
                                     ? AppColors.textPrimaryDark
                                     : AppColors.textPrimaryLight),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(type['name']),
-                      ],
-                    ),
-                    selected: isSelected,
-                    onSelected: (_) =>
-                        setSheetState(() => selectedType = type['id']),
-                    selectedColor: AppColors.primary,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark
+                          ),
+                          const SizedBox(width: 4),
+                          Text(type['name']),
+                        ],
+                      ),
+                      selected: isSelected,
+                      onSelected: (_) =>
+                          setSheetState(() => selectedType = type['id']),
+                      selectedColor: AppColors.primary,
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark
                                 ? AppColors.textPrimaryDark
                                 : AppColors.textPrimaryLight),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: notesController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: '${l10n.notes} (${l10n.optional})',
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    if (nameController.text.isEmpty || selectedType == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please fill required fields'),
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.pop(context);
-                    _pickAndUploadFile(
-                      name: nameController.text,
-                      type: selectedType!,
-                      notes: notesController.text,
+                      ),
                     );
-                  },
-                  icon: const Icon(Icons.attach_file),
-                  label: Text(l10n.selectFile),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: notesController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: '${l10n.notes} (${l10n.optional})',
+                    border: const OutlineInputBorder(),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (nameController.text.isEmpty || selectedType == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.pleaseFillRequiredFields),
+                          ),
+                        );
+                        return;
+                      }
+                      Navigator.pop(context);
+                      _pickAndUploadFile(
+                        name: nameController.text,
+                        type: selectedType!,
+                        notes: notesController.text,
+                      );
+                    },
+                    icon: const Icon(Icons.attach_file),
+                    label: Text(l10n.selectFile),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -440,171 +493,177 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
             right: 20,
             top: 20,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              Text(
-                l10n.updateDocument, // Title
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                Text(
+                  l10n.updateDocument,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: '${l10n.documentName} *',
-                  border: const OutlineInputBorder(),
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: '${l10n.documentName} *',
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              Text('${l10n.documentType} *'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _getDocumentTypes(l10n).map((type) {
-                  final isSelected = selectedType == type['id'];
-                  return ChoiceChip(
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          type['icon'],
-                          size: 16,
-                          color: isSelected
-                              ? Colors.white
-                              : (isDark
+                Text('${l10n.documentType} *'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _getDocumentTypes(l10n).map((type) {
+                    final isSelected = selectedType == type['id'];
+                    return ChoiceChip(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            type['icon'],
+                            size: 16,
+                            color: isSelected
+                                ? Colors.white
+                                : (isDark
                                     ? AppColors.textPrimaryDark
                                     : AppColors.textPrimaryLight),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(type['name']),
-                      ],
-                    ),
-                    selected: isSelected,
-                    onSelected: (_) =>
-                        setSheetState(() => selectedType = type['id']),
-                    selectedColor: AppColors.primary,
-                    labelStyle: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : (isDark
+                          ),
+                          const SizedBox(width: 4),
+                          Text(type['name']),
+                        ],
+                      ),
+                      selected: isSelected,
+                      onSelected: (_) =>
+                          setSheetState(() => selectedType = type['id']),
+                      selectedColor: AppColors.primary,
+                      labelStyle: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark
                                 ? AppColors.textPrimaryDark
                                 : AppColors.textPrimaryLight),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-
-              TextField(
-                controller: notesController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: '${l10n.notes} (${l10n.optional})',
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // File Replacement Section
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.attach_file, color: Colors.grey),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        newFile != null
-                            ? newFile!.path.split(Platform.pathSeparator).last
-                            : fileName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: newFile != null ? AppColors.primary : null,
-                          fontWeight: newFile != null ? FontWeight.bold : null,
-                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        final result = await FilePicker.platform.pickFiles(
-                          type: FileType.custom,
-                          allowedExtensions: [
-                            'pdf',
-                            'jpg',
-                            'jpeg',
-                            'png',
-                            'doc',
-                            'docx',
-                          ],
-                        );
-                        if (result != null && result.files.isNotEmpty) {
-                          setSheetState(() {
-                            newFile = File(result.files.single.path!);
-                          });
-                        }
-                      },
-                      child: Text(newFile != null ? l10n.change : l10n.replace),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    if (nameController.text.isEmpty || selectedType == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l10n.pleaseFillRequiredFields)),
-                      );
-                      return;
-                    }
-                    Navigator.pop(context);
-                    _performUpdate(
-                      docId: docId,
-                      oldData: data,
-                      newName: nameController.text,
-                      newType: selectedType!,
-                      newNotes: notesController.text,
-                      newFile: newFile,
                     );
-                  },
-                  icon: const Icon(Icons.save),
-                  label: Text(l10n.updateDocument),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: notesController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: '${l10n.notes} (${l10n.optional})',
+                    border: const OutlineInputBorder(),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 16),
+
+                // File Replacement Section
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border:
+                        Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.attach_file, color: Colors.grey),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          newFile != null
+                              ? newFile!.path.split(Platform.pathSeparator).last
+                              : fileName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: newFile != null ? AppColors.primary : null,
+                            fontWeight:
+                                newFile != null ? FontWeight.bold : null,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final result = await FilePicker.platform.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: [
+                              'pdf',
+                              'jpg',
+                              'jpeg',
+                              'png',
+                              'doc',
+                              'docx',
+                            ],
+                          );
+                          if (result != null && result.files.isNotEmpty) {
+                            setSheetState(() {
+                              newFile = File(result.files.single.path!);
+                            });
+                          }
+                        },
+                        child:
+                            Text(newFile != null ? l10n.change : l10n.replace),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (nameController.text.isEmpty || selectedType == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text(l10n.pleaseFillRequiredFields)),
+                        );
+                        return;
+                      }
+                      Navigator.pop(context);
+                      _performUpdate(
+                        docId: docId,
+                        oldData: data,
+                        newName: nameController.text,
+                        newType: selectedType!,
+                        newNotes: notesController.text,
+                        newFile: newFile,
+                      );
+                    },
+                    icon: const Icon(Icons.save),
+                    label: Text(l10n.updateDocument),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -619,6 +678,9 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     required String newNotes,
     File? newFile,
   }) async {
+    // Capture user before async gap
+    final user = context.read<AuthProvider>().user;
+
     try {
       setState(() {
         _isUploading = true;
@@ -633,37 +695,39 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       };
 
       // If a new file is uploaded, handle storage operations
-      if (newFile != null) {
-        final user = context.read<AuthProvider>().user;
-        if (user != null) {
-          final fileName = newFile.path.split(Platform.pathSeparator).last;
-          final extension = fileName.split('.').last;
-          final storagePath =
-              'medical_documents/${user.id}/${DateTime.now().millisecondsSinceEpoch}.$extension';
+      if (newFile != null && user != null) {
+        final fileName = newFile.path.split(Platform.pathSeparator).last;
+        final extension = fileName.split('.').last;
+        final storagePath =
+            'medical_documents/${user.id}/${DateTime.now().millisecondsSinceEpoch}.$extension';
 
-          final ref = _storage.ref().child(storagePath);
-          final uploadTask = ref.putFile(newFile);
+        final ref = _storage.ref().child(storagePath);
+        final uploadTask = ref.putFile(newFile);
 
-          uploadTask.snapshotEvents.listen((event) {
+        // Track the subscription so we can cancel on dispose
+        _uploadSubscription?.cancel();
+        _uploadSubscription = uploadTask.snapshotEvents.listen((event) {
+          if (mounted) {
             setState(() {
               _uploadProgress = event.bytesTransferred / event.totalBytes;
             });
-          });
+          }
+        });
 
-          await uploadTask;
-          final url = await ref.getDownloadURL();
+        await uploadTask;
+        _uploadSubscription = null;
+        final url = await ref.getDownloadURL();
 
-          updateData['url'] = url;
-          updateData['fileName'] = fileName;
-          updateData['storagePath'] = storagePath;
+        updateData['url'] = url;
+        updateData['fileName'] = fileName;
+        updateData['storagePath'] = storagePath;
 
-          // Try to delete old file if it exists
-          if (oldData['storagePath'] != null) {
-            try {
-              await _storage.ref().child(oldData['storagePath']).delete();
-            } catch (_) {
-              // Ignore deletion errors (file might be missing)
-            }
+        // Try to delete old file if it exists
+        if (oldData['storagePath'] != null) {
+          try {
+            await _storage.ref().child(oldData['storagePath']).delete();
+          } catch (_) {
+            // Ignore deletion errors (file might be missing)
           }
         }
       }
@@ -707,6 +771,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     required String type,
     required String notes,
   }) async {
+    // Capture user before async gap
     final user = context.read<AuthProvider>().user;
     if (user == null) return;
 
@@ -724,6 +789,8 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       final storagePath =
           'medical_documents/${user.id}/${DateTime.now().millisecondsSinceEpoch}.$extension';
 
+      if (!mounted) return;
+
       setState(() {
         _isUploading = true;
         _uploadProgress = 0;
@@ -733,13 +800,18 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       final ref = _storage.ref().child(storagePath);
       final uploadTask = ref.putFile(file);
 
-      uploadTask.snapshotEvents.listen((event) {
-        setState(() {
-          _uploadProgress = event.bytesTransferred / event.totalBytes;
-        });
+      // Track the subscription so we can cancel on dispose
+      _uploadSubscription?.cancel();
+      _uploadSubscription = uploadTask.snapshotEvents.listen((event) {
+        if (mounted) {
+          setState(() {
+            _uploadProgress = event.bytesTransferred / event.totalBytes;
+          });
+        }
       });
 
       await uploadTask;
+      _uploadSubscription = null;
       final url = await ref.getDownloadURL();
 
       // Save to Firestore
@@ -840,9 +912,13 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
 
     if (confirmed == true) {
       try {
-        // Delete from Storage
+        // Delete from Storage (ignore errors if file already missing)
         if (storagePath != null) {
-          await _storage.ref().child(storagePath).delete();
+          try {
+            await _storage.ref().child(storagePath).delete();
+          } catch (_) {
+            // File may already be deleted from storage
+          }
         }
         // Delete from Firestore
         await _firestore.collection('medical_documents').doc(docId).delete();

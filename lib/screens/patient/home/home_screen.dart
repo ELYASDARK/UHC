@@ -12,6 +12,7 @@ import '../../../providers/notification_provider.dart';
 import '../../../data/models/department_model.dart';
 import '../../../data/repositories/department_repository.dart';
 import '../../../l10n/app_localizations.dart';
+import '../appointments/emergency_request_screen.dart';
 
 /// Home dashboard screen
 class HomeScreen extends StatefulWidget {
@@ -141,6 +142,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 // Quick actions
                 _buildQuickActions(context, isDark),
+
+                const SizedBox(height: 20),
+
+                // Emergency Request button
+                _buildEmergencyButton(context, isDark),
 
                 const SizedBox(height: 28),
 
@@ -535,6 +541,81 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildEmergencyButton(BuildContext context, bool isDark) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const EmergencyRequestScreen()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                    spreadRadius: 2,
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.emergency_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Emergency Request',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.error,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Request urgent medical attention',
+                    style: GoogleFonts.roboto(
+                      fontSize: 13,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: AppColors.error,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
+    ).animate(delay: 450.ms).fadeIn(duration: 500.ms).slideY(begin: 0.2);
   }
 
   Widget _buildDepartmentsSection(BuildContext context, bool isDark) {

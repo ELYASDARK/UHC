@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/repositories/appointment_repository.dart';
+import '../../../l10n/app_localizations.dart';
 import '../booking/booking_screen.dart';
+import '../appointments/emergency_request_screen.dart';
 
 class DoctorScheduleScreen extends StatefulWidget {
   final DoctorModel doctor;
@@ -30,6 +33,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   }
 
   Future<void> _loadBookedSlots(DateTime date) async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
@@ -37,13 +41,16 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
         widget.doctor.id,
         date,
       );
+      if (!mounted) return;
       setState(() {
         _bookedSlots = appointments.map((a) => a.timeSlot).toList();
       });
     } catch (e) {
-      // Handle error silently
+      debugPrint('Error loading booked slots: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -72,18 +79,82 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
 
   List<TimeSlot> _getAvailableSlots(DateTime date) {
     final dayName = _getDayName(date);
-    return widget.doctor.weeklySchedule[dayName] ?? [];
+    final doctorSlots = widget.doctor.weeklySchedule[dayName];
+
+    // If doctor has specific slots for this day, use them
+    if (doctorSlots != null && doctorSlots.isNotEmpty) {
+      return doctorSlots;
+    }
+
+    // Check if doctor has ANY schedule set
+    final hasAnySchedule = widget.doctor.weeklySchedule.values.any(
+      (slots) => slots.isNotEmpty,
+    );
+
+    // If doctor has a schedule but this day is not in it, return empty
+    if (hasAnySchedule) {
+      return [];
+    }
+
+    // Fallback: No schedule set at all, return default time slots for weekdays
+    if (date.weekday >= 1 && date.weekday <= 5) {
+      return [
+        TimeSlot(startTime: '09:00', endTime: '09:30'),
+        TimeSlot(startTime: '09:30', endTime: '10:00'),
+        TimeSlot(startTime: '10:00', endTime: '10:30'),
+        TimeSlot(startTime: '10:30', endTime: '11:00'),
+        TimeSlot(startTime: '11:00', endTime: '11:30'),
+        TimeSlot(startTime: '14:00', endTime: '14:30'),
+        TimeSlot(startTime: '14:30', endTime: '15:00'),
+        TimeSlot(startTime: '15:00', endTime: '15:30'),
+        TimeSlot(startTime: '15:30', endTime: '16:00'),
+      ];
+    }
+
+    return [];
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final availableSlots = _getAvailableSlots(_selectedDay);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dr. ${widget.doctor.name}\'s Schedule'),
+        title: Text(
+          '${l10n.doctorScheduleTitle} ${widget.doctor.name}',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
         centerTitle: true,
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'emergency') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        EmergencyRequestScreen(doctor: widget.doctor),
+                  ),
+                );
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'emergency',
+                child: Row(
+                  children: [
+                    Icon(Icons.emergency, size: 20, color: AppColors.error),
+                    SizedBox(width: 8),
+                    Text('Emergency Request',
+                        style: TextStyle(color: AppColors.error)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -139,7 +210,6 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                   color: AppColors.primary,
                 ),
               ),
-              // Disable past days and weekends if needed
               enabledDayPredicate: (day) {
                 // Allow only future days
                 return day.isAfter(
@@ -172,16 +242,18 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                     children: [
                       Text(
                         _formatDate(_selectedDay),
-                        style: Theme.of(context).textTheme.titleMedium
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        '${availableSlots.length} time slots available',
+                        l10n.timeSlotsAvailable(availableSlots.length),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
                       ),
                     ],
                   ),
@@ -196,8 +268,8 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : availableSlots.isEmpty
-                ? _buildNoSlotsMessage()
-                : _buildTimeSlotsList(availableSlots),
+                    ? _buildNoSlotsMessage()
+                    : _buildTimeSlotsList(availableSlots),
           ),
         ],
       ),
@@ -205,6 +277,9 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   }
 
   Widget _buildNoSlotsMessage() {
+    final l10n = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -212,24 +287,27 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
           Icon(
             Icons.event_busy_outlined,
             size: 64,
-            color: AppColors.textSecondaryLight.withValues(alpha: 0.5),
+            color: (isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight)
+                .withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
-            'No Available Slots',
+            l10n.noAvailableSlots,
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Doctor is not available on this day.\nPlease select another date.',
+            l10n.doctorNotAvailableSelectAnother,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
           ),
         ],
       ),
@@ -238,6 +316,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
 
   Widget _buildTimeSlotsList(List<TimeSlot> slots) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -288,26 +367,26 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
               ),
             ),
             title: Text(
-              slot.display,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
+              slot.fullDisplay,
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
                 color: isAvailable
                     ? null
                     : (isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight),
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight),
                 decoration: !isAvailable ? TextDecoration.lineThrough : null,
               ),
             ),
             subtitle: Text(
               isBooked
-                  ? 'Already booked'
+                  ? l10n.alreadyBooked
                   : isPast
-                  ? 'Time has passed'
-                  : !slot.isAvailable
-                  ? 'Not available'
-                  : 'Available for booking',
-              style: TextStyle(
+                      ? l10n.timeHasPassed
+                      : !slot.isAvailable
+                          ? l10n.notAvailable
+                          : l10n.availableForBooking,
+              style: GoogleFonts.roboto(
                 color: isAvailable ? AppColors.success : Colors.grey,
                 fontSize: 12,
               ),
@@ -322,9 +401,9 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
-                      'Book',
-                      style: TextStyle(
+                    child: Text(
+                      l10n.book,
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -354,16 +433,25 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   }
 
   void _onSlotTap(TimeSlot slot) {
-    // Navigate to booking screen or show booking dialog
+    // Capture the outer navigator before opening the bottom sheet
+    final navigator = Navigator.of(context);
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => _BookingConfirmationSheet(
-        doctor: widget.doctor,
-        date: _selectedDay,
-        timeSlot: slot,
+      builder: (sheetContext) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: _BookingConfirmationSheet(
+          doctor: widget.doctor,
+          date: _selectedDay,
+          timeSlot: slot,
+          parentNavigator: navigator,
+        ),
       ),
     );
   }
@@ -400,17 +488,21 @@ class _BookingConfirmationSheet extends StatelessWidget {
   final DoctorModel doctor;
   final DateTime date;
   final TimeSlot timeSlot;
+  final NavigatorState parentNavigator;
 
   const _BookingConfirmationSheet({
     required this.doctor,
     required this.date,
     required this.timeSlot,
+    required this.parentNavigator,
   });
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -431,7 +523,7 @@ class _BookingConfirmationSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Confirm Booking',
+              l10n.confirmBooking,
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -450,29 +542,29 @@ class _BookingConfirmationSheet extends StatelessWidget {
                   _buildDetailRow(
                     context,
                     Icons.person,
-                    'Doctor',
-                    'Dr. ${doctor.name}',
+                    l10n.doctor,
+                    doctor.name,
                   ),
                   const Divider(height: 24),
                   _buildDetailRow(
                     context,
                     Icons.medical_services,
-                    'Specialization',
+                    l10n.specialty,
                     doctor.specialization,
                   ),
                   const Divider(height: 24),
                   _buildDetailRow(
                     context,
                     Icons.calendar_month,
-                    'Date',
+                    l10n.date,
                     _formatDate(date),
                   ),
                   const Divider(height: 24),
                   _buildDetailRow(
                     context,
                     Icons.access_time,
-                    'Time',
-                    timeSlot.display,
+                    l10n.time,
+                    timeSlot.fullDisplay,
                   ),
                 ],
               ),
@@ -491,18 +583,23 @@ class _BookingConfirmationSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('Cancel'),
+                    child: Text(l10n.cancel),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
+                      // Close the bottom sheet first
                       Navigator.pop(context);
-                      Navigator.push(
-                        context,
+                      // Use the parent navigator to push the booking screen
+                      parentNavigator.push(
                         MaterialPageRoute(
-                          builder: (_) => BookingScreen(doctor: doctor),
+                          builder: (_) => BookingScreen(
+                            doctor: doctor,
+                            initialDate: date,
+                            initialTimeSlot: timeSlot,
+                          ),
                         ),
                       );
                     },
@@ -514,7 +611,7 @@ class _BookingConfirmationSheet extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('Confirm'),
+                    child: Text(l10n.confirm),
                   ),
                 ),
               ],
@@ -531,26 +628,34 @@ class _BookingConfirmationSheet extends StatelessWidget {
     String label,
     String value,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Row(
       children: [
         Icon(icon, color: AppColors.primary, size: 20),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondaryLight,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
               ),
-            ),
-            Text(
-              value,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ],
+              Text(
+                value,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ],
     );
