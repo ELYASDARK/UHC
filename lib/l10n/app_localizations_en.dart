@@ -1862,6 +1862,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get month => 'Month';
 
   @override
+  String get week => 'Week';
+
+  @override
+  String get twoWeeks => '2 Weeks';
+
+  @override
   String get noDoctorsFound => 'No doctors found matching your search.';
 
   @override

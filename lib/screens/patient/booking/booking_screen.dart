@@ -323,6 +323,7 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _buildCalendarStep(bool isDark) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -355,6 +356,11 @@ class _BookingScreenState extends State<BookingScreen> {
           setState(() {
             _calendarFormat = format;
           });
+        },
+        availableCalendarFormats: {
+          CalendarFormat.month: l10n.month,
+          CalendarFormat.twoWeeks: l10n.twoWeeks,
+          CalendarFormat.week: l10n.week,
         },
         calendarStyle: CalendarStyle(
           // Enabled days: black text

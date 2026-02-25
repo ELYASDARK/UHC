@@ -207,6 +207,11 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                           _calendarFormat = format;
                         });
                       },
+                      availableCalendarFormats: {
+                        CalendarFormat.month: l10n.month,
+                        CalendarFormat.twoWeeks: l10n.twoWeeks,
+                        CalendarFormat.week: l10n.week,
+                      },
                       calendarStyle: CalendarStyle(
                         selectedDecoration: const BoxDecoration(
                           color: AppColors.primary,

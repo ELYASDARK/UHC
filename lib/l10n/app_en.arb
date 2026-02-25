@@ -675,6 +675,8 @@
   "findBestDoctorsDash": "Find the best doctors and book your visit",
   "bookAppointmentNow": "Book Appointment Now",
   "month": "Month",
+  "week": "Week",
+  "twoWeeks": "2 Weeks",
   "noDoctorsFound": "No doctors found matching your search.",
   "noDoctorsAvailable": "No doctors available at the moment.",
   "failedToLoadDoctors": "Failed to load doctors. Pull to retry."

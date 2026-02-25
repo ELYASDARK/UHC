@@ -332,7 +332,6 @@ Add these keys to `ios/Runner/Info.plist` for permissions:
 | `doctors` | Doctor profiles, specializations, and schedules |
 | `departments` | Department metadata — name, icon, color, working hours |
 | `appointments` | Booking records with status tracking, QR check-in, and scan failure counts |
-| `reviews` | Doctor ratings and patient reviews |
 | `notifications` | Per-user notification history |
 | `medical_documents` | Uploaded file metadata and storage references |
 

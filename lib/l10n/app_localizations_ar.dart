@@ -1848,7 +1848,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookAppointmentNow => 'احجز موعد الآن';
 
   @override
-  String get month => 'شهري';
+  String get month => 'شهر';
+
+  @override
+  String get week => 'أسبوع';
+
+  @override
+  String get twoWeeks => 'أسبوعين';
 
   @override
   String get noDoctorsFound => 'لم يتم العثور على أطباء يطابقون بحثك.';

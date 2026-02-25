@@ -1864,6 +1864,12 @@ class AppLocalizationsKu extends AppLocalizations {
   String get month => 'مانگ';
 
   @override
+  String get week => 'هەفتە';
+
+  @override
+  String get twoWeeks => 'دوو هەفتە';
+
+  @override
   String get noDoctorsFound =>
       'هیچ پزیشکێک نەدۆزرایەوە کە لەگەڵ گەڕانەکەتدا بگونجێت.';
 

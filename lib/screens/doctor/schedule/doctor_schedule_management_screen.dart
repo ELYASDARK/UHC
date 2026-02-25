@@ -149,6 +149,11 @@ class _DoctorScheduleManagementScreenState
                 }
               },
               onFormatChanged: (fmt) => setState(() => _calendarFormat = fmt),
+              availableCalendarFormats: {
+                CalendarFormat.month: l10n.month,
+                CalendarFormat.twoWeeks: l10n.twoWeeks,
+                CalendarFormat.week: l10n.week,
+              },
               calendarStyle: CalendarStyle(
                 selectedDecoration: const BoxDecoration(
                   color: AppColors.primary,

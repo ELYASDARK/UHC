@@ -3664,6 +3664,18 @@ abstract class AppLocalizations {
   /// **'Month'**
   String get month;
 
+  /// No description provided for @week.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get week;
+
+  /// No description provided for @twoWeeks.
+  ///
+  /// In en, this message translates to:
+  /// **'2 Weeks'**
+  String get twoWeeks;
+
   /// No description provided for @noDoctorsFound.
   ///
   /// In en, this message translates to:

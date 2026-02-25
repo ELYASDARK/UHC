@@ -594,7 +594,9 @@
   "emergencyRequestDescDash": "طلب مساعدة طبية عاجلة",
   "findBestDoctorsDash": "ابحث عن أفضل الأطباء واحجز موعدك",
   "bookAppointmentNow": "احجز موعد الآن",
-  "month": "شهري",
+  "month": "شهر",
+  "week": "أسبوع",
+  "twoWeeks": "أسبوعين",
   "noDoctorsFound": "لم يتم العثور على أطباء يطابقون بحثك.",
   "noDoctorsAvailable": "لا يوجد أطباء متاحون في الوقت الحالي.",
   "failedToLoadDoctors": "فشل تحميل الأطباء. اسحب لإعادة المحاولة."

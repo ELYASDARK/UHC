@@ -186,6 +186,8 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
               },
               availableCalendarFormats: {
                 CalendarFormat.month: l10n.month,
+                CalendarFormat.twoWeeks: l10n.twoWeeks,
+                CalendarFormat.week: l10n.week,
               },
               calendarStyle: CalendarStyle(
                 selectedDecoration: const BoxDecoration(
