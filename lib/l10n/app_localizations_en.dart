@@ -502,7 +502,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancelled => 'Cancelled';
 
   @override
-  String get pending => 'Pending';
+  String get pending => 'Booked';
 
   @override
   String get confirmed => 'Confirmed';

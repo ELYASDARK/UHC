@@ -47,9 +47,18 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   void initState() {
     super.initState();
     _doctor = widget.doctor;
-    // Load appointments if not already loaded
+
+    // Configure daily notifications and load appointments
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<DoctorAppointmentProvider>();
+
+      // Set up daily 9 PM notification config (uses doctor's weeklySchedule)
+      provider.configureDailyNotifications(
+        doctorUserId: _doctor.userId,
+        weeklySchedule: _doctor.weeklySchedule,
+        dailyNotificationTime: _doctor.dailyNotificationTime,
+      );
+
       if (provider.appointments.isEmpty && !provider.isLoading) {
         provider.loadAppointments(_doctor.id);
       }

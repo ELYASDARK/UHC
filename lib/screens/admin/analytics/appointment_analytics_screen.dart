@@ -139,8 +139,8 @@ class _AppointmentAnalyticsScreenState
                   Text(
                     'Status Distribution',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 12),
                   _buildStatusChart(isDark),
@@ -150,8 +150,8 @@ class _AppointmentAnalyticsScreenState
                   Text(
                     'By Department',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 12),
                   _buildDepartmentChart(isDark),
@@ -161,8 +161,8 @@ class _AppointmentAnalyticsScreenState
                   Text(
                     'Daily Trend',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 12),
                   _buildDailyTrend(isDark),
@@ -333,7 +333,9 @@ class _AppointmentAnalyticsScreenState
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      entry.key.toUpperCase(),
+                      entry.key == 'pending'
+                          ? 'BOOKED'
+                          : entry.key.toUpperCase(),
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                     Text('${entry.value} (${percentage.toStringAsFixed(0)}%)'),

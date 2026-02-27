@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../data/models/appointment_model.dart';
+import '../data/models/doctor_model.dart';
 import '../data/models/notification_model.dart';
 import '../data/repositories/appointment_repository.dart';
 import '../data/repositories/notification_repository.dart';
 import '../data/repositories/user_repository.dart';
+import '../services/local_notification_service.dart';
 
 /// Provider for managing doctor-side appointment state
 class DoctorAppointmentProvider extends ChangeNotifier {
@@ -15,6 +17,11 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   Map<String, String?> _patientPhotos = {};
+
+  // Daily notification config (set once via configureDailyNotifications)
+  String? _dailyNotifDoctorUserId;
+  Map<String, List<TimeSlot>>? _dailyNotifSchedule;
+  String _dailyNotifTime = '21:00';
 
   // Getters
   List<AppointmentModel> get appointments => _appointments;
@@ -66,6 +73,35 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     return upcoming.isEmpty ? null : upcoming.first;
   }
 
+  /// Map from DateTime.weekday (1=Mon … 7=Sun) to weeklySchedule key.
+  static const _dayNames = [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ];
+
+  /// Configure daily summary notifications.
+  /// Call once from the dashboard screen after login.
+  /// After this, every [loadAppointments] call will auto-schedule.
+  void configureDailyNotifications({
+    required String doctorUserId,
+    required Map<String, List<TimeSlot>> weeklySchedule,
+    String dailyNotificationTime = '21:00',
+  }) {
+    _dailyNotifDoctorUserId = doctorUserId;
+    _dailyNotifSchedule = weeklySchedule;
+    _dailyNotifTime = dailyNotificationTime;
+
+    // If appointments are already loaded, schedule immediately
+    if (_appointments.isNotEmpty) {
+      _scheduleDailyNotifications();
+    }
+  }
+
   /// Load all appointments for this doctor
   Future<void> loadAppointments(String doctorId) async {
     _isLoading = true;
@@ -82,6 +118,9 @@ class DoctorAppointmentProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+
+    // Best-effort: schedule daily summary notifications in background
+    _scheduleDailyNotifications();
   }
 
   /// Update appointment status (confirm, complete, no-show, cancel)
@@ -106,11 +145,6 @@ class DoctorAppointmentProvider extends ChangeNotifier {
         status,
         statusUpdatedBy: statusUpdatedBy,
       );
-
-      // Notify the patient about the status change
-      if (appointment != null && doctorName != null) {
-        await _notifyPatientStatusChange(appointment, status, doctorName);
-      }
 
       // Refresh
       await loadAppointments(doctorId);
@@ -212,15 +246,6 @@ class DoctorAppointmentProvider extends ChangeNotifier {
         statusUpdatedBy: statusUpdatedBy,
       );
 
-      // Notify the patient that the appointment is completed
-      if (appointment != null && doctorName != null) {
-        await _notifyPatientStatusChange(
-          appointment,
-          AppointmentStatus.completed,
-          doctorName,
-        );
-      }
-
       await loadAppointments(doctorId);
       return true;
     } catch (e) {
@@ -253,6 +278,11 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     _appointments = [];
     _patientPhotos = {};
     _error = null;
+    _dailyNotifDoctorUserId = null;
+    _dailyNotifSchedule = null;
+    _dailyNotifTime = '21:00';
+    // Cancel any scheduled daily summary local notifications
+    LocalNotificationService().cancelDoctorDailySummaries();
     notifyListeners();
   }
 
@@ -267,73 +297,110 @@ class DoctorAppointmentProvider extends ChangeNotifier {
 
   // ── Private helpers ──
 
-  /// Send a Firestore notification to the patient when a doctor changes
-  /// the appointment status (confirmed, completed, no-show).
-  /// Cancellation is handled separately via [cancelAppointment].
-  Future<void> _notifyPatientStatusChange(
-    AppointmentModel appointment,
-    AppointmentStatus newStatus,
-    String doctorName,
-  ) async {
+  /// Schedule daily summary notifications for the next 7 days.
+  /// For each day, checks if tomorrow is a working day and counts pending
+  /// appointments. Cancels all existing summaries first, then recreates.
+  Future<void> _scheduleDailyNotifications() async {
+    if (_dailyNotifDoctorUserId == null || _dailyNotifSchedule == null) return;
+
+    final notifService = LocalNotificationService();
+
+    // Parse configured time
+    int targetHour = 21;
+    int targetMin = 0;
     try {
-      final String title;
-      final String body;
-
-      switch (newStatus) {
-        case AppointmentStatus.confirmed:
-          title = 'Appointment Confirmed';
-          body =
-              'Your appointment with Dr. $doctorName on ${_formatDate(appointment.appointmentDate)} at ${appointment.timeSlot} has been confirmed by the doctor.';
-          break;
-        case AppointmentStatus.completed:
-          title = 'Appointment Completed';
-          body =
-              'Your appointment with Dr. $doctorName on ${_formatDate(appointment.appointmentDate)} has been marked as completed.';
-          break;
-        case AppointmentStatus.noShow:
-          title = 'Marked as No-Show';
-          body =
-              'Your appointment with Dr. $doctorName on ${_formatDate(appointment.appointmentDate)} was marked as no-show.';
-          break;
-        default:
-          return; // No notification for other statuses
+      final parts = _dailyNotifTime.split(':');
+      if (parts.length == 2) {
+        targetHour = int.parse(parts[0]);
+        targetMin = int.parse(parts[1]);
       }
+    } catch (_) {}
 
-      await _notificationRepo.createNotification(
-        NotificationModel(
-          id: '',
-          userId: appointment.patientId,
+    try {
+      // Cancel existing daily summary local notifications
+      await notifService.cancelDoctorDailySummaries();
+
+      // Delete existing future daily summary Firestore docs
+      await _notificationRepo
+          .deleteFutureDailySummaries(_dailyNotifDoctorUserId!);
+    } catch (e) {
+      debugPrint('Failed to clean old daily summaries: $e');
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
+      final notificationDate = today.add(Duration(days: dayOffset));
+      // Configured time on notificationDate
+      final scheduledTime =
+          notificationDate.add(Duration(hours: targetHour, minutes: targetMin));
+
+      // Skip if time has already passed
+      if (scheduledTime.isBefore(now)) continue;
+
+      // Target date is tomorrow relative to notificationDate
+      final targetDate = notificationDate.add(const Duration(days: 1));
+      final targetDayName = _dayNames[targetDate.weekday - 1];
+
+      // Skip if it's not a working day tomorrow
+      final daySlots = _dailyNotifSchedule![targetDayName];
+      if (daySlots == null || daySlots.isEmpty) continue;
+
+      // Count pending appointments for target date
+      final startOfTarget =
+          DateTime(targetDate.year, targetDate.month, targetDate.day);
+      final endOfTarget = startOfTarget.add(const Duration(days: 1));
+
+      final pendingCount = _appointments.where((apt) {
+        final isTargetDay = apt.appointmentDate.isAfter(
+              startOfTarget.subtract(const Duration(seconds: 1)),
+            ) &&
+            apt.appointmentDate.isBefore(endOfTarget);
+        return isTargetDay && apt.status == AppointmentStatus.pending;
+      }).length;
+
+      const title = "Tomorrow's Appointments";
+      final body = pendingCount == 0
+          ? 'You have no booked appointments tomorrow'
+          : pendingCount == 1
+              ? 'You have 1 booked appointment tomorrow'
+              : 'You have $pendingCount booked appointments tomorrow';
+
+      // Schedule local push notification
+      try {
+        await notifService.scheduleDoctorDailySummary(
+          dayOffset: dayOffset,
           title: title,
           body: body,
-          type: NotificationType.appointmentConfirmation,
-          data: {'appointmentId': appointment.id},
-          createdAt: DateTime.now(),
-          appointmentId: appointment.id,
-          reminderType: ReminderType.immediate,
-          isDelivered: true,
-        ),
-      );
-    } catch (e) {
-      debugPrint('Failed to send notification: $e');
-    }
-  }
+          scheduledTime: scheduledTime,
+        );
+      } catch (e) {
+        debugPrint('Failed to schedule daily summary local notif: $e');
+      }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+      // Create Firestore notification doc (for in-app notification list)
+      try {
+        await _notificationRepo.createNotification(
+          NotificationModel(
+            id: '',
+            userId: _dailyNotifDoctorUserId!,
+            title: title,
+            body: body,
+            type: NotificationType.dailySummary,
+            data: {
+              'targetDate': targetDate.toIso8601String(),
+              'pendingCount': pendingCount,
+            },
+            createdAt: DateTime.now(),
+            scheduledFor: scheduledTime,
+            isDelivered: false,
+          ),
+        );
+      } catch (e) {
+        debugPrint('Failed to create daily summary Firestore doc: $e');
+      }
+    }
   }
 
   /// Batch-fetch profile photos for all unique patients in the appointment list.

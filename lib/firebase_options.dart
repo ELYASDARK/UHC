@@ -46,7 +46,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '705258727806',
     projectId: 'uhca-20800',
     authDomain: 'uhca-20800.firebaseapp.com',
-    databaseURL: 'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
+    databaseURL:
+        'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'uhca-20800.firebasestorage.app',
     measurementId: 'G-H827KGWBWV',
   );
@@ -56,7 +57,8 @@ class DefaultFirebaseOptions {
     appId: '1:705258727806:android:1f73e29262863a3846eb2f',
     messagingSenderId: '705258727806',
     projectId: 'uhca-20800',
-    databaseURL: 'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
+    databaseURL:
+        'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'uhca-20800.firebasestorage.app',
   );
 
@@ -65,7 +67,8 @@ class DefaultFirebaseOptions {
     appId: '1:705258727806:ios:1fafb2d2e0fd742146eb2f',
     messagingSenderId: '705258727806',
     projectId: 'uhca-20800',
-    databaseURL: 'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
+    databaseURL:
+        'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'uhca-20800.firebasestorage.app',
     iosBundleId: 'com.example.uhc',
   );
@@ -75,7 +78,8 @@ class DefaultFirebaseOptions {
     appId: '1:705258727806:ios:1fafb2d2e0fd742146eb2f',
     messagingSenderId: '705258727806',
     projectId: 'uhca-20800',
-    databaseURL: 'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
+    databaseURL:
+        'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'uhca-20800.firebasestorage.app',
     iosBundleId: 'com.example.uhc',
   );
@@ -86,7 +90,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '705258727806',
     projectId: 'uhca-20800',
     authDomain: 'uhca-20800.firebaseapp.com',
-    databaseURL: 'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
+    databaseURL:
+        'https://uhca-20800-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'uhca-20800.firebasestorage.app',
     measurementId: 'G-FVYNT4ZZ57',
   );

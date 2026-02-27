@@ -25,6 +25,7 @@ class DoctorFunctionsService {
     List<String>? qualifications,
     Map<String, dynamic>? weeklySchedule,
     DateTime? dateOfBirth,
+    String? dailyNotificationTime,
   }) async {
     try {
       final callable = _functions.httpsCallable('createDoctorAccount');
@@ -42,6 +43,7 @@ class DoctorFunctionsService {
         'qualifications': qualifications ?? [],
         'weeklySchedule': weeklySchedule,
         'dateOfBirth': dateOfBirth?.toIso8601String(),
+        'dailyNotificationTime': dailyNotificationTime ?? '21:00',
       });
 
       return Map<String, dynamic>.from(result.data);

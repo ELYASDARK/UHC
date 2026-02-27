@@ -25,12 +25,11 @@ class NotificationRepository {
     return snapshot.docs
         .map((doc) => NotificationModel.fromFirestore(doc))
         .where((notification) {
-          // Show immediate notifications or scheduled ones that are due
-          if (notification.scheduledFor == null) return true;
-          return notification.scheduledFor!.isBefore(now) ||
-              notification.scheduledFor!.isAtSameMomentAs(now);
-        })
-        .toList();
+      // Show immediate notifications or scheduled ones that are due
+      if (notification.scheduledFor == null) return true;
+      return notification.scheduledFor!.isBefore(now) ||
+          notification.scheduledFor!.isAtSameMomentAs(now);
+    }).toList();
   }
 
   /// Get unread notifications count (only for delivered notifications)
@@ -45,10 +44,9 @@ class NotificationRepository {
     return snapshot.docs
         .map((doc) => NotificationModel.fromFirestore(doc))
         .where((notification) {
-          if (notification.scheduledFor == null) return true;
-          return notification.scheduledFor!.isBefore(now);
-        })
-        .length;
+      if (notification.scheduledFor == null) return true;
+      return notification.scheduledFor!.isBefore(now);
+    }).length;
   }
 
   /// Create notification
@@ -86,9 +84,8 @@ class NotificationRepository {
   /// Delete all user notifications
   Future<void> deleteAllNotifications(String userId) async {
     final batch = _firestore.batch();
-    final snapshot = await _notificationsRef
-        .where('userId', isEqualTo: userId)
-        .get();
+    final snapshot =
+        await _notificationsRef.where('userId', isEqualTo: userId).get();
 
     for (final doc in snapshot.docs) {
       batch.delete(doc.reference);
@@ -119,15 +116,14 @@ class NotificationRepository {
         .limit(50)
         .snapshots()
         .map((snapshot) {
-          final now = DateTime.now();
-          return snapshot.docs
-              .map((doc) => NotificationModel.fromFirestore(doc))
-              .where((notification) {
-                if (notification.scheduledFor == null) return true;
-                return notification.scheduledFor!.isBefore(now);
-              })
-              .toList();
-        });
+      final now = DateTime.now();
+      return snapshot.docs
+          .map((doc) => NotificationModel.fromFirestore(doc))
+          .where((notification) {
+        if (notification.scheduledFor == null) return true;
+        return notification.scheduledFor!.isBefore(now);
+      }).toList();
+    });
   }
 
   /// Stream unread count for real-time updates
@@ -137,15 +133,14 @@ class NotificationRepository {
         .where('isRead', isEqualTo: false)
         .snapshots()
         .map((snapshot) {
-          final now = DateTime.now();
-          return snapshot.docs
-              .map((doc) => NotificationModel.fromFirestore(doc))
-              .where((notification) {
-                if (notification.scheduledFor == null) return true;
-                return notification.scheduledFor!.isBefore(now);
-              })
-              .length;
-        });
+      final now = DateTime.now();
+      return snapshot.docs
+          .map((doc) => NotificationModel.fromFirestore(doc))
+          .where((notification) {
+        if (notification.scheduledFor == null) return true;
+        return notification.scheduledFor!.isBefore(now);
+      }).length;
+    });
   }
 
   /// Schedule 3 appointment reminder notifications (1 week, 1 day, 1 hour before)
@@ -337,5 +332,27 @@ class NotificationRepository {
       'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  /// Delete all future daily-summary notification docs for a user.
+  /// Queries by userId and filters client-side for type == dailySummary
+  /// with scheduledFor in the future.
+  Future<void> deleteFutureDailySummaries(String userId) async {
+    final now = DateTime.now();
+    final snapshot =
+        await _notificationsRef.where('userId', isEqualTo: userId).get();
+    final batch = _firestore.batch();
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      if (data['type'] == 'dailySummary') {
+        final scheduledFor = (data['scheduledFor'] as Timestamp?)?.toDate();
+        if (scheduledFor != null && scheduledFor.isAfter(now)) {
+          batch.delete(doc.reference);
+        }
+      }
+    }
+
+    await batch.commit();
   }
 }

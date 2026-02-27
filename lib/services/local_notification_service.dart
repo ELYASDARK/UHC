@@ -404,4 +404,33 @@ class LocalNotificationService {
       isAppointment: true,
     );
   }
+
+  // ── Doctor Daily Summary Notifications ──
+
+  /// Base notification ID for doctor daily summaries (7 IDs: 900000–900006).
+  static const int _doctorDailySummaryBaseId = 900000;
+
+  /// Schedule a single doctor daily summary local notification.
+  Future<void> scheduleDoctorDailySummary({
+    required int dayOffset,
+    required String title,
+    required String body,
+    required DateTime scheduledTime,
+  }) async {
+    await scheduleNotification(
+      id: _doctorDailySummaryBaseId + dayOffset,
+      title: title,
+      body: body,
+      scheduledTime: scheduledTime,
+      payload: jsonEncode({'type': 'daily_summary'}),
+      isAppointment: true,
+    );
+  }
+
+  /// Cancel all 7 doctor daily summary notifications.
+  Future<void> cancelDoctorDailySummaries() async {
+    for (int i = 0; i < 7; i++) {
+      await cancelNotification(_doctorDailySummaryBaseId + i);
+    }
+  }
 }

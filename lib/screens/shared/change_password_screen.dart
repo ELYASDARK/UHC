@@ -47,9 +47,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     try {
       await context.read<AuthProvider>().changePassword(
-        _currentController.text.trim(),
-        _newController.text.trim(),
-      );
+            _currentController.text.trim(),
+            _newController.text.trim(),
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

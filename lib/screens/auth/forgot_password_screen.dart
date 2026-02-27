@@ -76,9 +76,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   onPressed: widget.onBackTap,
                   icon: const Icon(Icons.arrow_back_rounded),
                   style: IconButton.styleFrom(
-                    backgroundColor: isDark
-                        ? Colors.grey[800]
-                        : Colors.grey[100],
+                    backgroundColor:
+                        isDark ? Colors.grey[800] : Colors.grey[100],
                   ),
                 ).animate().fadeIn(duration: 300.ms),
 
@@ -102,13 +101,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             color: AppColors.success,
                           ),
                         ).animate().scale(
-                          begin: const Offset(0.5, 0.5),
-                          duration: 500.ms,
-                          curve: Curves.elasticOut,
-                        ),
-
+                              begin: const Offset(0.5, 0.5),
+                              duration: 500.ms,
+                              curve: Curves.elasticOut,
+                            ),
                         const SizedBox(height: 32),
-
                         Text(
                           l10n.checkEmail,
                           style: GoogleFonts.poppins(
@@ -120,9 +117,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ),
                           textAlign: TextAlign.center,
                         ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
-
                         const SizedBox(height: 16),
-
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Text(
@@ -137,9 +132,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
-
                         const SizedBox(height: 48),
-
                         PrimaryButton(
                           text: l10n.backToLogin,
                           onPressed: widget.onBackTap,
@@ -163,15 +156,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const SizedBox(height: 8),
 
                   Text(
-                        l10n.resetPasswordSubtitle,
-                        style: GoogleFonts.roboto(
-                          fontSize: 16,
-                          height: 1.5,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
-                      )
+                    l10n.resetPasswordSubtitle,
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      height: 1.5,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  )
                       .animate(delay: 100.ms)
                       .fadeIn(duration: 400.ms)
                       .slideX(begin: -0.1),
@@ -179,26 +172,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const SizedBox(height: 48),
 
                   Form(
-                        key: _formKey,
-                        child: CustomTextField(
-                          label: l10n.email,
-                          hintText: l10n.enterEmailHint,
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          prefixIcon: Icons.email_outlined,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => _handleResetPassword(),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return l10n.fieldRequired;
-                            }
-                            if (!value.contains('@')) {
-                              return l10n.invalidEmail;
-                            }
-                            return null;
-                          },
-                        ),
-                      )
+                    key: _formKey,
+                    child: CustomTextField(
+                      label: l10n.email,
+                      hintText: l10n.enterEmailHint,
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      prefixIcon: Icons.email_outlined,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _handleResetPassword(),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return l10n.fieldRequired;
+                        }
+                        if (!value.contains('@')) {
+                          return l10n.invalidEmail;
+                        }
+                        return null;
+                      },
+                    ),
+                  )
                       .animate(delay: 200.ms)
                       .fadeIn(duration: 400.ms)
                       .slideX(begin: 0.1),
@@ -206,11 +199,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const SizedBox(height: 32),
 
                   PrimaryButton(
-                        text: l10n.sendResetLink,
-                        onPressed: _handleResetPassword,
-                        isLoading: authProvider.isLoading,
-                        icon: Icons.send_rounded,
-                      )
+                    text: l10n.sendResetLink,
+                    onPressed: _handleResetPassword,
+                    isLoading: authProvider.isLoading,
+                    icon: Icons.send_rounded,
+                  )
                       .animate(delay: 300.ms)
                       .fadeIn(duration: 400.ms)
                       .slideY(begin: 0.2),

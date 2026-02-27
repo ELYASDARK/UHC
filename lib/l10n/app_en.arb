@@ -161,7 +161,7 @@
   "scheduled": "Scheduled",
   "completed": "Completed",
   "cancelled": "Cancelled",
-  "pending": "Pending",
+  "pending": "Booked",
   "confirmed": "Confirmed",
   "available": "Available",
   "notAvailable": "Not Available",

@@ -1063,7 +1063,7 @@ abstract class AppLocalizations {
   /// No description provided for @pending.
   ///
   /// In en, this message translates to:
-  /// **'Pending'**
+  /// **'Booked'**
   String get pending;
 
   /// No description provided for @confirmed.

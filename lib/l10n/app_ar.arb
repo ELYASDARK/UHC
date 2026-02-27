@@ -161,7 +161,7 @@
   "scheduled": "مجدول",
   "completed": "مكتمل",
   "cancelled": "ملغي",
-  "pending": "قيد الانتظار",
+  "pending": "محجوز",
   "confirmed": "مؤكد",
   "available": "متاح",
   "notAvailable": "غير متاح",

@@ -246,8 +246,8 @@ class _MainShellState extends State<MainShell> {
               color: isSelected
                   ? AppColors.primary
                   : (isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight),
             ),
           ),
         ],
@@ -282,8 +282,8 @@ class _MainShellState extends State<MainShell> {
                   color: isSelected
                       ? AppColors.primary
                       : (isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight),
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
                   size: 24,
                 ),
                 if (showBadge)
@@ -310,8 +310,8 @@ class _MainShellState extends State<MainShell> {
                 color: isSelected
                     ? AppColors.primary
                     : (isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight),
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

@@ -9,6 +9,7 @@ enum NotificationType {
   newMessage,
   systemUpdate,
   healthTip,
+  dailySummary,
 }
 
 /// Reminder type for appointment notifications
@@ -85,9 +86,8 @@ class NotificationModel {
       'isRead': isRead,
       'createdAt': Timestamp.fromDate(createdAt),
       'appointmentId': appointmentId,
-      'scheduledFor': scheduledFor != null
-          ? Timestamp.fromDate(scheduledFor!)
-          : null,
+      'scheduledFor':
+          scheduledFor != null ? Timestamp.fromDate(scheduledFor!) : null,
       'reminderType': reminderType?.name,
       'isDelivered': isDelivered,
     };

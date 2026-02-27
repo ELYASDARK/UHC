@@ -51,8 +51,7 @@ class GlassmorphicCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: backgroundColor ?? defaultColor,
                 borderRadius: BorderRadius.circular(borderRadius),
-                border:
-                    border ??
+                border: border ??
                     Border.all(
                       color: isDark
                           ? Colors.white.withValues(alpha: 0.1)
@@ -110,8 +109,7 @@ class GradientCard extends StatelessWidget {
             colors: colors ?? AppColors.primaryGradient,
           ),
           borderRadius: BorderRadius.circular(borderRadius),
-          boxShadow:
-              boxShadow ??
+          boxShadow: boxShadow ??
               [
                 BoxShadow(
                   color: (colors?.first ?? AppColors.primary).withValues(

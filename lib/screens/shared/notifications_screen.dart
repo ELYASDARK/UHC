@@ -201,6 +201,8 @@ class _NotificationCard extends StatelessWidget {
         return Icons.update;
       case NotificationType.healthTip:
         return Icons.lightbulb;
+      case NotificationType.dailySummary:
+        return Icons.calendar_month;
       default:
         return Icons.notifications;
     }
@@ -218,6 +220,8 @@ class _NotificationCard extends StatelessWidget {
         return Colors.orange;
       case NotificationType.healthTip:
         return Colors.purple;
+      case NotificationType.dailySummary:
+        return AppColors.primary;
       default:
         return AppColors.primary;
     }

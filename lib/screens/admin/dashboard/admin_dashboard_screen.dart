@@ -182,7 +182,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         _buildStatCard(
           isDark: isDark,
-          title: 'Pending',
+          title: 'Booked',
           value: numberFormat.format(_pendingAppointments),
           icon: Icons.pending_actions,
           color: AppColors.warning,
@@ -444,7 +444,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        status.toString().toUpperCase(),
+                        status == 'pending'
+                            ? 'BOOKED'
+                            : status.toString().toUpperCase(),
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,

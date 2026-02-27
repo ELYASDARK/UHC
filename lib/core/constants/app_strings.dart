@@ -97,7 +97,7 @@ class AppStrings {
   static const String showQRCode = 'Show QR Code';
   static const String completed = 'Completed';
   static const String cancelled = 'Cancelled';
-  static const String pending = 'Pending';
+  static const String pending = 'Booked';
   static const String confirmed = 'Confirmed';
 
   // Profile

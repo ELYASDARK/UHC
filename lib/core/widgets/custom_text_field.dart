@@ -86,16 +86,14 @@ class _CustomTextFieldState extends State<CustomTextField> {
           enabled: widget.enabled,
           maxLines: widget.maxLines,
           maxLength: widget.maxLength,
-
           focusNode: widget.focusNode,
           textInputAction: widget.textInputAction,
           autofocus: widget.autofocus,
           readOnly: widget.readOnly,
           style: GoogleFonts.roboto(
             fontSize: 16,
-            color: isDark
-                ? AppColors.textPrimaryDark
-                : AppColors.textPrimaryLight,
+            color:
+                isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
           ),
           decoration: InputDecoration(
             hintText: widget.hintText,

@@ -502,7 +502,7 @@ class AppLocalizationsKu extends AppLocalizations {
   String get cancelled => 'هەڵوەشێنراوە';
 
   @override
-  String get pending => 'لە چاوەڕوانیدا';
+  String get pending => 'حجزکراو';
 
   @override
   String get confirmed => 'پەسەندکراو';

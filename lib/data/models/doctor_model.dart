@@ -19,6 +19,7 @@ class DoctorModel {
   final bool isAvailable;
   final bool isActive; // Admin-controlled activation status
   final Map<String, List<TimeSlot>> weeklySchedule;
+  final String dailyNotificationTime; // HH:mm format
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -36,6 +37,7 @@ class DoctorModel {
     this.isAvailable = true,
     this.isActive = true,
     this.weeklySchedule = const {},
+    this.dailyNotificationTime = '21:00',
     required this.createdAt,
     required this.updatedAt,
   });
@@ -85,6 +87,7 @@ class DoctorModel {
       isAvailable: data['isAvailable'] ?? true,
       isActive: data['isActive'] ?? true,
       weeklySchedule: schedule,
+      dailyNotificationTime: data['dailyNotificationTime'] ?? '21:00',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -109,6 +112,7 @@ class DoctorModel {
       'isAvailable': isAvailable,
       'isActive': isActive,
       'weeklySchedule': scheduleMap,
+      'dailyNotificationTime': dailyNotificationTime,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -128,6 +132,7 @@ class DoctorModel {
     bool? isAvailable,
     bool? isActive,
     Map<String, List<TimeSlot>>? weeklySchedule,
+    String? dailyNotificationTime,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -145,6 +150,8 @@ class DoctorModel {
       isAvailable: isAvailable ?? this.isAvailable,
       isActive: isActive ?? this.isActive,
       weeklySchedule: weeklySchedule ?? this.weeklySchedule,
+      dailyNotificationTime:
+          dailyNotificationTime ?? this.dailyNotificationTime,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

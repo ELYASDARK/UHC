@@ -17,8 +17,8 @@ class DoctorProvider extends ChangeNotifier {
   // Getters
   List<DoctorModel> get doctors =>
       _filteredDoctors.isEmpty && _searchQuery.isEmpty
-      ? _doctors
-      : _filteredDoctors;
+          ? _doctors
+          : _filteredDoctors;
   List<DoctorModel> get allDoctors => _doctors;
   DoctorModel? get selectedDoctor => _selectedDoctor;
   Department? get selectedDepartment => _selectedDepartment;
@@ -128,9 +128,8 @@ class DoctorProvider extends ChangeNotifier {
     if (department == null) {
       _filteredDoctors = [];
     } else {
-      _filteredDoctors = _doctors
-          .where((d) => d.department == department)
-          .toList();
+      _filteredDoctors =
+          _doctors.where((d) => d.department == department).toList();
     }
     notifyListeners();
   }

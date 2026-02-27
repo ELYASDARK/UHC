@@ -498,7 +498,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cancelled => 'ملغي';
 
   @override
-  String get pending => 'قيد الانتظار';
+  String get pending => 'محجوز';
 
   @override
   String get confirmed => 'مؤكد';

@@ -45,6 +45,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
   late TextEditingController _qualificationInputController;
   List<String> _qualifications = [];
   DateTime? _selectedDateOfBirth;
+  TimeOfDay _selectedNotificationTime = const TimeOfDay(hour: 21, minute: 0);
 
   /// Generate default weekly schedule with 30-minute slots
   Map<String, dynamic> _generateDefaultSchedule() {
@@ -151,6 +152,20 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
       (d) => d.name == widget.data?['department'],
       orElse: () => Department.generalMedicine,
     );
+
+    // Load existing notification time if available
+    if (widget.data?['dailyNotificationTime'] != null) {
+      try {
+        final timeStr = widget.data!['dailyNotificationTime'] as String;
+        final parts = timeStr.split(':');
+        if (parts.length == 2) {
+          _selectedNotificationTime = TimeOfDay(
+            hour: int.parse(parts[0]),
+            minute: int.parse(parts[1]),
+          );
+        }
+      } catch (_) {}
+    }
   }
 
   /// Load dateOfBirth - first from users collection, then fallback to doctors collection
@@ -727,6 +742,34 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                   ),
                 ),
 
+                const SizedBox(height: 12),
+
+                // Notification Time field
+                InkWell(
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: _selectedNotificationTime,
+                      helpText: 'Select Daily Notification Time',
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedNotificationTime = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Daily Notification Time',
+                      prefixIcon: Icon(Icons.notifications_active),
+                    ),
+                    child: Text(
+                      _selectedNotificationTime.format(context),
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                  ),
+                ),
+
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _experienceController,
@@ -899,6 +942,8 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           qualifications: _qualifications,
           weeklySchedule: _generateDefaultSchedule(),
           dateOfBirth: _selectedDateOfBirth,
+          dailyNotificationTime:
+              '${_selectedNotificationTime.hour.toString().padLeft(2, '0')}:${_selectedNotificationTime.minute.toString().padLeft(2, '0')}',
         );
 
         if (mounted) {
@@ -1007,6 +1052,8 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           'consultationFee': double.tryParse(_feeController.text) ?? 0.0,
           'qualifications': _qualifications,
           'isActive': widget.data?['isActive'] ?? true,
+          'dailyNotificationTime':
+              '${_selectedNotificationTime.hour.toString().padLeft(2, '0')}:${_selectedNotificationTime.minute.toString().padLeft(2, '0')}',
           'updatedAt': FieldValue.serverTimestamp(),
         };
 

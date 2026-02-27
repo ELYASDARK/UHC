@@ -136,8 +136,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             color: _currentPage == index
                                 ? AppColors.primary
                                 : (isDark
-                                      ? Colors.grey[700]
-                                      : Colors.grey[300]),
+                                    ? Colors.grey[700]
+                                    : Colors.grey[300]),
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -151,11 +151,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       duration: const Duration(milliseconds: 300),
                       transitionBuilder:
                           (Widget child, Animation<double> animation) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            );
-                          },
+                        return FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        );
+                      },
                       child: PrimaryButton(
                         key: ValueKey<int>(_currentPage),
                         text: _currentPage == items.length - 1
@@ -185,21 +185,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           // Icon container with gradient
           Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      item.color.withValues(alpha: 0.2),
-                      item.color.withValues(alpha: 0.1),
-                    ],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(item.icon, size: 100, color: item.color),
-              )
+            width: 180,
+            height: 180,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  item.color.withValues(alpha: 0.2),
+                  item.color.withValues(alpha: 0.1),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(item.icon, size: 100, color: item.color),
+          )
               .animate()
               .scale(
                 begin: const Offset(0.8, 0.8),

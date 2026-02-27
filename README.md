@@ -405,6 +405,21 @@ flutter build web --release
 
 ## 📝 Changelog
 
+<details open>
+<summary><b>v1.7.0</b> — February 2026</summary>
+
+#### 🔔 Doctor Daily Notifications
+- **Customizable Timing** — Admins can now configure the exact time doctors receive their daily appointment summary directly from the Doctor Management panel.
+- **Smart Working Days** — Daily notifications automatically respect the doctor's weekly schedule. Doctors will not receive alerts on their days off, preventing unnecessary spam.
+- **Accurate Pending Counts** — Notifications explicitly tell doctors exactly how many *pending* appointments they have, clearly differentiating them from completed or cancelled ones.
+
+#### 📷 QR Check-In System
+- **Time-Gated Verification** — Doctors can now utilize a built-in QR scanner to confirm patient attendance securely.
+- **Scan Attempt Monitoring** — Safely falls back to manual confirmation if multiple QR scans fail, with metrics stored in Firestore.
+- **Localized** — Fully integrated QR UI messages across English, Arabic, and Kurdish.
+
+</details>
+
 <details>
 <summary><b>v1.6.0</b> — February 2026</summary>
 

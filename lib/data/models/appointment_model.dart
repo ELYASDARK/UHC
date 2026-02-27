@@ -214,7 +214,7 @@ class AppointmentModel {
   String get statusDisplay {
     switch (status) {
       case AppointmentStatus.pending:
-        return 'Pending';
+        return 'Booked';
       case AppointmentStatus.confirmed:
         return 'Confirmed';
       case AppointmentStatus.completed:
