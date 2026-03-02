@@ -275,7 +275,7 @@ class _NotificationSettingsScreenState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'System notifications are disabled',
+                                l10n.systemNotificationsDisabled,
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: isDark ? Colors.white : Colors.black87,
@@ -283,7 +283,7 @@ class _NotificationSettingsScreenState
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Tap here to enable them in settings.',
+                                l10n.tapToEnableInSettings,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: isDark
@@ -308,16 +308,15 @@ class _NotificationSettingsScreenState
                   children: [
                     _buildSwitchTile(
                       title: l10n.pushNotifications,
-                      subtitle: 'Receive alerts directly on your device',
+                      subtitle: l10n.receiveAlertsOnDevice,
                       value: _settings.pushEnabled,
                       onChanged: _togglePushNotifications,
                     ),
                     if (isDoctor && _settings.pushEnabled) ...[
                       const Divider(height: 1),
                       _buildSubSwitchTile(
-                        title: 'Daily Summary',
-                        subtitle:
-                            'Get a daily summary for next day\'s appointments',
+                        title: l10n.dailySummaryTitle,
+                        subtitle: l10n.dailySummarySubtitle,
                         value: _settings.dailySummary,
                         onChanged: (value) async {
                           setState(() {
@@ -338,11 +337,10 @@ class _NotificationSettingsScreenState
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 0),
-                            title: const Text('Summary Time',
+                            title: Text(l10n.summaryTime,
                                 style: TextStyle(
                                     fontWeight: FontWeight.w500, fontSize: 14)),
-                            subtitle: const Text(
-                                'Time to receive your daily summary',
+                            subtitle: Text(l10n.summaryTimeSubtitle,
                                 style: TextStyle(fontSize: 11)),
                             trailing: Container(
                               padding: const EdgeInsets.symmetric(
@@ -474,7 +472,7 @@ class _NotificationSettingsScreenState
                     const Divider(height: 1),
                     _buildSwitchTile(
                       title: l10n.emailNotifications,
-                      subtitle: 'Receive summaries and updates via email',
+                      subtitle: l10n.receiveSummariesViaEmail,
                       value: _settings.emailEnabled,
                       onChanged: _toggleEmailNotifications,
                     ),
@@ -640,16 +638,17 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _sendTestNotification() async {
+    final l10n = AppLocalizations.of(context);
     try {
       await _notificationService.showNotification(
         id: DateTime.now().millisecondsSinceEpoch % 100000,
-        title: 'Test Notification',
-        body: 'This is a test notification from UHC App!',
+        title: l10n.testNotificationTitle,
+        body: l10n.testNotificationBody,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Test notification sent!'),
+          SnackBar(
+            content: Text(l10n.testNotificationSentSuccess),
             backgroundColor: AppColors.success,
           ),
         );
@@ -658,7 +657,7 @@ class _NotificationSettingsScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(l10n.errorPrefix(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );

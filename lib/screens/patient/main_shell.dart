@@ -49,7 +49,10 @@ class _MainShellState extends State<MainShell> {
       // initialize() saves FCM token, subscribes to topics, and starts
       // real-time notification streams.  It is idempotent, so calling it
       // every time the shell mounts is safe.
-      await notificationProvider.initialize(authProvider.user!.id);
+      await notificationProvider.initialize(
+        authProvider.user!.id,
+        role: authProvider.user!.role.name,
+      );
     }
   }
 

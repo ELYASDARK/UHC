@@ -4,8 +4,8 @@ import 'dart:io' show Platform;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'local_notification_service.dart';
 
 /// Background message handler - must be top-level function
 @pragma('vm:entry-point')
@@ -22,8 +22,8 @@ class FCMService {
   FCMService._internal();
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications =
-      FlutterLocalNotificationsPlugin();
+  final LocalNotificationService _localNotificationService =
+      LocalNotificationService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// Whether [initialize] has already completed successfully
@@ -35,16 +35,6 @@ class FCMService {
 
   Stream<RemoteMessage> get onMessageTapped => _messageStreamController.stream;
 
-  // Notification channel for Android
-  static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'uhc_notifications',
-    'UHC Notifications',
-    description: 'Notifications from University Health Center',
-    importance: Importance.high,
-    playSound: true,
-    enableVibration: true,
-  );
-
   /// Initialize FCM and local notifications.
   /// Safe to call multiple times — subsequent calls are no-ops.
   Future<void> initialize() async {
@@ -53,14 +43,16 @@ class FCMService {
       // Request permission
       await _requestPermission();
 
-      // Initialize local notifications
-      await _initializeLocalNotifications();
-
-      // Create notification channel for Android
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(_channel);
+      // Initialize local notifications via the shared singleton
+      await _localNotificationService.initialize(
+        onTap: (payload) {
+          if (payload != null) {
+            final data = jsonDecode(payload) as Map<String, dynamic>;
+            final message = RemoteMessage(data: data);
+            _messageStreamController.add(message);
+          }
+        },
+      );
 
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
@@ -100,54 +92,16 @@ class FCMService {
         settings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
-  /// Initialize local notifications
-  Future<void> _initializeLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
-    const iosSettings = DarwinInitializationSettings(
-      requestSoundPermission: true,
-      requestBadgePermission: true,
-      requestAlertPermission: true,
-    );
-
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _localNotifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-    );
-  }
-
   /// Handle foreground messages
   void _handleForegroundMessage(RemoteMessage message) {
     final notification = message.notification;
-    final android = message.notification?.android;
 
     // Show local notification when app is in foreground
     if (notification != null) {
-      _localNotifications.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channel.id,
-            _channel.name,
-            channelDescription: _channel.description,
-            icon: android?.smallIcon ?? '@mipmap/ic_launcher',
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
-        ),
+      _localNotificationService.showNotification(
+        id: notification.hashCode,
+        title: notification.title ?? '',
+        body: notification.body ?? '',
         payload: jsonEncode(message.data),
       );
     }
@@ -156,15 +110,6 @@ class FCMService {
   /// Handle notification tap when app is opened from background
   void _handleMessageOpenedApp(RemoteMessage message) {
     _messageStreamController.add(message);
-  }
-
-  /// Handle local notification tap
-  void _onNotificationTapped(NotificationResponse response) {
-    if (response.payload != null) {
-      final data = jsonDecode(response.payload!) as Map<String, dynamic>;
-      final message = RemoteMessage(data: data);
-      _messageStreamController.add(message);
-    }
   }
 
   /// Get FCM token
@@ -247,6 +192,7 @@ class FCMService {
   /// Subscribe user to relevant topics
   Future<void> subscribeUserToTopics(
     String userId, {
+    String? role,
     String? department,
   }) async {
     // Subscribe to general announcements
@@ -254,6 +200,11 @@ class FCMService {
 
     // Subscribe to user-specific topic
     await subscribeToTopic('user_$userId');
+
+    // Subscribe to role-based topic (e.g. role_student, role_doctor)
+    if (role != null && role.isNotEmpty) {
+      await subscribeToTopic('role_$role');
+    }
 
     // Subscribe to department if provided
     if (department != null) {
@@ -264,10 +215,15 @@ class FCMService {
   /// Unsubscribe user from all topics
   Future<void> unsubscribeUserFromTopics(
     String userId, {
+    String? role,
     String? department,
   }) async {
     await unsubscribeFromTopic('announcements');
     await unsubscribeFromTopic('user_$userId');
+
+    if (role != null && role.isNotEmpty) {
+      await unsubscribeFromTopic('role_$role');
+    }
 
     if (department != null) {
       await unsubscribeFromTopic('department_$department');

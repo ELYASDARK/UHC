@@ -53,7 +53,11 @@ class _DoctorShellState extends State<DoctorShell> {
     final authProvider = context.read<AuthProvider>();
     final notificationProvider = context.read<NotificationProvider>();
     if (authProvider.currentUser != null) {
-      await notificationProvider.initialize(authProvider.currentUser!.id);
+      await notificationProvider.initialize(
+        authProvider.currentUser!.id,
+        role: authProvider.currentUser!.role.name,
+        department: _doctor.departmentId,
+      );
     }
   }
 

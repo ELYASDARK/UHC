@@ -679,5 +679,22 @@
   "twoWeeks": "2 Weeks",
   "noDoctorsFound": "No doctors found matching your search.",
   "noDoctorsAvailable": "No doctors available at the moment.",
-  "failedToLoadDoctors": "Failed to load doctors. Pull to retry."
+  "failedToLoadDoctors": "Failed to load doctors. Pull to retry.",
+  "systemNotificationsDisabled": "System notifications are disabled",
+  "tapToEnableInSettings": "Tap here to enable them in settings.",
+  "receiveAlertsOnDevice": "Receive alerts directly on your device",
+  "dailySummaryTitle": "Daily Summary",
+  "dailySummarySubtitle": "Get a daily summary for next day's appointments",
+  "summaryTime": "Summary Time",
+  "summaryTimeSubtitle": "Time to receive your daily summary",
+  "receiveSummariesViaEmail": "Receive summaries and updates via email",
+  "testNotificationSentSuccess": "Test notification sent!",
+  "errorPrefix": "Error: {error}",
+  "@errorPrefix": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
 }

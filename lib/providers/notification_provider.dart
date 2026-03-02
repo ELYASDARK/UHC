@@ -5,6 +5,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../services/fcm_service.dart';
 import '../data/repositories/notification_repository.dart';
 import '../data/models/notification_model.dart';
+import '../main.dart' show navigatorKey;
+import '../screens/shared/notifications_screen.dart';
 
 /// Provider for managing notifications state
 class NotificationProvider extends ChangeNotifier {
@@ -16,6 +18,10 @@ class NotificationProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // Stored role for topic subscription/unsubscription
+  String? _currentRole;
+  String? _currentDepartment;
+
   // Real-time stream subscriptions
   StreamSubscription<List<NotificationModel>>? _notificationsSubscription;
   StreamSubscription<int>? _unreadCountSubscription;
@@ -26,7 +32,12 @@ class NotificationProvider extends ChangeNotifier {
   String? get error => _error;
 
   /// Initialize FCM and load notifications
-  Future<void> initialize(String userId) async {
+  Future<void> initialize(String userId,
+      {String? role, String? department}) async {
+    // Store role & department for later use in enable/disable/logout
+    _currentRole = role;
+    _currentDepartment = department;
+
     try {
       // Initialize FCM
       await _fcmService.initialize();
@@ -34,8 +45,9 @@ class NotificationProvider extends ChangeNotifier {
       // Save token to database
       await _fcmService.saveTokenToDatabase(userId);
 
-      // Subscribe to topics
-      await _fcmService.subscribeUserToTopics(userId);
+      // Subscribe to topics (including role-based topic)
+      await _fcmService.subscribeUserToTopics(userId,
+          role: role, department: department);
 
       // Start real-time notification streams
       startListening(userId);
@@ -171,15 +183,24 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Handle notification tap
+  /// Handle notification tap — navigates to the Notifications screen
   void _handleNotificationTap(RemoteMessage message) {
-    // Handle navigation based on notification data
     final data = message.data;
-    final appointmentId = data['appointmentId'];
 
-    if (appointmentId != null) {
-      // Navigate to appointment details
-      // This would typically use a navigation service or callback
+    // Mark the notification as read if we have its ID
+    final notificationId = data['notificationId'];
+    if (notificationId != null && notificationId.toString().isNotEmpty) {
+      markAsRead(notificationId);
+    }
+
+    // Navigate to the notifications screen using the global navigator key
+    final navigator = navigatorKey.currentState;
+    if (navigator != null) {
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => const NotificationsScreen(),
+        ),
+      );
     }
   }
 
@@ -192,7 +213,10 @@ class NotificationProvider extends ChangeNotifier {
     _unreadCountSubscription = null;
 
     await _fcmService.removeTokenFromDatabase(userId);
-    await _fcmService.unsubscribeUserFromTopics(userId);
+    await _fcmService.unsubscribeUserFromTopics(userId,
+        role: _currentRole, department: _currentDepartment);
+    _currentRole = null;
+    _currentDepartment = null;
     _notifications.clear();
     _unreadCount = 0;
     notifyListeners();
@@ -203,7 +227,8 @@ class NotificationProvider extends ChangeNotifier {
     try {
       await _fcmService.initialize();
       await _fcmService.saveTokenToDatabase(userId);
-      await _fcmService.subscribeUserToTopics(userId);
+      await _fcmService.subscribeUserToTopics(userId,
+          role: _currentRole, department: _currentDepartment);
     } catch (e, stack) {
       _error = e.toString();
       FirebaseCrashlytics.instance.recordError(e, stack,
@@ -216,7 +241,8 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> disablePushNotifications(String userId) async {
     try {
       await _fcmService.removeTokenFromDatabase(userId);
-      await _fcmService.unsubscribeUserFromTopics(userId);
+      await _fcmService.unsubscribeUserFromTopics(userId,
+          role: _currentRole, department: _currentDepartment);
     } catch (e, stack) {
       _error = e.toString();
       FirebaseCrashlytics.instance

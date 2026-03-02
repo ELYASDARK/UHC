@@ -599,5 +599,15 @@
   "twoWeeks": "أسبوعين",
   "noDoctorsFound": "لم يتم العثور على أطباء يطابقون بحثك.",
   "noDoctorsAvailable": "لا يوجد أطباء متاحون في الوقت الحالي.",
-  "failedToLoadDoctors": "فشل تحميل الأطباء. اسحب لإعادة المحاولة."
+  "failedToLoadDoctors": "فشل تحميل الأطباء. اسحب لإعادة المحاولة.",
+  "systemNotificationsDisabled": "إشعارات النظام معطلة",
+  "tapToEnableInSettings": "انقر هنا لتفعيلها في الإعدادات.",
+  "receiveAlertsOnDevice": "استقبال التنبيهات مباشرة على جهازك",
+  "dailySummaryTitle": "الملخص اليومي",
+  "dailySummarySubtitle": "احصل على ملخص يومي لمواعيد اليوم التالي",
+  "summaryTime": "وقت الملخص",
+  "summaryTimeSubtitle": "وقت استلام الملخص اليومي",
+  "receiveSummariesViaEmail": "استقبال الملخصات والتحديثات عبر البريد الإلكتروني",
+  "testNotificationSentSuccess": "تم إرسال الإشعار التجريبي!",
+  "errorPrefix": "خطأ: {error}"
 }

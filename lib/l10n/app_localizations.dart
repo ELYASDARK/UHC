@@ -3693,6 +3693,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to load doctors. Pull to retry.'**
   String get failedToLoadDoctors;
+
+  /// No description provided for @systemNotificationsDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'System notifications are disabled'**
+  String get systemNotificationsDisabled;
+
+  /// No description provided for @tapToEnableInSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap here to enable them in settings.'**
+  String get tapToEnableInSettings;
+
+  /// No description provided for @receiveAlertsOnDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive alerts directly on your device'**
+  String get receiveAlertsOnDevice;
+
+  /// No description provided for @dailySummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Summary'**
+  String get dailySummaryTitle;
+
+  /// No description provided for @dailySummarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get a daily summary for next day\'s appointments'**
+  String get dailySummarySubtitle;
+
+  /// No description provided for @summaryTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary Time'**
+  String get summaryTime;
+
+  /// No description provided for @summaryTimeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time to receive your daily summary'**
+  String get summaryTimeSubtitle;
+
+  /// No description provided for @receiveSummariesViaEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive summaries and updates via email'**
+  String get receiveSummariesViaEmail;
+
+  /// No description provided for @testNotificationSentSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Test notification sent!'**
+  String get testNotificationSentSuccess;
+
+  /// No description provided for @errorPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String errorPrefix(String error);
 }
 
 class _AppLocalizationsDelegate

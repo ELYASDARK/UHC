@@ -437,6 +437,11 @@ export const createUserAccount = functions.https.onCall(
                 studentId: data.studentId || null,
                 staffId: data.staffId || null,
                 isActive: true,
+                notificationSettings: {
+                    email: true,
+                    push: true,
+                    sms: false,
+                },
                 language: 'en',
                 createdAt: now,
                 updatedAt: now,

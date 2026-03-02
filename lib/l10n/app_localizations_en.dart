@@ -1875,4 +1875,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get failedToLoadDoctors => 'Failed to load doctors. Pull to retry.';
+
+  @override
+  String get systemNotificationsDisabled => 'System notifications are disabled';
+
+  @override
+  String get tapToEnableInSettings => 'Tap here to enable them in settings.';
+
+  @override
+  String get receiveAlertsOnDevice => 'Receive alerts directly on your device';
+
+  @override
+  String get dailySummaryTitle => 'Daily Summary';
+
+  @override
+  String get dailySummarySubtitle =>
+      'Get a daily summary for next day\'s appointments';
+
+  @override
+  String get summaryTime => 'Summary Time';
+
+  @override
+  String get summaryTimeSubtitle => 'Time to receive your daily summary';
+
+  @override
+  String get receiveSummariesViaEmail =>
+      'Receive summaries and updates via email';
+
+  @override
+  String get testNotificationSentSuccess => 'Test notification sent!';
+
+  @override
+  String errorPrefix(String error) {
+    return 'Error: $error';
+  }
 }

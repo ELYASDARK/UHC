@@ -1879,4 +1879,42 @@ class AppLocalizationsKu extends AppLocalizations {
   @override
   String get failedToLoadDoctors =>
       'بارکردنی پزیشکەکان سەرکەوتوو نەبوو. ڕایبکێشە بۆ هەوڵدانەوە.';
+
+  @override
+  String get systemNotificationsDisabled =>
+      'ئاگادارکردنەوەکانی سیستەم ناچالاکە';
+
+  @override
+  String get tapToEnableInSettings =>
+      'لێرە دابگرە بۆ چالاککردنیان لە ڕێکخستنەکان.';
+
+  @override
+  String get receiveAlertsOnDevice =>
+      'وەرگرتنی ئاگادارکردنەوەکان ڕاستەوخۆ لە ئامێرەکەت';
+
+  @override
+  String get dailySummaryTitle => 'پوختەی ڕۆژانە';
+
+  @override
+  String get dailySummarySubtitle =>
+      'پوختەیەکی ڕۆژانە وەربگرە بۆ چاوپێکەوتنەکانی ڕۆژی داهاتوو';
+
+  @override
+  String get summaryTime => 'کاتی پوختە';
+
+  @override
+  String get summaryTimeSubtitle => 'کاتی وەرگرتنی پوختەی ڕۆژانە';
+
+  @override
+  String get receiveSummariesViaEmail =>
+      'وەرگرتنی پوختە و نوێکارییەکان بە ئیمەیڵ';
+
+  @override
+  String get testNotificationSentSuccess =>
+      'ئاگادارکردنەوەی تاقیکردنەوە نێردرا!';
+
+  @override
+  String errorPrefix(String error) {
+    return 'هەڵە: $error';
+  }
 }

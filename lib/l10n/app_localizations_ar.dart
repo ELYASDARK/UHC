@@ -1864,4 +1864,37 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get failedToLoadDoctors => 'فشل تحميل الأطباء. اسحب لإعادة المحاولة.';
+
+  @override
+  String get systemNotificationsDisabled => 'إشعارات النظام معطلة';
+
+  @override
+  String get tapToEnableInSettings => 'انقر هنا لتفعيلها في الإعدادات.';
+
+  @override
+  String get receiveAlertsOnDevice => 'استقبال التنبيهات مباشرة على جهازك';
+
+  @override
+  String get dailySummaryTitle => 'الملخص اليومي';
+
+  @override
+  String get dailySummarySubtitle => 'احصل على ملخص يومي لمواعيد اليوم التالي';
+
+  @override
+  String get summaryTime => 'وقت الملخص';
+
+  @override
+  String get summaryTimeSubtitle => 'وقت استلام الملخص اليومي';
+
+  @override
+  String get receiveSummariesViaEmail =>
+      'استقبال الملخصات والتحديثات عبر البريد الإلكتروني';
+
+  @override
+  String get testNotificationSentSuccess => 'تم إرسال الإشعار التجريبي!';
+
+  @override
+  String errorPrefix(String error) {
+    return 'خطأ: $error';
+  }
 }
