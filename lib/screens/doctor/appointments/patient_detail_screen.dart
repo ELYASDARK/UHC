@@ -321,16 +321,19 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                         : AppColors.textSecondaryLight,
                   ),
                 ),
-                Text(
-                  item.value,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    item.value,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

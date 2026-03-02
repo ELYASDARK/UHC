@@ -37,7 +37,7 @@ class _DoctorShellState extends State<DoctorShell> {
     _currentIndex = widget.initialIndex;
     _visitedScreens = {widget.initialIndex};
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadNotifications();
+      _initNotifications();
     });
   }
 
@@ -49,12 +49,11 @@ class _DoctorShellState extends State<DoctorShell> {
     }
   }
 
-  Future<void> _loadNotifications() async {
+  Future<void> _initNotifications() async {
     final authProvider = context.read<AuthProvider>();
     final notificationProvider = context.read<NotificationProvider>();
     if (authProvider.currentUser != null) {
-      await notificationProvider
-          .loadNotifications(authProvider.currentUser!.id);
+      await notificationProvider.initialize(authProvider.currentUser!.id);
     }
   }
 

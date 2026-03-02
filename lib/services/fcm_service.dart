@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -13,12 +14,20 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // In production, this would trigger local notification or data sync
 }
 
-/// Firebase Cloud Messaging service for push notifications
+/// Firebase Cloud Messaging service for push notifications (singleton)
 class FCMService {
+  // Singleton pattern
+  static final FCMService _instance = FCMService._internal();
+  factory FCMService() => _instance;
+  FCMService._internal();
+
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  /// Whether [initialize] has already completed successfully
+  bool _initialized = false;
 
   // Stream controller for notification taps
   final StreamController<RemoteMessage> _messageStreamController =
@@ -36,8 +45,10 @@ class FCMService {
     enableVibration: true,
   );
 
-  /// Initialize FCM and local notifications
+  /// Initialize FCM and local notifications.
+  /// Safe to call multiple times — subsequent calls are no-ops.
   Future<void> initialize() async {
+    if (_initialized) return;
     try {
       // Request permission
       await _requestPermission();
@@ -65,6 +76,8 @@ class FCMService {
 
       // Set background message handler
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+      _initialized = true;
     } catch (e, stack) {
       FirebaseCrashlytics.instance
           .recordError(e, stack, reason: 'FCM Service Initialization Failed');
@@ -183,10 +196,11 @@ class FCMService {
       });
 
       // Save to user_tokens collection (for Cloud Functions)
+      final platform = Platform.isIOS ? 'ios' : 'android';
       await _firestore.collection('user_tokens').doc(userId).set({
         'token': token,
         'updatedAt': FieldValue.serverTimestamp(),
-        'platform': 'android', // or detect platform
+        'platform': platform,
       }, SetOptions(merge: true));
     }
 
@@ -201,10 +215,11 @@ class FCMService {
       });
 
       // Update user_tokens collection
+      final refreshPlatform = Platform.isIOS ? 'ios' : 'android';
       await _firestore.collection('user_tokens').doc(userId).set({
         'token': newToken,
         'updatedAt': FieldValue.serverTimestamp(),
-        'platform': 'android',
+        'platform': refreshPlatform,
       }, SetOptions(merge: true));
     });
   }

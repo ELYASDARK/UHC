@@ -3,14 +3,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../providers/locale_provider.dart';
-import '../../../providers/notification_provider.dart';
 import '../../shared/change_password_screen.dart';
 import '../../shared/notification_settings_screen.dart';
 import 'edit_doctor_profile_screen.dart';
@@ -35,60 +33,6 @@ class DoctorProfileScreen extends StatefulWidget {
 }
 
 class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
-  bool _pushEnabled = true;
-  bool _emailEnabled = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
-    final auth = context.read<AuthProvider>();
-    final prefs = await SharedPreferences.getInstance();
-    final user = auth.currentUser;
-
-    if (mounted) {
-      setState(() {
-        _pushEnabled = prefs.getBool('settings_push_notifications') ?? true;
-        if (user?.notificationSettings?.containsKey('email_notifications') ==
-            true) {
-          _emailEnabled = user!.notificationSettings!['email_notifications'];
-          prefs.setBool('settings_email_notifications', _emailEnabled);
-        } else {
-          _emailEnabled =
-              prefs.getBool('settings_email_notifications') ?? false;
-        }
-      });
-    }
-  }
-
-  Future<void> _togglePush(bool v) async {
-    setState(() => _pushEnabled = v);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('settings_push_notifications', v);
-    if (!mounted) return;
-    final auth = context.read<AuthProvider>();
-    if (auth.currentUser != null) {
-      final notif = context.read<NotificationProvider>();
-      if (v) {
-        await notif.enablePushNotifications(auth.currentUser!.id);
-      } else {
-        await notif.disablePushNotifications(auth.currentUser!.id);
-      }
-    }
-  }
-
-  Future<void> _toggleEmail(bool v) async {
-    setState(() => _emailEnabled = v);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('settings_email_notifications', v);
-    if (!mounted) return;
-    final auth = context.read<AuthProvider>();
-    await auth.updateNotificationPreferences({'email_notifications': v});
-  }
-
   // ───────────────────────── BUILD ─────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -153,24 +97,6 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
               _buildSection(
                 l10n.notificationSettings,
                 [
-                  _settingTile(
-                    icon: Icons.notifications_rounded,
-                    title: l10n.pushNotifications,
-                    trailing: Switch(
-                      value: _pushEnabled,
-                      onChanged: _togglePush,
-                    ),
-                    isDark: isDark,
-                  ),
-                  _settingTile(
-                    icon: Icons.email_rounded,
-                    title: l10n.emailNotifications,
-                    trailing: Switch(
-                      value: _emailEnabled,
-                      onChanged: _toggleEmail,
-                    ),
-                    isDark: isDark,
-                  ),
                   _settingTile(
                     icon: Icons.notifications_active_rounded,
                     title: l10n.notifications,

@@ -333,6 +333,7 @@ Add these keys to `ios/Runner/Info.plist` for permissions:
 | `departments` | Department metadata — name, icon, color, working hours |
 | `appointments` | Booking records with status tracking, QR check-in, and scan failure counts |
 | `notifications` | Per-user notification history |
+| `user_tokens` | FCM device tokens per user (used by Cloud Functions for push delivery) |
 | `medical_documents` | Uploaded file metadata and storage references |
 
 ---
@@ -348,6 +349,8 @@ Server-side functions handle privileged operations that require Firebase Admin S
 | `deleteDoctorAccount` | Removes a doctor from Auth and Firestore completely | 🔒 Admin |
 | `resetDoctorPassword` | Resets a doctor's password without requiring the old one | 🔒 Admin |
 | `createUserAccount` | Creates a user account in Auth + Firestore with a specified role | 🔒 Admin |
+| `onNotificationCreated` | Firestore trigger — sends FCM push when a notification document is created | 🔄 Auto |
+| `sendTopicNotification` | Sends broadcast push notifications to FCM topics (e.g. announcements) | 🔒 Admin |
 
 > **Security Note:** These functions enforce admin-only access to prevent unauthorized privilege escalation. All critical account mutations are handled server-side.
 
@@ -406,6 +409,67 @@ flutter build web --release
 ## 📝 Changelog
 
 <details open>
+<summary><b>v1.8.0</b> — March 2026</summary>
+
+#### 🔔 FCM Push Notification Infrastructure (BUGs 6–10)
+- **Server-Side FCM Sending** — Added `onNotificationCreated` Cloud Function: a Firestore `onDocumentCreated` trigger that automatically sends FCM push notifications when a notification document is created. Looks up user FCM tokens from the `user_tokens` collection and sends via `admin.messaging().send()` with Android high-priority channel and iOS alert/badge/sound support. Automatically cleans up stale tokens on `invalid-registration-token` errors.
+- **Topic Broadcast Function** — Added `sendTopicNotification` callable Cloud Function for admins to send push notifications to FCM topics (e.g. `announcements`, `department_*`).
+- **Patient FCM Token Registration** — Fixed `main_shell.dart` to call `notificationProvider.initialize(userId)` instead of `loadNotifications()`, ensuring patient devices register their FCM token, subscribe to topics, and start notification listeners.
+- **FCMService Singleton** — Refactored `FCMService` into a proper singleton with a factory constructor and `_initialized` guard, preventing duplicate notification handlers across `main.dart` and `NotificationProvider`.
+- **Platform Detection** — Replaced hardcoded `'android'` platform string with dynamic `Platform.isIOS ? 'ios' : 'android'` detection in both initial token save and `onTokenRefresh` listener.
+- **Logout FCM Cleanup** — `AuthProvider.signOut()` now calls `FCMService.removeTokenFromDatabase()` and `unsubscribeUserFromTopics()` before Firebase Auth sign-out, preventing stale token accumulation.
+
+#### 🔔 Notification System Consolidation
+- **Unified Notification Settings** — Removed individual push/email notification toggles from patient `ProfileScreen` and doctor `DoctorProfileScreen`. All notification preferences are now managed exclusively through the shared `NotificationSettingsScreen`.
+- **Real-Time Notification Streams** — `NotificationProvider` now uses Firestore real-time streams (`streamNotifications`, `streamUnreadCount`) instead of one-time fetches, so the UI auto-updates when new notifications arrive.
+- **Doctor Daily Summary Settings** — Consolidated daily summary toggle and time picker into `NotificationSettingsScreen`, visible only to doctors. Time selection uses `SharedPreferences` and syncs to the scheduling system.
+- **Dead Code Removal** — Removed unused `showAppointmentConfirmed()` and `showAppointmentCancelled()` methods from `LocalNotificationService`.
+
+#### ⏰ Appointment Reminder Timing Fix
+- **Exact Appointment Time** — Reminders now use `exactAppointmentTime` (date + timeSlot combined) instead of `appointmentDate` (midnight), so 1-week, 24-hour, and 1-hour reminders fire relative to the actual appointment time, not midnight.
+- **Reschedule Reminders** — Rescheduled appointments correctly rebuild the exact DateTime from the new date and time slot.
+
+#### 📬 Doctor Status Notifications to Patients
+- **Confirmation Notification** — When a doctor confirms an appointment, the patient now receives a Firestore notification with the doctor's name, date, and time slot.
+- **No-Show Notification** — When a doctor marks a patient as no-show, the patient receives a notification and old reminders are cleaned up.
+- **Completion Notification** — When an appointment is completed, the patient receives a thank-you notification and old reminders are deleted.
+
+#### 📷 Doctor Profile Photo Editing
+- **Large Avatar Editor** — Doctor edit profile screen now features a 120px tappable photo circle (matching patient profile style) with camera icon overlay and "Tap to change photo" text.
+- **Image Picker** — Camera, gallery, and remove options via bottom sheet with themed icons.
+- **Firebase Storage Upload** — Photo is uploaded on save and the URL is synced to both `doctors` and `users` Firestore collections.
+- **Read-Only Card Cleanup** — Removed duplicate small avatar from the read-only card, replaced with an info icon to avoid visual clutter.
+
+#### 🎨 UI Improvements
+- **Appointment Detail Layout** — Fixed text overflow in the doctor appointment detail info rows by switching to `Expanded` flex layout instead of `Spacer` + `Flexible`.
+- **Patient Detail FittedBox** — Patient info values now scale down gracefully using `FittedBox` instead of being truncated with `TextOverflow.ellipsis`.
+- **Home Screen Book Button** — "Book Appointment Now" text is now wrapped in `Flexible` with `maxLines: 1` to prevent overflow on narrow screens or long translations.
+
+#### 📁 Files Changed
+
+| File | Key Changes |
+|:---|:---|
+| `functions/src/index.ts` | Added `onNotificationCreated` and `sendTopicNotification` Cloud Functions |
+| `lib/services/fcm_service.dart` | Singleton pattern, idempotent init, platform detection |
+| `lib/providers/auth_provider.dart` | FCM cleanup on sign-out |
+| `lib/providers/notification_provider.dart` | Real-time streams, `startListening()`, stream cleanup |
+| `lib/providers/appointment_provider.dart` | `exactAppointmentTime` for reminders, `_buildExactTime()` helper |
+| `lib/providers/doctor_appointment_provider.dart` | Patient status notifications, daily summary SharedPrefs sync, `_formatDate()` |
+| `lib/screens/patient/main_shell.dart` | Calls `initialize()` instead of `loadNotifications()` |
+| `lib/screens/patient/profile/profile_screen.dart` | Removed push/email toggles (moved to settings screen) |
+| `lib/screens/doctor/doctor_shell.dart` | Calls `initialize()` instead of `loadNotifications()` |
+| `lib/screens/doctor/profile/doctor_profile_screen.dart` | Removed push/email toggles (moved to settings screen) |
+| `lib/screens/doctor/profile/edit_doctor_profile_screen.dart` | Photo picker, upload, name editing, read-only card cleanup |
+| `lib/screens/doctor/appointments/doctor_appointment_detail_screen.dart` | Expanded flex layout for info rows |
+| `lib/screens/doctor/appointments/patient_detail_screen.dart` | FittedBox for patient info values |
+| `lib/screens/patient/home/home_screen.dart` | Flexible book button text |
+| `lib/screens/shared/notification_settings_screen.dart` | Push/email toggles, doctor daily summary with time picker |
+| `lib/screens/shared/notifications_screen.dart` | Real-time stream init |
+| `lib/services/local_notification_service.dart` | Removed unused notification methods |
+
+</details>
+
+<details>
 <summary><b>v1.7.0</b> — February 2026</summary>
 
 #### 🔔 Doctor Daily Notifications

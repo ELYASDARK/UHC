@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -14,6 +15,10 @@ class NotificationProvider extends ChangeNotifier {
   int _unreadCount = 0;
   bool _isLoading = false;
   String? _error;
+
+  // Real-time stream subscriptions
+  StreamSubscription<List<NotificationModel>>? _notificationsSubscription;
+  StreamSubscription<int>? _unreadCountSubscription;
 
   List<NotificationModel> get notifications => _notifications;
   int get unreadCount => _unreadCount;
@@ -32,8 +37,8 @@ class NotificationProvider extends ChangeNotifier {
       // Subscribe to topics
       await _fcmService.subscribeUserToTopics(userId);
 
-      // Load notifications
-      await loadNotifications(userId);
+      // Start real-time notification streams
+      startListening(userId);
 
       // Listen for notification taps
       _fcmService.onMessageTapped.listen((message) {
@@ -47,7 +52,48 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Load user notifications
+  /// Start listening to real-time notification streams.
+  /// Replaces one-time fetches so the UI auto-updates when new
+  /// notifications arrive in Firestore.
+  void startListening(String userId) {
+    // Cancel any existing subscriptions first
+    _notificationsSubscription?.cancel();
+    _unreadCountSubscription?.cancel();
+
+    _isLoading = true;
+    notifyListeners();
+
+    _notificationsSubscription =
+        _notificationRepo.streamNotifications(userId).listen(
+      (notifications) {
+        _notifications = notifications;
+        _isLoading = false;
+        _error = null;
+        notifyListeners();
+      },
+      onError: (e, stack) {
+        _error = e.toString();
+        _isLoading = false;
+        FirebaseCrashlytics.instance.recordError(e, stack,
+            reason: 'NotificationProvider Error: streamNotifications');
+        notifyListeners();
+      },
+    );
+
+    _unreadCountSubscription =
+        _notificationRepo.streamUnreadCount(userId).listen(
+      (count) {
+        _unreadCount = count;
+        notifyListeners();
+      },
+      onError: (e, stack) {
+        FirebaseCrashlytics.instance.recordError(e, stack,
+            reason: 'NotificationProvider Error: streamUnreadCount');
+      },
+    );
+  }
+
+  /// Load user notifications (manual one-time refresh, e.g. pull-to-refresh)
   Future<void> loadNotifications(String userId) async {
     _isLoading = true;
     _error = null;
@@ -139,6 +185,12 @@ class NotificationProvider extends ChangeNotifier {
 
   /// Clean up on logout
   Future<void> onLogout(String userId) async {
+    // Cancel real-time streams
+    _notificationsSubscription?.cancel();
+    _unreadCountSubscription?.cancel();
+    _notificationsSubscription = null;
+    _unreadCountSubscription = null;
+
     await _fcmService.removeTokenFromDatabase(userId);
     await _fcmService.unsubscribeUserFromTopics(userId);
     _notifications.clear();
@@ -175,6 +227,8 @@ class NotificationProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _notificationsSubscription?.cancel();
+    _unreadCountSubscription?.cancel();
     _fcmService.dispose();
     super.dispose();
   }

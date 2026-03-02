@@ -46,7 +46,10 @@ class _MainShellState extends State<MainShell> {
     final notificationProvider = context.read<NotificationProvider>();
 
     if (authProvider.user != null) {
-      await notificationProvider.loadNotifications(authProvider.user!.id);
+      // initialize() saves FCM token, subscribes to topics, and starts
+      // real-time notification streams.  It is idempotent, so calling it
+      // every time the shell mounts is safe.
+      await notificationProvider.initialize(authProvider.user!.id);
     }
   }
 

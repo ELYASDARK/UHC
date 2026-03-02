@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/appointment_model.dart';
 import '../data/models/doctor_model.dart';
 import '../data/models/notification_model.dart';
@@ -21,7 +22,6 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   // Daily notification config (set once via configureDailyNotifications)
   String? _dailyNotifDoctorUserId;
   Map<String, List<TimeSlot>>? _dailyNotifSchedule;
-  String _dailyNotifTime = '21:00';
 
   // Getters
   List<AppointmentModel> get appointments => _appointments;
@@ -87,18 +87,23 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   /// Configure daily summary notifications.
   /// Call once from the dashboard screen after login.
   /// After this, every [loadAppointments] call will auto-schedule.
-  void configureDailyNotifications({
+  Future<void> configureDailyNotifications({
     required String doctorUserId,
     required Map<String, List<TimeSlot>> weeklySchedule,
-    String dailyNotificationTime = '21:00',
-  }) {
+    String? dailyNotificationTime,
+  }) async {
     _dailyNotifDoctorUserId = doctorUserId;
     _dailyNotifSchedule = weeklySchedule;
-    _dailyNotifTime = dailyNotificationTime;
+
+    // Sync admin-set notification time to SharedPreferences
+    if (dailyNotificationTime != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('notif_daily_summary_time', dailyNotificationTime);
+    }
 
     // If appointments are already loaded, schedule immediately
     if (_appointments.isNotEmpty) {
-      _scheduleDailyNotifications();
+      scheduleDailyNotifications();
     }
   }
 
@@ -120,7 +125,7 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     }
 
     // Best-effort: schedule daily summary notifications in background
-    _scheduleDailyNotifications();
+    scheduleDailyNotifications();
   }
 
   /// Update appointment status (confirm, complete, no-show, cancel)
@@ -280,7 +285,6 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     _error = null;
     _dailyNotifDoctorUserId = null;
     _dailyNotifSchedule = null;
-    _dailyNotifTime = '21:00';
     // Cancel any scheduled daily summary local notifications
     LocalNotificationService().cancelDoctorDailySummaries();
     notifyListeners();
@@ -300,16 +304,25 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   /// Schedule daily summary notifications for the next 7 days.
   /// For each day, checks if tomorrow is a working day and counts pending
   /// appointments. Cancels all existing summaries first, then recreates.
-  Future<void> _scheduleDailyNotifications() async {
+  /// Internal routine to sync local notifications with Firestore/SharedPreferences
+  Future<void> scheduleDailyNotifications() async {
     if (_dailyNotifDoctorUserId == null || _dailyNotifSchedule == null) return;
 
     final notifService = LocalNotificationService();
+
+    final prefs = await SharedPreferences.getInstance();
+    final dailySummaryEnabled = prefs.getBool('notif_daily_summary') ?? true;
+    if (!dailySummaryEnabled) {
+      return;
+    }
+
+    final timeString = prefs.getString('notif_daily_summary_time') ?? '21:00';
 
     // Parse configured time
     int targetHour = 21;
     int targetMin = 0;
     try {
-      final parts = _dailyNotifTime.split(':');
+      final parts = timeString.split(':');
       if (parts.length == 2) {
         targetHour = int.parse(parts[0]);
         targetMin = int.parse(parts[1]);

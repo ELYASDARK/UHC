@@ -368,43 +368,6 @@ class LocalNotificationService {
     return await _notifications.pendingNotificationRequests();
   }
 
-  /// Show appointment confirmed notification
-  Future<void> showAppointmentConfirmed({
-    required String appointmentId,
-    required String doctorName,
-    required String date,
-    required String time,
-  }) async {
-    await showNotification(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title: 'Appointment Confirmed',
-      body:
-          'Your appointment with Dr. $doctorName on $date at $time has been confirmed.',
-      payload: jsonEncode({
-        'type': 'appointment_confirmed',
-        'appointmentId': appointmentId,
-      }),
-      isAppointment: true,
-    );
-  }
-
-  /// Show appointment cancelled notification
-  Future<void> showAppointmentCancelled({
-    required String appointmentId,
-    required String doctorName,
-  }) async {
-    await showNotification(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title: 'Appointment Cancelled',
-      body: 'Your appointment with Dr. $doctorName has been cancelled.',
-      payload: jsonEncode({
-        'type': 'appointment_cancelled',
-        'appointmentId': appointmentId,
-      }),
-      isAppointment: true,
-    );
-  }
-
   // ── Doctor Daily Summary Notifications ──
 
   /// Base notification ID for doctor daily summaries (7 IDs: 900000–900006).

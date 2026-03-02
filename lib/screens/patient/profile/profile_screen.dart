@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/auth_provider.dart';
@@ -28,78 +27,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _pushNotificationsEnabled = true;
-  bool _emailNotificationsEnabled = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
-    final authProvider = context.read<AuthProvider>();
-    final prefs = await SharedPreferences.getInstance();
-    final user = authProvider.currentUser;
-
-    if (mounted) {
-      setState(() {
-        _pushNotificationsEnabled =
-            prefs.getBool('settings_push_notifications') ?? true;
-
-        // Prefer server setting for email, fallback to local
-        if (user?.notificationSettings?.containsKey('email_notifications') ==
-            true) {
-          _emailNotificationsEnabled =
-              user!.notificationSettings!['email_notifications'];
-          // Sync local
-          prefs.setBool(
-            'settings_email_notifications',
-            _emailNotificationsEnabled,
-          );
-        } else {
-          _emailNotificationsEnabled =
-              prefs.getBool('settings_email_notifications') ?? false;
-        }
-      });
-    }
-  }
-
-  Future<void> _togglePushNotifications(bool value) async {
-    setState(() => _pushNotificationsEnabled = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('settings_push_notifications', value);
-
-    if (mounted) {
-      final authProvider = context.read<AuthProvider>();
-      if (authProvider.currentUser != null) {
-        final notifProvider = context.read<NotificationProvider>();
-        if (value) {
-          await notifProvider.enablePushNotifications(
-            authProvider.currentUser!.id,
-          );
-        } else {
-          await notifProvider.disablePushNotifications(
-            authProvider.currentUser!.id,
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _toggleEmailNotifications(bool value) async {
-    setState(() => _emailNotificationsEnabled = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('settings_email_notifications', value);
-
-    if (mounted) {
-      final authProvider = context.read<AuthProvider>();
-      await authProvider.updateNotificationPreferences({
-        'email_notifications': value,
-      });
-    }
-  }
-
   void _showPrivacyPolicy(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -380,24 +307,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildSection(
                 l10n.notificationSettings,
                 [
-                  _buildSettingTile(
-                    icon: Icons.notifications_rounded,
-                    title: l10n.pushNotifications,
-                    trailing: Switch(
-                      value: _pushNotificationsEnabled,
-                      onChanged: _togglePushNotifications,
-                    ),
-                    isDark: isDark,
-                  ),
-                  _buildSettingTile(
-                    icon: Icons.email_rounded,
-                    title: l10n.emailNotifications,
-                    trailing: Switch(
-                      value: _emailNotificationsEnabled,
-                      onChanged: _toggleEmailNotifications,
-                    ),
-                    isDark: isDark,
-                  ),
                   _buildSettingTile(
                     icon: Icons.notifications_active_rounded,
                     title: l10n.notifications,

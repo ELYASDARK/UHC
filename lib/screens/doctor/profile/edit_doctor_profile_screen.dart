@@ -6,11 +6,17 @@ import '../../../core/widgets/widgets.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/repositories/doctor_repository.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../data/repositories/user_repository.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
 
 /// Edit screen for doctor profile fields.
 ///
 /// Editable fields: specialization, bio, experience years, qualifications.
-/// Name & email are read-only (managed by admin).
+/// Email & department are read-only (managed by admin).
 class EditDoctorProfileScreen extends StatefulWidget {
   final DoctorModel doctor;
 
@@ -27,10 +33,15 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
   final _specializationController = TextEditingController();
   final _experienceController = TextEditingController();
   final _qualificationInputController = TextEditingController();
+  final _nameController = TextEditingController();
 
   final DoctorRepository _doctorRepo = DoctorRepository();
+  final UserRepository _userRepo = UserRepository();
   List<String> _qualifications = [];
   bool _isSaving = false;
+  XFile? _selectedImage;
+  Uint8List? _webImageBytes;
+  bool _isPhotoRemoved = false;
 
   @override
   void initState() {
@@ -40,6 +51,7 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
 
   void _loadData() {
     final d = widget.doctor;
+    _nameController.text = d.name;
     _bioController.text = d.bio ?? '';
     _specializationController.text = d.specialization;
     _experienceController.text =
@@ -49,6 +61,7 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _bioController.dispose();
     _specializationController.dispose();
     _experienceController.dispose();
@@ -64,7 +77,9 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
     setState(() => _isSaving = true);
 
     try {
+      final newName = _nameController.text.trim();
       final data = <String, dynamic>{
+        'name': newName,
         'specialization': _specializationController.text.trim(),
         'bio': _bioController.text.trim().isEmpty
             ? null
@@ -73,7 +88,36 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
         'qualifications': _qualifications,
       };
 
+      // Upload photo if changed
+      String? newPhotoUrl;
+      if (_webImageBytes != null && _selectedImage != null) {
+        final authProvider = context.read<AuthProvider>();
+        newPhotoUrl = await authProvider.uploadProfileImageBytes(
+          _webImageBytes!,
+          _selectedImage!.name,
+        );
+        data['photoUrl'] = newPhotoUrl;
+      } else if (_isPhotoRemoved) {
+        data['photoUrl'] = null;
+        newPhotoUrl = '';
+      }
+
       await _doctorRepo.updateDoctor(widget.doctor.id, data);
+
+      // Sync name and photo to users collection and Firebase Auth
+      if (widget.doctor.userId.isNotEmpty) {
+        final userUpdates = <String, dynamic>{};
+        if (newName != widget.doctor.name) {
+          userUpdates['name'] = newName;
+          await FirebaseAuth.instance.currentUser?.updateDisplayName(newName);
+        }
+        if (newPhotoUrl != null) {
+          userUpdates['photoUrl'] = newPhotoUrl.isEmpty ? null : newPhotoUrl;
+        }
+        if (userUpdates.isNotEmpty) {
+          await _userRepo.updateUser(widget.doctor.userId, userUpdates);
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -124,6 +168,131 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
     setState(() => _qualifications.removeAt(index));
   }
 
+  // ──────────────── IMAGE PICKER ────────────────
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 80,
+      );
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _selectedImage = pickedFile;
+          _webImageBytes = bytes;
+          _isPhotoRemoved = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).error),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showImagePickerOptions() {
+    final l10n = AppLocalizations.of(context);
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                l10n.choosePhoto,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.camera_alt, color: AppColors.primary),
+                ),
+                title: Text(l10n.takePhoto),
+                subtitle: Text(l10n.useCamera),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library,
+                      color: AppColors.secondary),
+                ),
+                title: Text(l10n.chooseFromGallery),
+                subtitle: Text(l10n.selectFromLibrary),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (_selectedImage != null ||
+                  (widget.doctor.photoUrl != null &&
+                      widget.doctor.photoUrl!.isNotEmpty &&
+                      !_isPhotoRemoved))
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.delete, color: AppColors.error),
+                  ),
+                  title: Text(l10n.removePhoto),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _selectedImage = null;
+                      _webImageBytes = null;
+                      _isPhotoRemoved = true;
+                    });
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ──────────────── BUILD ────────────────
   @override
   Widget build(BuildContext context) {
@@ -157,12 +326,37 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Read-only info card ──
-              _readOnlyCard(isDark)
+              // ── Profile Photo ──
+              _buildPhotoSection(isDark)
                   .animate()
                   .fadeIn(duration: 400.ms)
                   .slideY(begin: 0.02),
+              const SizedBox(height: 20),
+
+              // ── Read-only info card ──
+              _readOnlyCard(isDark)
+                  .animate(delay: 50.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.02),
+
               const SizedBox(height: 24),
+              // ── Name ──
+              CustomTextField(
+                controller: _nameController,
+                label: l10n.fullName,
+                hintText: l10n.fullName,
+                prefixIcon: Icons.person_outlined,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return l10n.pleaseEnterName;
+                  }
+                  return null;
+                },
+              )
+                  .animate(delay: 100.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.02),
+              const SizedBox(height: 16),
               // ── Specialization ──
               CustomTextField(
                 controller: _specializationController,
@@ -176,7 +370,7 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
                   return null;
                 },
               )
-                  .animate(delay: 100.ms)
+                  .animate(delay: 150.ms)
                   .fadeIn(duration: 400.ms)
                   .slideY(begin: 0.02),
               const SizedBox(height: 16),
@@ -251,6 +445,134 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
     );
   }
 
+  // ──────────────── PHOTO SECTION ────────────────
+
+  Widget _buildPhotoSection(bool isDark) {
+    final hasNewImage = _webImageBytes != null;
+    final hasExistingImage = !_isPhotoRemoved &&
+        widget.doctor.photoUrl != null &&
+        widget.doctor.photoUrl!.isNotEmpty;
+    final initial = widget.doctor.name.isNotEmpty
+        ? widget.doctor.name[0].toUpperCase()
+        : '?';
+
+    return Center(
+      child: GestureDetector(
+        onTap: _showImagePickerOptions,
+        child: Column(
+          children: [
+            Stack(
+              children: [
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: hasNewImage
+                        ? Image.memory(
+                            _webImageBytes!,
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                          )
+                        : hasExistingImage
+                            ? Image.network(
+                                widget.doctor.photoUrl!,
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: isDark
+                                      ? AppColors.surfaceDark
+                                      : AppColors.surfaceLight,
+                                  child: Center(
+                                    child: Text(
+                                      initial,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 48,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark
+                                            ? Colors.white
+                                            : AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                color: isDark
+                                    ? AppColors.surfaceDark
+                                    : AppColors.surfaceLight,
+                                child: Center(
+                                  child: Text(
+                                    initial,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark
+                                          ? Colors.white
+                                          : AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? AppColors.surfaceDark : Colors.white,
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.camera_alt,
+                        size: 20, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              AppLocalizations.of(context).tapToChangePhoto,
+              style: GoogleFonts.roboto(
+                fontSize: 13,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ──────────────── READ-ONLY INFO ────────────────
   Widget _readOnlyCard(bool isDark) {
     return Container(
@@ -261,27 +583,15 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
       ),
       child: Row(
         children: [
-          // Avatar
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-            backgroundImage: widget.doctor.photoUrl != null &&
-                    widget.doctor.photoUrl!.isNotEmpty
-                ? NetworkImage(widget.doctor.photoUrl!)
-                : null,
-            child: widget.doctor.photoUrl == null ||
-                    widget.doctor.photoUrl!.isEmpty
-                ? Text(
-                    widget.doctor.name.isNotEmpty
-                        ? widget.doctor.name[0].toUpperCase()
-                        : '?',
-                    style: GoogleFonts.outfit(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  )
-                : null,
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.info_outline,
+                color: AppColors.primary, size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -289,23 +599,13 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.doctor.name,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  widget.doctor.email,
+                  style: GoogleFonts.roboto(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                     color: isDark
                         ? AppColors.textPrimaryDark
                         : AppColors.textPrimaryLight,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  widget.doctor.email,
-                  style: GoogleFonts.roboto(
-                    fontSize: 13,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
                   ),
                 ),
                 const SizedBox(height: 2),

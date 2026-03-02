@@ -480,3 +480,208 @@ export const createUserAccount = functions.https.onCall(
         }
     }
 );
+
+// ─────────────────────────────────────────────────────────
+// FCM Push Notification Functions
+// ─────────────────────────────────────────────────────────
+
+const messaging = admin.messaging();
+
+/**
+ * Firestore trigger: whenever a new notification document is created,
+ * look up the target user's FCM token and send a push notification.
+ *
+ * Expected document shape (from NotificationModel.toFirestore):
+ *   userId, title, body, type, data, isRead, createdAt,
+ *   appointmentId, scheduledFor, reminderType, isDelivered
+ */
+export const onNotificationCreated = functions.firestore
+    .onDocumentCreated('notifications/{notificationId}', async (event) => {
+        const snap = event.data;
+        if (!snap) {
+            console.log('No snapshot in event, skipping.');
+            return;
+        }
+        const notification = snap.data();
+        const notificationId = event.params.notificationId;
+
+        if (!notification) {
+            console.log('Empty notification document, skipping.');
+            return;
+        }
+
+        const userId: string = notification.userId;
+        if (!userId) {
+            console.log('No userId on notification, skipping.');
+            return;
+        }
+
+        // If scheduledFor is in the future, skip sending now.
+        // A scheduled Cloud Task or cron job should handle future delivery.
+        if (notification.scheduledFor) {
+            const scheduledTime = notification.scheduledFor.toDate
+                ? notification.scheduledFor.toDate()
+                : new Date(notification.scheduledFor);
+            if (scheduledTime > new Date()) {
+                console.log(`Notification ${notificationId} is scheduled for the future, skipping immediate send.`);
+                return;
+            }
+        }
+
+        try {
+            // Look up the user's FCM token from user_tokens collection
+            const tokenDoc = await db.collection('user_tokens').doc(userId).get();
+            const tokenData = tokenDoc.data();
+
+            if (!tokenDoc.exists || !tokenData?.token) {
+                console.log(`No FCM token found for user ${userId}, skipping push.`);
+                // Still mark as delivered so the in-app notification list shows it
+                await snap.ref.update({ isDelivered: true });
+                return;
+            }
+
+            const fcmToken: string = tokenData.token;
+
+            // Build the FCM message
+            const message: admin.messaging.Message = {
+                token: fcmToken,
+                notification: {
+                    title: notification.title || 'UHC Notification',
+                    body: notification.body || '',
+                },
+                data: {
+                    notificationId: notificationId,
+                    type: notification.type || 'systemUpdate',
+                    ...(notification.appointmentId && { appointmentId: notification.appointmentId }),
+                    // Flatten extra data fields for FCM (values must be strings)
+                    ...(notification.data && Object.fromEntries(
+                        Object.entries(notification.data).map(([k, v]) => [k, String(v)])
+                    )),
+                },
+                android: {
+                    priority: 'high',
+                    notification: {
+                        channelId: 'uhc_notifications',
+                        priority: 'high',
+                        sound: 'default',
+                    },
+                },
+                apns: {
+                    payload: {
+                        aps: {
+                            alert: {
+                                title: notification.title || 'UHC Notification',
+                                body: notification.body || '',
+                            },
+                            sound: 'default',
+                            badge: 1,
+                        },
+                    },
+                },
+            };
+
+            await messaging.send(message);
+            console.log(`FCM sent to user ${userId} for notification ${notificationId}`);
+
+            // Mark the notification as delivered in Firestore
+            await snap.ref.update({ isDelivered: true });
+        } catch (error: unknown) {
+            console.error(`Error sending FCM for notification ${notificationId}:`, error);
+
+            // If the token is invalid/expired, clean it up
+            if (error && typeof error === 'object' && 'code' in error) {
+                const fcmError = error as { code: string };
+                if (
+                    fcmError.code === 'messaging/invalid-registration-token' ||
+                    fcmError.code === 'messaging/registration-token-not-registered'
+                ) {
+                    console.log(`Removing stale FCM token for user ${userId}`);
+                    await db.collection('user_tokens').doc(userId).delete().catch(() => { });
+                }
+            }
+
+            // Still mark as delivered so it shows in the in-app list
+            await snap.ref.update({ isDelivered: true });
+        }
+    });
+
+interface TopicNotificationData {
+    topic: string;
+    title: string;
+    body: string;
+    data?: Record<string, string>;
+}
+
+/**
+ * Callable Cloud Function for admins to send notifications to FCM topics
+ * (e.g. "announcements", "department_cardiology").
+ */
+export const sendTopicNotification = functions.https.onCall(
+    async (request: functions.https.CallableRequest<TopicNotificationData>) => {
+        const data = request.data;
+        const context = request;
+
+        if (!context.auth) {
+            throw new functions.https.HttpsError(
+                'unauthenticated',
+                'You must be logged in to perform this action.'
+            );
+        }
+
+        // Verify caller is admin
+        const callerDoc = await db.collection('users').doc(context.auth.uid).get();
+        if (!callerDoc.exists || callerDoc.data()?.role !== 'admin') {
+            throw new functions.https.HttpsError(
+                'permission-denied',
+                'Only admins can send topic notifications.'
+            );
+        }
+
+        if (!data.topic || !data.title || !data.body) {
+            throw new functions.https.HttpsError(
+                'invalid-argument',
+                'Missing required fields: topic, title, body'
+            );
+        }
+
+        try {
+            const message: admin.messaging.Message = {
+                topic: data.topic,
+                notification: {
+                    title: data.title,
+                    body: data.body,
+                },
+                data: data.data || {},
+                android: {
+                    priority: 'high',
+                    notification: {
+                        channelId: 'uhc_notifications',
+                        sound: 'default',
+                    },
+                },
+                apns: {
+                    payload: {
+                        aps: {
+                            sound: 'default',
+                        },
+                    },
+                },
+            };
+
+            const messageId = await messaging.send(message);
+            console.log(`Topic notification sent to "${data.topic}", messageId: ${messageId}`);
+
+            return {
+                success: true,
+                messageId,
+                message: `Notification sent to topic "${data.topic}" successfully`,
+            };
+        } catch (error) {
+            console.error('Error sending topic notification:', error);
+            throw new functions.https.HttpsError(
+                'internal',
+                'Failed to send topic notification.'
+            );
+        }
+    }
+);

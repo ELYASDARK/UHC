@@ -843,20 +843,31 @@ class _DoctorAppointmentDetailScreenState
     bool isDark,
   ) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: AppColors.primary),
-        const SizedBox(width: 12),
-        Text(
-          label,
-          style: GoogleFonts.roboto(
-            fontSize: 14,
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textSecondaryLight,
+        Expanded(
+          flex: 5,
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: AppColors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.roboto(
+                    fontSize: 14,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const Spacer(),
-        Flexible(
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
           child: Text(
             value,
             style: GoogleFonts.poppins(
@@ -866,9 +877,7 @@ class _DoctorAppointmentDetailScreenState
                   ? AppColors.textPrimaryDark
                   : AppColors.textPrimaryLight,
             ),
-            textAlign: TextAlign.end,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
+            textAlign: TextAlign.start,
           ),
         ),
       ],

@@ -4,55 +4,60 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/doctor_appointment_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../services/local_notification_service.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Notification settings model
 class NotificationSettings {
+  final bool pushEnabled;
+  final bool emailEnabled;
   final bool appointmentReminders;
   final bool reminder1Week;
   final bool reminder24Hours;
   final bool reminder1Hour;
-  final bool promotionalNotifications;
-  final bool healthTips;
-  final bool doctorUpdates;
   final bool soundEnabled;
   final bool vibrationEnabled;
+  final bool dailySummary;
+  final String dailySummaryTime;
 
   NotificationSettings({
+    this.pushEnabled = true,
+    this.emailEnabled = false,
     this.appointmentReminders = true,
     this.reminder1Week = true,
     this.reminder24Hours = true,
     this.reminder1Hour = true,
-    this.promotionalNotifications = false,
-    this.healthTips = true,
-    this.doctorUpdates = true,
     this.soundEnabled = true,
     this.vibrationEnabled = true,
+    this.dailySummary = true,
+    this.dailySummaryTime = '21:00',
   });
 
   NotificationSettings copyWith({
+    bool? pushEnabled,
+    bool? emailEnabled,
     bool? appointmentReminders,
     bool? reminder1Week,
     bool? reminder24Hours,
     bool? reminder1Hour,
-    bool? promotionalNotifications,
-    bool? healthTips,
-    bool? doctorUpdates,
     bool? soundEnabled,
     bool? vibrationEnabled,
+    bool? dailySummary,
+    String? dailySummaryTime,
   }) {
     return NotificationSettings(
+      pushEnabled: pushEnabled ?? this.pushEnabled,
+      emailEnabled: emailEnabled ?? this.emailEnabled,
       appointmentReminders: appointmentReminders ?? this.appointmentReminders,
       reminder1Week: reminder1Week ?? this.reminder1Week,
       reminder24Hours: reminder24Hours ?? this.reminder24Hours,
       reminder1Hour: reminder1Hour ?? this.reminder1Hour,
-      promotionalNotifications:
-          promotionalNotifications ?? this.promotionalNotifications,
-      healthTips: healthTips ?? this.healthTips,
-      doctorUpdates: doctorUpdates ?? this.doctorUpdates,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       vibrationEnabled: vibrationEnabled ?? this.vibrationEnabled,
+      dailySummary: dailySummary ?? this.dailySummary,
+      dailySummaryTime: dailySummaryTime ?? this.dailySummaryTime,
     );
   }
 }
@@ -112,24 +117,33 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _loadSettings() async {
+    final authProvider = context.read<AuthProvider>();
     final prefs = await SharedPreferences.getInstance();
+    final user = authProvider.currentUser;
 
-    // Try to get from auth provider first if available, otherwise prefs
-    // Note: Here we stick to prefs as the source of truth for local toggle state,
-    // but the backend sync ensures eventual consistency.
+    bool emailEnabled = prefs.getBool('settings_email_notifications') ?? false;
+
+    // Prefer server setting for email, fallback to local
+    if (user?.notificationSettings?.containsKey('email_notifications') ==
+        true) {
+      emailEnabled = user!.notificationSettings!['email_notifications'];
+      prefs.setBool('settings_email_notifications', emailEnabled);
+    }
 
     setState(() {
       _settings = NotificationSettings(
+        pushEnabled: prefs.getBool('settings_push_notifications') ?? true,
+        emailEnabled: emailEnabled,
         appointmentReminders:
             prefs.getBool('notif_appointment_reminders') ?? true,
         reminder1Week: prefs.getBool('notif_reminder_1w') ?? true,
         reminder24Hours: prefs.getBool('notif_reminder_24h') ?? true,
         reminder1Hour: prefs.getBool('notif_reminder_1h') ?? true,
-        promotionalNotifications: prefs.getBool('notif_promotional') ?? false,
-        healthTips: prefs.getBool('notif_health_tips') ?? true,
-        doctorUpdates: prefs.getBool('notif_doctor_updates') ?? true,
         soundEnabled: prefs.getBool('notif_sound') ?? true,
         vibrationEnabled: prefs.getBool('notif_vibration') ?? true,
+        dailySummary: prefs.getBool('notif_daily_summary') ?? true,
+        dailySummaryTime:
+            prefs.getString('notif_daily_summary_time') ?? '21:00',
       );
       _isLoading = false;
     });
@@ -154,10 +168,81 @@ class _NotificationSettingsScreenState
     }
   }
 
+  Future<void> _saveSettingString(String key, String value) async {
+    // 1. Save locally
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, value);
+
+    // 2. Sync to backend
+    if (mounted) {
+      try {
+        await context.read<AuthProvider>().updateNotificationPreferences({
+          key: value,
+        });
+      } catch (e) {
+        debugPrint('Failed to sync setting $key: $e');
+        // We don't block the UI or show error for background sync failures usually,
+        // unless critical.
+      }
+    }
+  }
+
+  Future<void> _togglePushNotifications(bool value) async {
+    setState(() {
+      _settings = _settings.copyWith(pushEnabled: value);
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('settings_push_notifications', value);
+    if (mounted) {
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.currentUser != null) {
+        final notifProvider = context.read<NotificationProvider>();
+        if (value) {
+          await notifProvider.enablePushNotifications(
+            authProvider.currentUser!.id,
+          );
+          // For doctors: reschedule daily summary if it was enabled
+          if (authProvider.currentUser!.isDoctor &&
+              _settings.dailySummary &&
+              mounted) {
+            context
+                .read<DoctorAppointmentProvider>()
+                .scheduleDailyNotifications();
+          }
+        } else {
+          await notifProvider.disablePushNotifications(
+            authProvider.currentUser!.id,
+          );
+          // For doctors: cancel daily summary when push is disabled
+          if (authProvider.currentUser!.isDoctor) {
+            await LocalNotificationService().cancelDoctorDailySummaries();
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _toggleEmailNotifications(bool value) async {
+    setState(() {
+      _settings = _settings.copyWith(emailEnabled: value);
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('settings_email_notifications', value);
+
+    if (mounted) {
+      final authProvider = context.read<AuthProvider>();
+      await authProvider.updateNotificationPreferences({
+        'email_notifications': value,
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final authProvider = context.watch<AuthProvider>();
+    final isDoctor = authProvider.currentUser?.isDoctor ?? false;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.notificationSettings), centerTitle: true),
@@ -213,122 +298,185 @@ class _NotificationSettingsScreenState
                     ),
                   ),
 
-                // Appointment Notifications Section
+                // Core Notification Methods Section
                 _buildSectionHeader(
-                  l10n.appointmentNotifications,
-                  Icons.calendar_today,
+                  l10n.notificationSettings,
+                  Icons.phone_iphone_rounded,
                 ),
                 _buildSettingCard(
                   isDark: isDark,
                   children: [
                     _buildSwitchTile(
-                      title: l10n.appointmentReminders,
-                      subtitle: l10n.receiveRemindersForUpcomingAppointments,
-                      value: _settings.appointmentReminders,
-                      onChanged: (value) async {
-                        setState(() {
-                          _settings = _settings.copyWith(
-                            appointmentReminders: value,
-                          );
-                        });
-                        await _saveSetting(
-                          'notif_appointment_reminders',
-                          value,
-                        );
-                      },
+                      title: l10n.pushNotifications,
+                      subtitle: 'Receive alerts directly on your device',
+                      value: _settings.pushEnabled,
+                      onChanged: _togglePushNotifications,
                     ),
-                    if (_settings.appointmentReminders) ...[
+                    if (isDoctor && _settings.pushEnabled) ...[
                       const Divider(height: 1),
                       _buildSubSwitchTile(
-                        title: l10n.weekReminder1,
-                        subtitle: l10n.getNotified1WeekBefore,
-                        value: _settings.reminder1Week,
+                        title: 'Daily Summary',
+                        subtitle:
+                            'Get a daily summary for next day\'s appointments',
+                        value: _settings.dailySummary,
                         onChanged: (value) async {
                           setState(() {
-                            _settings = _settings.copyWith(
-                              reminder1Week: value,
-                            );
+                            _settings = _settings.copyWith(dailySummary: value);
                           });
-                          await _saveSetting('notif_reminder_1w', value);
+                          await _saveSetting('notif_daily_summary', value);
+                          if (context.mounted) {
+                            context
+                                .read<DoctorAppointmentProvider>()
+                                .scheduleDailyNotifications();
+                          }
                         },
                       ),
-                      const Divider(height: 1),
-                      _buildSubSwitchTile(
-                        title: l10n.hourReminder24,
-                        subtitle: l10n.getNotified24HoursBefore,
-                        value: _settings.reminder24Hours,
-                        onChanged: (value) async {
-                          setState(() {
-                            _settings = _settings.copyWith(
-                              reminder24Hours: value,
-                            );
-                          });
-                          await _saveSetting('notif_reminder_24h', value);
-                        },
-                      ),
-                      const Divider(height: 1),
-                      _buildSubSwitchTile(
-                        title: l10n.hourReminder1,
-                        subtitle: l10n.getNotified1HourBefore,
-                        value: _settings.reminder1Hour,
-                        onChanged: (value) async {
-                          setState(() {
-                            _settings = _settings.copyWith(
-                              reminder1Hour: value,
-                            );
-                          });
-                          await _saveSetting('notif_reminder_1h', value);
-                        },
-                      ),
+                      if (_settings.dailySummary) ...[
+                        const Divider(height: 1),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 24),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 0),
+                            title: const Text('Summary Time',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w500, fontSize: 14)),
+                            subtitle: const Text(
+                                'Time to receive your daily summary',
+                                style: TextStyle(fontSize: 11)),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Builder(
+                                builder: (context) {
+                                  final parts =
+                                      _settings.dailySummaryTime.split(':');
+                                  final hour = parts.isNotEmpty
+                                      ? int.tryParse(parts[0]) ?? 21
+                                      : 21;
+                                  final minute = parts.length > 1
+                                      ? int.tryParse(parts[1]) ?? 0
+                                      : 0;
+                                  final time =
+                                      TimeOfDay(hour: hour, minute: minute);
+                                  return Text(
+                                    time.format(context),
+                                    style: const TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            onTap: () async {
+                              final parts =
+                                  _settings.dailySummaryTime.split(':');
+                              final initialTime = TimeOfDay(
+                                hour: parts.isNotEmpty
+                                    ? int.tryParse(parts[0]) ?? 21
+                                    : 21,
+                                minute: parts.length > 1
+                                    ? int.tryParse(parts[1]) ?? 0
+                                    : 0,
+                              );
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: initialTime,
+                              );
+                              if (time != null && mounted) {
+                                final timeStr =
+                                    '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                                setState(() {
+                                  _settings = _settings.copyWith(
+                                      dailySummaryTime: timeStr);
+                                });
+                                await _saveSettingString(
+                                    'notif_daily_summary_time', timeStr);
+                                if (context.mounted) {
+                                  context
+                                      .read<DoctorAppointmentProvider>()
+                                      .scheduleDailyNotifications();
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Updates Section
-                _buildSectionHeader(
-                  l10n.updatesAndTips,
-                  Icons.lightbulb_outline,
-                ),
-                _buildSettingCard(
-                  isDark: isDark,
-                  children: [
-                    _buildSwitchTile(
-                      title: l10n.healthTipsNotification,
-                      subtitle: l10n.dailyHealthTipsAndWellnessAdvice,
-                      value: _settings.healthTips,
-                      onChanged: (value) async {
-                        setState(() {
-                          _settings = _settings.copyWith(healthTips: value);
-                        });
-                        await _saveSetting('notif_health_tips', value);
-                      },
-                    ),
-                    const Divider(height: 1),
-                    _buildSwitchTile(
-                      title: l10n.doctorUpdates,
-                      subtitle: l10n.updatesFromYourDoctors,
-                      value: _settings.doctorUpdates,
-                      onChanged: (value) async {
-                        setState(() {
-                          _settings = _settings.copyWith(doctorUpdates: value);
-                        });
-                        await _saveSetting('notif_doctor_updates', value);
-                      },
-                    ),
-                    const Divider(height: 1),
-                    _buildSwitchTile(
-                      title: l10n.promotionalNotifications,
-                      subtitle: l10n.specialOffersAndPromotions,
-                      value: _settings.promotionalNotifications,
-                      onChanged: (value) async {
-                        setState(() {
-                          _settings = _settings.copyWith(
-                            promotionalNotifications: value,
+                    if (!isDoctor && _settings.pushEnabled) ...[
+                      const Divider(height: 1),
+                      _buildSubSwitchTile(
+                        title: l10n.appointmentReminders,
+                        subtitle: l10n.receiveRemindersForUpcomingAppointments,
+                        value: _settings.appointmentReminders,
+                        onChanged: (value) async {
+                          setState(() {
+                            _settings = _settings.copyWith(
+                              appointmentReminders: value,
+                            );
+                          });
+                          await _saveSetting(
+                            'notif_appointment_reminders',
+                            value,
                           );
-                        });
-                        await _saveSetting('notif_promotional', value);
-                      },
+                        },
+                      ),
+                      if (_settings.appointmentReminders) ...[
+                        const Divider(height: 1),
+                        _buildSubSwitchTile(
+                          title: l10n.weekReminder1,
+                          subtitle: l10n.getNotified1WeekBefore,
+                          value: _settings.reminder1Week,
+                          onChanged: (value) async {
+                            setState(() {
+                              _settings = _settings.copyWith(
+                                reminder1Week: value,
+                              );
+                            });
+                            await _saveSetting('notif_reminder_1w', value);
+                          },
+                        ),
+                        const Divider(height: 1),
+                        _buildSubSwitchTile(
+                          title: l10n.hourReminder24,
+                          subtitle: l10n.getNotified24HoursBefore,
+                          value: _settings.reminder24Hours,
+                          onChanged: (value) async {
+                            setState(() {
+                              _settings = _settings.copyWith(
+                                reminder24Hours: value,
+                              );
+                            });
+                            await _saveSetting('notif_reminder_24h', value);
+                          },
+                        ),
+                        const Divider(height: 1),
+                        _buildSubSwitchTile(
+                          title: l10n.hourReminder1,
+                          subtitle: l10n.getNotified1HourBefore,
+                          value: _settings.reminder1Hour,
+                          onChanged: (value) async {
+                            setState(() {
+                              _settings = _settings.copyWith(
+                                reminder1Hour: value,
+                              );
+                            });
+                            await _saveSetting('notif_reminder_1h', value);
+                          },
+                        ),
+                      ],
+                    ],
+                    const Divider(height: 1),
+                    _buildSwitchTile(
+                      title: l10n.emailNotifications,
+                      subtitle: 'Receive summaries and updates via email',
+                      value: _settings.emailEnabled,
+                      onChanged: _toggleEmailNotifications,
                     ),
                   ],
                 ),

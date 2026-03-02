@@ -20,9 +20,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    // Defer loading to avoid setState during build
+    // Ensure real-time streams are active; if already listening this is a no-op
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadNotifications();
+      final authProvider = context.read<AuthProvider>();
+      final notificationProvider = context.read<NotificationProvider>();
+      if (authProvider.user != null) {
+        notificationProvider.startListening(authProvider.user!.id);
+      }
     });
   }
 

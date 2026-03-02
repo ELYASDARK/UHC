@@ -125,10 +125,12 @@ class AppointmentProvider extends ChangeNotifier {
       );
 
       // Schedule local device notifications (1 week, 1 day, 1 hour before)
+      // Use exactAppointmentTime (date + timeSlot) so reminders fire relative
+      // to the real appointment hour, not midnight.
       await _notificationService.scheduleAppointmentReminders(
         appointmentId: appointmentId,
         doctorName: appointment.doctorName,
-        appointmentTime: appointment.appointmentDate,
+        appointmentTime: appointment.exactAppointmentTime,
         timeSlot: appointment.timeSlot,
       );
 
@@ -138,7 +140,7 @@ class AppointmentProvider extends ChangeNotifier {
         userId: appointment.patientId,
         appointmentId: appointmentId,
         doctorName: appointment.doctorName,
-        appointmentTime: appointment.appointmentDate,
+        appointmentTime: appointment.exactAppointmentTime,
         timeSlot: appointment.timeSlot,
       );
 
@@ -147,7 +149,7 @@ class AppointmentProvider extends ChangeNotifier {
         userId: appointment.patientId,
         appointmentId: appointmentId,
         doctorName: appointment.doctorName,
-        appointmentTime: appointment.appointmentDate,
+        appointmentTime: appointment.exactAppointmentTime,
         timeSlot: appointment.timeSlot,
       );
 
@@ -313,12 +315,16 @@ class AppointmentProvider extends ChangeNotifier {
         reason,
       );
 
+      // Build exact DateTime from newDate + newTimeSlot so reminders fire
+      // relative to the real appointment hour, not midnight.
+      final newExactTime = _buildExactTime(newDate, newTimeSlot);
+
       // Cancel old local reminders and schedule new ones
       await _notificationService.cancelAppointmentReminders(appointmentId);
       await _notificationService.scheduleAppointmentReminders(
         appointmentId: appointmentId,
         doctorName: doctorName,
-        appointmentTime: newDate,
+        appointmentTime: newExactTime,
         timeSlot: newTimeSlot,
       );
 
@@ -328,7 +334,7 @@ class AppointmentProvider extends ChangeNotifier {
         appointmentId: appointmentId,
         doctorName: doctorName,
         oldAppointmentTime: oldTime,
-        newAppointmentTime: newDate,
+        newAppointmentTime: newExactTime,
         newTimeSlot: newTimeSlot,
       );
 
@@ -385,6 +391,20 @@ class AppointmentProvider extends ChangeNotifier {
     _doctorPhotos = {};
     _error = null;
     notifyListeners();
+  }
+
+  /// Build exact DateTime from a date-only [date] and a timeSlot string
+  /// like "09:00 - 09:30". Extracts the start time and combines with [date].
+  DateTime _buildExactTime(DateTime date, String timeSlot) {
+    final startTimeStr = timeSlot.split(' - ').first;
+    final parts = startTimeStr.split(':');
+    int hour = 0;
+    int minute = 0;
+    if (parts.length == 2) {
+      hour = int.tryParse(parts[0]) ?? 0;
+      minute = int.tryParse(parts[1]) ?? 0;
+    }
+    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
   /// Batch-fetch profile photos for all unique doctors across appointments.
