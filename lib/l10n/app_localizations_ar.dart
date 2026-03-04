@@ -1897,4 +1897,45 @@ class AppLocalizationsAr extends AppLocalizations {
   String errorPrefix(String error) {
     return 'خطأ: $error';
   }
+
+  @override
+  String get medicine => 'دواء';
+
+  @override
+  String get patientDocuments => 'مستندات المريض';
+
+  @override
+  String get viewPatientDocuments => 'عرض وإدارة المستندات الطبية للمريض';
+
+  @override
+  String get addDocument => 'إضافة مستند';
+
+  @override
+  String addedByDoctor(String name) {
+    return 'أضافه د. $name';
+  }
+
+  @override
+  String get addedByPatient => 'أضافه المريض';
+
+  @override
+  String get readOnlyMode => 'للقراءة فقط';
+
+  @override
+  String get appointmentCompletedReadOnly =>
+      'هذا الموعد مكتمل. المستندات للقراءة فقط.';
+
+  @override
+  String get noEditPermission => 'يمكنك فقط تعديل المستندات التي أضفتها';
+
+  @override
+  String documentsCount(int count) {
+    return '$count مستند';
+  }
+
+  @override
+  String get doctorDocument => 'مستند الطبيب';
+
+  @override
+  String get myDocument => 'مستندي';
 }

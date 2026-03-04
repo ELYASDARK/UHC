@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 
 /// One-time screen shown after login to link a Google account.
 /// Users must link their account before they can proceed to the app.
@@ -64,7 +65,12 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
     );
 
     if (shouldLogout == true && mounted) {
-      context.read<AuthProvider>().signOut();
+      final auth = context.read<AuthProvider>();
+      final userId = auth.currentUser?.id;
+      if (userId != null) {
+        await context.read<NotificationProvider>().onLogout(userId);
+      }
+      await auth.signOut();
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/notification_provider.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../providers/locale_provider.dart';
@@ -478,6 +479,12 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             onPressed: () async {
               // Dismiss the dialog first using its own context
               Navigator.of(dialogContext, rootNavigator: true).pop();
+              // Clean up notifications (FCM tokens, topics, streams)
+              final userId = auth.currentUser?.id;
+              if (userId != null) {
+                final notificationProvider = ctx.read<NotificationProvider>();
+                await notificationProvider.onLogout(userId);
+              }
               // Sign out
               await auth.signOut();
               // Pop all routes back to root so AppNavigator can rebuild with LoginScreen

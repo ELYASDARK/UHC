@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart'; // Added
 import '../services/auth_service.dart';
-import '../services/fcm_service.dart';
 import '../data/models/user_model.dart';
 
 /// Authentication state
@@ -332,18 +331,9 @@ class AuthProvider with ChangeNotifier {
 
   /// Sign out
   Future<void> signOut() async {
-    // Clean up FCM tokens and topic subscriptions before signing out.
-    // We use FCMService directly (singleton) to avoid circular provider deps.
-    final userId = _currentUser?.id;
-    if (userId != null) {
-      try {
-        final fcm = FCMService();
-        await fcm.removeTokenFromDatabase(userId);
-        await fcm.unsubscribeUserFromTopics(userId);
-      } catch (e) {
-        debugPrint('FCM cleanup on logout error: $e');
-      }
-    }
+    // NOTE: FCM cleanup (token removal + topic unsubscription) must be done
+    // via NotificationProvider.onLogout() BEFORE calling signOut(). That method
+    // properly passes the stored role & department so all topics are cleaned up.
 
     try {
       await _authService.signOut();

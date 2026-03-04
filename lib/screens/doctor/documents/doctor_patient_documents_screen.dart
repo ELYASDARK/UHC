@@ -5,22 +5,37 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../providers/auth_provider.dart';
 import '../../../providers/document_provider.dart';
 import '../../../data/models/medical_document_model.dart';
 import '../../../l10n/app_localizations.dart';
 
-/// Medical document upload and management screen
-class MedicalDocumentsScreen extends StatefulWidget {
-  const MedicalDocumentsScreen({super.key});
+/// Screen for doctors to view and manage a patient's medical documents
+class DoctorPatientDocumentsScreen extends StatefulWidget {
+  final String patientId;
+  final String patientName;
+  final String appointmentId;
+  final String doctorId;
+  final String doctorName;
+  final bool isReadOnly;
+
+  const DoctorPatientDocumentsScreen({
+    super.key,
+    required this.patientId,
+    required this.patientName,
+    required this.appointmentId,
+    required this.doctorId,
+    required this.doctorName,
+    this.isReadOnly = false,
+  });
 
   @override
-  State<MedicalDocumentsScreen> createState() => _MedicalDocumentsScreenState();
+  State<DoctorPatientDocumentsScreen> createState() =>
+      _DoctorPatientDocumentsScreenState();
 }
 
-class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
-  Stream<List<MedicalDocumentModel>>? _documentsStream;
-  String? _currentUserId;
+class _DoctorPatientDocumentsScreenState
+    extends State<DoctorPatientDocumentsScreen> {
+  late final Stream<List<MedicalDocumentModel>> _docsStream;
 
   List<Map<String, dynamic>> _getDocumentTypes(AppLocalizations l10n) {
     return [
@@ -46,43 +61,44 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final user = context.read<AuthProvider>().user;
-    if (user != null && user.id != _currentUserId) {
-      _currentUserId = user.id;
-      _documentsStream =
-          context.read<DocumentProvider>().streamDocuments(user.id);
-    }
+  void initState() {
+    super.initState();
+    _docsStream =
+        context.read<DocumentProvider>().streamDocuments(widget.patientId);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = context.watch<AuthProvider>().user;
     final l10n = AppLocalizations.of(context);
     final docProvider = context.watch<DocumentProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.medicalDocuments), centerTitle: true),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed:
-            docProvider.isUploading ? null : () => _showUploadDialog(context),
-        icon: docProvider.isUploading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : const Icon(Icons.upload_file),
-        label:
-            Text(docProvider.isUploading ? l10n.loading : l10n.uploadDocument),
-        backgroundColor: AppColors.primary,
-        shape: const StadiumBorder(),
+      appBar: AppBar(
+        title: Text('${l10n.patientDocuments} — ${widget.patientName}'),
+        centerTitle: true,
       ),
+      floatingActionButton: widget.isReadOnly
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: docProvider.isUploading
+                  ? null
+                  : () => _showUploadDialog(context),
+              icon: docProvider.isUploading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.add),
+              label: Text(
+                  docProvider.isUploading ? l10n.loading : l10n.addDocument),
+              backgroundColor: AppColors.primary,
+              shape: const StadiumBorder(),
+            ),
       body: Column(
         children: [
           // Upload Progress
@@ -92,41 +108,61 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
               backgroundColor: AppColors.primary.withValues(alpha: 0.2),
             ),
 
+          // Read-only banner
+          if (widget.isReadOnly)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Colors.orange.withValues(alpha: 0.1),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline,
+                      size: 16, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.appointmentCompletedReadOnly,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // Documents List
           Expanded(
-            child: (user == null || _documentsStream == null)
-                ? Center(child: Text(l10n.pleaseLoginFirst))
-                : StreamBuilder<List<MedicalDocumentModel>>(
-                    stream: _documentsStream,
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              '${l10n.errorLoadingDocuments}: ${snapshot.error}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppColors.error),
-                            ),
-                          ),
-                        );
-                      }
+            child: StreamBuilder<List<MedicalDocumentModel>>(
+              stream: _docsStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        '${l10n.errorLoadingDocuments}: ${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.error),
+                      ),
+                    ),
+                  );
+                }
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-                      if (snapshot.connectionState == ConnectionState.waiting &&
-                          !snapshot.hasData) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return _buildEmptyState(context, isDark);
+                }
 
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return _buildEmptyState(isDark);
-                      }
-
-                      final docs = snapshot.data!;
-                      return _buildDocsList(docs, isDark, l10n);
-                    },
-                  ),
+                final docs = snapshot.data!;
+                return _buildDocsList(context, docs, isDark, l10n);
+              },
+            ),
           ),
         ],
       ),
@@ -134,6 +170,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
   }
 
   Widget _buildDocsList(
+    BuildContext context,
     List<MedicalDocumentModel> docs,
     bool isDark,
     AppLocalizations l10n,
@@ -145,12 +182,12 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       itemCount: docs.length,
       itemBuilder: (context, index) {
         final doc = docs[index];
-        return _buildDocumentCard(doc, isDark, documentTypes);
+        return _buildDocumentCard(context, doc, isDark, documentTypes);
       },
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
+  Widget _buildEmptyState(BuildContext context, bool isDark) {
     final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
@@ -168,7 +205,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            l10n.uploadMedicalDocumentsDescription,
+            l10n.viewPatientDocuments,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: isDark
@@ -182,6 +219,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
   }
 
   Widget _buildDocumentCard(
+    BuildContext context,
     MedicalDocumentModel doc,
     bool isDark,
     List<Map<String, dynamic>> documentTypes,
@@ -192,8 +230,8 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       orElse: () => documentTypes.last,
     );
 
-    // Check if doctor added this document
-    final isDoctorAdded = doc.addedByRole == 'doctor';
+    final isDoctorOwn = doc.addedBy == widget.doctorId;
+    final isPatientDoc = doc.addedByRole == 'patient';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -208,7 +246,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
         ],
       ),
       child: ListTile(
-        onTap: () => _viewDocument(doc.url),
+        onTap: () => _viewDocument(context, doc.url),
         contentPadding: const EdgeInsets.all(12),
         leading: Container(
           padding: const EdgeInsets.all(12),
@@ -238,40 +276,42 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                       : AppColors.textSecondaryLight,
                 ),
               ),
-            // Attribution badge for doctor-added documents
-            if (isDoctorAdded)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    l10n.addedByDoctor(doc.addedByName),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.blue,
-                      fontWeight: FontWeight.w500,
-                    ),
+            // Attribution badge
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isPatientDoc
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  isPatientDoc
+                      ? l10n.addedByPatient
+                      : (isDoctorOwn ? l10n.myDocument : l10n.doctorDocument),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isPatientDoc ? Colors.green : Colors.blue,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
+            ),
           ],
         ),
         trailing: PopupMenuButton<String>(
           onSelected: (value) {
             switch (value) {
               case 'view':
-                _viewDocument(doc.url);
+                _viewDocument(context, doc.url);
                 break;
               case 'edit':
                 _showEditDialog(context, doc);
                 break;
               case 'delete':
-                _confirmDelete(doc.id, doc.storagePath);
+                _confirmDelete(context, doc.id, doc.storagePath);
                 break;
             }
           },
@@ -286,8 +326,8 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                 ],
               ),
             ),
-            // Hide edit/delete for doctor-added documents
-            if (!isDoctorAdded)
+            // Edit/Delete only for doctor's own docs and not read-only
+            if (isDoctorOwn && !widget.isReadOnly)
               PopupMenuItem(
                 value: 'edit',
                 child: Row(
@@ -298,7 +338,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   ],
                 ),
               ),
-            if (!isDoctorAdded)
+            if (isDoctorOwn && !widget.isReadOnly)
               PopupMenuItem(
                 value: 'delete',
                 child: Row(
@@ -331,10 +371,10 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
             left: 20,
             right: 20,
             top: 20,
@@ -356,7 +396,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  l10n.uploadDocument,
+                  l10n.addDocument,
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -431,8 +471,9 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                         );
                         return;
                       }
-                      Navigator.pop(context);
+                      Navigator.pop(sheetContext);
                       _pickAndUploadFile(
+                        context,
                         name: nameController.text,
                         type: selectedType!,
                         notes: notesController.text,
@@ -454,10 +495,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     );
   }
 
-  void _showEditDialog(
-    BuildContext context,
-    MedicalDocumentModel doc,
-  ) {
+  void _showEditDialog(BuildContext context, MedicalDocumentModel doc) {
     String? selectedType = doc.type.toFirestoreString();
     final nameController = TextEditingController(text: doc.name);
     final notesController = TextEditingController(text: doc.notes);
@@ -472,10 +510,10 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
             left: 20,
             right: 20,
             top: 20,
@@ -485,7 +523,6 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Handle
                 Center(
                   child: Container(
                     width: 40,
@@ -497,7 +534,6 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
                 Text(
                   l10n.updateDocument,
                   style: const TextStyle(
@@ -506,7 +542,6 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-
                 TextField(
                   controller: nameController,
                   decoration: InputDecoration(
@@ -515,7 +550,6 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 Text('${l10n.documentType} *'),
                 const SizedBox(height: 8),
                 Wrap(
@@ -555,7 +589,6 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   }).toList(),
                 ),
                 const SizedBox(height: 16),
-
                 TextField(
                   controller: notesController,
                   maxLines: 2,
@@ -565,7 +598,6 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 // File Replacement Section
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -617,9 +649,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -631,8 +661,9 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                         );
                         return;
                       }
-                      Navigator.pop(context);
+                      Navigator.pop(sheetContext);
                       _performUpdate(
+                        context,
                         doc: doc,
                         newName: nameController.text,
                         newType: selectedType!,
@@ -656,27 +687,26 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     );
   }
 
-  Future<void> _performUpdate({
+  Future<void> _performUpdate(
+    BuildContext context, {
     required MedicalDocumentModel doc,
     required String newName,
     required String newType,
     required String newNotes,
     File? newFile,
   }) async {
-    final user = context.read<AuthProvider>().user;
     final docProvider = context.read<DocumentProvider>();
     final l10n = AppLocalizations.of(context);
 
     bool success;
 
-    if (newFile != null && user != null) {
-      // Update with file replacement
+    if (newFile != null) {
       final bytes = await newFile.readAsBytes();
       final fileName = newFile.path.split(Platform.pathSeparator).last;
 
       success = await docProvider.updateDocumentWithFile(
         docId: doc.id,
-        userId: user.id,
+        userId: widget.patientId,
         metaData: {
           'name': newName,
           'type': newType,
@@ -687,7 +717,6 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
         oldStoragePath: doc.storagePath,
       );
     } else {
-      // Metadata-only update
       success = await docProvider.updateDocument(doc.id, {
         'name': newName,
         'type': newType,
@@ -695,7 +724,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       });
     }
 
-    if (mounted) {
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success ? l10n.documentUpdated : l10n.updateFailed),
@@ -705,14 +734,12 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     }
   }
 
-  Future<void> _pickAndUploadFile({
+  Future<void> _pickAndUploadFile(
+    BuildContext context, {
     required String name,
     required String type,
     required String notes,
   }) async {
-    final user = context.read<AuthProvider>().user;
-    if (user == null) return;
-
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -725,24 +752,25 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       final fileName = result.files.single.name;
       final bytes = await file.readAsBytes();
 
-      if (!mounted) return;
+      if (!context.mounted) return;
 
       final docProvider = context.read<DocumentProvider>();
       final l10n = AppLocalizations.of(context);
 
       final success = await docProvider.uploadAndAddDocument(
-        userId: user.id,
+        userId: widget.patientId,
         name: name,
         type: DocumentType.fromString(type),
         notes: notes,
         bytes: bytes,
         fileName: fileName,
-        addedBy: user.id,
-        addedByRole: 'patient',
-        addedByName: user.fullName,
+        addedBy: widget.doctorId,
+        addedByRole: 'doctor',
+        addedByName: widget.doctorName,
+        appointmentId: widget.appointmentId,
       );
 
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(success ? l10n.documentUploaded : l10n.uploadFailed),
@@ -751,7 +779,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -764,7 +792,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     }
   }
 
-  Future<void> _viewDocument(String? url) async {
+  Future<void> _viewDocument(BuildContext context, String? url) async {
     if (url == null || url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).noURLProvided)),
@@ -777,7 +805,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        if (mounted) {
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(AppLocalizations.of(context).couldNotOpenDocument),
@@ -786,7 +814,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -798,7 +826,11 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     }
   }
 
-  Future<void> _confirmDelete(String docId, String? storagePath) async {
+  Future<void> _confirmDelete(
+    BuildContext context,
+    String docId,
+    String? storagePath,
+  ) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -819,13 +851,13 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       ),
     );
 
-    if (confirmed == true && mounted) {
+    if (confirmed == true && context.mounted) {
       final docProvider = context.read<DocumentProvider>();
 
       final success =
           await docProvider.deleteDocument(docId, storagePath ?? '');
 
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

@@ -11,6 +11,7 @@ import '../../../providers/doctor_appointment_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import 'patient_detail_screen.dart';
 import '../qr/qr_scan_confirm_screen.dart';
+import '../documents/doctor_patient_documents_screen.dart';
 
 /// Detail screen for a single appointment (doctor view)
 ///
@@ -448,7 +449,76 @@ class _DoctorAppointmentDetailScreenState
                         ),
                     ],
                   ),
-                ).animate(delay: 500.ms).fadeIn(duration: 400.ms)
+                ).animate(delay: 500.ms).fadeIn(duration: 400.ms),
+
+                // ── Patient Documents section ──
+                if (_appointment.status == AppointmentStatus.confirmed ||
+                    _appointment.status == AppointmentStatus.completed) ...[
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DoctorPatientDocumentsScreen(
+                          patientId: _appointment.patientId,
+                          patientName: _appointment.patientName,
+                          appointmentId: _appointment.id,
+                          doctorId: widget.doctor.userId,
+                          doctorName: widget.doctor.name,
+                          isReadOnly: _appointment.status ==
+                              AppointmentStatus.completed,
+                        ),
+                      ),
+                    ),
+                    child: _sectionCard(
+                      isDark: isDark,
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.folder_shared,
+                                color: AppColors.primary),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.patientDocuments,
+                                  style: GoogleFonts.roboto(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  l10n.viewPatientDocuments,
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ).animate(delay: 550.ms).fadeIn(duration: 400.ms),
+                ],
               ],
             ),
           ),

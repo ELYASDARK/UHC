@@ -76,5 +76,26 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+    // Check if the authenticated user has the 'doctor' role in the users collection.
+    function isDoctor() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+    }
+
+    // ── Medical Documents Collection ──
+    // Read: patient reads own docs, doctor reads any.
+    // Create: patient creates own docs, doctor creates with addedBy == self.
+    // Update/Delete: only docs you personally added (addedBy == auth.uid).
+    // Backward compat: old docs without addedBy fall back to userId check.
+    match /medical_documents/{docId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isDoctor());
+      allow create: if isAuthenticated() &&
+        (request.resource.data.userId == request.auth.uid ||
+         (isDoctor() && request.resource.data.addedBy == request.auth.uid));
+      allow update, delete: if isAuthenticated() &&
+        (resource.data.addedBy == request.auth.uid ||
+         (!('addedBy' in resource.data) && resource.data.userId == request.auth.uid));
+    }
   }
 }

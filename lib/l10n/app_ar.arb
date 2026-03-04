@@ -609,5 +609,17 @@
   "summaryTimeSubtitle": "وقت استلام الملخص اليومي",
   "receiveSummariesViaEmail": "استقبال الملخصات والتحديثات عبر البريد الإلكتروني",
   "testNotificationSentSuccess": "تم إرسال الإشعار التجريبي!",
-  "errorPrefix": "خطأ: {error}"
+  "errorPrefix": "خطأ: {error}",
+  "medicine": "دواء",
+  "patientDocuments": "مستندات المريض",
+  "viewPatientDocuments": "عرض وإدارة المستندات الطبية للمريض",
+  "addDocument": "إضافة مستند",
+  "addedByDoctor": "أضافه د. {name}",
+  "addedByPatient": "أضافه المريض",
+  "readOnlyMode": "للقراءة فقط",
+  "appointmentCompletedReadOnly": "هذا الموعد مكتمل. المستندات للقراءة فقط.",
+  "noEditPermission": "يمكنك فقط تعديل المستندات التي أضفتها",
+  "documentsCount": "{count} مستند",
+  "doctorDocument": "مستند الطبيب",
+  "myDocument": "مستندي"
 }

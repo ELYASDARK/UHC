@@ -3753,6 +3753,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error: {error}'**
   String errorPrefix(String error);
+
+  /// No description provided for @medicine.
+  ///
+  /// In en, this message translates to:
+  /// **'Medicine'**
+  String get medicine;
+
+  /// No description provided for @patientDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Patient Documents'**
+  String get patientDocuments;
+
+  /// No description provided for @viewPatientDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'View and manage patient\'s medical documents'**
+  String get viewPatientDocuments;
+
+  /// No description provided for @addDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Document'**
+  String get addDocument;
+
+  /// No description provided for @addedByDoctor.
+  ///
+  /// In en, this message translates to:
+  /// **'Added by Dr. {name}'**
+  String addedByDoctor(String name);
+
+  /// No description provided for @addedByPatient.
+  ///
+  /// In en, this message translates to:
+  /// **'Added by patient'**
+  String get addedByPatient;
+
+  /// No description provided for @readOnlyMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only'**
+  String get readOnlyMode;
+
+  /// No description provided for @appointmentCompletedReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'This appointment is completed. Documents are read-only.'**
+  String get appointmentCompletedReadOnly;
+
+  /// No description provided for @noEditPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You can only edit documents you added'**
+  String get noEditPermission;
+
+  /// No description provided for @documentsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} documents'**
+  String documentsCount(int count);
+
+  /// No description provided for @doctorDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor Document'**
+  String get doctorDocument;
+
+  /// No description provided for @myDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'My Document'**
+  String get myDocument;
 }
 
 class _AppLocalizationsDelegate

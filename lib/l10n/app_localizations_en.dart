@@ -1909,4 +1909,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String errorPrefix(String error) {
     return 'Error: $error';
   }
+
+  @override
+  String get medicine => 'Medicine';
+
+  @override
+  String get patientDocuments => 'Patient Documents';
+
+  @override
+  String get viewPatientDocuments =>
+      'View and manage patient\'s medical documents';
+
+  @override
+  String get addDocument => 'Add Document';
+
+  @override
+  String addedByDoctor(String name) {
+    return 'Added by Dr. $name';
+  }
+
+  @override
+  String get addedByPatient => 'Added by patient';
+
+  @override
+  String get readOnlyMode => 'Read-only';
+
+  @override
+  String get appointmentCompletedReadOnly =>
+      'This appointment is completed. Documents are read-only.';
+
+  @override
+  String get noEditPermission => 'You can only edit documents you added';
+
+  @override
+  String documentsCount(int count) {
+    return '$count documents';
+  }
+
+  @override
+  String get doctorDocument => 'Doctor Document';
+
+  @override
+  String get myDocument => 'My Document';
 }

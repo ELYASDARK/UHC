@@ -696,5 +696,31 @@
         "type": "String"
       }
     }
-  }
+  },
+  "medicine": "Medicine",
+  "patientDocuments": "Patient Documents",
+  "viewPatientDocuments": "View and manage patient's medical documents",
+  "addDocument": "Add Document",
+  "addedByDoctor": "Added by Dr. {name}",
+  "@addedByDoctor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "addedByPatient": "Added by patient",
+  "readOnlyMode": "Read-only",
+  "appointmentCompletedReadOnly": "This appointment is completed. Documents are read-only.",
+  "noEditPermission": "You can only edit documents you added",
+  "documentsCount": "{count} documents",
+  "@documentsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "doctorDocument": "Doctor Document",
+  "myDocument": "My Document"
 }

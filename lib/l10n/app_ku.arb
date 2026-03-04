@@ -609,5 +609,17 @@
   "summaryTimeSubtitle": "کاتی وەرگرتنی پوختەی ڕۆژانە",
   "receiveSummariesViaEmail": "وەرگرتنی پوختە و نوێکارییەکان بە ئیمەیڵ",
   "testNotificationSentSuccess": "ئاگادارکردنەوەی تاقیکردنەوە نێردرا!",
-  "errorPrefix": "هەڵە: {error}"
+  "errorPrefix": "هەڵە: {error}",
+  "medicine": "دەرمان",
+  "patientDocuments": "بەڵگەنامەکانی نەخۆش",
+  "viewPatientDocuments": "بینین و بەڕێوەبردنی بەڵگەنامە پزیشکییەکانی نەخۆش",
+  "addDocument": "زیادکردنی بەڵگەنامە",
+  "addedByDoctor": "زیادکراوە لەلایەن د. {name}",
+  "addedByPatient": "زیادکراوە لەلایەن نەخۆش",
+  "readOnlyMode": "تەنها خوێندنەوە",
+  "appointmentCompletedReadOnly": "ئەم چاوپێکەوتنە تەواو بووە. بەڵگەنامەکان تەنها خوێندنەوەن.",
+  "noEditPermission": "تەنها دەتوانیت ئەو بەڵگەنامانە دەستکاری بکەیت کە خۆت زیادت کردووە",
+  "documentsCount": "{count} بەڵگەنامە",
+  "doctorDocument": "بەڵگەنامەی دکتۆر",
+  "myDocument": "بەڵگەنامەی من"
 }

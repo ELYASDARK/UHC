@@ -859,6 +859,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () async {
               // Dismiss the dialog first
               Navigator.of(dialogContext, rootNavigator: true).pop();
+              // Clean up notifications (FCM tokens, topics, streams)
+              final userId = authProvider.user?.id;
+              if (userId != null) {
+                final notificationProvider =
+                    outerContext.read<NotificationProvider>();
+                await notificationProvider.onLogout(userId);
+              }
               // Sign out
               await authProvider.signOut();
               // Pop all routes back to root so AppNavigator can rebuild with LoginScreen

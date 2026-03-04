@@ -17,6 +17,7 @@ import 'providers/appointment_provider.dart';
 import 'providers/doctor_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/doctor_appointment_provider.dart';
+import 'providers/document_provider.dart';
 import 'services/local_notification_service.dart';
 import 'services/fcm_service.dart';
 import 'screens/splash/splash_screen.dart';
@@ -125,6 +126,7 @@ class UHCApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => DoctorProvider()),
         ChangeNotifierProvider(create: (_) => DoctorAppointmentProvider()),
+        ChangeNotifierProvider(create: (_) => DocumentProvider()),
       ],
       child: Consumer2<ThemeProvider, LocaleProvider>(
         builder: (context, themeProvider, localeProvider, _) {

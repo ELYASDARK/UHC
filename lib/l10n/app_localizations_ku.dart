@@ -1917,4 +1917,47 @@ class AppLocalizationsKu extends AppLocalizations {
   String errorPrefix(String error) {
     return 'هەڵە: $error';
   }
+
+  @override
+  String get medicine => 'دەرمان';
+
+  @override
+  String get patientDocuments => 'بەڵگەنامەکانی نەخۆش';
+
+  @override
+  String get viewPatientDocuments =>
+      'بینین و بەڕێوەبردنی بەڵگەنامە پزیشکییەکانی نەخۆش';
+
+  @override
+  String get addDocument => 'زیادکردنی بەڵگەنامە';
+
+  @override
+  String addedByDoctor(String name) {
+    return 'زیادکراوە لەلایەن د. $name';
+  }
+
+  @override
+  String get addedByPatient => 'زیادکراوە لەلایەن نەخۆش';
+
+  @override
+  String get readOnlyMode => 'تەنها خوێندنەوە';
+
+  @override
+  String get appointmentCompletedReadOnly =>
+      'ئەم چاوپێکەوتنە تەواو بووە. بەڵگەنامەکان تەنها خوێندنەوەن.';
+
+  @override
+  String get noEditPermission =>
+      'تەنها دەتوانیت ئەو بەڵگەنامانە دەستکاری بکەیت کە خۆت زیادت کردووە';
+
+  @override
+  String documentsCount(int count) {
+    return '$count بەڵگەنامە';
+  }
+
+  @override
+  String get doctorDocument => 'بەڵگەنامەی دکتۆر';
+
+  @override
+  String get myDocument => 'بەڵگەنامەی من';
 }
