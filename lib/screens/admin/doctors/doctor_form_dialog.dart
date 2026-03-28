@@ -362,6 +362,34 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
       // Read as bytes for Web compatibility
       final bytes = await image.readAsBytes();
 
+      // Enforce 25 MB file size limit
+      const maxSizeBytes = 25 * 1024 * 1024; // 25 MB
+      if (bytes.lengthInBytes > maxSizeBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 25 MB.',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
       setState(() {
         _imageBytes = bytes;
         _isUploading = true;

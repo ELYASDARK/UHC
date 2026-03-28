@@ -66,9 +66,15 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
 
     if (shouldLogout == true && mounted) {
       final auth = context.read<AuthProvider>();
-      final userId = auth.currentUser?.id;
-      if (userId != null) {
-        await context.read<NotificationProvider>().onLogout(userId);
+      // Clean up notifications — wrapped in try-catch so signOut
+      // always runs even if FCM cleanup fails (e.g. on web).
+      try {
+        final userId = auth.currentUser?.id;
+        if (userId != null) {
+          await context.read<NotificationProvider>().onLogout(userId);
+        }
+      } catch (e) {
+        debugPrint('Notification cleanup on logout failed: $e');
       }
       await auth.signOut();
     }

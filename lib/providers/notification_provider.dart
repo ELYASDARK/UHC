@@ -212,9 +212,16 @@ class NotificationProvider extends ChangeNotifier {
     _notificationsSubscription = null;
     _unreadCountSubscription = null;
 
-    await _fcmService.removeTokenFromDatabase(userId);
-    await _fcmService.unsubscribeUserFromTopics(userId,
-        role: _currentRole, department: _currentDepartment);
+    // FCM cleanup — wrapped in try-catch so local state cleanup always runs.
+    // On web, FCM operations (getToken, topic subscribe/unsubscribe) may fail.
+    try {
+      await _fcmService.removeTokenFromDatabase(userId);
+      await _fcmService.unsubscribeUserFromTopics(userId,
+          role: _currentRole, department: _currentDepartment);
+    } catch (e) {
+      debugPrint('FCM cleanup on logout failed (safe to ignore on web): $e');
+    }
+
     _currentRole = null;
     _currentDepartment = null;
     _notifications.clear();

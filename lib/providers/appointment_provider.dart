@@ -153,8 +153,11 @@ class AppointmentProvider extends ChangeNotifier {
         timeSlot: appointment.timeSlot,
       );
 
-      // Refresh upcoming appointments
-      await loadUpcomingAppointments(appointment.patientId);
+      // Refresh upcoming appointments (pass email for fallback query)
+      await loadUpcomingAppointments(
+        appointment.patientId,
+        email: appointment.patientEmail,
+      );
 
       _error = null;
       return appointmentId;

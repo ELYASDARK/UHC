@@ -68,13 +68,14 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
           ),
           body: TabBarView(
             controller: _tabController,
-            children: [
+             children: [
               _buildList(
                 provider.upcomingAppointments,
                 true,
                 isDark,
                 provider.isLoading,
                 l10n,
+                provider,
               ),
               _buildList(
                 provider.pastAppointments,
@@ -82,6 +83,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
                 isDark,
                 provider.isLoading,
                 l10n,
+                provider,
               ),
             ],
           ),
@@ -96,6 +98,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
     bool isDark,
     bool isLoading,
     AppLocalizations l10n,
+    DoctorAppointmentProvider provider,
   ) {
     if (isLoading) {
       return ListView.separated(
@@ -163,9 +166,8 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final appointment = appointments[index];
-          final patientPhoto = context
-              .read<DoctorAppointmentProvider>()
-              .patientPhotos[appointment.patientId];
+          final patientPhoto =
+              provider.patientPhotos[appointment.patientId];
           return _DoctorAppointmentCard(
             appointment: appointment,
             isDark: isDark,

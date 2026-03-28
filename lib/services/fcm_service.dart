@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show TargetPlatform, debugPrint, defaultTargetPlatform, kIsWeb;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -117,75 +118,102 @@ class FCMService {
     return await _messaging.getToken();
   }
 
-  /// Subscribe to topic
+  /// Subscribe to topic (not supported on web)
   Future<void> subscribeToTopic(String topic) async {
+    if (kIsWeb) return; // Topic subscription not supported on web
     await _messaging.subscribeToTopic(topic);
   }
 
-  /// Unsubscribe from topic
+  /// Unsubscribe from topic (not supported on web)
   Future<void> unsubscribeFromTopic(String topic) async {
+    if (kIsWeb) return; // Topic unsubscription not supported on web
     await _messaging.unsubscribeFromTopic(topic);
   }
 
   /// Save FCM token to Firestore for user
   Future<void> saveTokenToDatabase(String userId) async {
-    final token = await getToken();
-    if (token != null) {
-      // Save to users collection (legacy support)
-      await _firestore.collection('users').doc(userId).update({
-        'fcmTokens': FieldValue.arrayUnion([token]),
-        'lastTokenUpdate': FieldValue.serverTimestamp(),
-      }).catchError((e, stack) {
-        FirebaseCrashlytics.instance
-            .recordError(e, stack, reason: 'Failed to update user FCM token');
-      });
+    try {
+      final token = await getToken();
+      if (token != null) {
+        // Save to users collection (legacy support)
+        await _firestore.collection('users').doc(userId).update({
+          'fcmTokens': FieldValue.arrayUnion([token]),
+          'lastTokenUpdate': FieldValue.serverTimestamp(),
+        }).catchError((e, stack) {
+          FirebaseCrashlytics.instance
+              .recordError(e, stack, reason: 'Failed to update user FCM token');
+        });
 
-      // Save to user_tokens collection (for Cloud Functions)
-      final platform = Platform.isIOS ? 'ios' : 'android';
-      await _firestore.collection('user_tokens').doc(userId).set({
-        'token': token,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'platform': platform,
-      }, SetOptions(merge: true));
+        // Save to user_tokens collection (for Cloud Functions)
+        // dart:io Platform is not available on web, so use 'web' as a fallback.
+        final platform = kIsWeb ? 'web' : _getNativePlatform();
+        await _firestore.collection('user_tokens').doc(userId).set({
+          'token': token,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'platform': platform,
+        }, SetOptions(merge: true));
+      }
+
+      // Listen for token refresh
+      _messaging.onTokenRefresh.listen((newToken) async {
+        await _firestore.collection('users').doc(userId).update({
+          'fcmTokens': FieldValue.arrayUnion([newToken]),
+          'lastTokenUpdate': FieldValue.serverTimestamp(),
+        }).catchError((e, stack) {
+          FirebaseCrashlytics.instance.recordError(e, stack,
+              reason: 'Failed to update refreshed FCM token');
+        });
+
+        // Update user_tokens collection
+        final refreshPlatform = kIsWeb ? 'web' : _getNativePlatform();
+        await _firestore.collection('user_tokens').doc(userId).set({
+          'token': newToken,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'platform': refreshPlatform,
+        }, SetOptions(merge: true));
+      });
+    } catch (e) {
+      // getToken() can throw on web (requires VAPID key) — don't let that
+      // block the rest of the initialization flow.
+      debugPrint('saveTokenToDatabase failed (safe to ignore on web): $e');
     }
+  }
 
-    // Listen for token refresh
-    _messaging.onTokenRefresh.listen((newToken) async {
-      await _firestore.collection('users').doc(userId).update({
-        'fcmTokens': FieldValue.arrayUnion([newToken]),
-        'lastTokenUpdate': FieldValue.serverTimestamp(),
-      }).catchError((e, stack) {
-        FirebaseCrashlytics.instance.recordError(e, stack,
-            reason: 'Failed to update refreshed FCM token');
-      });
-
-      // Update user_tokens collection
-      final refreshPlatform = Platform.isIOS ? 'ios' : 'android';
-      await _firestore.collection('user_tokens').doc(userId).set({
-        'token': newToken,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'platform': refreshPlatform,
-      }, SetOptions(merge: true));
-    });
+  /// Determine native platform name (only called when NOT on web).
+  /// Separated into its own method so dart:io is only imported conditionally.
+  String _getNativePlatform() {
+    // On web, this should never be called, but default to 'unknown' as safety.
+    try {
+      // ignore: avoid_slow_async_io
+      return defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+    } catch (_) {
+      return 'unknown';
+    }
   }
 
   /// Remove FCM token when user logs out
   Future<void> removeTokenFromDatabase(String userId) async {
-    final token = await getToken();
-    if (token != null) {
-      await _firestore.collection('users').doc(userId).update({
-        'fcmTokens': FieldValue.arrayRemove([token]),
-      }).catchError((e, stack) {
-        FirebaseCrashlytics.instance.recordError(e, stack,
-            reason: 'Failed to update refreshed FCM token');
-      });
+    try {
+      final token = await getToken();
+      if (token != null) {
+        await _firestore.collection('users').doc(userId).update({
+          'fcmTokens': FieldValue.arrayRemove([token]),
+        }).catchError((e, stack) {
+          FirebaseCrashlytics.instance.recordError(e, stack,
+              reason: 'Failed to remove FCM token');
+        });
 
-      // Remove from user_tokens collection
-      await _firestore
-          .collection('user_tokens')
-          .doc(userId)
-          .delete()
-          .catchError((_) {});
+        // Remove from user_tokens collection
+        await _firestore
+            .collection('user_tokens')
+            .doc(userId)
+            .delete()
+            .catchError((_) {});
+      }
+    } catch (e) {
+      // getToken() can throw on web (requires VAPID key) — don't let that
+      // block the rest of the logout flow.
+      debugPrint('removeTokenFromDatabase failed (safe to ignore on web): $e');
     }
   }
 

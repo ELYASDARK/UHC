@@ -72,8 +72,11 @@ void main() async {
     // Printing to console is the best fallback here.
   }
 
+  // Load theme before running app so correct theme is applied on first frame
+  final themeProvider = await ThemeProvider.create();
+
   // Start app immediately - show UI first
-  runApp(const UHCApp());
+  runApp(UHCApp(themeProvider: themeProvider));
 
   // Defer non-critical initialization after first frame is rendered
   // This prevents blocking the main thread during startup
@@ -113,14 +116,16 @@ Future<void> _initializeServicesAsync() async {
 }
 
 class UHCApp extends StatelessWidget {
-  const UHCApp({super.key});
+  final ThemeProvider themeProvider;
+
+  const UHCApp({super.key, required this.themeProvider});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => AppointmentProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),

@@ -37,7 +37,8 @@ class DoctorAppointmentDetailScreen extends StatefulWidget {
 }
 
 class _DoctorAppointmentDetailScreenState
-    extends State<DoctorAppointmentDetailScreen> {
+    extends State<DoctorAppointmentDetailScreen>
+    with WidgetsBindingObserver {
   late AppointmentModel _appointment;
   final _notesController = TextEditingController();
   bool _isSaving = false;
@@ -48,18 +49,31 @@ class _DoctorAppointmentDetailScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _appointment = widget.appointment;
     _notesController.text = _appointment.medicalNotes ?? '';
     _qrScanFailures = _appointment.qrScanFailures;
     // Refresh _now every 30 s to keep the confirm-window UI accurate
     _timeCheckTimer = Timer.periodic(
       const Duration(seconds: 30),
-      (_) => setState(() => _now = DateTime.now()),
+      (_) {
+        if (mounted) setState(() => _now = DateTime.now());
+      },
     );
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When the app comes back from background, immediately update _now
+    // so the countdown label reflects real time on mobile
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() => _now = DateTime.now());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timeCheckTimer?.cancel();
     _notesController.dispose();
     super.dispose();
@@ -158,7 +172,7 @@ class _DoctorAppointmentDetailScreenState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
     final patientPhoto = context
-        .read<DoctorAppointmentProvider>()
+        .watch<DoctorAppointmentProvider>()
         .patientPhotos[_appointment.patientId];
 
     return Scaffold(

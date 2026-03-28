@@ -24,7 +24,12 @@ class AppointmentRepository {
     String userId, {
     String? email,
   }) async {
+    // Compare against *start of today* (midnight), not DateTime.now().
+    // appointmentDate is stored as midnight of the appointment day, so
+    // comparing against the exact current time would incorrectly classify
+    // today's appointments as "past".
     final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
     try {
       // First try by patientId only (no date filter to avoid index)
       var snapshot =
@@ -41,8 +46,8 @@ class AppointmentRepository {
       final appointments = snapshot.docs
           .map((doc) => AppointmentModel.fromFirestore(doc))
           .where((apt) {
-        final isUpcoming = apt.appointmentDate.isAfter(now) ||
-            apt.appointmentDate.isAtSameMomentAs(now);
+        // Appointment is upcoming if its date is today or later
+        final isUpcoming = !apt.appointmentDate.isBefore(startOfToday);
         final isActive = apt.status == AppointmentStatus.pending ||
             apt.status == AppointmentStatus.confirmed;
         return isUpcoming && isActive;
@@ -65,7 +70,11 @@ class AppointmentRepository {
     String userId, {
     String? email,
   }) async {
+    // Compare against *start of today* (midnight) to stay consistent
+    // with getUpcomingAppointments. Today's active appointments are
+    // NOT past.
     final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
     try {
       // First try by patientId only (no date filter to avoid index)
       var snapshot =
@@ -79,14 +88,14 @@ class AppointmentRepository {
       }
 
       // Filter for past/history appointments in-memory:
-      // - Appointments with past dates, OR
+      // - Appointments with dates strictly before today, OR
       // - Cancelled appointments (any date), OR
       // - Completed appointments, OR
       // - No-show appointments
       final appointments = snapshot.docs
           .map((doc) => AppointmentModel.fromFirestore(doc))
           .where((apt) {
-        final isPastDate = apt.appointmentDate.isBefore(now);
+        final isPastDate = apt.appointmentDate.isBefore(startOfToday);
         final isCancelled = apt.status == AppointmentStatus.cancelled;
         final isCompleted = apt.status == AppointmentStatus.completed;
         final isNoShow = apt.status == AppointmentStatus.noShow;

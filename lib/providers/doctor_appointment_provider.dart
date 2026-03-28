@@ -31,9 +31,11 @@ class DoctorAppointmentProvider extends ChangeNotifier {
 
   List<AppointmentModel> get upcomingAppointments {
     final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
     return _appointments.where((apt) {
-      final isUpcoming = apt.appointmentDate.isAfter(now) ||
-          apt.appointmentDate.isAtSameMomentAs(now);
+      // Compare against start of today (midnight) instead of current time,
+      // because appointmentDate is stored as midnight of the appointment day.
+      final isUpcoming = !apt.appointmentDate.isBefore(startOfToday);
       final isActive = apt.status == AppointmentStatus.pending ||
           apt.status == AppointmentStatus.confirmed;
       return isUpcoming && isActive;
@@ -43,8 +45,10 @@ class DoctorAppointmentProvider extends ChangeNotifier {
 
   List<AppointmentModel> get pastAppointments {
     final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
     return _appointments.where((apt) {
-      final isPastDate = apt.appointmentDate.isBefore(now);
+      // Appointment date is before today (not just before current time)
+      final isPastDate = apt.appointmentDate.isBefore(startOfToday);
       final isTerminal = apt.status == AppointmentStatus.completed ||
           apt.status == AppointmentStatus.cancelled ||
           apt.status == AppointmentStatus.noShow;
@@ -115,6 +119,10 @@ class DoctorAppointmentProvider extends ChangeNotifier {
 
     try {
       _appointments = await _appointmentRepo.getAllDoctorAppointments(doctorId);
+
+      // Auto-mark overdue pending appointments as no-show (best-effort)
+      await _autoMarkNoShow(doctorId);
+
       await _fetchPatientPhotos();
       _error = null;
     } catch (e) {
@@ -413,6 +421,52 @@ class DoctorAppointmentProvider extends ChangeNotifier {
       } catch (e) {
         debugPrint('Failed to create daily summary Firestore doc: $e');
       }
+    }
+  }
+
+  /// Auto-mark pending appointments as no-show when their time has passed.
+  ///
+  /// Logic: appointment slot is ~30 min. After the slot ends, the patient gets
+  /// a 30-minute grace window. If still pending after that (60 min total from
+  /// slot start), the system marks it no-show automatically.
+  ///
+  /// Only `pending` appointments are affected — `confirmed` means
+  /// the patient checked in (QR scan), so that stays for the doctor to close.
+  Future<void> _autoMarkNoShow(String doctorId) async {
+    final now = DateTime.now();
+    // 30 min appointment duration + 30 min grace = 60 min after slot start
+    const autoNoShowMinutes = 60;
+
+    final overdue = _appointments.where((apt) {
+      if (apt.status != AppointmentStatus.pending) return false;
+
+      final cutoff = apt.exactAppointmentTime
+          .add(const Duration(minutes: autoNoShowMinutes));
+      return now.isAfter(cutoff);
+    }).toList();
+
+    if (overdue.isEmpty) return;
+
+    debugPrint('Auto no-show: marking ${overdue.length} overdue appointment(s)');
+
+    for (final apt in overdue) {
+      try {
+        await _appointmentRepo.updateAppointmentStatus(
+          apt.id,
+          AppointmentStatus.noShow,
+          statusUpdatedBy: 'system_auto',
+        );
+      } catch (e) {
+        debugPrint('Auto no-show failed for ${apt.id}: $e');
+      }
+    }
+
+    // Re-fetch so the local list reflects the updated statuses
+    try {
+      _appointments =
+          await _appointmentRepo.getAllDoctorAppointments(doctorId);
+    } catch (e) {
+      debugPrint('Re-fetch after auto no-show failed: $e');
     }
   }
 

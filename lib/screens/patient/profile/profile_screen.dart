@@ -859,15 +859,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () async {
               // Dismiss the dialog first
               Navigator.of(dialogContext, rootNavigator: true).pop();
-              // Clean up notifications (FCM tokens, topics, streams)
-              final userId = authProvider.user?.id;
-              if (userId != null) {
-                final notificationProvider =
-                    outerContext.read<NotificationProvider>();
-                await notificationProvider.onLogout(userId);
+
+              // Clean up notifications — wrapped in try-catch so signOut
+              // always runs even if FCM cleanup fails (e.g. on web).
+              try {
+                final userId = authProvider.user?.id;
+                if (userId != null) {
+                  final notificationProvider =
+                      outerContext.read<NotificationProvider>();
+                  await notificationProvider.onLogout(userId);
+                }
+              } catch (e) {
+                debugPrint('Notification cleanup on logout failed: $e');
               }
-              // Sign out
+
+              // Sign out — must always run
               await authProvider.signOut();
+
               // Pop all routes back to root so AppNavigator can rebuild with LoginScreen
               if (outerContext.mounted) {
                 Navigator.of(outerContext, rootNavigator: true)

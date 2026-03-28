@@ -479,14 +479,23 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             onPressed: () async {
               // Dismiss the dialog first using its own context
               Navigator.of(dialogContext, rootNavigator: true).pop();
-              // Clean up notifications (FCM tokens, topics, streams)
-              final userId = auth.currentUser?.id;
-              if (userId != null) {
-                final notificationProvider = ctx.read<NotificationProvider>();
-                await notificationProvider.onLogout(userId);
+
+              // Clean up notifications — wrapped in try-catch so signOut
+              // always runs even if FCM cleanup fails (e.g. on web).
+              try {
+                final userId = auth.currentUser?.id;
+                if (userId != null) {
+                  final notificationProvider =
+                      ctx.read<NotificationProvider>();
+                  await notificationProvider.onLogout(userId);
+                }
+              } catch (e) {
+                debugPrint('Notification cleanup on logout failed: $e');
               }
-              // Sign out
+
+              // Sign out — must always run
               await auth.signOut();
+
               // Pop all routes back to root so AppNavigator can rebuild with LoginScreen
               if (ctx.mounted) {
                 Navigator.of(ctx, rootNavigator: true)
