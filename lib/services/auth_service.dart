@@ -75,39 +75,60 @@ class AuthService {
   /// Sign in with Google
   Future<UserCredential?> signInWithGoogle() async {
     try {
+      UserCredential? userCredential;
+
       if (kIsWeb) {
-        // On web, use Firebase Auth popup directly (no client ID meta tag needed)
+        // On web, use Firebase Auth popup directly
         final provider = GoogleAuthProvider();
-        final userCredential = await _auth.signInWithPopup(provider);
-        if (userCredential.user != null) {
-          await _createOrUpdateUserDocument(userCredential.user!);
+        userCredential = await _auth.signInWithPopup(provider);
+      } else {
+        // On mobile, use google_sign_in package
+        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+        if (googleUser == null) {
+          return null; // User cancelled the sign-in
         }
-        return userCredential;
+
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        userCredential = await _auth.signInWithCredential(credential);
       }
 
-      // On mobile, use google_sign_in package
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final user = userCredential.user!;
 
-      if (googleUser == null) {
-        return null; // User cancelled the sign-in
+      // Check if this user already has an account in Firestore
+      // (created by admin or via email/password registration).
+      // Google sign-in must NOT create new accounts.
+      final docRef = _firestore.collection('users').doc(user.uid);
+      final doc = await docRef.get();
+
+      if (!doc.exists) {
+        // No account exists — reject this sign-in.
+        // Delete the Firebase Auth user that was just created and sign out.
+        await user.delete();
+        try {
+          await _googleSignIn.signOut();
+        } catch (_) {}
+        throw Exception(
+          'No account found. Please contact your administrator to create an account.',
+        );
       }
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential = await _auth.signInWithCredential(credential);
-
-      if (userCredential.user != null) {
-        await _createOrUpdateUserDocument(userCredential.user!);
-      }
+      // Account exists — update last login, preserving existing photo.
+      await _updateExistingUserDocument(doc, user);
 
       return userCredential;
     } catch (e) {
+      // Re-throw our custom "no account" error as-is
+      if (e.toString().contains('No account found')) {
+        rethrow;
+      }
       throw Exception('Google sign-in failed: $e');
     }
   }
@@ -273,29 +294,26 @@ class AuthService {
         .set(userModel.toFirestore());
   }
 
-  /// Create or update user document for Google sign-in
-  Future<void> _createOrUpdateUserDocument(User user) async {
-    final docRef = _firestore.collection('users').doc(user.uid);
-    final doc = await docRef.get();
+  /// Update existing user document on Google sign-in.
+  /// Only updates the login timestamp; preserves existing photo.
+  Future<void> _updateExistingUserDocument(
+    DocumentSnapshot doc,
+    User user,
+  ) async {
+    final existingData = doc.data() as Map<String, dynamic>?;
+    final existingPhoto = existingData?['photoUrl'] as String?;
 
-    if (!doc.exists) {
-      final userModel = UserModel(
-        id: user.uid,
-        email: user.email ?? '',
-        fullName: user.displayName ?? '',
-        photoUrl: user.photoURL,
-        role: UserRole.student,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      await docRef.set(userModel.toFirestore());
-    } else {
-      // Update last login
-      await docRef.update({
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-        'photoUrl': user.photoURL,
-      });
+    final updates = <String, dynamic>{
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    };
+
+    // Only set photoUrl from Google if the user has no existing photo
+    if ((existingPhoto == null || existingPhoto.isEmpty) &&
+        user.photoURL != null) {
+      updates['photoUrl'] = user.photoURL;
     }
+
+    await _firestore.collection('users').doc(user.uid).update(updates);
   }
 
   /// Get user data from Firestore
