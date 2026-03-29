@@ -127,31 +127,41 @@ class AppointmentProvider extends ChangeNotifier {
       // Schedule local device notifications (1 week, 1 day, 1 hour before)
       // Use exactAppointmentTime (date + timeSlot) so reminders fire relative
       // to the real appointment hour, not midnight.
-      await _notificationService.scheduleAppointmentReminders(
-        appointmentId: appointmentId,
-        doctorName: appointment.doctorName,
-        appointmentTime: appointment.exactAppointmentTime,
-        timeSlot: appointment.timeSlot,
-      );
+      // Wrap in try-catch: notification failures should NOT fail the booking
+      // since the appointment is already created in Firestore.
+      try {
+        await _notificationService.scheduleAppointmentReminders(
+          appointmentId: appointmentId,
+          doctorName: appointment.doctorName,
+          appointmentTime: appointment.exactAppointmentTime,
+          timeSlot: appointment.timeSlot,
+        );
+      } catch (e) {
+        debugPrint('Failed to schedule local reminders: $e');
+      }
 
       // Create Firebase notifications:
       // 1. Immediate confirmation notification
-      await _notificationRepo.sendAppointmentConfirmation(
-        userId: appointment.patientId,
-        appointmentId: appointmentId,
-        doctorName: appointment.doctorName,
-        appointmentTime: appointment.exactAppointmentTime,
-        timeSlot: appointment.timeSlot,
-      );
+      try {
+        await _notificationRepo.sendAppointmentConfirmation(
+          userId: appointment.patientId,
+          appointmentId: appointmentId,
+          doctorName: appointment.doctorName,
+          appointmentTime: appointment.exactAppointmentTime,
+          timeSlot: appointment.timeSlot,
+        );
 
-      // 2. Schedule 3 reminder notifications in Firebase (1 week, 1 day, 1 hour before)
-      await _notificationRepo.scheduleAppointmentReminders(
-        userId: appointment.patientId,
-        appointmentId: appointmentId,
-        doctorName: appointment.doctorName,
-        appointmentTime: appointment.exactAppointmentTime,
-        timeSlot: appointment.timeSlot,
-      );
+        // 2. Schedule 3 reminder notifications in Firebase (1 week, 1 day, 1 hour before)
+        await _notificationRepo.scheduleAppointmentReminders(
+          userId: appointment.patientId,
+          appointmentId: appointmentId,
+          doctorName: appointment.doctorName,
+          appointmentTime: appointment.exactAppointmentTime,
+          timeSlot: appointment.timeSlot,
+        );
+      } catch (e) {
+        debugPrint('Failed to send Firebase notifications: $e');
+      }
 
       // Refresh upcoming appointments (pass email for fallback query)
       await loadUpcomingAppointments(

@@ -213,11 +213,13 @@ class LocalNotificationService {
 
       debugPrint('Notification scheduled successfully with ID: $id');
     } catch (e, stack) {
-      // If scheduling fails, show an immediate notification as fallback
+      // If scheduling fails, log and continue gracefully.
+      // Do NOT rethrow – the appointment is already created, and crashing here
+      // would cause the user to see an error and potentially retry, creating
+      // duplicate appointments.
       debugPrint('Failed to schedule notification: $e');
       FirebaseCrashlytics.instance
           .recordError(e, stack, reason: 'Scheduling Notification Failed');
-      rethrow;
     }
   }
 
