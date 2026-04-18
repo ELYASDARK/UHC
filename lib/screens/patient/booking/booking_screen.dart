@@ -109,6 +109,7 @@ class _BookingScreenState extends State<BookingScreen> {
       final snapshot = await FirebaseFirestore.instance
           .collection('appointments')
           .where('doctorId', isEqualTo: widget.doctor.id)
+          .limit(500)
           .get();
 
       if (!mounted) return;

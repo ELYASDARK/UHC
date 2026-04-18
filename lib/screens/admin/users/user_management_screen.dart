@@ -195,10 +195,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   Stream<QuerySnapshot> _getUsersStream() {
-    // Get all users and filter on client side to avoid composite index issues
+    // Limit to 200 most recent users to prevent memory issues at scale
+    // (50k+ users would crash the app without this limit)
     return _firestore
         .collection('users')
         .orderBy('createdAt', descending: true)
+        .limit(200)
         .snapshots();
   }
 

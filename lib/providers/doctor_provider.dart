@@ -64,7 +64,7 @@ class DoctorProvider extends ChangeNotifier {
     }
   }
 
-  /// Search doctors
+  /// Search doctors (from cached list to avoid re-fetching entire collection)
   Future<void> searchDoctors(String query) async {
     _searchQuery = query;
 
@@ -74,18 +74,33 @@ class DoctorProvider extends ChangeNotifier {
       return;
     }
 
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      _filteredDoctors = await _doctorRepo.searchDoctors(query);
-      _error = null;
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
+    // If doctors aren't loaded yet, fetch them first
+    if (_doctors.isEmpty) {
+      _isLoading = true;
       notifyListeners();
+      try {
+        _doctors = await _doctorRepo.getAllDoctors();
+      } catch (e) {
+        _error = e.toString();
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
     }
+
+    // Filter locally from cached data instead of re-fetching
+    final queryLower = query.toLowerCase();
+    _filteredDoctors = _doctors
+        .where(
+          (doctor) =>
+              doctor.name.toLowerCase().contains(queryLower) ||
+              doctor.specialization.toLowerCase().contains(queryLower) ||
+              doctor.departmentName.toLowerCase().contains(queryLower),
+        )
+        .toList();
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
   }
 
   /// Get doctor by ID

@@ -29,6 +29,7 @@ class FCMService {
 
   /// Whether [initialize] has already completed successfully
   bool _initialized = false;
+  StreamSubscription<String>? _tokenRefreshSubscription;
 
   // Stream controller for notification taps
   final StreamController<RemoteMessage> _messageStreamController =
@@ -154,8 +155,10 @@ class FCMService {
         }, SetOptions(merge: true));
       }
 
-      // Listen for token refresh
-      _messaging.onTokenRefresh.listen((newToken) async {
+      // Listen for token refresh (cancel previous to prevent duplicates)
+      _tokenRefreshSubscription?.cancel();
+      _tokenRefreshSubscription =
+          _messaging.onTokenRefresh.listen((newToken) async {
         await _firestore.collection('users').doc(userId).update({
           'fcmTokens': FieldValue.arrayUnion([newToken]),
           'lastTokenUpdate': FieldValue.serverTimestamp(),
@@ -193,6 +196,10 @@ class FCMService {
 
   /// Remove FCM token when user logs out
   Future<void> removeTokenFromDatabase(String userId) async {
+    // Cancel token refresh listener to prevent stale writes
+    _tokenRefreshSubscription?.cancel();
+    _tokenRefreshSubscription = null;
+
     try {
       final token = await getToken();
       if (token != null) {
@@ -260,6 +267,7 @@ class FCMService {
 
   /// Dispose resources
   void dispose() {
+    _tokenRefreshSubscription?.cancel();
     _messageStreamController.close();
   }
 }

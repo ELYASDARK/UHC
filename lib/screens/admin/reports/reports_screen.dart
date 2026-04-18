@@ -413,6 +413,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           isLessThanOrEqualTo: Timestamp.fromDate(_endDate),
         )
         .orderBy('appointmentDate', descending: true)
+        .limit(10000)
         .get();
 
     final buffer = StringBuffer();
@@ -471,6 +472,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final snapshot = await _firestore
         .collection('users')
         .orderBy('createdAt', descending: true)
+        .limit(5000)
         .get();
 
     final buffer = StringBuffer();
@@ -508,6 +510,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           isLessThanOrEqualTo: Timestamp.fromDate(_endDate),
         )
         .where('status', isEqualTo: 'completed')
+        .limit(10000)
         .get();
 
     // Group by department

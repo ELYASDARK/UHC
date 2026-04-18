@@ -25,6 +25,7 @@ class NotificationProvider extends ChangeNotifier {
   // Real-time stream subscriptions
   StreamSubscription<List<NotificationModel>>? _notificationsSubscription;
   StreamSubscription<int>? _unreadCountSubscription;
+  StreamSubscription<RemoteMessage>? _messageTapSubscription;
 
   List<NotificationModel> get notifications => _notifications;
   int get unreadCount => _unreadCount;
@@ -52,8 +53,9 @@ class NotificationProvider extends ChangeNotifier {
       // Start real-time notification streams
       startListening(userId);
 
-      // Listen for notification taps
-      _fcmService.onMessageTapped.listen((message) {
+      // Listen for notification taps (cancel previous to prevent duplicates)
+      _messageTapSubscription?.cancel();
+      _messageTapSubscription = _fcmService.onMessageTapped.listen((message) {
         _handleNotificationTap(message);
       });
     } catch (e, stack) {
@@ -209,8 +211,10 @@ class NotificationProvider extends ChangeNotifier {
     // Cancel real-time streams
     _notificationsSubscription?.cancel();
     _unreadCountSubscription?.cancel();
+    _messageTapSubscription?.cancel();
     _notificationsSubscription = null;
     _unreadCountSubscription = null;
+    _messageTapSubscription = null;
 
     // FCM cleanup — wrapped in try-catch so local state cleanup always runs.
     // On web, FCM operations (getToken, topic subscribe/unsubscribe) may fail.
@@ -262,6 +266,7 @@ class NotificationProvider extends ChangeNotifier {
   void dispose() {
     _notificationsSubscription?.cancel();
     _unreadCountSubscription?.cancel();
+    _messageTapSubscription?.cancel();
     _fcmService.dispose();
     super.dispose();
   }

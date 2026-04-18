@@ -32,13 +32,16 @@ class AppointmentRepository {
     final startOfToday = DateTime(now.year, now.month, now.day);
     try {
       // First try by patientId only (no date filter to avoid index)
-      var snapshot =
-          await _appointmentsRef.where('patientId', isEqualTo: userId).get();
+      var snapshot = await _appointmentsRef
+          .where('patientId', isEqualTo: userId)
+          .limit(500)
+          .get();
 
       // If no results and email is provided, try by patientEmail only
       if (snapshot.docs.isEmpty && email != null) {
         snapshot = await _appointmentsRef
             .where('patientEmail', isEqualTo: email)
+            .limit(500)
             .get();
       }
 
@@ -77,13 +80,16 @@ class AppointmentRepository {
     final startOfToday = DateTime(now.year, now.month, now.day);
     try {
       // First try by patientId only (no date filter to avoid index)
-      var snapshot =
-          await _appointmentsRef.where('patientId', isEqualTo: userId).get();
+      var snapshot = await _appointmentsRef
+          .where('patientId', isEqualTo: userId)
+          .limit(500)
+          .get();
 
       // If no results and email is provided, try by patientEmail only
       if (snapshot.docs.isEmpty && email != null) {
         snapshot = await _appointmentsRef
             .where('patientEmail', isEqualTo: email)
+            .limit(500)
             .get();
       }
 
@@ -125,8 +131,10 @@ class AppointmentRepository {
 
     try {
       // Simplified query - only filter by doctorId
-      final snapshot =
-          await _appointmentsRef.where('doctorId', isEqualTo: doctorId).get();
+      final snapshot = await _appointmentsRef
+          .where('doctorId', isEqualTo: doctorId)
+          .limit(500)
+          .get();
 
       // Filter by date and status in-memory
       return snapshot.docs
@@ -164,8 +172,15 @@ class AppointmentRepository {
     final snapshot =
         await _appointmentsRef.where('patientId', isEqualTo: userId).get();
 
-    for (final doc in snapshot.docs) {
-      await doc.reference.delete();
+    // Use batched writes for efficiency (chunked to respect 500 limit)
+    final docs = snapshot.docs;
+    for (var i = 0; i < docs.length; i += 500) {
+      final batch = _firestore.batch();
+      final end = (i + 500 < docs.length) ? i + 500 : docs.length;
+      for (var j = i; j < end; j++) {
+        batch.delete(docs[j].reference);
+      }
+      await batch.commit();
     }
   }
 
@@ -261,8 +276,10 @@ class AppointmentRepository {
       query = query.where('status', isEqualTo: status.name);
     }
 
-    final snapshot =
-        await query.orderBy('appointmentDate', descending: true).get();
+    final snapshot = await query
+        .orderBy('appointmentDate', descending: true)
+        .limit(1000)
+        .get();
     return snapshot.docs
         .map((doc) => AppointmentModel.fromFirestore(doc))
         .toList();
@@ -273,6 +290,7 @@ class AppointmentRepository {
     return _appointmentsRef
         .where('patientId', isEqualTo: userId)
         .orderBy('appointmentDate', descending: true)
+        .limit(200)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
@@ -296,6 +314,7 @@ class AppointmentRepository {
       final snapshot = await _appointmentsRef
           .where('doctorId', isEqualTo: doctorId)
           .where('timeSlot', isEqualTo: timeSlot)
+          .limit(200)
           .get();
 
       // Filter results in-memory for date range and status
@@ -329,8 +348,10 @@ class AppointmentRepository {
     String doctorId,
   ) async {
     try {
-      final snapshot =
-          await _appointmentsRef.where('doctorId', isEqualTo: doctorId).get();
+      final snapshot = await _appointmentsRef
+          .where('doctorId', isEqualTo: doctorId)
+          .limit(1000)
+          .get();
       final appointments = snapshot.docs
           .map((doc) => AppointmentModel.fromFirestore(doc))
           .toList();
@@ -364,8 +385,10 @@ class AppointmentRepository {
     try {
       // Query by doctorId, then filter by patientId in-memory
       // (avoids composite index requirement)
-      final snapshot =
-          await _appointmentsRef.where('doctorId', isEqualTo: doctorId).get();
+      final snapshot = await _appointmentsRef
+          .where('doctorId', isEqualTo: doctorId)
+          .limit(500)
+          .get();
       final appointments = snapshot.docs
           .map((doc) => AppointmentModel.fromFirestore(doc))
           .where((apt) => apt.patientId == patientId)

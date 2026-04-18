@@ -474,14 +474,17 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   Future<void> _fetchPatientPhotos() async {
     final uniqueIds = _appointments.map((a) => a.patientId).toSet();
     // Only fetch IDs we haven't cached yet
-    final idsToFetch = uniqueIds.where((id) => !_patientPhotos.containsKey(id));
-    for (final id in idsToFetch) {
+    final idsToFetch =
+        uniqueIds.where((id) => !_patientPhotos.containsKey(id)).toList();
+    if (idsToFetch.isEmpty) return;
+    // Fetch all patient photos in parallel instead of sequentially (N+1 fix)
+    await Future.wait(idsToFetch.map((id) async {
       try {
         final user = await _userRepo.getUserById(id);
         _patientPhotos[id] = user?.photoUrl;
       } catch (_) {
         _patientPhotos[id] = null;
       }
-    }
+    }));
   }
 }

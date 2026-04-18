@@ -61,6 +61,7 @@ class _AppointmentAnalyticsScreenState
             'createdAt',
             isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
           )
+          .limit(5000)
           .get();
 
       _totalAppointments = snapshot.docs.length;

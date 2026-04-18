@@ -34,19 +34,13 @@ class NotificationRepository {
 
   /// Get unread notifications count (only for delivered notifications)
   Future<int> getUnreadCount(String userId) async {
-    final now = DateTime.now();
-    final snapshot = await _notificationsRef
+    // Use Firestore count() aggregation to avoid downloading all unread docs
+    final countQuery = _notificationsRef
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
-        .get();
-
-    // Count only delivered notifications
-    return snapshot.docs
-        .map((doc) => NotificationModel.fromFirestore(doc))
-        .where((notification) {
-      if (notification.scheduledFor == null) return true;
-      return notification.scheduledFor!.isBefore(now);
-    }).length;
+        .count();
+    final snapshot = await countQuery.get();
+    return snapshot.count ?? 0;
   }
 
   /// Create notification
@@ -63,17 +57,21 @@ class NotificationRepository {
 
   /// Mark all notifications as read
   Future<void> markAllAsRead(String userId) async {
-    final batch = _firestore.batch();
     final snapshot = await _notificationsRef
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
         .get();
 
-    for (final doc in snapshot.docs) {
-      batch.update(doc.reference, {'isRead': true});
+    // Chunk into batches of 500 (Firestore batch limit)
+    final docs = snapshot.docs;
+    for (var i = 0; i < docs.length; i += 500) {
+      final batch = _firestore.batch();
+      final end = (i + 500 < docs.length) ? i + 500 : docs.length;
+      for (var j = i; j < end; j++) {
+        batch.update(docs[j].reference, {'isRead': true});
+      }
+      await batch.commit();
     }
-
-    await batch.commit();
   }
 
   /// Delete notification
@@ -83,29 +81,37 @@ class NotificationRepository {
 
   /// Delete all user notifications
   Future<void> deleteAllNotifications(String userId) async {
-    final batch = _firestore.batch();
     final snapshot =
         await _notificationsRef.where('userId', isEqualTo: userId).get();
 
-    for (final doc in snapshot.docs) {
-      batch.delete(doc.reference);
+    // Chunk into batches of 500 (Firestore batch limit)
+    final docs = snapshot.docs;
+    for (var i = 0; i < docs.length; i += 500) {
+      final batch = _firestore.batch();
+      final end = (i + 500 < docs.length) ? i + 500 : docs.length;
+      for (var j = i; j < end; j++) {
+        batch.delete(docs[j].reference);
+      }
+      await batch.commit();
     }
-
-    await batch.commit();
   }
 
   /// Delete all notifications for a specific appointment
   Future<void> deleteAppointmentNotifications(String appointmentId) async {
-    final batch = _firestore.batch();
     final snapshot = await _notificationsRef
         .where('appointmentId', isEqualTo: appointmentId)
         .get();
 
-    for (final doc in snapshot.docs) {
-      batch.delete(doc.reference);
+    // Chunk into batches of 500 (Firestore batch limit)
+    final docs = snapshot.docs;
+    for (var i = 0; i < docs.length; i += 500) {
+      final batch = _firestore.batch();
+      final end = (i + 500 < docs.length) ? i + 500 : docs.length;
+      for (var j = i; j < end; j++) {
+        batch.delete(docs[j].reference);
+      }
+      await batch.commit();
     }
-
-    await batch.commit();
   }
 
   /// Stream user's notifications for real-time updates
@@ -131,6 +137,7 @@ class NotificationRepository {
     return _notificationsRef
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
+        .limit(200)
         .snapshots()
         .map((snapshot) {
       final now = DateTime.now();
@@ -339,20 +346,26 @@ class NotificationRepository {
   /// with scheduledFor in the future.
   Future<void> deleteFutureDailySummaries(String userId) async {
     final now = DateTime.now();
-    final snapshot =
-        await _notificationsRef.where('userId', isEqualTo: userId).get();
-    final batch = _firestore.batch();
+    // Filter by type server-side to reduce data transfer
+    final snapshot = await _notificationsRef
+        .where('userId', isEqualTo: userId)
+        .where('type', isEqualTo: 'dailySummary')
+        .get();
 
-    for (final doc in snapshot.docs) {
+    final docsToDelete = snapshot.docs.where((doc) {
       final data = doc.data();
-      if (data['type'] == 'dailySummary') {
-        final scheduledFor = (data['scheduledFor'] as Timestamp?)?.toDate();
-        if (scheduledFor != null && scheduledFor.isAfter(now)) {
-          batch.delete(doc.reference);
-        }
-      }
-    }
+      final scheduledFor = (data['scheduledFor'] as Timestamp?)?.toDate();
+      return scheduledFor != null && scheduledFor.isAfter(now);
+    }).toList();
 
-    await batch.commit();
+    // Chunk into batches of 500 (Firestore batch limit)
+    for (var i = 0; i < docsToDelete.length; i += 500) {
+      final batch = _firestore.batch();
+      final end = (i + 500 < docsToDelete.length) ? i + 500 : docsToDelete.length;
+      for (var j = i; j < end; j++) {
+        batch.delete(docsToDelete[j].reference);
+      }
+      await batch.commit();
+    }
   }
 }

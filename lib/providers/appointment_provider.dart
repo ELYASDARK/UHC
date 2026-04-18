@@ -425,14 +425,17 @@ class AppointmentProvider extends ChangeNotifier {
     final allAppointments = [..._upcomingAppointments, ..._pastAppointments];
     final uniqueIds = allAppointments.map((a) => a.doctorId).toSet();
     // Only fetch IDs we haven't cached yet
-    final idsToFetch = uniqueIds.where((id) => !_doctorPhotos.containsKey(id));
-    for (final id in idsToFetch) {
+    final idsToFetch =
+        uniqueIds.where((id) => !_doctorPhotos.containsKey(id)).toList();
+    if (idsToFetch.isEmpty) return;
+    // Fetch all doctor photos in parallel instead of sequentially (N+1 fix)
+    await Future.wait(idsToFetch.map((id) async {
       try {
         final doctor = await _doctorRepo.getDoctorById(id);
         _doctorPhotos[id] = doctor?.photoUrl;
       } catch (_) {
         _doctorPhotos[id] = null;
       }
-    }
+    }));
   }
 }
