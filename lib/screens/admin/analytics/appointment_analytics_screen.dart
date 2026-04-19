@@ -55,24 +55,39 @@ class _AppointmentAnalyticsScreenState
           startDate = now.subtract(const Duration(days: 7));
       }
 
-      final snapshot = await _firestore
+      // Paginate through all results in batches of 5000
+      final baseQuery = _firestore
           .collection('appointments')
           .where(
             'createdAt',
             isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
           )
-          .limit(5000)
-          .get();
+          .orderBy('createdAt');
 
-      _totalAppointments = snapshot.docs.length;
+      final allDocs = <QueryDocumentSnapshot>[];
+      DocumentSnapshot? lastDoc;
+      const batchSize = 5000;
+
+      while (true) {
+        Query batchQuery = baseQuery.limit(batchSize);
+        if (lastDoc != null) {
+          batchQuery = batchQuery.startAfterDocument(lastDoc);
+        }
+        final snapshot = await batchQuery.get();
+        allDocs.addAll(snapshot.docs);
+        if (snapshot.docs.length < batchSize) break;
+        lastDoc = snapshot.docs.last;
+      }
+
+      _totalAppointments = allDocs.length;
       _statusDistribution = {};
       _departmentDistribution = {};
       _dailyAppointments = {};
       _completedAppointments = 0;
       _cancelledAppointments = 0;
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
+      for (final doc in allDocs) {
+        final data = doc.data() as Map<String, dynamic>;
 
         // Status distribution
         final status = data['status'] ?? 'pending';

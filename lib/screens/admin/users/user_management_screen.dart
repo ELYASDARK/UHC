@@ -19,6 +19,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   Set<UserRole> _selectedRoles = {};
+  int _displayLimit = 200;
 
   @override
   void dispose() {
@@ -156,10 +157,31 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   return matchesSearch && _selectedRoles.contains(role);
                 }).toList();
 
+                // Check if there might be more users to load
+                final totalFetched = snapshot.data!.docs.length;
+                final hasMore = totalFetched >= _displayLimit;
+
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: docs.length,
+                  itemCount: docs.length + (hasMore ? 1 : 0),
                   itemBuilder: (context, index) {
+                    // "Load More" button at the end
+                    if (index == docs.length) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() => _displayLimit += 200);
+                            },
+                            icon: const Icon(Icons.expand_more),
+                            label: Text(
+                              'Load More (showing $totalFetched)',
+                            ),
+                          ),
+                        ),
+                      );
+                    }
                     final doc = docs[index];
                     final data = doc.data() as Map<String, dynamic>;
                     return _buildUserCard(context, doc.id, data, isDark);
@@ -195,12 +217,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   Stream<QuerySnapshot> _getUsersStream() {
-    // Limit to 200 most recent users to prevent memory issues at scale
-    // (50k+ users would crash the app without this limit)
+    // Paginated stream: starts at 200, increases by 200 on "Load More"
+    // Each page is bounded to prevent memory issues at scale
     return _firestore
         .collection('users')
         .orderBy('createdAt', descending: true)
-        .limit(200)
+        .limit(_displayLimit)
         .snapshots();
   }
 

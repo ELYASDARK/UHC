@@ -401,8 +401,31 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  /// Fetch all documents matching a query using cursor-based pagination.
+  /// Fetches in batches of [batchSize] to keep each request bounded.
+  Future<List<QueryDocumentSnapshot>> _paginatedFetch(
+    Query query, {
+    int batchSize = 5000,
+  }) async {
+    final allDocs = <QueryDocumentSnapshot>[];
+    DocumentSnapshot? lastDoc;
+
+    while (true) {
+      Query batchQuery = query.limit(batchSize);
+      if (lastDoc != null) {
+        batchQuery = batchQuery.startAfterDocument(lastDoc);
+      }
+      final snapshot = await batchQuery.get();
+      allDocs.addAll(snapshot.docs);
+      if (snapshot.docs.length < batchSize) break; // Last page
+      lastDoc = snapshot.docs.last;
+    }
+
+    return allDocs;
+  }
+
   Future<String> _generateAppointmentsReport() async {
-    final snapshot = await _firestore
+    final query = _firestore
         .collection('appointments')
         .where(
           'appointmentDate',
@@ -412,17 +435,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
           'appointmentDate',
           isLessThanOrEqualTo: Timestamp.fromDate(_endDate),
         )
-        .orderBy('appointmentDate', descending: true)
-        .limit(10000)
-        .get();
+        .orderBy('appointmentDate', descending: true);
+
+    final docs = await _paginatedFetch(query);
 
     final buffer = StringBuffer();
     buffer.writeln(
       'ID,Patient Name,Patient Email,Doctor Name,Department,Date,Time Slot,Status,Type,Notes',
     );
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
       final date = (data['appointmentDate'] as Timestamp?)?.toDate();
       buffer.writeln(
         '${doc.id},'
@@ -469,19 +492,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<String> _generateUsersReport() async {
-    final snapshot = await _firestore
+    final query = _firestore
         .collection('users')
-        .orderBy('createdAt', descending: true)
-        .limit(5000)
-        .get();
+        .orderBy('createdAt', descending: true);
+
+    final docs = await _paginatedFetch(query);
 
     final buffer = StringBuffer();
     buffer.writeln(
       'ID,Full Name,Email,Phone,Role,Blood Type,Active,Created At',
     );
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
       final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
       buffer.writeln(
         '${doc.id},'
@@ -499,7 +522,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<String> _generateRevenueReport() async {
-    final snapshot = await _firestore
+    final query = _firestore
         .collection('appointments')
         .where(
           'appointmentDate',
@@ -510,15 +533,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
           isLessThanOrEqualTo: Timestamp.fromDate(_endDate),
         )
         .where('status', isEqualTo: 'completed')
-        .limit(10000)
-        .get();
+        .orderBy('appointmentDate', descending: true);
+
+    final docs = await _paginatedFetch(query);
 
     // Group by department
     final Map<String, Map<String, dynamic>> departmentStats = {};
     const consultationFee = 50.0; // Mock fee
 
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
       final department = data['department'] ?? 'Unknown';
 
       if (!departmentStats.containsKey(department)) {
