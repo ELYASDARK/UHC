@@ -419,7 +419,7 @@ A comprehensive code audit identified and resolved 13 scalability issues to ensu
 ##### 🔴 Critical Fixes
 - **Bounded Firestore Queries** — Added `.limit()` to every unbounded query across the entire codebase. Previously, methods like `getUpcomingAppointments()`, `getPastAppointments()`, and `getAllDoctorAppointments()` would download entire document collections (potentially 500k+ docs at scale). All queries now have appropriate limits (500–1000 docs per method).
 - **N+1 Query Elimination** — Replaced sequential `for`-loop photo fetching with `Future.wait()` for parallel execution. Loading 10 doctor photos now takes ~200ms instead of ~3,000ms (one network round-trip vs. ten sequential ones).
-- **Admin User Stream Limit** — Added `.limit(200)` to the admin User Management screen's real-time stream, preventing out-of-memory crashes when streaming 50k+ user documents.
+- **Admin User Stream Limit** — Added `.limit(200)` with **"Load More" pagination** to the admin User Management screen. Starts with 200 users, each tap loads 200 more — the admin can browse all users without loading 50k at once.
 - **Notification Query Optimization** — Replaced `getUnreadCount()` (which downloaded all unread documents) with Firestore's `.count()` aggregation — zero document downloads, server-side counting.
 
 ##### 🟡 Moderate Fixes
@@ -427,7 +427,7 @@ A comprehensive code audit identified and resolved 13 scalability issues to ensu
 - **Batch Operation Chunking** — All batch write operations (`markAllAsRead`, `deleteAllNotifications`, `deleteAllUserAppointments`, `deleteFutureDailySummaries`) now chunk into groups of 500 to respect Firestore's batch limit. Previously, batches with >500 operations would fail silently.
 - **Booking Screen Query Limit** — Added `.limit(500)` to the booking screen's appointment fetch, preventing download of a doctor's entire appointment history on every calendar date tap.
 - **Doctor Search Caching** — `searchDoctors()` now caches the doctor list in memory and filters locally, instead of re-fetching the entire `doctors` collection on every keystroke.
-- **Analytics & Reports Limits** — Added `.limit(5000)` to analytics queries and `.limit(10000)` / `.limit(5000)` to CSV report generation queries to prevent timeouts and OOM crashes.
+- **Analytics & Reports Pagination** — Reports and analytics now use **cursor-based auto-pagination** (fetching in 5,000-doc batches using `startAfterDocument`) instead of hard limits. The admin clicks "Generate" and gets a **complete** CSV export or accurate stats, regardless of how many documents exist. Each individual Firestore request stays bounded at 5,000 docs to stay safe.
 
 ##### 🟢 Minor Fixes
 - **FCM Token Refresh Leak** — Fixed duplicate `onTokenRefresh` listeners by cancelling previous subscriptions before re-registering.
@@ -453,10 +453,10 @@ A comprehensive code audit identified and resolved 13 scalability issues to ensu
 | `lib/providers/doctor_appointment_provider.dart` | Parallel patient photo fetching via `Future.wait()` |
 | `lib/providers/doctor_provider.dart` | In-memory caching for doctor search |
 | `lib/providers/notification_provider.dart` | Fixed FCM listener memory leak (`_messageTapSubscription`) |
-| `lib/screens/admin/users/user_management_screen.dart` | `.limit(200)` on user stream |
+| `lib/screens/admin/users/user_management_screen.dart` | "Load More" pagination (200 per page) |
 | `lib/screens/patient/booking/booking_screen.dart` | `.limit(500)` on booked slots query |
-| `lib/screens/admin/analytics/appointment_analytics_screen.dart` | `.limit(5000)` on analytics query |
-| `lib/screens/admin/reports/reports_screen.dart` | `.limit()` on 3 report generation queries |
+| `lib/screens/admin/analytics/appointment_analytics_screen.dart` | Cursor-based auto-pagination (5k batches) |
+| `lib/screens/admin/reports/reports_screen.dart` | `_paginatedFetch()` helper, auto-pagination on all 3 report generators |
 | `lib/services/fcm_service.dart` | Fixed duplicate token refresh listeners |
 | `firestore.indexes.json` | Added 8 composite indexes |
 
