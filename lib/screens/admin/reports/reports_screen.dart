@@ -371,10 +371,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
       final file = File('${directory.path}/${fileName}_$dateStr.csv');
       await file.writeAsString(csvContent);
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject:
-            'UHC Report - ${DateFormat('MMM d, yyyy').format(DateTime.now())}',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          subject:
+              'UHC Report - ${DateFormat('MMM d, yyyy').format(DateTime.now())}',
+        ),
       );
 
       if (mounted) {

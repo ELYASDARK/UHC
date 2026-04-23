@@ -10,7 +10,7 @@ import '../data/models/user_model.dart';
 /// Authentication service handling Firebase Auth and Google Sign-In
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance; // Added
 
@@ -83,7 +83,7 @@ class AuthService {
         userCredential = await _auth.signInWithPopup(provider);
       } else {
         // On mobile, use google_sign_in package
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+        final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
 
         if (googleUser == null) {
           return null; // User cancelled the sign-in
@@ -93,7 +93,6 @@ class AuthService {
             await googleUser.authentication;
 
         final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
 
@@ -182,7 +181,7 @@ class AuthService {
       }
 
       // On mobile, use google_sign_in package
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
       if (googleUser == null) {
         throw Exception('Google sign-in cancelled');
       }
@@ -191,7 +190,6 @@ class AuthService {
           await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 

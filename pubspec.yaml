@@ -24,7 +24,7 @@ dependencies:
   # Firebase
   firebase_core: ^4.7.0         # was 3.15.2
   firebase_auth: ^6.4.0         # was 5.5.3
-  cloud_firestore: ^6.3.0       # was 5.6.7  ← your main complaint
+  cloud_firestore: ^6.3.0       # was 5.6.7 
   firebase_messaging: ^16.2.0   # was 15.2.10
   cloud_functions: ^6.2.0       # was 5.3.1
   

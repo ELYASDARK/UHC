@@ -50,7 +50,7 @@ class LocalNotificationService {
     );
 
     await _notifications.initialize(
-      initSettings,
+      settings: initSettings,
       onDidReceiveNotificationResponse: _onNotificationResponse,
     );
 
@@ -159,7 +159,7 @@ class LocalNotificationService {
       ),
     );
 
-    await _notifications.show(id, title, body, details, payload: payload);
+    await _notifications.show(id: id, title: title, body: body, notificationDetails: details, payload: payload);
   }
 
   /// Schedule a notification for a specific time
@@ -199,15 +199,12 @@ class LocalNotificationService {
       );
 
       await _notifications.zonedSchedule(
-        id,
-        title,
-        body,
-        scheduledTz,
-        details,
-        // Use exact scheduling for reliable timing
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: scheduledTz,
+        notificationDetails: details,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
 
@@ -350,7 +347,7 @@ class LocalNotificationService {
 
   /// Cancel a scheduled notification
   Future<void> cancelNotification(int id) async {
-    await _notifications.cancel(id);
+    await _notifications.cancel(id: id);
   }
 
   /// Cancel all appointment reminders (all 3: 1 week, 1 day, 1 hour)

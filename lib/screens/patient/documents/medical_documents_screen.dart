@@ -594,7 +594,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                       ),
                       TextButton(
                         onPressed: () async {
-                          final result = await FilePicker.platform.pickFiles(
+                          final result = await FilePicker.pickFiles(
                             type: FileType.custom,
                             allowedExtensions: [
                               'pdf',
@@ -714,7 +714,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     if (user == null) return;
 
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
       );
