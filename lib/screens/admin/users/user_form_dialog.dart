@@ -639,7 +639,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                             ),
                           ),
                           items: UserRole.values
-                              .where((role) => role != UserRole.doctor)
+                              .where((role) => role != UserRole.doctor && role != UserRole.superAdmin)
                               .map((role) {
                             return DropdownMenuItem(
                               value: role,

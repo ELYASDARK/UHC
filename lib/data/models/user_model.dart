@@ -1,9 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'admin_permissions_model.dart';
 
 /// User roles in the system
-enum UserRole { student, staff, doctor, admin }
+enum UserRole { student, staff, doctor, admin, superAdmin }
 
-/// User model representing students, staff, doctors, and admins
+/// Super Admin slot type (exactly 2 super admins: 1 primary + 1 backup)
+enum SuperAdminType { primary, backup }
+
+/// User model representing students, staff, doctors, admins, and super admins
 class UserModel {
   final String id;
   final String email;
@@ -23,6 +27,12 @@ class UserModel {
   final String language;
   final String? googleEmail;
 
+  /// Only set when role == superAdmin
+  final SuperAdminType? superAdminType;
+
+  /// Granular permissions for admin users (ignored for superAdmin — full access)
+  final AdminPermissions? adminPermissions;
+
   UserModel({
     required this.id,
     required this.email,
@@ -41,6 +51,8 @@ class UserModel {
     this.notificationSettings,
     this.language = 'en',
     this.googleEmail,
+    this.superAdminType,
+    this.adminPermissions,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -68,6 +80,16 @@ class UserModel {
       notificationSettings: data['notificationSettings'],
       language: data['language'] ?? 'en',
       googleEmail: data['googleEmail'],
+      superAdminType: data['superAdminType'] != null
+          ? SuperAdminType.values.firstWhere(
+              (t) => t.name == data['superAdminType'],
+              orElse: () => SuperAdminType.primary,
+            )
+          : null,
+      adminPermissions: data['adminPermissions'] != null
+          ? AdminPermissions.fromMap(
+              data['adminPermissions'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -90,6 +112,8 @@ class UserModel {
       'notificationSettings': notificationSettings,
       'language': language,
       'googleEmail': googleEmail,
+      'superAdminType': superAdminType?.name,
+      'adminPermissions': adminPermissions?.toMap(),
     };
   }
 
@@ -111,6 +135,8 @@ class UserModel {
     Map<String, dynamic>? notificationSettings,
     String? language,
     String? googleEmail,
+    SuperAdminType? superAdminType,
+    AdminPermissions? adminPermissions,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -130,6 +156,8 @@ class UserModel {
       notificationSettings: notificationSettings ?? this.notificationSettings,
       language: language ?? this.language,
       googleEmail: googleEmail ?? this.googleEmail,
+      superAdminType: superAdminType ?? this.superAdminType,
+      adminPermissions: adminPermissions ?? this.adminPermissions,
     );
   }
 
@@ -137,6 +165,21 @@ class UserModel {
   bool get isAdmin => role == UserRole.admin;
   bool get isStaff => role == UserRole.staff;
   bool get isStudent => role == UserRole.student;
+  bool get isSuperAdmin => role == UserRole.superAdmin;
+
+  /// Returns true if user is admin or superAdmin (for shared admin features)
+  bool get isAdminOrSuperAdmin =>
+      role == UserRole.admin || role == UserRole.superAdmin;
+
+  /// Check if this admin user has a specific permission.
+  /// Super Admins always return true (bypass all checks).
+  bool hasPermission(String permissionKey) {
+    if (isSuperAdmin) return true;
+    if (!isAdmin) return false;
+    // If no permissions object yet (legacy admin), grant full access
+    if (adminPermissions == null) return true;
+    return adminPermissions!.getByKey(permissionKey);
+  }
 
   String get displayRole {
     switch (role) {
@@ -148,6 +191,8 @@ class UserModel {
         return 'Doctor';
       case UserRole.admin:
         return 'Admin';
+      case UserRole.superAdmin:
+        return 'Super Admin';
     }
   }
 }

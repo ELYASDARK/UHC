@@ -409,7 +409,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 isDark),
 
             // Developer Testing section - only visible to admin
-            if (user?.isAdmin == true) ...[
+            if (user?.isAdminOrSuperAdmin == true) ...[
               const SizedBox(height: 20),
               _buildSection(
                   l10n.developerTesting,

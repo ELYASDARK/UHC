@@ -338,36 +338,39 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ],
               ),
             ),
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, size: 18),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
+            // Super admin rows are view-only — governed through Super Admin UI
+            if (role != UserRole.superAdmin) ...[
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 18),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
               ),
-            ),
-            PopupMenuItem(
-              value: 'toggle',
-              child: Row(
-                children: [
-                  Icon(isActive ? Icons.block : Icons.check_circle, size: 18),
-                  const SizedBox(width: 8),
-                  Text(isActive ? 'Deactivate' : 'Activate'),
-                ],
+              PopupMenuItem(
+                value: 'toggle',
+                child: Row(
+                  children: [
+                    Icon(isActive ? Icons.block : Icons.check_circle, size: 18),
+                    const SizedBox(width: 8),
+                    Text(isActive ? 'Deactivate' : 'Activate'),
+                  ],
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'role',
-              child: Row(
-                children: [
-                  Icon(Icons.admin_panel_settings, size: 18),
-                  SizedBox(width: 8),
-                  Text('Change Role'),
-                ],
+              const PopupMenuItem(
+                value: 'role',
+                child: Row(
+                  children: [
+                    Icon(Icons.admin_panel_settings, size: 18),
+                    SizedBox(width: 8),
+                    Text('Change Role'),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -376,6 +379,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   Color _getRoleColor(UserRole role) {
     switch (role) {
+      case UserRole.superAdmin:
+        return AppColors.warning;
       case UserRole.admin:
         return AppColors.error;
       case UserRole.doctor:
@@ -402,7 +407,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 mainAxisSize: MainAxisSize.min,
                 // Exclude doctor from filter options
                 children: UserRole.values
-                    .where((role) => role != UserRole.doctor)
+                    .where((role) => role != UserRole.doctor && role != UserRole.superAdmin)
                     .map((role) {
                   return CheckboxListTile(
                     title: Text(role.name.toUpperCase()),
@@ -459,6 +464,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final isActive = data['isActive'] ?? true;
     final photoUrl = data['photoUrl'] as String?;
     final fullName = data['fullName'] ?? 'Unknown';
+    final roleStr = data['role'] as String? ?? 'student';
+    final isSuperAdminRow = roleStr == 'superAdmin';
 
     showModalBottomSheet(
       context: context,
@@ -595,56 +602,87 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
               ),
 
-              // Actions
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _toggleUserStatus(id, isActive);
-                        },
-                        icon: Icon(
-                          isActive ? Icons.block : Icons.check_circle,
-                          color: isActive ? AppColors.error : AppColors.success,
-                        ),
-                        label: Text(
-                          isActive ? 'Deactivate' : 'Activate',
-                          style: TextStyle(
-                            color:
-                                isActive ? AppColors.error : AppColors.success,
+              // Actions — hidden for super admin rows (governed via Super Admin UI)
+              if (!isSuperAdminRow)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _toggleUserStatus(id, isActive);
+                          },
+                          icon: Icon(
+                            isActive ? Icons.block : Icons.check_circle,
+                            color: isActive ? AppColors.error : AppColors.success,
                           ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(
-                            color:
-                                isActive ? AppColors.error : AppColors.success,
+                          label: Text(
+                            isActive ? 'Deactivate' : 'Activate',
+                            style: TextStyle(
+                              color:
+                                  isActive ? AppColors.error : AppColors.success,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: BorderSide(
+                              color:
+                                  isActive ? AppColors.error : AppColors.success,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showEditUserDialog(id, data);
-                        },
-                        icon: const Icon(Icons.edit, color: Colors.white),
-                        label: const Text('Edit'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showEditUserDialog(id, data);
+                          },
+                          icon: const Icon(Icons.edit, color: Colors.white),
+                          label: const Text('Edit'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.3),
+                      ),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(Icons.shield, color: AppColors.warning, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Super Admin accounts are managed through the Super Admin panel.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -709,7 +747,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               mainAxisSize: MainAxisSize.min,
               // Exclude doctor from role change options
               children: UserRole.values
-                  .where((role) => role != UserRole.doctor)
+                  .where((role) => role != UserRole.doctor && role != UserRole.superAdmin)
                   .map((role) {
                 return RadioListTile<UserRole>(
                   title: Text(role.name.toUpperCase()),
