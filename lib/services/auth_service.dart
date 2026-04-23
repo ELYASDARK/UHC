@@ -83,14 +83,12 @@ class AuthService {
         userCredential = await _auth.signInWithPopup(provider);
       } else {
         // On mobile, use google_sign_in package
-        final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
+        final googleUser = await _googleSignIn.authenticate();
 
-        if (googleUser == null) {
-          return null; // User cancelled the sign-in
-        }
+
 
         final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
+            googleUser.authentication;
 
         final credential = GoogleAuthProvider.credential(
           idToken: googleAuth.idToken,
@@ -181,13 +179,11 @@ class AuthService {
       }
 
       // On mobile, use google_sign_in package
-      final GoogleSignInAccount? googleUser = await _googleSignIn.authenticate();
-      if (googleUser == null) {
-        throw Exception('Google sign-in cancelled');
-      }
+      final googleUser = await _googleSignIn.authenticate();
+
 
       final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+          googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,

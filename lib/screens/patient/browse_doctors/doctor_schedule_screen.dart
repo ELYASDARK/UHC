@@ -335,7 +335,6 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isAvailable
@@ -353,7 +352,11 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                   ]
                 : null,
           ),
-          child: ListTile(
+          child: Material(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.hardEdge,
+            child: ListTile(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 20,
               vertical: 8,
@@ -417,6 +420,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                   )
                 : const Icon(Icons.block, color: Colors.grey, size: 20),
             onTap: isAvailable ? () => _onSlotTap(slot) : null,
+          ),
           ),
         );
       },

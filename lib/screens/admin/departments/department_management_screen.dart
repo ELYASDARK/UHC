@@ -359,7 +359,6 @@ class _DepartmentManagementScreenState
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -368,7 +367,11 @@ class _DepartmentManagementScreenState
           ),
         ],
       ),
-      child: ListTile(
+      child: Material(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.hardEdge,
+        child: ListTile(
         contentPadding: const EdgeInsets.all(12),
         leading: Stack(
           children: [
@@ -533,6 +536,7 @@ class _DepartmentManagementScreenState
             ),
           ],
         ),
+      ),
       ),
     );
   }

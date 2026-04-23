@@ -241,7 +241,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -250,7 +249,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
         ],
       ),
-      child: ListTile(
+      child: Material(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.hardEdge,
+        child: ListTile(
         contentPadding: const EdgeInsets.all(12),
         leading: Stack(
           children: [
@@ -373,6 +376,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             ],
           ],
         ),
+      ),
       ),
     );
   }

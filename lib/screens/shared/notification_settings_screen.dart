@@ -83,7 +83,9 @@ class _NotificationSettingsScreenState
   void initState() {
     super.initState();
     _loadSettings();
-    _checkPermissions();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPermissions();
+    });
   }
 
   @override
@@ -587,7 +589,6 @@ class _NotificationSettingsScreenState
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -596,7 +597,12 @@ class _NotificationSettingsScreenState
           ),
         ],
       ),
-      child: Column(children: children),
+      child: Material(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.hardEdge,
+        child: Column(children: children),
+      ),
     );
   }
 

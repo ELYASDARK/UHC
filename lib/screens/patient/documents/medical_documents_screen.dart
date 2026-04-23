@@ -198,7 +198,6 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -207,7 +206,11 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
           ),
         ],
       ),
-      child: ListTile(
+      child: Material(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.hardEdge,
+        child: ListTile(
         onTap: () => _viewDocument(doc.url),
         contentPadding: const EdgeInsets.all(12),
         leading: Container(
@@ -314,6 +317,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
               ),
           ],
         ),
+      ),
       ),
     );
   }

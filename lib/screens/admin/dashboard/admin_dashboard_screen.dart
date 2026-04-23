@@ -411,60 +411,63 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               final status = data['status'] ?? 'pending';
               final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
 
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: _getStatusColor(
-                    status,
-                  ).withValues(alpha: 0.15),
-                  child: Icon(
-                    _getStatusIcon(status),
-                    color: _getStatusColor(status),
-                    size: 20,
-                  ),
-                ),
-                title: Text(
-                  data['patientName'] ?? 'Unknown',
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-                subtitle: Text(
-                  'Dr. ${data['doctorName'] ?? 'Unknown'} • ${data['timeSlot'] ?? ''}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(status).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        status == 'pending'
-                            ? 'BOOKED'
-                            : status.toString().toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _getStatusColor(status),
-                        ),
-                      ),
+              return Material(
+                type: MaterialType.transparency,
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: _getStatusColor(
+                      status,
+                    ).withValues(alpha: 0.15),
+                    child: Icon(
+                      _getStatusIcon(status),
+                      color: _getStatusColor(status),
+                      size: 20,
                     ),
-                    if (createdAt != null)
-                      Text(
-                        _formatTime(createdAt),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                  ),
+                  title: Text(
+                    data['patientName'] ?? 'Unknown',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Text(
+                    'Dr. ${data['doctorName'] ?? 'Unknown'} • ${data['timeSlot'] ?? ''}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(status).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          status == 'pending'
+                              ? 'BOOKED'
+                              : status.toString().toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _getStatusColor(status),
+                          ),
                         ),
                       ),
-                  ],
+                      if (createdAt != null)
+                        Text(
+                          _formatTime(createdAt),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               );
             },
