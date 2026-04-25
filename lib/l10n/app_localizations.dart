@@ -3825,6 +3825,534 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'My Document'**
   String get myDocument;
+
+  /// No description provided for @superAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Super Admin'**
+  String get superAdmin;
+
+  /// No description provided for @superAdminDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Super Admin Dashboard'**
+  String get superAdminDashboard;
+
+  /// No description provided for @adminGovernance.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin Governance'**
+  String get adminGovernance;
+
+  /// No description provided for @admins.
+  ///
+  /// In en, this message translates to:
+  /// **'Admins'**
+  String get admins;
+
+  /// No description provided for @permissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions'**
+  String get permissions;
+
+  /// No description provided for @slots.
+  ///
+  /// In en, this message translates to:
+  /// **'Slots'**
+  String get slots;
+
+  /// No description provided for @auditLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Audit Logs'**
+  String get auditLogs;
+
+  /// No description provided for @totalAdmins.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Admins'**
+  String get totalAdmins;
+
+  /// No description provided for @activeAdmins.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get activeAdmins;
+
+  /// No description provided for @inactiveAdmins.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get inactiveAdmins;
+
+  /// No description provided for @superAdmins.
+  ///
+  /// In en, this message translates to:
+  /// **'Super Admins'**
+  String get superAdmins;
+
+  /// No description provided for @superAdminSlots.
+  ///
+  /// In en, this message translates to:
+  /// **'Super Admin Slots'**
+  String get superAdminSlots;
+
+  /// No description provided for @slotHealthy.
+  ///
+  /// In en, this message translates to:
+  /// **'All Slots Healthy'**
+  String get slotHealthy;
+
+  /// No description provided for @slotAttentionNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Slot Attention Needed'**
+  String get slotAttentionNeeded;
+
+  /// No description provided for @primarySlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary'**
+  String get primarySlot;
+
+  /// No description provided for @backupSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get backupSlot;
+
+  /// No description provided for @primarySlotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary Super Admin slot is empty'**
+  String get primarySlotEmpty;
+
+  /// No description provided for @backupSlotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup Super Admin slot is empty'**
+  String get backupSlotEmpty;
+
+  /// No description provided for @inactiveAdminWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} admin account(s) are inactive'**
+  String inactiveAdminWarning(int count);
+
+  /// No description provided for @riskWarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Risk Warnings'**
+  String get riskWarnings;
+
+  /// No description provided for @adminControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin Control'**
+  String get adminControl;
+
+  /// No description provided for @viewOnlyMode.
+  ///
+  /// In en, this message translates to:
+  /// **'View-only mode: only Super Admin can perform governance actions.'**
+  String get viewOnlyMode;
+
+  /// No description provided for @createAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Admin'**
+  String get createAdmin;
+
+  /// No description provided for @promote.
+  ///
+  /// In en, this message translates to:
+  /// **'Promote'**
+  String get promote;
+
+  /// No description provided for @demote.
+  ///
+  /// In en, this message translates to:
+  /// **'Demote'**
+  String get demote;
+
+  /// No description provided for @activate.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get activate;
+
+  /// No description provided for @deactivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate'**
+  String get deactivate;
+
+  /// No description provided for @passwordResetAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Password Reset'**
+  String get passwordResetAction;
+
+  /// No description provided for @deleteAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Admin'**
+  String get deleteAdmin;
+
+  /// No description provided for @forceSignOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Force Sign-Out'**
+  String get forceSignOut;
+
+  /// No description provided for @permissionsUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions Update'**
+  String get permissionsUpdate;
+
+  /// No description provided for @slotAssign.
+  ///
+  /// In en, this message translates to:
+  /// **'Slot Assign'**
+  String get slotAssign;
+
+  /// No description provided for @slotRotate.
+  ///
+  /// In en, this message translates to:
+  /// **'Slot Rotate'**
+  String get slotRotate;
+
+  /// No description provided for @allActions.
+  ///
+  /// In en, this message translates to:
+  /// **'All Actions'**
+  String get allActions;
+
+  /// No description provided for @filterByTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Target'**
+  String get filterByTarget;
+
+  /// No description provided for @filterByActor.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Actor'**
+  String get filterByActor;
+
+  /// No description provided for @filterByDateRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Date Range'**
+  String get filterByDateRange;
+
+  /// No description provided for @filterAuditDates.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter Audit Dates'**
+  String get filterAuditDates;
+
+  /// No description provided for @targetUserUid.
+  ///
+  /// In en, this message translates to:
+  /// **'Target User UID'**
+  String get targetUserUid;
+
+  /// No description provided for @actorUserUid.
+  ///
+  /// In en, this message translates to:
+  /// **'Actor User UID'**
+  String get actorUserUid;
+
+  /// No description provided for @pasteUidHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the UID here'**
+  String get pasteUidHere;
+
+  /// No description provided for @apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get apply;
+
+  /// No description provided for @noAuditLogsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No audit logs found'**
+  String get noAuditLogsFound;
+
+  /// No description provided for @noRecentActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent activity'**
+  String get noRecentActivity;
+
+  /// No description provided for @recentAuditActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Audit Activity'**
+  String get recentAuditActivity;
+
+  /// No description provided for @assignSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign Slot'**
+  String get assignSlot;
+
+  /// No description provided for @rotateSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate Slot'**
+  String get rotateSlot;
+
+  /// No description provided for @slotType.
+  ///
+  /// In en, this message translates to:
+  /// **'Slot Type'**
+  String get slotType;
+
+  /// No description provided for @replacementUid.
+  ///
+  /// In en, this message translates to:
+  /// **'Replacement UID'**
+  String get replacementUid;
+
+  /// No description provided for @maxSlotsReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum 2 Super Admin slots reached'**
+  String get maxSlotsReached;
+
+  /// No description provided for @fullAccessPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Full Access'**
+  String get fullAccessPreset;
+
+  /// No description provided for @readOnlyPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Read Only'**
+  String get readOnlyPreset;
+
+  /// No description provided for @operationsPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Operations'**
+  String get operationsPreset;
+
+  /// No description provided for @customPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get customPreset;
+
+  /// No description provided for @doctorsManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Doctors'**
+  String get doctorsManage;
+
+  /// No description provided for @departmentsManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Departments'**
+  String get departmentsManage;
+
+  /// No description provided for @usersManageNonAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Users (Non-Admin)'**
+  String get usersManageNonAdmin;
+
+  /// No description provided for @appointmentsView.
+  ///
+  /// In en, this message translates to:
+  /// **'View Appointments'**
+  String get appointmentsView;
+
+  /// No description provided for @reportsExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Reports'**
+  String get reportsExport;
+
+  /// No description provided for @reportsView.
+  ///
+  /// In en, this message translates to:
+  /// **'View Reports'**
+  String get reportsView;
+
+  /// No description provided for @analyticsView.
+  ///
+  /// In en, this message translates to:
+  /// **'View Analytics'**
+  String get analyticsView;
+
+  /// No description provided for @notificationsSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Notifications'**
+  String get notificationsSend;
+
+  /// No description provided for @permissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission Required'**
+  String get permissionRequired;
+
+  /// No description provided for @exportPermissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Permission Required'**
+  String get exportPermissionRequired;
+
+  /// No description provided for @noPermissionForAction.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission for this action'**
+  String get noPermissionForAction;
+
+  /// No description provided for @generateReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Report'**
+  String get generateReport;
+
+  /// No description provided for @generating.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating...'**
+  String get generating;
+
+  /// No description provided for @addDoctor.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Doctor'**
+  String get addDoctor;
+
+  /// No description provided for @addDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Department'**
+  String get addDepartment;
+
+  /// No description provided for @addUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Add User'**
+  String get addUser;
+
+  /// No description provided for @editDoctor.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Doctor'**
+  String get editDoctor;
+
+  /// No description provided for @deleteDoctor.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Doctor'**
+  String get deleteDoctor;
+
+  /// No description provided for @toggleDoctorStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Doctor Status'**
+  String get toggleDoctorStatus;
+
+  /// No description provided for @editDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Department'**
+  String get editDepartment;
+
+  /// No description provided for @deleteDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Department'**
+  String get deleteDepartment;
+
+  /// No description provided for @toggleDepartmentStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Department Status'**
+  String get toggleDepartmentStatus;
+
+  /// No description provided for @editUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit User'**
+  String get editUser;
+
+  /// No description provided for @deleteUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete User'**
+  String get deleteUser;
+
+  /// No description provided for @toggleUserStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle User Status'**
+  String get toggleUserStatus;
+
+  /// No description provided for @changeUserRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Change User Role'**
+  String get changeUserRole;
+
+  /// No description provided for @confirmDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Delete'**
+  String get confirmDeleteTitle;
+
+  /// No description provided for @confirmDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this? This action cannot be undone.'**
+  String get confirmDeleteMessage;
+
+  /// No description provided for @confirmToggleStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Status'**
+  String get confirmToggleStatusTitle;
+
+  /// No description provided for @confirmToggleStatusMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to change the status?'**
+  String get confirmToggleStatusMessage;
+
+  /// No description provided for @noAdminsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No admin accounts found'**
+  String get noAdminsFound;
+
+  /// No description provided for @createFirstAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your first admin account'**
+  String get createFirstAdmin;
+
+  /// No description provided for @bootstrapSuperAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Bootstrap Super Admin'**
+  String get bootstrapSuperAdmin;
+
+  /// No description provided for @migrationRunbook.
+  ///
+  /// In en, this message translates to:
+  /// **'Migration Runbook'**
+  String get migrationRunbook;
 }
 
 class _AppLocalizationsDelegate

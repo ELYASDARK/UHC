@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = void 0;
+exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -23,18 +23,6 @@ async function getCallerUserDoc(uid) {
         throw new functions.https.HttpsError('not-found', 'Caller user document not found.');
     }
     return doc;
-}
-/** Returns true if user role is admin or superAdmin. */
-function isAdminOrSuperAdmin(role) {
-    return role === 'admin' || role === 'superAdmin';
-}
-/** Throws if caller is not admin or superAdmin. */
-function requireAdminOrSuperAdmin(callerDoc) {
-    var _a;
-    const role = (_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role;
-    if (!isAdminOrSuperAdmin(role)) {
-        throw new functions.https.HttpsError('permission-denied', 'Only admins can perform this action.');
-    }
 }
 /** Throws if caller is not superAdmin. */
 function requireSuperAdmin(callerDoc) {
@@ -63,8 +51,39 @@ function requirePermission(callerDoc, permissionKey) {
 }
 /** Writes an entry to admin_audit_logs collection. */
 async function writeAdminAuditLog(params) {
-    await db.collection('admin_audit_logs').add(Object.assign(Object.assign({}, params), { createdAt: admin.firestore.Timestamp.now() }));
+    const payload = Object.assign(Object.assign({}, params), { createdAt: admin.firestore.Timestamp.now() });
+    // Firestore rejects undefined values; strip optional undefined fields.
+    const sanitized = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+    await db.collection('admin_audit_logs').add(sanitized);
 }
+/** Convert unknown runtime errors to consistent callable HttpsError responses. */
+function toHttpsError(error, fallbackMessage) {
+    if (error instanceof functions.https.HttpsError) {
+        return error;
+    }
+    const maybe = error;
+    const code = maybe === null || maybe === void 0 ? void 0 : maybe.code;
+    if (code === 'auth/user-not-found') {
+        return new functions.https.HttpsError('not-found', 'Target auth user not found.');
+    }
+    if (code === 'auth/invalid-password' || code === 'auth/weak-password') {
+        return new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+    }
+    const message = (maybe === null || maybe === void 0 ? void 0 : maybe.message) || fallbackMessage;
+    return new functions.https.HttpsError('internal', message);
+}
+const READ_ONLY_ADMIN_PERMISSIONS = {
+    'users.view': true,
+    'users.manageNonAdmin': false,
+    'doctors.view': true,
+    'doctors.manage': false,
+    'departments.view': true,
+    'departments.manage': false,
+    'analytics.view': true,
+    'reports.view': true,
+    'reports.export': false,
+    'notifications.send': false,
+};
 /**
  * Cloud Function to create a doctor account
  * This creates both the Firebase Auth user and the Firestore documents
@@ -172,17 +191,10 @@ exports.createDoctorAccount = functions.https.onCall(async (request) => {
  * Cloud Function to update a doctor's auth email
  */
 exports.updateDoctorEmail = functions.https.onCall(async (request) => {
-    var _a;
     const data = request.data;
-    const context = request;
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to perform this action.');
-    }
-    // Verify caller is admin
-    const callerDoc = await db.collection('users').doc(context.auth.uid).get();
-    if (!callerDoc.exists || !isAdminOrSuperAdmin((_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role)) {
-        throw new functions.https.HttpsError('permission-denied', 'Only admins can update doctor accounts.');
-    }
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'doctors.manage');
     try {
         // Get doctor document to find userId
         const doctorDoc = await db.collection('doctors').doc(data.doctorId).get();
@@ -216,17 +228,10 @@ exports.updateDoctorEmail = functions.https.onCall(async (request) => {
  * Cloud Function to delete a doctor account
  */
 exports.deleteDoctorAccount = functions.https.onCall(async (request) => {
-    var _a;
     const data = request.data;
-    const context = request;
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to perform this action.');
-    }
-    // Verify caller is admin
-    const callerDoc = await db.collection('users').doc(context.auth.uid).get();
-    if (!callerDoc.exists || !isAdminOrSuperAdmin((_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role)) {
-        throw new functions.https.HttpsError('permission-denied', 'Only admins can delete doctor accounts.');
-    }
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'doctors.manage');
     try {
         // Get doctor document to find userId
         const doctorDoc = await db.collection('doctors').doc(data.doctorId).get();
@@ -259,17 +264,10 @@ exports.deleteDoctorAccount = functions.https.onCall(async (request) => {
  * Cloud Function to reset a doctor's password
  */
 exports.resetDoctorPassword = functions.https.onCall(async (request) => {
-    var _a;
     const data = request.data;
-    const context = request;
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to perform this action.');
-    }
-    // Verify caller is admin
-    const callerDoc = await db.collection('users').doc(context.auth.uid).get();
-    if (!callerDoc.exists || !isAdminOrSuperAdmin((_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role)) {
-        throw new functions.https.HttpsError('permission-denied', 'Only admins can reset doctor passwords.');
-    }
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'doctors.manage');
     if (!data.newPassword || data.newPassword.length < 6) {
         throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters long.');
     }
@@ -302,7 +300,7 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
     // Auth + permission check
     const callerUid = requireAuth(request);
     const callerDoc = await getCallerUserDoc(callerUid);
-    requireAdminOrSuperAdmin(callerDoc);
+    requirePermission(callerDoc, 'users.manageNonAdmin');
     // Validate required fields
     if (!data.email || !data.password || !data.fullName || !data.role) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: email, password, fullName, role');
@@ -367,6 +365,347 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
         }
         throw new functions.https.HttpsError('internal', 'Failed to create user account. Please try again.');
     }
+});
+/**
+ * Cloud Function to update doctor profile-safe fields.
+ */
+exports.updateDoctorProfile = functions.https.onCall(async (request) => {
+    var _a;
+    const data = request.data;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'doctors.manage');
+    if (!data.doctorId) {
+        throw new functions.https.HttpsError('invalid-argument', 'doctorId is required.');
+    }
+    const doctorRef = db.collection('doctors').doc(data.doctorId);
+    const doctorSnap = await doctorRef.get();
+    if (!doctorSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Doctor not found.');
+    }
+    const updates = {
+        updatedAt: admin.firestore.Timestamp.now(),
+    };
+    if (data.name !== undefined)
+        updates.name = data.name.trim();
+    if (data.specialization !== undefined)
+        updates.specialization = data.specialization.trim();
+    if (data.department !== undefined)
+        updates.department = data.department;
+    if (data.bio !== undefined)
+        updates.bio = (_a = data.bio) !== null && _a !== void 0 ? _a : '';
+    if (data.photoUrl !== undefined)
+        updates.photoUrl = data.photoUrl;
+    if (data.experienceYears !== undefined)
+        updates.experienceYears = data.experienceYears;
+    if (data.consultationFee !== undefined)
+        updates.consultationFee = data.consultationFee;
+    if (data.qualifications !== undefined)
+        updates.qualifications = data.qualifications;
+    if (data.dailyNotificationTime !== undefined) {
+        updates.dailyNotificationTime = data.dailyNotificationTime;
+    }
+    if (data.isActive !== undefined)
+        updates.isActive = data.isActive;
+    await doctorRef.update(updates);
+    return { success: true, message: 'Doctor profile updated successfully' };
+});
+/**
+ * Cloud Function to activate/deactivate a doctor record.
+ */
+exports.setDoctorActiveStatus = functions.https.onCall(async (request) => {
+    const data = request.data;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'doctors.manage');
+    if (!data.doctorId || typeof data.isActive !== 'boolean') {
+        throw new functions.https.HttpsError('invalid-argument', 'doctorId and isActive are required.');
+    }
+    const doctorRef = db.collection('doctors').doc(data.doctorId);
+    const doctorSnap = await doctorRef.get();
+    if (!doctorSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Doctor not found.');
+    }
+    await doctorRef.update({
+        isActive: data.isActive,
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    return {
+        success: true,
+        message: data.isActive ? 'Doctor activated successfully' : 'Doctor deactivated successfully',
+    };
+});
+/**
+ * Cloud Function to update a doctor's weekly schedule.
+ */
+exports.updateDoctorSchedule = functions.https.onCall(async (request) => {
+    const data = request.data;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'doctors.manage');
+    if (!data.doctorId || !data.weeklySchedule || typeof data.weeklySchedule !== 'object') {
+        throw new functions.https.HttpsError('invalid-argument', 'doctorId and weeklySchedule are required.');
+    }
+    const doctorRef = db.collection('doctors').doc(data.doctorId);
+    const doctorSnap = await doctorRef.get();
+    if (!doctorSnap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Doctor not found.');
+    }
+    await doctorRef.update({
+        weeklySchedule: data.weeklySchedule,
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    return { success: true, message: 'Schedule updated successfully' };
+});
+/**
+ * Cloud Function to create a department document.
+ */
+exports.createDepartment = functions.https.onCall(async (request) => {
+    var _a, _b, _c;
+    const data = request.data;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'departments.manage');
+    if (!data.key || !data.name || !data.workingHours) {
+        throw new functions.https.HttpsError('invalid-argument', 'key, name, and workingHours are required.');
+    }
+    const existing = await db.collection('departments')
+        .where('key', '==', data.key)
+        .limit(1)
+        .get();
+    if (!existing.empty) {
+        throw new functions.https.HttpsError('already-exists', 'Department key already exists.');
+    }
+    const now = admin.firestore.Timestamp.now();
+    const ref = await db.collection('departments').add({
+        key: data.key,
+        name: data.name,
+        description: (_a = data.description) !== null && _a !== void 0 ? _a : '',
+        iconName: (_b = data.iconName) !== null && _b !== void 0 ? _b : 'medical_services',
+        colorHex: (_c = data.colorHex) !== null && _c !== void 0 ? _c : '#2196F3',
+        workingHours: data.workingHours,
+        isActive: true,
+        doctorCount: 0,
+        createdAt: now,
+        updatedAt: now,
+    });
+    return { success: true, departmentId: ref.id, message: 'Department created successfully' };
+});
+/**
+ * Cloud Function to update department fields.
+ */
+exports.updateDepartment = functions.https.onCall(async (request) => {
+    const data = request.data;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'departments.manage');
+    if (!data.departmentId) {
+        throw new functions.https.HttpsError('invalid-argument', 'departmentId is required.');
+    }
+    const ref = db.collection('departments').doc(data.departmentId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Department not found.');
+    }
+    const updates = {
+        updatedAt: admin.firestore.Timestamp.now(),
+    };
+    if (data.key !== undefined)
+        updates.key = data.key;
+    if (data.name !== undefined)
+        updates.name = data.name;
+    if (data.description !== undefined)
+        updates.description = data.description;
+    if (data.iconName !== undefined)
+        updates.iconName = data.iconName;
+    if (data.colorHex !== undefined)
+        updates.colorHex = data.colorHex;
+    if (data.workingHours !== undefined)
+        updates.workingHours = data.workingHours;
+    await ref.update(updates);
+    return { success: true, message: 'Department updated successfully' };
+});
+/**
+ * Cloud Function to activate/deactivate a department.
+ */
+exports.setDepartmentActiveStatus = functions.https.onCall(async (request) => {
+    const data = request.data;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'departments.manage');
+    if (!data.departmentId || typeof data.isActive !== 'boolean') {
+        throw new functions.https.HttpsError('invalid-argument', 'departmentId and isActive are required.');
+    }
+    const ref = db.collection('departments').doc(data.departmentId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Department not found.');
+    }
+    await ref.update({
+        isActive: data.isActive,
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    return {
+        success: true,
+        message: data.isActive
+            ? 'Department activated successfully'
+            : 'Department deactivated successfully',
+    };
+});
+/**
+ * Cloud Function to delete a department.
+ */
+exports.deleteDepartment = functions.https.onCall(async (request) => {
+    const data = request.data;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'departments.manage');
+    if (!data.departmentId) {
+        throw new functions.https.HttpsError('invalid-argument', 'departmentId is required.');
+    }
+    const ref = db.collection('departments').doc(data.departmentId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+        throw new functions.https.HttpsError('not-found', 'Department not found.');
+    }
+    await ref.delete();
+    return { success: true, message: 'Department deleted successfully' };
+});
+/**
+ * Create the caller's own user document after self-registration.
+ * This keeps users/{userId} create blocked in Firestore rules while
+ * preserving the existing registerWithEmail UX.
+ */
+exports.bootstrapSelfUserDocument = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const data = request.data;
+    if (!(data === null || data === void 0 ? void 0 : data.fullName) || !data.fullName.trim()) {
+        throw new functions.https.HttpsError('invalid-argument', 'fullName is required.');
+    }
+    const userRef = db.collection('users').doc(callerUid);
+    const existingDoc = await userRef.get();
+    if (existingDoc.exists) {
+        return { success: true, message: 'User document already exists.' };
+    }
+    const authUser = await auth.getUser(callerUid);
+    const now = admin.firestore.Timestamp.now();
+    await userRef.set({
+        email: authUser.email || '',
+        fullName: data.fullName.trim(),
+        photoUrl: authUser.photoURL || null,
+        phoneNumber: data.phoneNumber || null,
+        dateOfBirth: data.dateOfBirth
+            ? admin.firestore.Timestamp.fromDate(new Date(data.dateOfBirth))
+            : null,
+        bloodType: null,
+        allergies: null,
+        role: 'student',
+        studentId: null,
+        staffId: null,
+        createdAt: now,
+        updatedAt: now,
+        isActive: true,
+        notificationSettings: {
+            email: true,
+            push: true,
+            sms: false,
+        },
+        language: 'en',
+        googleEmail: null,
+    });
+    return { success: true, message: 'User profile initialized successfully.' };
+});
+/**
+ * Activate/deactivate a non-admin user.
+ * Admin requires users.manageNonAdmin permission.
+ * Super Admin bypasses permission checks.
+ */
+exports.setUserActiveStatus = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'users.manageNonAdmin');
+    const { targetUid, isActive } = request.data;
+    if (!targetUid || typeof isActive !== 'boolean') {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid targetUid/isActive.');
+    }
+    const callerRole = callerDoc.data().role;
+    const targetDoc = await db.collection('users').doc(targetUid).get();
+    if (!targetDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Target user not found.');
+    }
+    const targetRole = targetDoc.data().role;
+    if (targetRole === 'superAdmin') {
+        throw new functions.https.HttpsError('failed-precondition', 'Cannot modify Super Admin status via this function.');
+    }
+    if (targetRole === 'admin') {
+        throw new functions.https.HttpsError('failed-precondition', 'Use setAdminActiveStatus for admin accounts.');
+    }
+    if (callerRole === 'admin' && targetRole === 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'Admins cannot modify admin accounts.');
+    }
+    await db.collection('users').doc(targetUid).update({
+        isActive,
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    return {
+        success: true,
+        message: isActive ? 'User activated successfully.' : 'User deactivated successfully.',
+    };
+});
+/**
+ * Update profile-safe fields for a target user via server-side enforcement.
+ * Admins can manage non-admin users only.
+ * Super Admins can manage admins and non-admins (excluding super admins).
+ */
+exports.updateUserProfileByAdmin = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'users.manageNonAdmin');
+    const data = request.data;
+    if (!(data === null || data === void 0 ? void 0 : data.targetUid)) {
+        throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+    }
+    const callerRole = callerDoc.data().role;
+    const targetRef = db.collection('users').doc(data.targetUid);
+    const targetDoc = await targetRef.get();
+    if (!targetDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Target user not found.');
+    }
+    const targetRole = targetDoc.data().role;
+    if (targetRole === 'superAdmin') {
+        throw new functions.https.HttpsError('failed-precondition', 'Cannot update Super Admin profile via this function.');
+    }
+    if (callerRole === 'admin' && targetRole === 'admin') {
+        throw new functions.https.HttpsError('permission-denied', 'Admins cannot edit admin accounts.');
+    }
+    const updates = {
+        updatedAt: admin.firestore.Timestamp.now(),
+    };
+    if (data.fullName !== undefined) {
+        const trimmed = data.fullName.trim();
+        if (!trimmed) {
+            throw new functions.https.HttpsError('invalid-argument', 'fullName cannot be empty.');
+        }
+        updates.fullName = trimmed;
+    }
+    if (data.phoneNumber !== undefined)
+        updates.phoneNumber = data.phoneNumber;
+    if (data.photoUrl !== undefined)
+        updates.photoUrl = data.photoUrl;
+    if (data.studentId !== undefined)
+        updates.studentId = data.studentId;
+    if (data.staffId !== undefined)
+        updates.staffId = data.staffId;
+    if (data.dateOfBirth !== undefined) {
+        updates.dateOfBirth = data.dateOfBirth
+            ? admin.firestore.Timestamp.fromDate(new Date(data.dateOfBirth))
+            : null;
+    }
+    await targetRef.update(updates);
+    return {
+        success: true,
+        message: 'User profile updated successfully.',
+    };
 });
 // ─────────────────────────────────────────────────────────
 // FCM Push Notification Functions
@@ -474,17 +813,10 @@ exports.onNotificationCreated = functions.firestore
  * (e.g. "announcements", "department_cardiology").
  */
 exports.sendTopicNotification = functions.https.onCall(async (request) => {
-    var _a;
     const data = request.data;
-    const context = request;
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to perform this action.');
-    }
-    // Verify caller is admin
-    const callerDoc = await db.collection('users').doc(context.auth.uid).get();
-    if (!callerDoc.exists || !isAdminOrSuperAdmin((_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role)) {
-        throw new functions.https.HttpsError('permission-denied', 'Only admins can send topic notifications.');
-    }
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'notifications.send');
     if (!data.topic || !data.title || !data.body) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: topic, title, body');
     }
@@ -551,7 +883,8 @@ exports.createAdminAccount = functions.https.onCall(async (request) => {
             email: data.email, fullName: data.fullName, role: 'admin',
             phoneNumber: data.phoneNumber || null, photoUrl: data.photoUrl || null,
             dateOfBirth: data.dateOfBirth ? admin.firestore.Timestamp.fromDate(new Date(data.dateOfBirth)) : null,
-            isActive: true, adminPermissions: null, // full access by default
+            isActive: true,
+            adminPermissions: READ_ONLY_ADMIN_PERMISSIONS,
             notificationSettings: { email: true, push: true, sms: false },
             language: 'en', createdAt: now, updatedAt: now,
             bloodType: null, allergies: null, studentId: null, staffId: null,
@@ -605,46 +938,61 @@ exports.changeAdminRole = functions.https.onCall(async (request) => {
  * Activate or deactivate an admin. Super Admin only.
  */
 exports.setAdminActiveStatus = functions.https.onCall(async (request) => {
-    const callerUid = requireAuth(request);
-    const callerDoc = await getCallerUserDoc(callerUid);
-    requireSuperAdmin(callerDoc);
-    const { targetUid, isActive } = request.data;
-    const targetDoc = await db.collection('users').doc(targetUid).get();
-    if (!targetDoc.exists)
-        throw new functions.https.HttpsError('not-found', 'Target user not found.');
-    const targetRole = targetDoc.data().role;
-    if (targetRole !== 'admin')
-        throw new functions.https.HttpsError('failed-precondition', 'This function can only target admin accounts.');
-    await db.collection('users').doc(targetUid).update({ isActive, updatedAt: admin.firestore.Timestamp.now() });
-    await writeAdminAuditLog({
-        actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
-        targetUid, targetName: targetDoc.data().fullName,
-        action: isActive ? 'admin.activate' : 'admin.deactivate',
-    });
-    return { success: true, message: isActive ? 'Admin activated' : 'Admin deactivated' };
+    try {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requireSuperAdmin(callerDoc);
+        const { targetUid, isActive } = request.data;
+        if (!targetUid || typeof isActive !== 'boolean') {
+            throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid targetUid/isActive.');
+        }
+        const targetDoc = await db.collection('users').doc(targetUid).get();
+        if (!targetDoc.exists)
+            throw new functions.https.HttpsError('not-found', 'Target user not found.');
+        const targetRole = targetDoc.data().role;
+        if (targetRole !== 'admin')
+            throw new functions.https.HttpsError('failed-precondition', 'This function can only target admin accounts.');
+        await db.collection('users').doc(targetUid).update({ isActive, updatedAt: admin.firestore.Timestamp.now() });
+        await writeAdminAuditLog({
+            actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
+            targetUid, targetName: targetDoc.data().fullName,
+            action: isActive ? 'admin.activate' : 'admin.deactivate',
+        });
+        return { success: true, message: isActive ? 'Admin activated' : 'Admin deactivated' };
+    }
+    catch (error) {
+        console.error('setAdminActiveStatus failed:', error);
+        throw toHttpsError(error, 'Failed to update admin active status.');
+    }
 });
 /**
  * Reset an admin's password. Super Admin only.
  */
 exports.resetAdminPassword = functions.https.onCall(async (request) => {
-    const callerUid = requireAuth(request);
-    const callerDoc = await getCallerUserDoc(callerUid);
-    requireSuperAdmin(callerDoc);
-    const { targetUid, newPassword } = request.data;
-    if (!newPassword || newPassword.length < 6)
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters.');
-    const targetDoc = await db.collection('users').doc(targetUid).get();
-    if (!targetDoc.exists)
-        throw new functions.https.HttpsError('not-found', 'Target user not found.');
-    if (targetDoc.data().role !== 'admin')
-        throw new functions.https.HttpsError('failed-precondition', 'This function can only target admin accounts.');
-    await auth.updateUser(targetUid, { password: newPassword });
-    await writeAdminAuditLog({
-        actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
-        targetUid, targetName: targetDoc.data().fullName,
-        action: 'admin.passwordReset',
-    });
-    return { success: true, message: 'Password reset successfully' };
+    try {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requireSuperAdmin(callerDoc);
+        const { targetUid, newPassword } = request.data;
+        if (!targetUid || !newPassword || newPassword.length < 6)
+            throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+        const targetDoc = await db.collection('users').doc(targetUid).get();
+        if (!targetDoc.exists)
+            throw new functions.https.HttpsError('not-found', 'Target user not found.');
+        if (targetDoc.data().role !== 'admin')
+            throw new functions.https.HttpsError('failed-precondition', 'This function can only target admin accounts.');
+        await auth.updateUser(targetUid, { password: newPassword });
+        await writeAdminAuditLog({
+            actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
+            targetUid, targetName: targetDoc.data().fullName,
+            action: 'admin.passwordReset',
+        });
+        return { success: true, message: 'Password reset successfully' };
+    }
+    catch (error) {
+        console.error('resetAdminPassword failed:', error);
+        throw toHttpsError(error, 'Failed to reset admin password.');
+    }
 });
 /**
  * Delete an admin account. Super Admin only.
@@ -678,49 +1026,85 @@ exports.deleteAdminAccount = functions.https.onCall(async (request) => {
  * Force sign-out a user by revoking refresh tokens. Super Admin only.
  */
 exports.forceSignOutUser = functions.https.onCall(async (request) => {
-    const callerUid = requireAuth(request);
-    const callerDoc = await getCallerUserDoc(callerUid);
-    requireSuperAdmin(callerDoc);
-    const { targetUid } = request.data;
-    const targetDoc = await db.collection('users').doc(targetUid).get();
-    if (!targetDoc.exists)
-        throw new functions.https.HttpsError('not-found', 'Target user not found.');
-    await auth.revokeRefreshTokens(targetUid);
-    // Also remove FCM token to stop push notifications
-    await db.collection('user_tokens').doc(targetUid).delete().catch(() => { });
-    await writeAdminAuditLog({
-        actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
-        targetUid, targetName: targetDoc.data().fullName,
-        action: 'admin.forceSignOut',
-    });
-    return { success: true, message: 'User sessions revoked' };
+    try {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requireSuperAdmin(callerDoc);
+        const { targetUid } = request.data;
+        if (!targetUid) {
+            throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+        }
+        const targetDoc = await db.collection('users').doc(targetUid).get();
+        if (!targetDoc.exists)
+            throw new functions.https.HttpsError('not-found', 'Target user not found.');
+        let authUserFound = true;
+        try {
+            await auth.revokeRefreshTokens(targetUid);
+        }
+        catch (error) {
+            const code = error === null || error === void 0 ? void 0 : error.code;
+            if (code === 'auth/user-not-found') {
+                authUserFound = false;
+            }
+            else {
+                throw error;
+            }
+        }
+        // Also remove FCM token to stop push notifications
+        await db.collection('user_tokens').doc(targetUid).delete().catch(() => { });
+        await writeAdminAuditLog({
+            actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
+            targetUid, targetName: targetDoc.data().fullName,
+            action: 'admin.forceSignOut',
+            metadata: { authUserFound },
+        });
+        return {
+            success: true,
+            message: authUserFound
+                ? 'User sessions revoked'
+                : 'Auth user not found; local tokens were cleared.',
+        };
+    }
+    catch (error) {
+        console.error('forceSignOutUser failed:', error);
+        throw toHttpsError(error, 'Failed to force sign out user.');
+    }
 });
 /**
  * Set admin permissions. Super Admin only.
  */
 exports.setAdminPermissions = functions.https.onCall(async (request) => {
-    const callerUid = requireAuth(request);
-    const callerDoc = await getCallerUserDoc(callerUid);
-    requireSuperAdmin(callerDoc);
-    const { targetUid, permissions } = request.data;
-    const targetDoc = await db.collection('users').doc(targetUid).get();
-    if (!targetDoc.exists)
-        throw new functions.https.HttpsError('not-found', 'Target user not found.');
-    if (targetDoc.data().role !== 'admin')
-        throw new functions.https.HttpsError('failed-precondition', 'Permissions can only be set on admin accounts.');
-    const oldPerms = targetDoc.data().adminPermissions || {};
-    await db.collection('users').doc(targetUid).update({
-        adminPermissions: permissions,
-        updatedAt: admin.firestore.Timestamp.now(),
-    });
-    await writeAdminAuditLog({
-        actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
-        targetUid, targetName: targetDoc.data().fullName,
-        action: 'admin.permissionsUpdate',
-        before: oldPerms,
-        after: permissions,
-    });
-    return { success: true, message: 'Permissions updated' };
+    try {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requireSuperAdmin(callerDoc);
+        const { targetUid, permissions } = request.data;
+        if (!targetUid || !permissions || typeof permissions !== 'object') {
+            throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid targetUid/permissions.');
+        }
+        const targetDoc = await db.collection('users').doc(targetUid).get();
+        if (!targetDoc.exists)
+            throw new functions.https.HttpsError('not-found', 'Target user not found.');
+        if (targetDoc.data().role !== 'admin')
+            throw new functions.https.HttpsError('failed-precondition', 'Permissions can only be set on admin accounts.');
+        const oldPerms = targetDoc.data().adminPermissions || {};
+        await db.collection('users').doc(targetUid).update({
+            adminPermissions: permissions,
+            updatedAt: admin.firestore.Timestamp.now(),
+        });
+        await writeAdminAuditLog({
+            actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
+            targetUid, targetName: targetDoc.data().fullName,
+            action: 'admin.permissionsUpdate',
+            before: oldPerms,
+            after: permissions,
+        });
+        return { success: true, message: 'Permissions updated' };
+    }
+    catch (error) {
+        console.error('setAdminPermissions failed:', error);
+        throw toHttpsError(error, 'Failed to update admin permissions.');
+    }
 });
 // ─────────────────────────────────────────────────────────
 // Super Admin Slot Management (strict two-account model)
@@ -854,22 +1238,62 @@ exports.rotateSuperAdminSlot = functions.https.onCall(async (request) => {
  * List admin audit logs with optional filtering. Super Admin only.
  */
 exports.listAdminAuditLogs = functions.https.onCall(async (request) => {
-    const callerUid = requireAuth(request);
-    const callerDoc = await getCallerUserDoc(callerUid);
-    requireSuperAdmin(callerDoc);
-    const { limit: queryLimit, targetUid, action } = request.data || {};
-    let query = db.collection('admin_audit_logs')
-        .orderBy('createdAt', 'desc');
-    if (targetUid)
-        query = query.where('targetUid', '==', targetUid);
-    if (action)
-        query = query.where('action', '==', action);
-    query = query.limit(Math.min(queryLimit || 50, 200));
-    const snap = await query.get();
-    const logs = snap.docs.map(doc => {
-        var _a, _b, _c;
-        return (Object.assign(Object.assign({ id: doc.id }, doc.data()), { createdAt: ((_c = (_b = (_a = doc.data().createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a)) === null || _c === void 0 ? void 0 : _c.toISOString()) || null }));
-    });
-    return { success: true, logs };
+    try {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requireSuperAdmin(callerDoc);
+        const { limit: queryLimit, targetUid, actorUid, action, dateFrom, dateTo, } = request.data || {};
+        let dateFromValue = null;
+        let dateToValue = null;
+        if (dateFrom) {
+            const parsed = new Date(dateFrom);
+            if (Number.isNaN(parsed.getTime())) {
+                throw new functions.https.HttpsError('invalid-argument', 'dateFrom must be a valid ISO date string.');
+            }
+            dateFromValue = parsed;
+        }
+        if (dateTo) {
+            const parsed = new Date(dateTo);
+            if (Number.isNaN(parsed.getTime())) {
+                throw new functions.https.HttpsError('invalid-argument', 'dateTo must be a valid ISO date string.');
+            }
+            dateToValue = parsed;
+        }
+        if (dateFromValue && dateToValue && dateFromValue > dateToValue) {
+            throw new functions.https.HttpsError('invalid-argument', 'dateFrom cannot be later than dateTo.');
+        }
+        // Query only by createdAt desc to avoid composite index failures;
+        // apply additional filters in memory.
+        const snap = await db
+            .collection('admin_audit_logs')
+            .orderBy('createdAt', 'desc')
+            .limit(Math.min(queryLimit || 100, 500))
+            .get();
+        const filteredDocs = snap.docs.filter((doc) => {
+            var _a, _b;
+            const data = doc.data();
+            if (targetUid && data.targetUid !== targetUid)
+                return false;
+            if (actorUid && data.actorUid !== actorUid)
+                return false;
+            if (action && data.action !== action)
+                return false;
+            const createdAtDate = (_b = (_a = data.createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a);
+            if (dateFromValue && (!createdAtDate || createdAtDate < dateFromValue))
+                return false;
+            if (dateToValue && (!createdAtDate || createdAtDate > dateToValue))
+                return false;
+            return true;
+        });
+        const logs = filteredDocs.map(doc => {
+            var _a, _b, _c;
+            return (Object.assign(Object.assign({ id: doc.id }, doc.data()), { createdAt: ((_c = (_b = (_a = doc.data().createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a)) === null || _c === void 0 ? void 0 : _c.toISOString()) || null }));
+        });
+        return { success: true, logs };
+    }
+    catch (error) {
+        console.error('listAdminAuditLogs failed:', error);
+        throw toHttpsError(error, 'Failed to load admin audit logs.');
+    }
 });
 //# sourceMappingURL=index.js.map

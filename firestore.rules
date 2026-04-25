@@ -15,6 +15,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
+    function getCurrentUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
       return isAuthenticated() && getUserRole() == 'admin';
     }
@@ -26,6 +30,22 @@ service cloud.firestore {
     function isAdminOrSuperAdmin() {
       return isAuthenticated() &&
         (getUserRole() == 'admin' || getUserRole() == 'superAdmin');
+    }
+
+    // Permission-map check with superAdmin bypass.
+    // Legacy admin docs without adminPermissions keep full access.
+    function hasRolePermission(permissionKey) {
+      return isAuthenticated() &&
+        (
+          getCurrentUserData().role == 'superAdmin' ||
+          (
+            getCurrentUserData().role == 'admin' &&
+            (
+              !('adminPermissions' in getCurrentUserData()) ||
+              getCurrentUserData().adminPermissions[permissionKey] == true
+            )
+          )
+        );
     }
 
     // Resolves a doctor's Firestore doc ID → auth UID via the userId field.
@@ -48,7 +68,9 @@ service cloud.firestore {
     // can only be changed via Cloud Functions (Admin SDK bypasses rules).
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if false; // Only Cloud Functions create users
+      // Self-registration: owner can create their own doc with student role only
+      allow create: if isOwner(userId) &&
+        request.resource.data.role == 'student';
       allow update: if isOwner(userId) &&
         // Block client-side changes to sensitive governance fields
         !request.resource.data.diff(resource.data).affectedKeys()
@@ -88,19 +110,19 @@ service cloud.firestore {
     // ── Doctors Collection ──
     // Anyone authenticated can read doctor profiles.
     // Only the doctor themselves can update their own profile.
-    // Create/delete handled by Cloud Functions (Admin SDK bypasses rules).
+    // Admin mutations are callable-only via Cloud Functions.
     match /doctors/{doctorId} {
       allow read: if isAuthenticated();
       allow update: if isAuthenticated() &&
         resource.data.userId == request.auth.uid;
-      allow create, delete: if isAdminOrSuperAdmin();
+      allow create, delete: if false;
     }
 
     // ── Departments Collection ──
-    // Public read; admin/superAdmin write.
+    // Public read; writes are callable-only via Cloud Functions.
     match /departments/{departmentId} {
       allow read: if true;
-      allow write: if isAdminOrSuperAdmin();
+      allow write: if false;
     }
 
     // ── Admin Audit Logs ──

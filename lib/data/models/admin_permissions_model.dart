@@ -38,8 +38,7 @@ class AdminPermissions {
     this.notificationsSend = false,
   });
 
-  /// Full access preset — used as default for newly created admins
-  /// or when migrating existing admins
+  /// Full access preset — optional preset for trusted admins
   static const AdminPermissions fullAccess = AdminPermissions(
     usersView: true,
     usersManageNonAdmin: true,
@@ -67,7 +66,7 @@ class AdminPermissions {
     notificationsSend: false,
   );
 
-  /// Operations admin preset
+  /// Operations admin preset — day-to-day management without sensitive actions
   static const AdminPermissions operations = AdminPermissions(
     usersView: true,
     usersManageNonAdmin: true,
@@ -77,8 +76,8 @@ class AdminPermissions {
     departmentsManage: true,
     analyticsView: true,
     reportsView: true,
-    reportsExport: true,
-    notificationsSend: true,
+    reportsExport: false,
+    notificationsSend: false,
   );
 
   factory AdminPermissions.fromMap(Map<String, dynamic>? map) {
@@ -169,7 +168,8 @@ class AdminPermissions {
   /// Human-readable descriptions for permission keys
   static const Map<String, String> descriptions = {
     'users.view': 'Can view the user list and user details',
-    'users.manageNonAdmin': 'Can create, edit, activate/deactivate non-admin users',
+    'users.manageNonAdmin':
+        'Can create, edit, activate/deactivate non-admin users',
     'doctors.view': 'Can view doctor profiles and schedules',
     'doctors.manage': 'Can create, edit, and delete doctor accounts',
     'departments.view': 'Can view department information',

@@ -1938,4 +1938,274 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get myDocument => 'مستندي';
+
+  @override
+  String get superAdmin => 'Super Admin';
+
+  @override
+  String get superAdminDashboard => 'Super Admin Dashboard';
+
+  @override
+  String get adminGovernance => 'Admin Governance';
+
+  @override
+  String get admins => 'Admins';
+
+  @override
+  String get permissions => 'Permissions';
+
+  @override
+  String get slots => 'Slots';
+
+  @override
+  String get auditLogs => 'Audit Logs';
+
+  @override
+  String get totalAdmins => 'Total Admins';
+
+  @override
+  String get activeAdmins => 'Active';
+
+  @override
+  String get inactiveAdmins => 'Inactive';
+
+  @override
+  String get superAdmins => 'Super Admins';
+
+  @override
+  String get superAdminSlots => 'Super Admin Slots';
+
+  @override
+  String get slotHealthy => 'All Slots Healthy';
+
+  @override
+  String get slotAttentionNeeded => 'Slot Attention Needed';
+
+  @override
+  String get primarySlot => 'Primary';
+
+  @override
+  String get backupSlot => 'Backup';
+
+  @override
+  String get primarySlotEmpty => 'Primary Super Admin slot is empty';
+
+  @override
+  String get backupSlotEmpty => 'Backup Super Admin slot is empty';
+
+  @override
+  String inactiveAdminWarning(int count) {
+    return '$count admin account(s) are inactive';
+  }
+
+  @override
+  String get riskWarnings => 'Risk Warnings';
+
+  @override
+  String get adminControl => 'Admin Control';
+
+  @override
+  String get viewOnlyMode =>
+      'View-only mode: only Super Admin can perform governance actions.';
+
+  @override
+  String get createAdmin => 'Create Admin';
+
+  @override
+  String get promote => 'Promote';
+
+  @override
+  String get demote => 'Demote';
+
+  @override
+  String get activate => 'Activate';
+
+  @override
+  String get deactivate => 'Deactivate';
+
+  @override
+  String get passwordResetAction => 'Password Reset';
+
+  @override
+  String get deleteAdmin => 'Delete Admin';
+
+  @override
+  String get forceSignOut => 'Force Sign-Out';
+
+  @override
+  String get permissionsUpdate => 'Permissions Update';
+
+  @override
+  String get slotAssign => 'Slot Assign';
+
+  @override
+  String get slotRotate => 'Slot Rotate';
+
+  @override
+  String get allActions => 'All Actions';
+
+  @override
+  String get filterByTarget => 'Filter by Target';
+
+  @override
+  String get filterByActor => 'Filter by Actor';
+
+  @override
+  String get filterByDateRange => 'Filter by Date Range';
+
+  @override
+  String get filterAuditDates => 'Filter Audit Dates';
+
+  @override
+  String get targetUserUid => 'Target User UID';
+
+  @override
+  String get actorUserUid => 'Actor User UID';
+
+  @override
+  String get pasteUidHere => 'Paste the UID here';
+
+  @override
+  String get apply => 'Apply';
+
+  @override
+  String get noAuditLogsFound => 'No audit logs found';
+
+  @override
+  String get noRecentActivity => 'No recent activity';
+
+  @override
+  String get recentAuditActivity => 'Recent Audit Activity';
+
+  @override
+  String get assignSlot => 'Assign Slot';
+
+  @override
+  String get rotateSlot => 'Rotate Slot';
+
+  @override
+  String get slotType => 'Slot Type';
+
+  @override
+  String get replacementUid => 'Replacement UID';
+
+  @override
+  String get maxSlotsReached => 'Maximum 2 Super Admin slots reached';
+
+  @override
+  String get fullAccessPreset => 'Full Access';
+
+  @override
+  String get readOnlyPreset => 'Read Only';
+
+  @override
+  String get operationsPreset => 'Operations';
+
+  @override
+  String get customPreset => 'Custom';
+
+  @override
+  String get doctorsManage => 'Manage Doctors';
+
+  @override
+  String get departmentsManage => 'Manage Departments';
+
+  @override
+  String get usersManageNonAdmin => 'Manage Users (Non-Admin)';
+
+  @override
+  String get appointmentsView => 'View Appointments';
+
+  @override
+  String get reportsExport => 'Export Reports';
+
+  @override
+  String get reportsView => 'View Reports';
+
+  @override
+  String get analyticsView => 'View Analytics';
+
+  @override
+  String get notificationsSend => 'Send Notifications';
+
+  @override
+  String get permissionRequired => 'Permission Required';
+
+  @override
+  String get exportPermissionRequired => 'Export Permission Required';
+
+  @override
+  String get noPermissionForAction =>
+      'You do not have permission for this action';
+
+  @override
+  String get generateReport => 'Generate Report';
+
+  @override
+  String get generating => 'Generating...';
+
+  @override
+  String get addDoctor => 'Add Doctor';
+
+  @override
+  String get addDepartment => 'Add Department';
+
+  @override
+  String get addUser => 'Add User';
+
+  @override
+  String get editDoctor => 'Edit Doctor';
+
+  @override
+  String get deleteDoctor => 'Delete Doctor';
+
+  @override
+  String get toggleDoctorStatus => 'Toggle Doctor Status';
+
+  @override
+  String get editDepartment => 'Edit Department';
+
+  @override
+  String get deleteDepartment => 'Delete Department';
+
+  @override
+  String get toggleDepartmentStatus => 'Toggle Department Status';
+
+  @override
+  String get editUser => 'Edit User';
+
+  @override
+  String get deleteUser => 'Delete User';
+
+  @override
+  String get toggleUserStatus => 'Toggle User Status';
+
+  @override
+  String get changeUserRole => 'Change User Role';
+
+  @override
+  String get confirmDeleteTitle => 'Confirm Delete';
+
+  @override
+  String get confirmDeleteMessage =>
+      'Are you sure you want to delete this? This action cannot be undone.';
+
+  @override
+  String get confirmToggleStatusTitle => 'Toggle Status';
+
+  @override
+  String get confirmToggleStatusMessage =>
+      'Are you sure you want to change the status?';
+
+  @override
+  String get noAdminsFound => 'No admin accounts found';
+
+  @override
+  String get createFirstAdmin => 'Create your first admin account';
+
+  @override
+  String get bootstrapSuperAdmin => 'Bootstrap Super Admin';
+
+  @override
+  String get migrationRunbook => 'Migration Runbook';
 }

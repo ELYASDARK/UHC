@@ -115,12 +115,18 @@ class AdminGovernanceService {
   Future<Map<String, dynamic>> listAdminAuditLogs({
     int? limit,
     String? targetUid,
+    String? actorUid,
     String? action,
+    DateTime? dateFrom,
+    DateTime? dateTo,
   }) async {
     return _call('listAdminAuditLogs', {
       if (limit != null) 'limit': limit,
       if (targetUid != null) 'targetUid': targetUid,
+      if (actorUid != null) 'actorUid': actorUid,
       if (action != null) 'action': action,
+      if (dateFrom != null) 'dateFrom': dateFrom.toIso8601String(),
+      if (dateTo != null) 'dateTo': dateTo.toIso8601String(),
     });
   }
 

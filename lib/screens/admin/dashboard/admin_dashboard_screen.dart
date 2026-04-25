@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/user_model.dart';
+import '../../../providers/auth_provider.dart';
 import '../departments/department_management_screen.dart';
 import '../doctors/doctor_management_screen.dart';
 import '../users/user_management_screen.dart';
@@ -265,15 +267,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildQuickActions(bool isDark) {
     final width = MediaQuery.of(context).size.width;
     final crossAxisCount = width > 1200 ? 4 : (width > 600 ? 3 : 2);
+    final user = context.read<AuthProvider>().currentUser;
 
-    return GridView.count(
-      crossAxisCount: crossAxisCount,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 2.5,
-      children: [
+    final actions = <Widget>[
+      if (user?.hasPermission('doctors.view') ?? false)
         _buildActionCard(
           isDark: isDark,
           title: 'Manage Doctors',
@@ -284,6 +281,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             MaterialPageRoute(builder: (_) => const DoctorManagementScreen()),
           ),
         ),
+      if (user?.hasPermission('users.view') ?? false)
         _buildActionCard(
           isDark: isDark,
           title: 'Manage Users',
@@ -294,6 +292,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             MaterialPageRoute(builder: (_) => const UserManagementScreen()),
           ),
         ),
+      if (user?.hasPermission('analytics.view') ?? false)
         _buildActionCard(
           isDark: isDark,
           title: 'Analytics',
@@ -306,6 +305,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
         ),
+      if (user?.hasPermission('reports.view') ?? false)
         _buildActionCard(
           isDark: isDark,
           title: 'Reports',
@@ -316,6 +316,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             MaterialPageRoute(builder: (_) => const ReportsScreen()),
           ),
         ),
+      if (user?.hasPermission('departments.view') ?? false)
         _buildActionCard(
           isDark: isDark,
           title: 'Departments',
@@ -328,7 +329,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
           ),
         ),
-      ],
+    ];
+
+    if (actions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return GridView.count(
+      crossAxisCount: crossAxisCount,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 2.5,
+      children: actions,
     );
   }
 

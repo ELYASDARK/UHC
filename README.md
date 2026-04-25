@@ -30,6 +30,7 @@
 - [Firebase Configuration](#-firebase-configuration)
 - [Cloud Functions](#-cloud-functions)
 - [User Roles & Permissions](#-user-roles--permissions)
+- [Super Admin Bootstrap](#-super-admin-bootstrap)
 - [Building for Production](#-building-for-production)
 - [Changelog](#-changelog)
 - [Contributing](#-contributing)
@@ -39,7 +40,7 @@
 
 ## 🔭 Overview
 
-**UHC** is a full-featured, production-ready Flutter application designed for university health centers. It provides a seamless experience for **students** and **staff** to book medical appointments, a dedicated **doctor dashboard** for managing appointments and schedules with QR-verified check-ins, and powerful **admin tools** for managing doctors, departments, and analytics — all backed by Firebase's real-time infrastructure.
+**UHC** is a full-featured, production-ready Flutter application designed for university health centers. It provides a seamless experience for **students** and **staff** to book medical appointments, a dedicated **doctor dashboard** for managing appointments and schedules with QR-verified check-ins, robust **admin operations**, and a dedicated **Super Admin governance layer** for RBAC, permission control, slot governance, and auditability — all backed by Firebase's real-time infrastructure.
 
 ### ✨ Why UHC?
 
@@ -90,9 +91,21 @@
 - **Real-Time Dashboard** — Live KPIs: total users, doctors, appointments, and revenue
 - **Department Management** — Create departments with custom color, icon (155+ options), and per-day working hours
 - **Doctor Management** — Full CRUD with schedule constraints tied to department hours
-- **User Management** — View all users, assign roles, toggle account status
+- **User Management** — View all users with role-safe controls and account status management
+- **Permission-Aware UI** — Admin actions are gated by granular permission keys (`users.manageNonAdmin`, `doctors.manage`, `departments.manage`, etc.)
 - **Analytics** — Interactive charts for appointment trends and department performance
-- **Reports** — Export CSV reports for appointments, doctors, users, and revenue
+- **Reports** — Export CSV reports for appointments, doctors, users, and revenue (permission-gated)
+</details>
+
+<details>
+<summary><b>🛡️ Super Admin Governance</b></summary>
+
+- **Dedicated Super Admin Shell** — Separate governance experience for web and mobile
+- **Strict Slot Model** — Exactly two Super Admin slots (`primary` + `backup`) with transactional server-side enforcement
+- **Admin Governance Actions** — Create admin, promote/demote roles, activate/deactivate, reset password, delete admin, force sign-out
+- **Permissions Matrix** — Per-admin granular permission assignment with presets (Full / Operations / Read-Only)
+- **Audit Logs** — Filterable governance audit trail by actor, target, action, and date
+- **Hardened Trust Boundary** — Sensitive mutations moved to Cloud Functions; Firestore rules block client-side privilege escalation
 </details>
 
 <details>
@@ -202,13 +215,18 @@ uhc/
 │   │   │   ├── schedule/           # Calendar-based schedule management
 │   │   │   ├── profile/            # Doctor profile & edit profile
 │   │   │   └── qr/                 # QR code scanner for appointment check-in
-│   │   └── admin/                  # Admin management console
+│   │   ├── admin/                  # Admin management console
 │   │       ├── dashboard/          # Admin KPI dashboard
 │   │       ├── departments/        # Department CRUD with form dialog
 │   │       ├── doctors/            # Doctor CRUD with schedule dialog
 │   │       ├── users/              # User management with form dialog
 │   │       ├── analytics/          # Appointment analytics & charts
 │   │       └── reports/            # CSV report generation & export
+│   │   └── super_admin/            # Super Admin governance shell & screens
+│   │       ├── super_admin_shell.dart
+│   │       ├── super_admin_dashboard_screen.dart
+│   │       ├── admin_control_screen.dart
+│   │       └── audit_log_screen.dart
 │   ├── services/                   # Auth, FCM, local notifications, Cloud Function wrappers
 │   └── utils/                      # Helper functions
 ├── functions/                      # Firebase Cloud Functions (TypeScript)
@@ -219,7 +237,7 @@ uhc/
 ├── android/                        # Android platform configuration
 ├── ios/                            # iOS platform configuration
 ├── web/                            # Web platform configuration
-├── docs/                           # Internal documentation & audit reports
+├── docs/                           # Internal documentation, plans, and runbooks
 ├── firestore.rules                 # Firestore security rules (role-based)
 ├── firestore.indexes.json          # Composite index definitions for optimized queries
 └── pubspec.yaml                    # Dependencies & metadata
@@ -337,6 +355,7 @@ Add these keys to `ios/Runner/Info.plist` for permissions:
 | `notifications` | Per-user notification history |
 | `user_tokens` | FCM device tokens per user (used by Cloud Functions for push delivery) |
 | `medical_documents` | Uploaded file metadata and storage references |
+| `admin_audit_logs` | Immutable governance audit trail for Super Admin actions |
 
 ---
 
@@ -350,11 +369,24 @@ Server-side functions handle privileged operations that require Firebase Admin S
 | `updateDoctorEmail` | Updates a doctor's email in both Auth and Firestore | 🔒 Admin |
 | `deleteDoctorAccount` | Removes a doctor from Auth and Firestore completely | 🔒 Admin |
 | `resetDoctorPassword` | Resets a doctor's password without requiring the old one | 🔒 Admin |
-| `createUserAccount` | Creates a user account in Auth + Firestore with a specified role | 🔒 Admin |
+| `createUserAccount` | Creates student/staff accounts in Auth + Firestore | 🔒 Admin |
+| `bootstrapSelfUserDocument` | Creates self-registration user profile document securely (`student` role) | 🔒 Authenticated |
+| `setUserActiveStatus` | Activates/deactivates non-admin users | 🔒 Admin |
+| `updateUserProfileByAdmin` | Admin-safe profile updates without direct privilege writes | 🔒 Admin |
 | `onNotificationCreated` | Firestore trigger — sends FCM push when a notification document is created | 🔄 Auto |
 | `sendTopicNotification` | Sends broadcast push notifications to FCM topics (e.g. announcements) | 🔒 Admin |
+| `createAdminAccount` | Creates admin account with default permission map | 🛡️ Super Admin |
+| `changeAdminRole` | Promotes/demotes admin role (excluding superAdmin assignment) | 🛡️ Super Admin |
+| `setAdminActiveStatus` | Activates/deactivates admin accounts | 🛡️ Super Admin |
+| `resetAdminPassword` | Resets an admin password | 🛡️ Super Admin |
+| `deleteAdminAccount` | Deletes admin account from Auth + Firestore | 🛡️ Super Admin |
+| `forceSignOutUser` | Revokes user refresh tokens / sessions | 🛡️ Super Admin |
+| `setAdminPermissions` | Updates granular admin permission map | 🛡️ Super Admin |
+| `assignSuperAdminSlot` | Assigns `primary`/`backup` super admin slot with transaction checks | 🛡️ Super Admin |
+| `rotateSuperAdminSlot` | Rotates slot holder atomically (demote + promote) | 🛡️ Super Admin |
+| `listAdminAuditLogs` | Returns filtered governance audit logs | 🛡️ Super Admin |
 
-> **Security Note:** These functions enforce admin-only access to prevent unauthorized privilege escalation. All critical account mutations are handled server-side.
+> **Security Note:** Sensitive account/role mutations are callable-only and validated server-side. Firestore rules block client-side writes to privileged fields (`role`, `isActive`, `superAdminType`, `adminPermissions`).
 
 ---
 
@@ -365,16 +397,27 @@ Server-side functions handle privileged operations that require Firebase Admin S
 | **Student** | Book/manage appointments, upload documents, view own records |
 | **Staff** | Same as Student — campus staff access |
 | **Doctor** | View assigned appointments, manage schedule and availability |
-| **Admin** | Full system access — manage users, doctors, departments, view analytics, export reports |
+| **Admin** | Permission-scoped operations (view/manage non-admin users, doctors, departments, analytics, reports, notifications) |
+| **Super Admin** | Full admin powers + admin governance, slot management (`primary`/`backup`), permissions control, audit log access |
 
-> **Note:** The first admin user must be created manually in Firestore.
-> 
-> **How to create an Admin:**
-> 1. Sign up as a regular user in the app.
-> 2. Go to Firebase Console > Firestore Database > `users` collection.
-> 3. Find your user document.
-> 4. Change the `role` field from `"student"` to `"admin"`.
-> 5. Restart the app to see the Admin Dashboard.
+> **RBAC Model:** Admin actions are permission-driven, and Super Admin bypasses permission checks for governance tasks.
+
+---
+
+## 🛡 Super Admin Bootstrap
+
+Use the runbook: `docs/SUPER_ADMIN_BOOTSTRAP_RUNBOOK.md`
+
+Quick bootstrap summary:
+
+1. Create/login the target account in Firebase Authentication.
+2. Ensure Firestore profile document exists at `users/{authUid}` (document ID must equal Auth UID).
+3. Set:
+   - `role: "superAdmin"`
+   - `superAdminType: "primary"`
+   - `isActive: true`
+4. Restart the app and verify routing goes to `SuperAdminShell`.
+5. Assign backup slot through Super Admin UI or `assignSuperAdminSlot`.
 
 ---
 
@@ -411,6 +454,33 @@ flutter build web --release
 ## 📝 Changelog
 
 <details open>
+<summary><b>v2.0.0</b> — April 2026</summary>
+
+#### 🛡 Super Admin + Admin RBAC (Phases 0–8)
+- Added new `superAdmin` role end-to-end (model, routing, UI, backend guards, rules)
+- Added strict two-slot governance model (`primary` + `backup`) with transactional enforcement
+- Added dedicated Super Admin shell and governance screens (Admins, Permissions, Slots, Audit Logs)
+- Added admin permission model + presets and permission-driven admin UI gates
+- Added comprehensive governance callables:
+  - admin account lifecycle (create/changeRole/activate/reset/delete)
+  - force sign-out
+  - set admin permissions
+  - assign/rotate super admin slots
+  - audit log listing
+- Hardened Firestore rules to block client-side privilege escalation fields
+- Added `admin_audit_logs` collection model + UI query surface
+- Added bootstrap/migration runbook for secure first Super Admin setup
+
+#### 🧩 Reliability & Web Fixes
+- Improved auth/profile mismatch handling (prevents silent fallback role routing)
+- Improved governance callable error mapping to readable client errors
+- Fixed Super Admin slot layout overflow in web/mobile card actions
+- Fixed duplicate Hero tag conflicts in governance screen
+- Guarded non-web Google Sign-In initialization path to avoid web client-id assertion at startup
+
+</details>
+
+<details>
 <summary><b>v1.10.0</b> — April 2026</summary>
 
 #### ⚡ Scalability & Performance Audit (20k–50k Concurrent Users)

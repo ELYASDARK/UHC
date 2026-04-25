@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -28,6 +29,7 @@ import 'screens/auth/link_google_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/patient/main_shell.dart';
 import 'screens/doctor/doctor_shell.dart';
+import 'screens/super_admin/super_admin_shell.dart';
 import 'data/repositories/doctor_repository.dart';
 import 'data/models/doctor_model.dart';
 import 'data/models/user_model.dart';
@@ -57,7 +59,11 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    await GoogleSignIn.instance.initialize();
+    // google_sign_in_web requires explicit web client id; the app uses
+    // Firebase Auth popup on web, so only initialize google_sign_in on non-web.
+    if (!kIsWeb) {
+      await GoogleSignIn.instance.initialize();
+    }
 
     // Pass all uncaught "fatal" errors from the framework to Crashlytics
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
@@ -282,8 +288,13 @@ class _AppNavigatorState extends State<AppNavigator> {
         );
       }
 
-      // Route doctor role to DoctorShell
+      // Route superAdmin to dedicated governance shell
       final currentUser = authProvider.currentUser;
+      if (currentUser?.role == UserRole.superAdmin) {
+        return const SuperAdminShell();
+      }
+
+      // Route doctor role to DoctorShell
       if (currentUser?.role == UserRole.doctor) {
         // Trigger fetch if needed (user changed or first load)
         if (!_doctorLoading &&

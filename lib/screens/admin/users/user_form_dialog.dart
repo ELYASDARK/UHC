@@ -21,7 +21,6 @@ class UserFormDialog extends StatefulWidget {
 
 class _UserFormDialogState extends State<UserFormDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _firestore = FirebaseFirestore.instance;
   final _picker = ImagePicker();
   final _userFunctionsService = UserFunctionsService();
   bool _isUploading = false;
@@ -221,7 +220,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
               SnackBar(
                 content: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                    const Icon(Icons.warning_amber_rounded,
+                        color: Colors.white),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -331,24 +331,21 @@ class _UserFormDialogState extends State<UserFormDialog> {
           photoUrl = await _uploadImage(widget.id!);
         }
 
-        final userData = {
-          'fullName': _nameController.text.trim(),
-          'phoneNumber': _phoneController.text.trim().isNotEmpty
+        await _userFunctionsService.updateUserProfileByAdmin(
+          targetUid: widget.id!,
+          fullName: _nameController.text.trim(),
+          phoneNumber: _phoneController.text.trim().isNotEmpty
               ? _phoneController.text.trim()
               : null,
-          'photoUrl': photoUrl,
-          'role': _selectedRole.name,
-          'studentId': _studentIdController.text.trim().isNotEmpty
+          photoUrl: photoUrl,
+          studentId: _studentIdController.text.trim().isNotEmpty
               ? _studentIdController.text.trim()
               : null,
-          'staffId': _staffIdController.text.trim().isNotEmpty
+          staffId: _staffIdController.text.trim().isNotEmpty
               ? _staffIdController.text.trim()
               : null,
-          'dateOfBirth': _selectedDateOfBirth,
-          'updatedAt': FieldValue.serverTimestamp(),
-        };
-
-        await _firestore.collection('users').doc(widget.id).update(userData);
+          dateOfBirth: _selectedDateOfBirth,
+        );
 
         if (mounted) {
           Navigator.pop(context, true);
@@ -626,10 +623,17 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       title: 'Role & Details',
                       isDark: isDark,
                       children: [
-                        // Role Dropdown (exclude doctor)
+                        // Role Dropdown (exclude doctor/superAdmin, and admin on create)
                         DropdownButtonFormField<UserRole>(
                           key: ValueKey(_selectedRole),
                           initialValue: _selectedRole,
+                          onChanged: isEditing
+                              ? null
+                              : (value) {
+                                  if (value != null) {
+                                    setState(() => _selectedRole = value);
+                                  }
+                                },
                           decoration: InputDecoration(
                             labelText: 'Role *',
                             prefixIcon:
@@ -637,20 +641,25 @@ class _UserFormDialogState extends State<UserFormDialog> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            helperText: isEditing
+                                ? 'Role changes are managed from User Management actions'
+                                : null,
                           ),
-                          items: UserRole.values
-                              .where((role) => role != UserRole.doctor && role != UserRole.superAdmin)
-                              .map((role) {
+                          items: UserRole.values.where((role) {
+                            if (role == UserRole.doctor ||
+                                role == UserRole.superAdmin) {
+                              return false;
+                            }
+                            if (!isEditing && role == UserRole.admin) {
+                              return false;
+                            }
+                            return true;
+                          }).map((role) {
                             return DropdownMenuItem(
                               value: role,
                               child: Text(role.name.toUpperCase()),
                             );
                           }).toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() => _selectedRole = value);
-                            }
-                          },
                         ),
                         const SizedBox(height: 16),
 

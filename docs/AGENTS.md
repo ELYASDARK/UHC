@@ -1,145 +1,42 @@
-# AGENTS.md — UHC (University Health Center)
+# Repository Guidelines
 
-## Project Overview
+## Project Structure & Module Organization
+- `lib/` contains the Flutter app code: `core/` (theme, constants, shared widgets), `data/` (models/repositories), `providers/`, `services/`, `screens/`, and `l10n/`.
+- `functions/` contains Firebase Cloud Functions (TypeScript entrypoint at `functions/src/index.ts`).
+- `test/` contains Flutter tests (`widget_test.dart` today; add new tests here).
+- `assets/` stores images, animations, and icons declared in `pubspec.yaml`.
+- Platform folders (`android/`, `ios/`, `web/`, `linux/`, `macos/`, `windows/`) hold build-specific configs.
+- `docs/` is for implementation plans and supporting documentation.
 
-Flutter/Dart healthcare appointment booking app with Firebase backend.
-Dart SDK ^3.5.0, Provider (ChangeNotifier) state management, Firestore + Auth + Cloud Functions (TypeScript/Node.js 22).
-Localization: English, Arabic, Kurdish via ARB files. No code generation (no freezed/json_serializable).
+## Build, Test, and Development Commands
+- `flutter pub get` installs Dart/Flutter dependencies.
+- `flutter gen-l10n` regenerates localization classes from `lib/l10n/*.arb`.
+- `flutter run` launches the app locally.
+- `flutter analyze` runs static analysis using `flutter_lints`.
+- `flutter test` runs the test suite.
+- `flutter build apk --release` (or `appbundle`, `ios`, `web`) builds production artifacts.
+- `cd functions && npm install` installs Functions dependencies.
+- `cd functions && npm run build|serve|deploy` compiles, emulates, or deploys Cloud Functions.
 
-## Build / Run / Test
+## Coding Style & Naming Conventions
+- Follow `analysis_options.yaml` (`include: package:flutter_lints/flutter.yaml`).
+- Use standard Dart formatting: 2-space indentation and `dart format .` before PRs.
+- Naming: files `snake_case.dart`, classes/enums `PascalCase`, methods/variables `camelCase`.
+- Keep role-specific UI under `lib/screens/patient`, `lib/screens/doctor`, and `lib/screens/admin`.
 
-```bash
-flutter pub get                          # Install dependencies
-flutter gen-l10n                         # Generate l10n (MUST run before analyze/build)
-flutter analyze                          # Static analysis
-flutter test                             # Run all tests
-flutter test test/widget_test.dart       # Run single test file
-flutter test --name "test name here"     # Run single test by name
-dart format .                            # Format code
-dart format --set-exit-if-changed .      # Format check (CI)
-flutter run                              # Debug run
-flutter build apk --release              # Release APK
+## Testing Guidelines
+- Use `flutter_test` with files named `*_test.dart` in `test/`.
+- Prefer widget tests for UI flows and provider/service tests for business logic.
+- No coverage threshold is currently enforced; add regression tests for changed behavior.
+- CI (`.github/workflows/dart.yml`) runs `flutter gen-l10n`, `flutter analyze`, and `flutter test` on PRs to `main`.
 
-# Cloud Functions (from functions/ directory)
-npm install && npm run build             # Install + compile TS
-npm run serve                            # Local emulator
-```
+## Commit & Pull Request Guidelines
+- Git history mostly follows Conventional Commits (`feat:`, `chore:`, `docs:`); keep using that style.
+- Write concise, imperative commit subjects (example: `feat: add doctor schedule validation`).
+- PRs should include: change summary, linked issue/plan, and local verification steps run.
+- For UI updates, attach screenshots from `screenshots/` or new captures.
 
-**CI** (`.github/workflows/dart.yml`): `pub get` -> `gen-l10n` -> `analyze` -> `test` on push/PR to `main`.
-
-## Project Structure
-
-```
-lib/
-  main.dart                 # Entry point, 7 ChangeNotifierProviders, AppNavigator state machine
-  firebase_options.dart     # Auto-generated — NEVER edit
-  core/
-    constants/              # AppColors, AppStrings, AppAssets (private constructor utility classes)
-    theme/                  # AppTheme — Material 3 light/dark (Poppins headings, Roboto body)
-    utils/                  # Locale utilities, dynamic content translation maps
-    widgets/                # PrimaryButton, CustomTextField, GlassmorphicCard, skeletons
-  data/
-    models/                 # 5 models: User, Appointment, Doctor, Department, Notification
-    repositories/           # Firestore CRUD — one per collection
-  providers/                # 7 ChangeNotifiers: auth, theme, locale, appointment, notification, doctor, doctor_appointment
-  services/                 # Firebase SDK wrappers (AuthService, FCMService, etc.)
-  screens/                  # Screens grouped by feature (auth/, home/, booking/, doctor/, admin/)
-  l10n/                     # ARB files (app_en.arb, app_ar.arb, app_ku.arb) + generated
-functions/src/index.ts      # 5 admin-only callable Cloud Functions (Gen2)
-firestore.rules             # Security rules with role-based access
-```
-
-## Code Style
-
-### Formatting
-- `dart format` default settings. **Trailing commas** everywhere. **Single quotes** only.
-
-### Imports (3 groups, no blank lines between)
-1. `dart:` core libraries
-2. `package:` dependencies
-3. Relative project imports (`'../services/...'`) — never `package:uhc/...`
-
-### Naming
-
-| Element            | Convention                            | Example                              |
-|--------------------|---------------------------------------|--------------------------------------|
-| Files              | `snake_case`                          | `auth_provider.dart`                 |
-| Classes            | `PascalCase`                          | `AuthProvider`, `AppointmentModel`   |
-| Enums              | `PascalCase` name, `camelCase` values | `enum UserRole { student, doctor }`  |
-| Variables/fields   | `camelCase`, explicit types preferred | `final String id;`                   |
-| Private members    | `_` prefix                            | `_authService`, `_handleError()`     |
-| Constants          | `static const camelCase`              | `static const Color primary = ...`   |
-| Widget builders    | `_build` prefix                       | `_buildHeader()`                     |
-| Constants classes  | Private constructor                   | `class AppColors { AppColors._(); }` |
-
-### Types
-- Explicit type annotations on fields and method signatures. `final` without type OK for obvious locals.
-- Always annotate return types. Nullable: `String?`, fallbacks with `??`.
-- `const` constructors on StatelessWidgets. `const` children wherever possible.
-
-## Key Patterns
-
-### Screen Lifecycle
-- `StatefulWidget`. Load data in `initState` via `addPostFrameCallback`.
-- **Always check `mounted`** before `setState` after any `await`.
-- **Always dispose** controllers/subscriptions. `super.dispose()` last.
-- Dark mode: `final isDark = Theme.of(context).brightness == Brightness.dark;`
-- Break large `build()` into `_buildXxx()` methods.
-
-### Navigation
-- No router package. `AppNavigator` state machine: splash -> onboarding -> auth -> role shell.
-- `UserRole.doctor` -> `DoctorShell`, others -> `MainShell`. Both use `IndexedStack`.
-- Screens receive navigation callbacks (`VoidCallback?`) — no direct `Navigator.push` from children.
-
-### Provider Pattern
-```dart
-class XxxProvider extends ChangeNotifier {
-  bool _isLoading = false;
-  String? _error;
-  // public getters, no public setters
-
-  Future<bool> doAction() async {
-    _isLoading = true; _error = null; notifyListeners();
-    try {
-      // await service call
-      return true;
-    } catch (e) {
-      _error = e.toString(); return false;
-    } finally {
-      _isLoading = false; notifyListeners();
-    }
-  }
-}
-```
-Providers are independent — no cross-provider injection.
-
-### Data Models
-All `final` fields. `factory fromFirestore(DocumentSnapshot)` with `??` fallbacks, `toFirestore()`, `copyWith(...)`. Enums at top of file.
-
-### Firestore Repositories
-- Single-field `.where()` + in-memory filtering (avoids composite indexes).
-- Create: `.add()` then `.update({'id': docRef.id})`.
-- Error: `catch (e) { debugPrint(...); return []; }`.
-
-### Error Handling
-
-| Layer        | Pattern                                                          |
-|--------------|------------------------------------------------------------------|
-| Services     | Catch `FirebaseAuthException`, map to user strings, rethrow      |
-| Providers    | `catch (e)` -> set `_error` -> `notifyListeners()` -> return `false` |
-| Repositories | `catch (e)` -> `debugPrint(...)` -> return `[]` or `null`        |
-| Screens      | Check `isLoading`/`error` inline, show `SnackBar` on failure     |
-
-### Localization
-- Strings in ARB files (`lib/l10n/`). Access: `AppLocalizations.of(context)!.key`.
-- Run `flutter gen-l10n` after any ARB change.
-
-### Cloud Functions (TypeScript)
-- Admin-only: verify `context.auth` + Firestore role check.
-- Gen2 `onCall`, typed `CallableRequest<T>`, throw `HttpsError`.
-- Strict TS: `noImplicitReturns`, `noUnusedLocals`, `strict`.
-
-## Never Edit Manually
-
-- `lib/firebase_options.dart` — generated by FlutterFire CLI
-- `lib/l10n/app_localizations*.dart` — generated by `flutter gen-l10n`
+## Security & Configuration Tips
+- Firebase settings live in `firebase.json`, `firestore.rules`, and platform config files.
+- Do not commit service-account credentials or other private keys.
+- When changing access patterns, update `firestore.rules` and `firestore.indexes.json` together.

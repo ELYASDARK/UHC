@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../services/doctor_functions_service.dart';
+import '../../../services/user_functions_service.dart';
 import 'doctor_schedule_dialog.dart';
 
 class DoctorFormDialog extends StatefulWidget {
@@ -24,6 +25,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
   final _firestore = FirebaseFirestore.instance;
   final _picker = ImagePicker();
   final _doctorFunctionsService = DoctorFunctionsService();
+  final _userFunctionsService = UserFunctionsService();
   bool _isUploading = false;
   bool _isSubmitting = false;
   Uint8List? _imageBytes;
@@ -1067,38 +1069,34 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           );
         }
       } else {
-        // Update existing doctor (no auth changes)
-        final doctorData = {
-          'name': _nameController.text.trim(),
-          'specialization': _specializationController.text.trim(),
-          'department': _selectedDepartment.name,
-          'bio': _bioController.text.trim(),
-          'photoUrl': _photoUrlController.text.isNotEmpty
+        await _doctorFunctionsService.updateDoctorProfile(
+          doctorId: widget.id!,
+          name: _nameController.text.trim(),
+          specialization: _specializationController.text.trim(),
+          department: _selectedDepartment.name,
+          bio: _bioController.text.trim(),
+          photoUrl: _photoUrlController.text.isNotEmpty
               ? _photoUrlController.text.trim()
               : null,
-          'experienceYears': int.tryParse(_experienceController.text) ?? 0,
-          'consultationFee': double.tryParse(_feeController.text) ?? 0.0,
-          'qualifications': _qualifications,
-          'isActive': widget.data?['isActive'] ?? true,
-          'dailyNotificationTime':
+          experienceYears: int.tryParse(_experienceController.text) ?? 0,
+          consultationFee: double.tryParse(_feeController.text) ?? 0.0,
+          qualifications: _qualifications,
+          isActive: widget.data?['isActive'] ?? true,
+          dailyNotificationTime:
               '${_selectedNotificationTime.hour.toString().padLeft(2, '0')}:${_selectedNotificationTime.minute.toString().padLeft(2, '0')}',
-          'updatedAt': FieldValue.serverTimestamp(),
-        };
+        );
 
-        await _firestore
-            .collection('doctors')
-            .doc(widget.id)
-            .update(doctorData);
-
-        // Update dateOfBirth in the user document (not doctor)
+        // Best-effort sync of dateOfBirth to linked user profile.
+        // If caller lacks users.manageNonAdmin, keep doctor update successful.
         if (widget.data?['userId'] != null) {
-          await _firestore
-              .collection('users')
-              .doc(widget.data!['userId'])
-              .update({
-            'dateOfBirth': _selectedDateOfBirth,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+          try {
+            await _userFunctionsService.updateUserProfileByAdmin(
+              targetUid: widget.data!['userId'],
+              dateOfBirth: _selectedDateOfBirth,
+            );
+          } catch (e) {
+            debugPrint('Skipping user dateOfBirth sync: $e');
+          }
         }
 
         if (mounted) {

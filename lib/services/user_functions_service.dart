@@ -17,26 +17,66 @@ class UserFunctionsService {
     String? staffId,
     String? photoUrl,
   }) async {
-    try {
-      final callable = _functions.httpsCallable('createUserAccount');
-      final result = await callable.call<Map<String, dynamic>>({
-        'email': email,
-        'password': password,
-        'fullName': fullName,
-        'role': role,
-        'phoneNumber': phoneNumber,
-        'dateOfBirth': dateOfBirth?.toIso8601String(),
-        'studentId': studentId,
-        'staffId': staffId,
-        'photoUrl': photoUrl,
-      });
+    return _call('createUserAccount', {
+      'email': email,
+      'password': password,
+      'fullName': fullName,
+      'role': role,
+      'phoneNumber': phoneNumber,
+      'dateOfBirth': dateOfBirth?.toIso8601String(),
+      'studentId': studentId,
+      'staffId': staffId,
+      'photoUrl': photoUrl,
+    });
+  }
 
+  /// Activate/deactivate a non-admin user.
+  Future<Map<String, dynamic>> setUserActiveStatus({
+    required String targetUid,
+    required bool isActive,
+  }) async {
+    return _call('setUserActiveStatus', {
+      'targetUid': targetUid,
+      'isActive': isActive,
+    });
+  }
+
+  /// Update profile-safe fields for a target user through Cloud Functions.
+  Future<Map<String, dynamic>> updateUserProfileByAdmin({
+    required String targetUid,
+    String? fullName,
+    String? phoneNumber,
+    String? photoUrl,
+    DateTime? dateOfBirth,
+    String? studentId,
+    String? staffId,
+  }) async {
+    return _call('updateUserProfileByAdmin', {
+      'targetUid': targetUid,
+      'fullName': fullName,
+      'phoneNumber': phoneNumber,
+      'photoUrl': photoUrl,
+      'dateOfBirth': dateOfBirth?.toIso8601String(),
+      'studentId': studentId,
+      'staffId': staffId,
+    });
+  }
+
+  Future<Map<String, dynamic>> _call(
+    String functionName,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final callable = _functions.httpsCallable(functionName);
+      final result = await callable.call<Map<String, dynamic>>(payload);
       return Map<String, dynamic>.from(result.data);
     } on FirebaseFunctionsException catch (e) {
-      debugPrint('Firebase Functions Error: ${e.code} - ${e.message}');
+      debugPrint(
+        '[$functionName] Firebase Functions Error: ${e.code} - ${e.message}',
+      );
       rethrow;
     } catch (e) {
-      debugPrint('Error creating user account: $e');
+      debugPrint('[$functionName] Error: $e');
       rethrow;
     }
   }

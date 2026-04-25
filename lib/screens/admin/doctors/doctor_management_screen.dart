@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/doctor_model.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../services/doctor_functions_service.dart';
 import 'doctor_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
@@ -20,6 +22,14 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   final _doctorFunctionsService = DoctorFunctionsService();
   String _searchQuery = '';
   Set<Department> _selectedDepartments = {};
+
+  /// Whether the current admin can perform doctor management mutations
+  bool get _canManage =>
+      context
+          .read<AuthProvider>()
+          .currentUser
+          ?.hasPermission('doctors.manage') ??
+      false;
 
   @override
   void dispose() {
@@ -42,18 +52,20 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => const DoctorFormDialog(),
-          );
-        },
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add Doctor'),
-        backgroundColor: AppColors.primary,
-        shape: const StadiumBorder(),
-      ),
+      floatingActionButton: _canManage
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const DoctorFormDialog(),
+                );
+              },
+              icon: const Icon(Icons.person_add),
+              label: const Text('Add Doctor'),
+              backgroundColor: AppColors.primary,
+              shape: const StadiumBorder(),
+            )
+          : null,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -139,16 +151,26 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                         const SizedBox(height: 16),
                         const Text('No doctors found'),
                         const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) => const DoctorFormDialog(),
-                            );
-                          },
-                          icon: const Icon(Icons.person_add),
-                          label: const Text('Add Doctor'),
-                        ),
+                        if (_canManage)
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => const DoctorFormDialog(),
+                              );
+                            },
+                            icon: const Icon(Icons.person_add),
+                            label: const Text('Add Doctor'),
+                          )
+                        else
+                          Text(
+                            'View-only access',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
                       ],
                     ),
                   );
@@ -220,115 +242,120 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.hardEdge,
         child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: Stack(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundImage: data['photoUrl'] != null &&
-                      (data['photoUrl'] as String).isNotEmpty
-                  ? NetworkImage(data['photoUrl'])
-                  : null,
-              child: data['photoUrl'] == null ||
-                      (data['photoUrl'] as String).isEmpty
-                  ? const Icon(Icons.person)
-                  : null,
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: (data['isActive'] ?? true)
-                      ? AppColors.success
-                      : Colors.grey,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark ? AppColors.surfaceDark : Colors.white,
-                    width: 2,
+          contentPadding: const EdgeInsets.all(12),
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: data['photoUrl'] != null &&
+                        (data['photoUrl'] as String).isNotEmpty
+                    ? NetworkImage(data['photoUrl'])
+                    : null,
+                child: data['photoUrl'] == null ||
+                        (data['photoUrl'] as String).isEmpty
+                    ? const Icon(Icons.person)
+                    : null,
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: (data['isActive'] ?? true)
+                        ? AppColors.success
+                        : Colors.grey,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDark ? AppColors.surfaceDark : Colors.white,
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-        title: Text(
-          'Dr. ${data['name'] ?? 'Unknown'}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [Text(data['specialization'] ?? 'General')],
-        ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            switch (value) {
-              case 'view':
-                _showDoctorDetails(context, id, data);
-                break;
-              case 'edit':
-                showDialog(
-                  context: context,
-                  builder: (context) => DoctorFormDialog(id: id, data: data),
-                );
-                break;
-              case 'delete':
-                _confirmDelete(id, data['name'] ?? 'this doctor', data);
-                break;
-              case 'toggle':
-                _toggleDoctorStatus(id, data['isActive'] ?? true);
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'view',
-              child: Row(
-                children: [
-                  Icon(Icons.visibility, size: 18),
-                  SizedBox(width: 8),
-                  Text('View Details'),
-                ],
+            ],
+          ),
+          title: Text(
+            'Dr. ${data['name'] ?? 'Unknown'}',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [Text(data['specialization'] ?? 'General')],
+          ),
+          trailing: PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'view':
+                  _showDoctorDetails(context, id, data);
+                  break;
+                case 'edit':
+                  showDialog(
+                    context: context,
+                    builder: (context) => DoctorFormDialog(id: id, data: data),
+                  );
+                  break;
+                case 'delete':
+                  _confirmDelete(id, data['name'] ?? 'this doctor', data);
+                  break;
+                case 'toggle':
+                  _toggleDoctorStatus(id, data['isActive'] ?? true);
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'view',
+                child: Row(
+                  children: [
+                    Icon(Icons.visibility, size: 18),
+                    SizedBox(width: 8),
+                    Text('View Details'),
+                  ],
+                ),
               ),
-            ),
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, size: 18),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'toggle',
-              child: Row(
-                children: [
-                  Icon(
-                    data['isActive'] == true ? Icons.block : Icons.check_circle,
-                    size: 18,
+              if (_canManage) ...[
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(data['isActive'] == true ? 'Deactivate' : 'Activate'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, size: 18, color: AppColors.error),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: AppColors.error)),
-                ],
-              ),
-            ),
-          ],
+                ),
+                PopupMenuItem(
+                  value: 'toggle',
+                  child: Row(
+                    children: [
+                      Icon(
+                        data['isActive'] == true
+                            ? Icons.block
+                            : Icons.check_circle,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                          data['isActive'] == true ? 'Deactivate' : 'Activate'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: AppColors.error),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: AppColors.error)),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -456,13 +483,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
 
     if (confirmed == true) {
       try {
-        if (hasAuthAccount) {
-          // Use Cloud Function to delete auth account, user doc, and doctor doc
-          await _doctorFunctionsService.deleteDoctorAccount(doctorId: id);
-        } else {
-          // Just delete the doctor document
-          await _firestore.collection('doctors').doc(id).delete();
-        }
+        await _doctorFunctionsService.deleteDoctorAccount(doctorId: id);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -495,18 +516,39 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   }
 
   Future<void> _toggleDoctorStatus(String id, bool currentStatus) async {
-    await _firestore.collection('doctors').doc(id).update({
-      'isActive': !currentStatus,
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            currentStatus ? 'Doctor deactivated' : 'Doctor activated',
-          ),
-          backgroundColor: AppColors.success,
-        ),
+    try {
+      await _doctorFunctionsService.setDoctorActiveStatus(
+        doctorId: id,
+        isActive: !currentStatus,
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              currentStatus ? 'Doctor deactivated' : 'Doctor activated',
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } on DoctorFunctionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.userMessage),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update doctor status: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -784,60 +826,64 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                 ),
               ),
 
-              // Actions
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _toggleDoctorStatus(id, isActive);
-                        },
-                        icon: Icon(
-                          isActive ? Icons.block : Icons.check_circle,
-                          color: isActive ? AppColors.error : AppColors.success,
-                        ),
-                        label: Text(
-                          isActive ? 'Deactivate' : 'Activate',
-                          style: TextStyle(
+              // Actions (only shown if admin has manage permission)
+              if (_canManage)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _toggleDoctorStatus(id, isActive);
+                          },
+                          icon: Icon(
+                            isActive ? Icons.block : Icons.check_circle,
                             color:
                                 isActive ? AppColors.error : AppColors.success,
                           ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(
-                            color:
-                                isActive ? AppColors.error : AppColors.success,
+                          label: Text(
+                            isActive ? 'Deactivate' : 'Activate',
+                            style: TextStyle(
+                              color: isActive
+                                  ? AppColors.error
+                                  : AppColors.success,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: BorderSide(
+                              color: isActive
+                                  ? AppColors.error
+                                  : AppColors.success,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          showDialog(
-                            context: context,
-                            builder: (context) =>
-                                DoctorFormDialog(id: id, data: data),
-                          );
-                        },
-                        icon: const Icon(Icons.edit, color: Colors.white),
-                        label: const Text('Edit'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            showDialog(
+                              context: context,
+                              builder: (context) =>
+                                  DoctorFormDialog(id: id, data: data),
+                            );
+                          },
+                          icon: const Icon(Icons.edit, color: Colors.white),
+                          label: const Text('Edit'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

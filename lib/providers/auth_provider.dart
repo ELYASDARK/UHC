@@ -44,12 +44,24 @@ class AuthProvider with ChangeNotifier {
   Future<void> _loadUserData(String uid) async {
     try {
       _state = AuthState.loading;
+      _errorMessage = null;
       notifyListeners();
 
       _currentUser = await _authService.getUserData(uid);
 
+      if (_currentUser == null) {
+        // Profile doc is missing for this auth UID.
+        // Sign out to avoid falling back into a wrong shell.
+        await _authService.signOut();
+        _state = AuthState.error;
+        _errorMessage =
+            'Account profile not found for this login. Please ask admin to create users/$uid with your role.';
+        notifyListeners();
+        return;
+      }
+
       // Check if user is active
-      if (_currentUser != null && !_currentUser!.isActive) {
+      if (!_currentUser!.isActive) {
         // User is deactivated - sign them out
         await _authService.signOut();
         _currentUser = null;

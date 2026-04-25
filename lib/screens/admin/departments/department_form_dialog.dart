@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../services/department_functions_service.dart';
 
 /// All available icon options for departments — organized by category
 const Map<String, IconData> departmentIcons = {
@@ -194,7 +194,7 @@ class DepartmentFormDialog extends StatefulWidget {
 
 class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _firestore = FirebaseFirestore.instance;
+  final _departmentFunctionsService = DepartmentFunctionsService();
   bool _isSubmitting = false;
 
   late TextEditingController _nameController;
@@ -846,25 +846,25 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
                   : '')
               .join('');
 
-      final data = {
-        'key': key,
-        'name': name,
-        'description': _descriptionController.text.trim(),
-        'iconName': _selectedIcon,
-        'colorHex': _selectedColor,
-        'workingHours': workingHours,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      };
-
       if (widget.id != null) {
-        // Update existing department
-        await _firestore.collection('departments').doc(widget.id).update(data);
+        await _departmentFunctionsService.updateDepartment(
+          departmentId: widget.id!,
+          key: key,
+          name: name,
+          description: _descriptionController.text.trim(),
+          iconName: _selectedIcon,
+          colorHex: _selectedColor,
+          workingHours: workingHours,
+        );
       } else {
-        // Create new department
-        data['isActive'] = true;
-        data['doctorCount'] = 0;
-        data['createdAt'] = Timestamp.fromDate(DateTime.now());
-        await _firestore.collection('departments').add(data);
+        await _departmentFunctionsService.createDepartment(
+          key: key,
+          name: name,
+          description: _descriptionController.text.trim(),
+          iconName: _selectedIcon,
+          colorHex: _selectedColor,
+          workingHours: workingHours,
+        );
       }
 
       if (mounted) {
@@ -877,6 +877,15 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
                   : 'Department created successfully',
             ),
             backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } on DepartmentFunctionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.userMessage),
+            backgroundColor: AppColors.error,
           ),
         );
       }

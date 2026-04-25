@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -476,30 +478,21 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
-              // Dismiss the dialog first using its own context
-              Navigator.of(dialogContext, rootNavigator: true).pop();
+              Navigator.of(dialogContext).pop();
 
-              // Clean up notifications — wrapped in try-catch so signOut
-              // always runs even if FCM cleanup fails (e.g. on web).
-              try {
-                final userId = auth.currentUser?.id;
-                if (userId != null) {
-                  final notificationProvider =
-                      ctx.read<NotificationProvider>();
-                  await notificationProvider.onLogout(userId);
-                }
-              } catch (e) {
-                debugPrint('Notification cleanup on logout failed: $e');
+              final userId = auth.currentUser?.id;
+              final notificationProvider = ctx.read<NotificationProvider>();
+
+              // Run cleanup in background so web logout is never blocked.
+              if (userId != null) {
+                unawaited(
+                  notificationProvider.onLogout(userId).catchError((e) {
+                    debugPrint('Notification cleanup on logout failed: $e');
+                  }),
+                );
               }
 
-              // Sign out — must always run
               await auth.signOut();
-
-              // Pop all routes back to root so AppNavigator can rebuild with LoginScreen
-              if (ctx.mounted) {
-                Navigator.of(ctx, rootNavigator: true)
-                    .popUntil((route) => route.isFirst);
-              }
             },
             child: Text(l10n.logout,
                 style: const TextStyle(color: AppColors.error)),

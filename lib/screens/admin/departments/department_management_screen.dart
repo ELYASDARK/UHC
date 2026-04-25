@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../providers/auth_provider.dart';
 import 'department_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../services/department_functions_service.dart';
 
 /// Department management screen for admin
 class DepartmentManagementScreen extends StatefulWidget {
@@ -16,9 +19,18 @@ class DepartmentManagementScreen extends StatefulWidget {
 class _DepartmentManagementScreenState
     extends State<DepartmentManagementScreen> {
   final _firestore = FirebaseFirestore.instance;
+  final _departmentFunctionsService = DepartmentFunctionsService();
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String _statusFilter = 'all'; // 'all', 'active', 'inactive'
+
+  /// Whether the current admin can perform department management mutations
+  bool get _canManage =>
+      context
+          .read<AuthProvider>()
+          .currentUser
+          ?.hasPermission('departments.manage') ??
+      false;
 
   /// Dynamically loaded doctor counts per department key
   Map<String, int> _doctorCounts = {};
@@ -27,7 +39,6 @@ class _DepartmentManagementScreenState
   void initState() {
     super.initState();
     _loadDoctorCounts();
-    _cleanupSampleDataField();
   }
 
   @override
@@ -97,55 +108,6 @@ class _DepartmentManagementScreenState
     return 0;
   }
 
-  /// One-time cleanup: fix department keys and remove legacy fields from Firestore
-  Future<void> _cleanupSampleDataField() async {
-    try {
-      final snapshot = await _firestore.collection('departments').get();
-      final batch = _firestore.batch();
-      bool hasChanges = false;
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final updates = <String, dynamic>{};
-
-        // Remove legacy isSampleData field
-        if (data.containsKey('isSampleData')) {
-          updates['isSampleData'] = FieldValue.delete();
-        }
-
-        // Fix department key to camelCase format if needed
-        final name = (data['name'] ?? '').toString();
-        final currentKey = (data['key'] ?? '').toString();
-        if (name.isNotEmpty) {
-          final words = name.split(' ');
-          final correctKey = words.first.toLowerCase() +
-              words
-                  .skip(1)
-                  .map((w) => w.isNotEmpty
-                      ? '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}'
-                      : '')
-                  .join('');
-          if (currentKey != correctKey) {
-            updates['key'] = correctKey;
-            debugPrint('Fixing department key: "$currentKey" → "$correctKey"');
-          }
-        }
-
-        if (updates.isNotEmpty) {
-          batch.update(doc.reference, updates);
-          hasChanges = true;
-        }
-      }
-      if (hasChanges) {
-        await batch.commit();
-        debugPrint('Department cleanup completed');
-        // Reload doctor counts after key fixes
-        _loadDoctorCounts();
-      }
-    } catch (e) {
-      debugPrint('Error during department cleanup: $e');
-    }
-  }
-
   Color _hexToColor(String hex) {
     hex = hex.replaceAll('#', '');
     if (hex.length == 6) hex = 'FF$hex';
@@ -175,21 +137,23 @@ class _DepartmentManagementScreenState
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => const DepartmentFormDialog(),
-          );
-        },
-        icon: const Icon(Icons.add_business, color: Colors.white),
-        label: const Text(
-          'Add Department',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: AppColors.primary,
-        shape: const StadiumBorder(),
-      ),
+      floatingActionButton: _canManage
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => const DepartmentFormDialog(),
+                );
+              },
+              icon: const Icon(Icons.add_business, color: Colors.white),
+              label: const Text(
+                'Add Department',
+                style: TextStyle(color: Colors.white),
+              ),
+              backgroundColor: AppColors.primary,
+              shape: const StadiumBorder(),
+            )
+          : null,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -275,17 +239,27 @@ class _DepartmentManagementScreenState
                         const SizedBox(height: 16),
                         const Text('No departments found'),
                         const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (context) =>
-                                  const DepartmentFormDialog(),
-                            );
-                          },
-                          icon: const Icon(Icons.add_business),
-                          label: const Text('Add Department'),
-                        ),
+                        if (_canManage)
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) =>
+                                    const DepartmentFormDialog(),
+                              );
+                            },
+                            icon: const Icon(Icons.add_business),
+                            label: const Text('Add Department'),
+                          )
+                        else
+                          Text(
+                            'View-only access',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
                       ],
                     ),
                   );
@@ -372,171 +346,173 @@ class _DepartmentManagementScreenState
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.hardEdge,
         child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: Stack(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: deptColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                _getIconData(iconName),
-                color: deptColor,
-                size: 28,
-              ),
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 14,
-                height: 14,
+          contentPadding: const EdgeInsets.all(12),
+          leading: Stack(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: isActive ? AppColors.success : Colors.grey,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark ? AppColors.surfaceDark : Colors.white,
-                    width: 2,
-                  ),
+                  color: deptColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  _getIconData(iconName),
+                  color: deptColor,
+                  size: 28,
                 ),
               ),
-            ),
-          ],
-        ),
-        title: Text(
-          data['name'] ?? 'Unknown',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              data['description'] ?? '',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 14,
+                  height: 14,
                   decoration: BoxDecoration(
-                    color: deptColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '$doctorCount doctors',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: deptColor,
+                    color: isActive ? AppColors.success : Colors.grey,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDark ? AppColors.surfaceDark : Colors.white,
+                      width: 2,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (isActive ? AppColors.success : Colors.grey)
-                        .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    isActive ? 'ACTIVE' : 'INACTIVE',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: isActive ? AppColors.success : Colors.grey,
+              ),
+            ],
+          ),
+          title: Text(
+            data['name'] ?? 'Unknown',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                data['description'] ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
                     ),
+                    decoration: BoxDecoration(
+                      color: deptColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$doctorCount doctors',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: deptColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (isActive ? AppColors.success : Colors.grey)
+                          .withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      isActive ? 'ACTIVE' : 'INACTIVE',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isActive ? AppColors.success : Colors.grey,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          trailing: PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'view':
+                  _showDepartmentDetails(context, id, data);
+                  break;
+                case 'edit':
+                  showDialog(
+                    context: context,
+                    builder: (context) =>
+                        DepartmentFormDialog(id: id, data: data),
+                  );
+                  break;
+                case 'toggle':
+                  _toggleDepartmentStatus(id, isActive);
+                  break;
+                case 'delete':
+                  _confirmDelete(id, data['name'] ?? 'this department');
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'view',
+                child: Row(
+                  children: [
+                    Icon(Icons.visibility, size: 18),
+                    SizedBox(width: 8),
+                    Text('View Details'),
+                  ],
+                ),
+              ),
+              if (_canManage) ...[
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'toggle',
+                  child: Row(
+                    children: [
+                      Icon(
+                        isActive ? Icons.block : Icons.check_circle,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(isActive ? 'Deactivate' : 'Activate'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 18, color: AppColors.error),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: AppColors.error)),
+                    ],
                   ),
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
         ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            switch (value) {
-              case 'view':
-                _showDepartmentDetails(context, id, data);
-                break;
-              case 'edit':
-                showDialog(
-                  context: context,
-                  builder: (context) =>
-                      DepartmentFormDialog(id: id, data: data),
-                );
-                break;
-              case 'toggle':
-                _toggleDepartmentStatus(id, isActive);
-                break;
-              case 'delete':
-                _confirmDelete(id, data['name'] ?? 'this department');
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'view',
-              child: Row(
-                children: [
-                  Icon(Icons.visibility, size: 18),
-                  SizedBox(width: 8),
-                  Text('View Details'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit, size: 18),
-                  SizedBox(width: 8),
-                  Text('Edit'),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'toggle',
-              child: Row(
-                children: [
-                  Icon(
-                    isActive ? Icons.block : Icons.check_circle,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(isActive ? 'Deactivate' : 'Activate'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, size: 18, color: AppColors.error),
-                  SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: AppColors.error)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
       ),
     );
   }
@@ -606,19 +582,39 @@ class _DepartmentManagementScreenState
   }
 
   Future<void> _toggleDepartmentStatus(String id, bool currentStatus) async {
-    await _firestore.collection('departments').doc(id).update({
-      'isActive': !currentStatus,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            currentStatus ? 'Department deactivated' : 'Department activated',
-          ),
-          backgroundColor: AppColors.success,
-        ),
+    try {
+      await _departmentFunctionsService.setDepartmentActiveStatus(
+        departmentId: id,
+        isActive: !currentStatus,
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              currentStatus ? 'Department deactivated' : 'Department activated',
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } on DepartmentFunctionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.userMessage),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating department status: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -677,12 +673,21 @@ class _DepartmentManagementScreenState
 
     if (confirmed == true) {
       try {
-        await _firestore.collection('departments').doc(id).delete();
+        await _departmentFunctionsService.deleteDepartment(departmentId: id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Department deleted successfully'),
               backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } on DepartmentFunctionException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.userMessage),
+              backgroundColor: AppColors.error,
             ),
           );
         }
@@ -970,59 +975,96 @@ class _DepartmentManagementScreenState
               ),
 
               // Actions
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _toggleDepartmentStatus(id, isActive);
-                        },
-                        icon: Icon(
-                          isActive ? Icons.block : Icons.check_circle,
-                          color: isActive ? AppColors.error : AppColors.success,
-                        ),
-                        label: Text(
-                          isActive ? 'Deactivate' : 'Activate',
-                          style: TextStyle(
+              if (_canManage)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _toggleDepartmentStatus(id, isActive);
+                          },
+                          icon: Icon(
+                            isActive ? Icons.block : Icons.check_circle,
                             color:
                                 isActive ? AppColors.error : AppColors.success,
                           ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          side: BorderSide(
-                            color:
-                                isActive ? AppColors.error : AppColors.success,
+                          label: Text(
+                            isActive ? 'Deactivate' : 'Activate',
+                            style: TextStyle(
+                              color: isActive
+                                  ? AppColors.error
+                                  : AppColors.success,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            side: BorderSide(
+                              color: isActive
+                                  ? AppColors.error
+                                  : AppColors.success,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          showDialog(
-                            context: context,
-                            builder: (context) =>
-                                DepartmentFormDialog(id: id, data: data),
-                          );
-                        },
-                        icon: const Icon(Icons.edit, color: Colors.white),
-                        label: const Text('Edit'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            showDialog(
+                              context: context,
+                              builder: (context) =>
+                                  DepartmentFormDialog(id: id, data: data),
+                            );
+                          },
+                          icon: const Icon(Icons.edit, color: Colors.white),
+                          label: const Text('Edit'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                  ],
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.shield, color: AppColors.warning, size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'View-only mode for this department.',
+                            style: TextStyle(
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
             ],
           ),
         ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -66,15 +68,16 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
 
     if (shouldLogout == true && mounted) {
       final auth = context.read<AuthProvider>();
-      // Clean up notifications — wrapped in try-catch so signOut
-      // always runs even if FCM cleanup fails (e.g. on web).
-      try {
-        final userId = auth.currentUser?.id;
-        if (userId != null) {
-          await context.read<NotificationProvider>().onLogout(userId);
-        }
-      } catch (e) {
-        debugPrint('Notification cleanup on logout failed: $e');
+      final userId = auth.currentUser?.id;
+      final notificationProvider = context.read<NotificationProvider>();
+
+      // Run cleanup in background so web logout is never blocked.
+      if (userId != null) {
+        unawaited(
+          notificationProvider.onLogout(userId).catchError((e) {
+            debugPrint('Notification cleanup on logout failed: $e');
+          }),
+        );
       }
       await auth.signOut();
     }

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/user_model.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../services/admin_governance_service.dart';
+import '../../../services/user_functions_service.dart';
 import 'user_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 
@@ -16,6 +20,8 @@ class UserManagementScreen extends StatefulWidget {
 
 class _UserManagementScreenState extends State<UserManagementScreen> {
   final _firestore = FirebaseFirestore.instance;
+  final _governanceService = AdminGovernanceService();
+  final _userFunctionsService = UserFunctionsService();
   final _searchController = TextEditingController();
   String _searchQuery = '';
   Set<UserRole> _selectedRoles = {};
@@ -192,13 +198,20 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddUserDialog(),
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.person_add, color: Colors.white),
-        label: const Text('Add User', style: TextStyle(color: Colors.white)),
-        shape: const StadiumBorder(),
-      ),
+      floatingActionButton: (context
+                  .read<AuthProvider>()
+                  .currentUser
+                  ?.hasPermission('users.manageNonAdmin') ??
+              false)
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddUserDialog(),
+              backgroundColor: AppColors.primary,
+              icon: const Icon(Icons.person_add, color: Colors.white),
+              label:
+                  const Text('Add User', style: TextStyle(color: Colors.white)),
+              shape: const StadiumBorder(),
+            )
+          : null,
     );
   }
 
@@ -254,129 +267,146 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.hardEdge,
         child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: Stack(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundImage: data['photoUrl'] != null
-                  ? NetworkImage(data['photoUrl'])
-                  : null,
-              child: data['photoUrl'] == null
-                  ? Text(
-                      (data['fullName'] ?? 'U')[0].toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    )
-                  : null,
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: isActive ? AppColors.success : Colors.grey,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isDark ? AppColors.surfaceDark : Colors.white,
-                    width: 2,
+          contentPadding: const EdgeInsets.all(12),
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: data['photoUrl'] != null
+                    ? NetworkImage(data['photoUrl'])
+                    : null,
+                child: data['photoUrl'] == null
+                    ? Text(
+                        (data['fullName'] ?? 'U')[0].toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      )
+                    : null,
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: isActive ? AppColors.success : Colors.grey,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDark ? AppColors.surfaceDark : Colors.white,
+                      width: 2,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-        title: Text(
-          data['fullName'] ?? 'Unknown User',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(data['email'] ?? ''),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: _getRoleColor(role).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                role.name.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: _getRoleColor(role),
+            ],
+          ),
+          title: Text(
+            data['fullName'] ?? 'Unknown User',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(data['email'] ?? ''),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _getRoleColor(role).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ),
-            ),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            switch (value) {
-              case 'view':
-                _showUserDetails(context, id, data, isDark);
-                break;
-              case 'edit':
-                _showEditUserDialog(id, data);
-                break;
-              case 'toggle':
-                _toggleUserStatus(id, isActive);
-                break;
-              case 'role':
-                _changeUserRole(id, role);
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'view',
-              child: Row(
-                children: [
-                  Icon(Icons.visibility, size: 18),
-                  SizedBox(width: 8),
-                  Text('View Details'),
-                ],
-              ),
-            ),
-            // Super admin rows are view-only — governed through Super Admin UI
-            if (role != UserRole.superAdmin) ...[
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18),
-                    SizedBox(width: 8),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'toggle',
-                child: Row(
-                  children: [
-                    Icon(isActive ? Icons.block : Icons.check_circle, size: 18),
-                    const SizedBox(width: 8),
-                    Text(isActive ? 'Deactivate' : 'Activate'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'role',
-                child: Row(
-                  children: [
-                    Icon(Icons.admin_panel_settings, size: 18),
-                    SizedBox(width: 8),
-                    Text('Change Role'),
-                  ],
+                child: Text(
+                  role.name.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: _getRoleColor(role),
+                  ),
                 ),
               ),
             ],
-          ],
+          ),
+          trailing: PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'view':
+                  _showUserDetails(context, id, data, isDark);
+                  break;
+                case 'edit':
+                  _showEditUserDialog(id, data);
+                  break;
+                case 'toggle':
+                  _toggleUserStatus(id, isActive);
+                  break;
+                case 'role':
+                  _changeUserRole(id, role);
+                  break;
+              }
+            },
+            itemBuilder: (context) {
+              final actorRole = context.read<AuthProvider>().currentUser?.role;
+              final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
+              final hasManagePerm = context
+                      .read<AuthProvider>()
+                      .currentUser
+                      ?.hasPermission('users.manageNonAdmin') ??
+                  false;
+              // Admins can only manage non-admin targets; superAdmins manage all except superAdmin
+              final canManageTarget = hasManagePerm &&
+                  (actorIsSuperAdmin
+                      ? role != UserRole.superAdmin
+                      : (role != UserRole.superAdmin &&
+                          role != UserRole.admin));
+              return [
+                const PopupMenuItem(
+                  value: 'view',
+                  child: Row(
+                    children: [
+                      Icon(Icons.visibility, size: 18),
+                      SizedBox(width: 8),
+                      Text('View Details'),
+                    ],
+                  ),
+                ),
+                if (canManageTarget) ...[
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'toggle',
+                    child: Row(
+                      children: [
+                        Icon(isActive ? Icons.block : Icons.check_circle,
+                            size: 18),
+                        const SizedBox(width: 8),
+                        Text(isActive ? 'Deactivate' : 'Activate'),
+                      ],
+                    ),
+                  ),
+                  // Only superAdmin can change roles
+                  if (actorIsSuperAdmin)
+                    const PopupMenuItem(
+                      value: 'role',
+                      child: Row(
+                        children: [
+                          Icon(Icons.admin_panel_settings, size: 18),
+                          SizedBox(width: 8),
+                          Text('Change Role'),
+                        ],
+                      ),
+                    ),
+                ],
+              ];
+            },
+          ),
         ),
-      ),
       ),
     );
   }
@@ -411,7 +441,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 mainAxisSize: MainAxisSize.min,
                 // Exclude doctor from filter options
                 children: UserRole.values
-                    .where((role) => role != UserRole.doctor && role != UserRole.superAdmin)
+                    .where((role) =>
+                        role != UserRole.doctor && role != UserRole.superAdmin)
                     .map((role) {
                   return CheckboxListTile(
                     title: Text(role.name.toUpperCase()),
@@ -606,8 +637,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
               ),
 
-              // Actions — hidden for super admin rows (governed via Super Admin UI)
-              if (!isSuperAdminRow)
+              // Actions — governed by actor role: admins manage non-admin only, superAdmins manage all except superAdmin
+              if (!isSuperAdminRow && _canManageTarget(context, data))
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Row(
@@ -620,20 +651,23 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           },
                           icon: Icon(
                             isActive ? Icons.block : Icons.check_circle,
-                            color: isActive ? AppColors.error : AppColors.success,
+                            color:
+                                isActive ? AppColors.error : AppColors.success,
                           ),
                           label: Text(
                             isActive ? 'Deactivate' : 'Activate',
                             style: TextStyle(
-                              color:
-                                  isActive ? AppColors.error : AppColors.success,
+                              color: isActive
+                                  ? AppColors.error
+                                  : AppColors.success,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             side: BorderSide(
-                              color:
-                                  isActive ? AppColors.error : AppColors.success,
+                              color: isActive
+                                  ? AppColors.error
+                                  : AppColors.success,
                             ),
                           ),
                         ),
@@ -661,7 +695,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 16),
                     decoration: BoxDecoration(
                       color: AppColors.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -675,7 +710,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Super Admin accounts are managed through the Super Admin panel.',
+                            'You have view-only access for this account.',
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.warning,
@@ -726,32 +761,79 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
   }
 
+  /// Check if the current actor can manage a target row.
+  bool _canManageTarget(BuildContext context, Map<String, dynamic> data) {
+    final hasManagePerm = context
+            .read<AuthProvider>()
+            .currentUser
+            ?.hasPermission('users.manageNonAdmin') ??
+        false;
+    if (!hasManagePerm) return false;
+
+    final actorRole = context.read<AuthProvider>().currentUser?.role;
+    final targetRoleStr = data['role'] as String? ?? 'student';
+    final targetRole = UserRole.values.firstWhere(
+      (r) => r.name == targetRoleStr,
+      orElse: () => UserRole.student,
+    );
+    if (actorRole == UserRole.superAdmin) {
+      return targetRole != UserRole.superAdmin;
+    }
+    // Admin can only manage non-admin, non-superAdmin targets
+    return targetRole != UserRole.admin && targetRole != UserRole.superAdmin;
+  }
+
   Future<void> _toggleUserStatus(String id, bool currentStatus) async {
-    await _firestore.collection('users').doc(id).update({
-      'isActive': !currentStatus,
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(currentStatus ? 'User deactivated' : 'User activated'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+    try {
+      // Check if target is an admin — use governance function for admin targets
+      final doc = await _firestore.collection('users').doc(id).get();
+      final role = doc.data()?['role'] as String? ?? 'student';
+      if (role == 'admin') {
+        await _governanceService.setAdminActiveStatus(
+          targetUid: id,
+          isActive: !currentStatus,
+        );
+      } else {
+        // Non-admin users: use callable function (rules deny direct admin writes).
+        await _userFunctionsService.setUserActiveStatus(
+          targetUid: id,
+          isActive: !currentStatus,
+        );
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(currentStatus ? 'User deactivated' : 'User activated'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update status: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
   void _changeUserRole(String id, UserRole currentRole) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Change User Role'),
         content: StatefulBuilder(
-          builder: (context, setState) {
+          builder: (dialogContext, setState) {
             return Column(
               mainAxisSize: MainAxisSize.min,
-              // Exclude doctor from role change options
+              // Exclude doctor and superAdmin from role change options
               children: UserRole.values
-                  .where((role) => role != UserRole.doctor && role != UserRole.superAdmin)
+                  .where((role) =>
+                      role != UserRole.doctor && role != UserRole.superAdmin)
                   .map((role) {
                 return RadioListTile<UserRole>(
                   title: Text(role.name.toUpperCase()),
@@ -761,17 +843,32 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   // ignore: deprecated_member_use
                   onChanged: (value) async {
                     if (value != null) {
-                      await _firestore.collection('users').doc(id).update({
-                        'role': value.name,
-                      });
-                      if (!context.mounted) return;
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Role updated'),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
+                      try {
+                        // Route through governance function (superAdmin only)
+                        await _governanceService.changeAdminRole(
+                          targetUid: id,
+                          newRole: value.name,
+                        );
+                        if (!dialogContext.mounted) return;
+                        Navigator.pop(dialogContext);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Role updated'),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      } catch (e) {
+                        if (!dialogContext.mounted) return;
+                        Navigator.pop(dialogContext);
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to change role: $e'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                      }
                     }
                   },
                 );
@@ -781,7 +878,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
         ],

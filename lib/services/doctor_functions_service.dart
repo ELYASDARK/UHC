@@ -125,6 +125,91 @@ class DoctorFunctionsService {
       );
     }
   }
+
+  /// Update a doctor's profile-safe fields.
+  Future<Map<String, dynamic>> updateDoctorProfile({
+    required String doctorId,
+    String? name,
+    String? specialization,
+    String? department,
+    String? bio,
+    String? photoUrl,
+    int? experienceYears,
+    double? consultationFee,
+    List<String>? qualifications,
+    String? dailyNotificationTime,
+    bool? isActive,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('updateDoctorProfile');
+      final result = await callable.call<Map<String, dynamic>>({
+        'doctorId': doctorId,
+        if (name != null) 'name': name,
+        if (specialization != null) 'specialization': specialization,
+        if (department != null) 'department': department,
+        if (bio != null) 'bio': bio,
+        if (photoUrl != null) 'photoUrl': photoUrl,
+        if (experienceYears != null) 'experienceYears': experienceYears,
+        if (consultationFee != null) 'consultationFee': consultationFee,
+        if (qualifications != null) 'qualifications': qualifications,
+        if (dailyNotificationTime != null)
+          'dailyNotificationTime': dailyNotificationTime,
+        if (isActive != null) 'isActive': isActive,
+      });
+
+      return Map<String, dynamic>.from(result.data);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('Error updating doctor profile: ${e.code} - ${e.message}');
+      throw DoctorFunctionException(
+        code: e.code,
+        message: e.message ?? 'Failed to update doctor profile',
+      );
+    }
+  }
+
+  /// Activate/deactivate a doctor.
+  Future<Map<String, dynamic>> setDoctorActiveStatus({
+    required String doctorId,
+    required bool isActive,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('setDoctorActiveStatus');
+      final result = await callable.call<Map<String, dynamic>>({
+        'doctorId': doctorId,
+        'isActive': isActive,
+      });
+
+      return Map<String, dynamic>.from(result.data);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('Error updating doctor status: ${e.code} - ${e.message}');
+      throw DoctorFunctionException(
+        code: e.code,
+        message: e.message ?? 'Failed to update doctor status',
+      );
+    }
+  }
+
+  /// Update a doctor's weekly schedule.
+  Future<Map<String, dynamic>> updateDoctorSchedule({
+    required String doctorId,
+    required Map<String, dynamic> weeklySchedule,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('updateDoctorSchedule');
+      final result = await callable.call<Map<String, dynamic>>({
+        'doctorId': doctorId,
+        'weeklySchedule': weeklySchedule,
+      });
+
+      return Map<String, dynamic>.from(result.data);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint('Error updating doctor schedule: ${e.code} - ${e.message}');
+      throw DoctorFunctionException(
+        code: e.code,
+        message: e.message ?? 'Failed to update doctor schedule',
+      );
+    }
+  }
 }
 
 /// Exception for doctor function errors

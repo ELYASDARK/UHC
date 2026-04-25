@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../services/doctor_functions_service.dart';
 
 /// A time slot representing a start and end time
 class TimeSlot {
@@ -141,7 +141,7 @@ class DoctorScheduleDialog extends StatefulWidget {
 }
 
 class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
-  final _firestore = FirebaseFirestore.instance;
+  final _doctorFunctionsService = DoctorFunctionsService();
   bool _isSaving = false;
 
   // Days of the week
@@ -382,10 +382,10 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
         }
       }
 
-      await _firestore.collection('doctors').doc(widget.doctorId).update({
-        'weeklySchedule': scheduleData,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      await _doctorFunctionsService.updateDoctorSchedule(
+        doctorId: widget.doctorId,
+        weeklySchedule: scheduleData,
+      );
 
       if (mounted) {
         Navigator.pop(context, true);

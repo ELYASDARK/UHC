@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart'; // Added
 import 'package:image_picker/image_picker.dart'; // Added
 import '../data/models/user_model.dart';
@@ -12,6 +13,7 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance; // Added
 
   /// Current Firebase user
@@ -58,12 +60,18 @@ class AuthService {
 
       // Create user document in Firestore
       if (credential.user != null) {
-        await _createUserDocument(
-          credential.user!,
-          fullName,
-          phoneNumber: phoneNumber,
-          dateOfBirth: dateOfBirth,
-        );
+        try {
+          await _createUserDocument(
+            credential.user!,
+            fullName,
+            phoneNumber: phoneNumber,
+            dateOfBirth: dateOfBirth,
+          );
+        } catch (e) {
+          // Roll back the auth user if profile bootstrap fails.
+          await credential.user!.delete().catchError((_) {});
+          rethrow;
+        }
       }
 
       return credential;
@@ -85,10 +93,7 @@ class AuthService {
         // On mobile, use google_sign_in package
         final googleUser = await _googleSignIn.authenticate();
 
-
-
-        final GoogleSignInAuthentication googleAuth =
-            googleUser.authentication;
+        final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
         final credential = GoogleAuthProvider.credential(
           idToken: googleAuth.idToken,
@@ -181,9 +186,7 @@ class AuthService {
       // On mobile, use google_sign_in package
       final googleUser = await _googleSignIn.authenticate();
 
-
-      final GoogleSignInAuthentication googleAuth =
-          googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,
@@ -270,22 +273,12 @@ class AuthService {
     String? phoneNumber,
     DateTime? dateOfBirth,
   }) async {
-    final userModel = UserModel(
-      id: user.uid,
-      email: user.email ?? '',
-      fullName: fullName,
-      photoUrl: user.photoURL,
-      phoneNumber: phoneNumber,
-      dateOfBirth: dateOfBirth,
-      role: UserRole.student,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
-    await _firestore
-        .collection('users')
-        .doc(user.uid)
-        .set(userModel.toFirestore());
+    final callable = _functions.httpsCallable('bootstrapSelfUserDocument');
+    await callable.call<Map<String, dynamic>>({
+      'fullName': fullName,
+      'phoneNumber': phoneNumber,
+      'dateOfBirth': dateOfBirth?.toIso8601String(),
+    });
   }
 
   /// Update existing user document on Google sign-in.
@@ -315,6 +308,29 @@ class AuthService {
     final doc = await _firestore.collection('users').doc(uid).get();
     if (doc.exists) {
       return UserModel.fromFirestore(doc);
+    }
+
+    // Helpful diagnostic: account exists in Auth but user profile doc ID
+    // does not match auth.uid (common when created manually in console).
+    final email = currentUser?.email;
+    if (email != null && email.isNotEmpty) {
+      final emailMatch = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(2)
+          .get();
+      if (emailMatch.docs.length == 1) {
+        final wrongDocId = emailMatch.docs.first.id;
+        throw Exception(
+          'Profile UID mismatch. Auth UID is "$uid" but Firestore user doc is "$wrongDocId". '
+          'Create users/$uid with the same data/role, then remove the old doc.',
+        );
+      }
+      if (emailMatch.docs.length > 1) {
+        throw Exception(
+          'Multiple Firestore user profiles found for $email. Keep exactly one users/<auth_uid> document.',
+        );
+      }
     }
     return null;
   }

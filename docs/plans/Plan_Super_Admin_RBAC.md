@@ -103,7 +103,7 @@
 1. `requireAuth(context)`
 2. `getCallerUserDoc(uid)`
 3. `requireSuperAdmin(callerDoc)`
-4. `requireAdminOrSuperAdminWithPermission(...)`
+4. `requirePermission(...)` (with `superAdmin` bypass)
 5. `writeAdminAuditLog(...)`
 
 ### New/updated callable functions
@@ -262,13 +262,12 @@ Notes:
 
 Add indexes for new governance queries:
 
-1. `users`: `role + createdAt`
-2. `users`: `role + isActive`
-3. `users`: `role + superAdminType`
-4. `admin_audit_logs`: `createdAt`
-5. `admin_audit_logs`: `actorUid + createdAt`
-6. `admin_audit_logs`: `targetUid + createdAt`
-7. `admin_audit_logs`: `action + createdAt`
+1. `users`: `role + isActive`
+2. `users`: `role + superAdminType`
+3. `admin_audit_logs`: `actorUid + createdAt`
+4. `admin_audit_logs`: `targetUid + createdAt`
+5. `admin_audit_logs`: `action + createdAt`
+6. `admin_audit_logs`: `createdAt` uses Firestore single-field indexing by default
 
 ---
 

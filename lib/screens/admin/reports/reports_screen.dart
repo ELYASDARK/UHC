@@ -2,9 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../providers/auth_provider.dart';
 
 /// Reports generation screen for admin
 class ReportsScreen extends StatefulWidget {
@@ -85,27 +87,40 @@ class _ReportsScreenState extends State<ReportsScreen> {
             // Generate Button
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isGenerating ? null : _generateReport,
-                icon: _isGenerating
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.file_download),
-                label: Text(
-                  _isGenerating ? 'Generating...' : 'Generate Report',
-                ),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+              child: Builder(
+                builder: (context) {
+                  final canExport = context.read<AuthProvider>().currentUser
+                          ?.hasPermission('reports.export') ??
+                      false;
+                  return ElevatedButton.icon(
+                    onPressed: canExport
+                        ? (_isGenerating ? null : _generateReport)
+                        : null,
+                    icon: _isGenerating
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.file_download),
+                    label: Text(
+                      _isGenerating
+                          ? 'Generating...'
+                          : canExport
+                              ? 'Generate Report'
+                              : 'Export Permission Required',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 16),
