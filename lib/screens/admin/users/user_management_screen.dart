@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/user_model.dart';
 import '../../../providers/auth_provider.dart';
@@ -245,6 +246,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     Map<String, dynamic> data,
     bool isDark,
   ) {
+    final actorIsSuperAdmin =
+        context.read<AuthProvider>().currentUser?.role == UserRole.superAdmin;
     final role = UserRole.values.firstWhere(
       (r) => r.name == data['role'],
       orElse: () => UserRole.student,
@@ -324,6 +327,36 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   ),
                 ),
               ),
+              if (actorIsSuperAdmin) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'UID: ${_shortUid(id)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _copyUid(id),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.copy_rounded,
+                          size: 16,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
           trailing: PopupMenuButton<String>(
@@ -351,8 +384,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       .currentUser
                       ?.hasPermission('users.manageNonAdmin') ??
                   false;
-              // Admins can only manage non-admin targets; superAdmins manage all except superAdmin
-              final canManageTarget = hasManagePerm &&
+              // Super Admin can edit superAdmin rows, but destructive actions stay blocked.
+              final canEditSuperAdminTarget =
+                  actorIsSuperAdmin && role == UserRole.superAdmin;
+              // Admins can only manage non-admin targets; superAdmins can fully
+              // manage non-superAdmin targets.
+              final canManageNonSuperAdminTarget = hasManagePerm &&
                   (actorIsSuperAdmin
                       ? role != UserRole.superAdmin
                       : (role != UserRole.superAdmin &&
@@ -368,7 +405,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ],
                   ),
                 ),
-                if (canManageTarget) ...[
+                if (canEditSuperAdminTarget || canManageNonSuperAdminTarget)
                   const PopupMenuItem(
                     value: 'edit',
                     child: Row(
@@ -379,6 +416,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       ],
                     ),
                   ),
+                if (canManageNonSuperAdminTarget) ...[
                   PopupMenuItem(
                     value: 'toggle',
                     child: Row(
@@ -424,6 +462,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       case UserRole.staff:
         return AppColors.info;
     }
+  }
+
+  String _shortUid(String uid) {
+    if (uid.length <= 12) return uid;
+    return '${uid.substring(0, 12)}...';
+  }
+
+  Future<void> _copyUid(String uid) async {
+    await Clipboard.setData(ClipboardData(text: uid));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('UID copied'),
+        backgroundColor: AppColors.success,
+      ),
+    );
   }
 
   void _showFilterDialog() {
@@ -637,7 +691,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
               ),
 
-              // Actions — governed by actor role: admins manage non-admin only, superAdmins manage all except superAdmin
+              // Actions — superAdmin can edit superAdmin rows (edit-only).
               if (!isSuperAdminRow && _canManageTarget(context, data))
                 Padding(
                   padding: const EdgeInsets.all(24),
@@ -689,6 +743,28 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         ),
                       ),
                     ],
+                  ),
+                )
+              else if (isSuperAdminRow &&
+                  context.read<AuthProvider>().currentUser?.role ==
+                      UserRole.superAdmin)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showEditUserDialog(id, data);
+                      },
+                      icon: const Icon(Icons.edit, color: Colors.white),
+                      label: const Text('Edit'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
                   ),
                 )
               else
@@ -830,10 +906,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           builder: (dialogContext, setState) {
             return Column(
               mainAxisSize: MainAxisSize.min,
-              // Exclude doctor and superAdmin from role change options
+              // Exclude admin, doctor and superAdmin from role change options.
+              // Admin accounts are created via Admin Governance.
               children: UserRole.values
                   .where((role) =>
-                      role != UserRole.doctor && role != UserRole.superAdmin)
+                      role != UserRole.admin &&
+                      role != UserRole.doctor &&
+                      role != UserRole.superAdmin)
                   .map((role) {
                 return RadioListTile<UserRole>(
                   title: Text(role.name.toUpperCase()),

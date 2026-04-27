@@ -1,12 +1,14 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/user_model.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../services/admin_governance_service.dart';
 import '../../../services/user_functions_service.dart';
 
 class UserFormDialog extends StatefulWidget {
@@ -23,6 +25,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _picker = ImagePicker();
   final _userFunctionsService = UserFunctionsService();
+  final _governanceService = AdminGovernanceService();
   bool _isUploading = false;
   bool _isSubmitting = false;
   Uint8List? _imageBytes;
@@ -32,8 +35,6 @@ class _UserFormDialogState extends State<UserFormDialog> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   late TextEditingController _phoneController;
-  late TextEditingController _studentIdController;
-  late TextEditingController _staffIdController;
   late TextEditingController _photoUrlController;
   bool _obscurePassword = true;
   DateTime? _selectedDateOfBirth;
@@ -50,10 +51,6 @@ class _UserFormDialogState extends State<UserFormDialog> {
     _passwordController = TextEditingController();
     _phoneController =
         TextEditingController(text: widget.data?['phoneNumber'] ?? '');
-    _studentIdController =
-        TextEditingController(text: widget.data?['studentId'] ?? '');
-    _staffIdController =
-        TextEditingController(text: widget.data?['staffId'] ?? '');
     _photoUrlController =
         TextEditingController(text: widget.data?['photoUrl'] ?? '');
 
@@ -86,8 +83,6 @@ class _UserFormDialogState extends State<UserFormDialog> {
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
-    _studentIdController.dispose();
-    _staffIdController.dispose();
     _photoUrlController.dispose();
     super.dispose();
   }
@@ -324,12 +319,20 @@ class _UserFormDialogState extends State<UserFormDialog> {
     setState(() => _isSubmitting = true);
 
     try {
+      final actorRole = context.read<AuthProvider>().currentUser?.role;
+      final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
+      final originalRole =
+          (widget.data?['role'] as String?) ?? _selectedRole.name;
+
       if (isEditing) {
         // Update existing user
         String? photoUrl = _photoUrlController.text;
         if (_imageBytes != null) {
           photoUrl = await _uploadImage(widget.id!);
         }
+        final roleStudentId =
+            _selectedRole == UserRole.student ? widget.id : null;
+        final roleStaffId = _selectedRole == UserRole.staff ? widget.id : null;
 
         await _userFunctionsService.updateUserProfileByAdmin(
           targetUid: widget.id!,
@@ -338,14 +341,19 @@ class _UserFormDialogState extends State<UserFormDialog> {
               ? _phoneController.text.trim()
               : null,
           photoUrl: photoUrl,
-          studentId: _studentIdController.text.trim().isNotEmpty
-              ? _studentIdController.text.trim()
-              : null,
-          staffId: _staffIdController.text.trim().isNotEmpty
-              ? _staffIdController.text.trim()
-              : null,
+          studentId: roleStudentId,
+          staffId: roleStaffId,
           dateOfBirth: _selectedDateOfBirth,
         );
+
+        // Super Admin can change user role directly from edit form.
+        // ADMIN is intentionally excluded from selectable options.
+        if (actorIsSuperAdmin && originalRole != _selectedRole.name) {
+          await _governanceService.changeAdminRole(
+            targetUid: widget.id!,
+            newRole: _selectedRole.name,
+          );
+        }
 
         if (mounted) {
           Navigator.pop(context, true);
@@ -367,12 +375,6 @@ class _UserFormDialogState extends State<UserFormDialog> {
               ? _phoneController.text.trim()
               : null,
           dateOfBirth: _selectedDateOfBirth,
-          studentId: _studentIdController.text.trim().isNotEmpty
-              ? _studentIdController.text.trim()
-              : null,
-          staffId: _staffIdController.text.trim().isNotEmpty
-              ? _staffIdController.text.trim()
-              : null,
         );
 
         // Upload image if selected
@@ -410,6 +412,19 @@ class _UserFormDialogState extends State<UserFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final actorRole = context.watch<AuthProvider>().currentUser?.role;
+    final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
+    final isEditingSuperAdmin = isEditing &&
+        (widget.data?['role'] as String?) == UserRole.superAdmin.name;
+    final canEditRole = !isEditing || actorIsSuperAdmin;
+    final roleOptions = UserRole.values
+        .where((role) =>
+            role != UserRole.admin &&
+            role != UserRole.doctor &&
+            role != UserRole.superAdmin)
+        .toList();
+    final selectedRoleInOptions =
+        roleOptions.contains(_selectedRole) ? _selectedRole : null;
 
     return Dialog(
       insetPadding: const EdgeInsets.all(16),
@@ -623,45 +638,47 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       title: 'Role & Details',
                       isDark: isDark,
                       children: [
-                        // Role Dropdown (exclude doctor/superAdmin, and admin on create)
-                        DropdownButtonFormField<UserRole>(
-                          key: ValueKey(_selectedRole),
-                          initialValue: _selectedRole,
-                          onChanged: isEditing
-                              ? null
-                              : (value) {
-                                  if (value != null) {
-                                    setState(() => _selectedRole = value);
-                                  }
-                                },
-                          decoration: InputDecoration(
-                            labelText: 'Role *',
-                            prefixIcon:
-                                const Icon(Icons.admin_panel_settings_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        if (!isEditingSuperAdmin) ...[
+                          // Role Dropdown (exclude doctor/superAdmin, and admin on create)
+                          DropdownButtonFormField<UserRole>(
+                            key: ValueKey('${_selectedRole.name}-$canEditRole'),
+                            initialValue: selectedRoleInOptions,
+                            hint: Text(
+                              isEditing && _selectedRole == UserRole.admin
+                                  ? 'Select new role'
+                                  : 'Select role',
                             ),
-                            helperText: isEditing
-                                ? 'Role changes are managed from User Management actions'
+                            onChanged: canEditRole
+                                ? (value) {
+                                    if (value != null) {
+                                      setState(() => _selectedRole = value);
+                                    }
+                                  }
                                 : null,
+                            decoration: InputDecoration(
+                              labelText: 'Role *',
+                              prefixIcon: const Icon(
+                                  Icons.admin_panel_settings_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              helperText: isEditing
+                                  ? (actorIsSuperAdmin
+                                      ? (_selectedRole == UserRole.admin
+                                          ? 'ADMIN removed from options. Choose STUDENT or STAFF.'
+                                          : null)
+                                      : 'Role changes are managed from User Management actions')
+                                  : null,
+                            ),
+                            items: roleOptions.map((role) {
+                              return DropdownMenuItem(
+                                value: role,
+                                child: Text(role.name.toUpperCase()),
+                              );
+                            }).toList(),
                           ),
-                          items: UserRole.values.where((role) {
-                            if (role == UserRole.doctor ||
-                                role == UserRole.superAdmin) {
-                              return false;
-                            }
-                            if (!isEditing && role == UserRole.admin) {
-                              return false;
-                            }
-                            return true;
-                          }).map((role) {
-                            return DropdownMenuItem(
-                              value: role,
-                              child: Text(role.name.toUpperCase()),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 16),
+                        ],
 
                         // Date of Birth
                         InkWell(
@@ -701,27 +718,35 @@ class _UserFormDialogState extends State<UserFormDialog> {
                           ),
                         ),
                         const SizedBox(height: 16),
-
-                        // Student ID (show only for student role)
-                        if (_selectedRole == UserRole.student)
+                        if (isEditing)
                           TextFormField(
-                            controller: _studentIdController,
+                            initialValue: widget.id ?? '',
+                            readOnly: true,
                             decoration: InputDecoration(
-                              labelText: 'Student ID',
-                              prefixIcon: const Icon(Icons.badge_outlined),
+                              labelText: 'User UID',
+                              prefixIcon:
+                                  const Icon(Icons.perm_identity_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
+                              suffixIcon: actorIsSuperAdmin
+                                  ? IconButton(
+                                      tooltip: 'Copy UID',
+                                      icon: const Icon(Icons.copy_rounded),
+                                      onPressed: () =>
+                                          _copyUid(widget.id ?? ''),
+                                    )
+                                  : null,
                             ),
-                          ),
-
-                        // Staff ID (show only for staff role)
-                        if (_selectedRole == UserRole.staff)
+                          )
+                        else
                           TextFormField(
-                            controller: _staffIdController,
+                            initialValue: 'Auto-generated after create',
+                            readOnly: true,
                             decoration: InputDecoration(
-                              labelText: 'Staff ID',
-                              prefixIcon: const Icon(Icons.badge_outlined),
+                              labelText: 'User UID',
+                              prefixIcon:
+                                  const Icon(Icons.perm_identity_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -781,6 +806,18 @@ class _UserFormDialogState extends State<UserFormDialog> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _copyUid(String uid) async {
+    if (uid.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: uid));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('UID copied'),
+        backgroundColor: AppColors.success,
       ),
     );
   }

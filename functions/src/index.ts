@@ -974,7 +974,7 @@ interface UpdateUserProfileByAdminData {
 /**
  * Update profile-safe fields for a target user via server-side enforcement.
  * Admins can manage non-admin users only.
- * Super Admins can manage admins and non-admins (excluding super admins).
+ * Super Admins can manage all users, including super admins.
  */
 export const updateUserProfileByAdmin = functions.https.onCall(
     async (request: functions.https.CallableRequest<UpdateUserProfileByAdminData>) => {
@@ -995,10 +995,10 @@ export const updateUserProfileByAdmin = functions.https.onCall(
         }
 
         const targetRole = targetDoc.data()!.role;
-        if (targetRole === 'superAdmin') {
+        if (targetRole === 'superAdmin' && callerRole !== 'superAdmin') {
             throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Cannot update Super Admin profile via this function.'
+                'permission-denied',
+                'Only Super Admin can edit Super Admin profile.'
             );
         }
         if (callerRole === 'admin' && targetRole === 'admin') {

@@ -257,13 +257,33 @@ class AuthService {
 
   /// Sign out
   Future<void> signOut() async {
-    try {
-      await _googleSignIn.signOut();
-    } catch (e) {
-      // Ignore google sign out errors (common on web if not signed in via google)
+    if (!kIsWeb) {
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {
+        // Ignore google sign out errors on mobile.
+      }
     }
-    // Always sign out of Firebase Auth
+
     await _auth.signOut();
+    // Verify sign-out deterministically (helps on web where stream timing can vary).
+    for (var i = 0; i < 20; i++) {
+      final user = _auth.currentUser;
+      if (user == null) return;
+      try {
+        await user.reload();
+      } catch (_) {
+        // Ignore reload errors during sign-out verification.
+      }
+      if (i == 5) {
+        // Retry once in case the first call was interrupted by transient state.
+        await _auth.signOut();
+      }
+      await Future.delayed(const Duration(milliseconds: 250));
+    }
+    if (_auth.currentUser != null) {
+      throw Exception('Firebase sign-out did not complete.');
+    }
   }
 
   /// Create user document in Firestore

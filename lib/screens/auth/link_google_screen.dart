@@ -79,7 +79,17 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
           }),
         );
       }
-      await auth.signOut();
+      try {
+        await auth.signOut();
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Logout failed. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 

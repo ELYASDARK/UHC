@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/admin_governance_service.dart';
@@ -15,6 +16,7 @@ class AuditLogScreen extends StatefulWidget {
 
 class _AuditLogScreenState extends State<AuditLogScreen> {
   final _governance = AdminGovernanceService();
+  final _firestore = FirebaseFirestore.instance;
   List<Map<String, dynamic>> _logs = [];
   bool _isLoading = true;
   String? _filterAction;
@@ -169,9 +171,20 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                 children: [
                   if (_filterAction != null)
                     Chip(
-                      label: Text(
-                          _actionLabels[_filterAction] ?? _filterAction!,
-                          style: GoogleFonts.poppins(fontSize: 11)),
+                      label:
+                          Text(_actionLabels[_filterAction] ?? _filterAction!,
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: isDark ? Colors.white : Colors.black87,
+                              )),
+                      backgroundColor:
+                          isDark ? AppColors.surfaceDark : Colors.white,
+                      side: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.35)
+                            : Colors.black.withValues(alpha: 0.15),
+                      ),
+                      deleteIconColor: isDark ? Colors.white70 : Colors.black54,
                       deleteIcon: const Icon(Icons.close, size: 16),
                       onDeleted: () {
                         _filterAction = null;
@@ -181,7 +194,18 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                   if (_filterTargetUid != null)
                     Chip(
                       label: Text('Target: ${_shortUid(_filterTargetUid!)}',
-                          style: GoogleFonts.poppins(fontSize: 11)),
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: isDark ? Colors.white : Colors.black87,
+                          )),
+                      backgroundColor:
+                          isDark ? AppColors.surfaceDark : Colors.white,
+                      side: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.35)
+                            : Colors.black.withValues(alpha: 0.15),
+                      ),
+                      deleteIconColor: isDark ? Colors.white70 : Colors.black54,
                       deleteIcon: const Icon(Icons.close, size: 16),
                       onDeleted: () {
                         _filterTargetUid = null;
@@ -192,7 +216,18 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                   if (_filterActorUid != null)
                     Chip(
                       label: Text('Actor: ${_shortUid(_filterActorUid!)}',
-                          style: GoogleFonts.poppins(fontSize: 11)),
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            color: isDark ? Colors.white : Colors.black87,
+                          )),
+                      backgroundColor:
+                          isDark ? AppColors.surfaceDark : Colors.white,
+                      side: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.35)
+                            : Colors.black.withValues(alpha: 0.15),
+                      ),
+                      deleteIconColor: isDark ? Colors.white70 : Colors.black54,
                       deleteIcon: const Icon(Icons.close, size: 16),
                       onDeleted: () {
                         _filterActorUid = null;
@@ -204,8 +239,19 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                     Chip(
                       label: Text(
                         _dateRangeLabel(),
-                        style: GoogleFonts.poppins(fontSize: 11),
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
                       ),
+                      backgroundColor:
+                          isDark ? AppColors.surfaceDark : Colors.white,
+                      side: BorderSide(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.35)
+                            : Colors.black.withValues(alpha: 0.15),
+                      ),
+                      deleteIconColor: isDark ? Colors.white70 : Colors.black54,
                       deleteIcon: const Icon(Icons.close, size: 16),
                       onDeleted: () {
                         _filterDateFrom = null;
@@ -262,8 +308,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         content: TextField(
           controller: _targetUidCtrl,
           decoration: InputDecoration(
-            labelText: l10n.targetUserUid,
-            hintText: l10n.pasteUidHere,
+            labelText: '${l10n.targetUserUid} / Email',
+            hintText: 'Paste UID or email',
           ),
         ),
         actions: [
@@ -277,10 +323,29 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
             child: Text(l10n.clear),
           ),
           ElevatedButton(
-            onPressed: () {
-              final uid = _targetUidCtrl.text.trim();
-              _filterTargetUid = uid.isNotEmpty ? uid : null;
-              Navigator.pop(ctx);
+            onPressed: () async {
+              final raw = _targetUidCtrl.text.trim();
+              if (raw.isEmpty) {
+                _filterTargetUid = null;
+                if (ctx.mounted) Navigator.pop(ctx);
+                _loadLogs();
+                return;
+              }
+
+              final resolvedUid = await _resolveUidFromInput(raw);
+              if (resolvedUid == null) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('User not found. Enter a valid UID or email.'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+                return;
+              }
+              _filterTargetUid = resolvedUid;
+              if (ctx.mounted) Navigator.pop(ctx);
               _loadLogs();
             },
             child: Text(l10n.apply),
@@ -299,8 +364,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         content: TextField(
           controller: _actorUidCtrl,
           decoration: InputDecoration(
-            labelText: l10n.actorUserUid,
-            hintText: l10n.pasteUidHere,
+            labelText: '${l10n.actorUserUid} / Email',
+            hintText: 'Paste UID or email',
           ),
         ),
         actions: [
@@ -314,10 +379,29 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
             child: Text(l10n.clear),
           ),
           ElevatedButton(
-            onPressed: () {
-              final uid = _actorUidCtrl.text.trim();
-              _filterActorUid = uid.isNotEmpty ? uid : null;
-              Navigator.pop(ctx);
+            onPressed: () async {
+              final raw = _actorUidCtrl.text.trim();
+              if (raw.isEmpty) {
+                _filterActorUid = null;
+                if (ctx.mounted) Navigator.pop(ctx);
+                _loadLogs();
+                return;
+              }
+
+              final resolvedUid = await _resolveUidFromInput(raw);
+              if (resolvedUid == null) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('User not found. Enter a valid UID or email.'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+                return;
+              }
+              _filterActorUid = resolvedUid;
+              if (ctx.mounted) Navigator.pop(ctx);
               _loadLogs();
             },
             child: Text(l10n.apply),
@@ -371,6 +455,34 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     final from = _filterDateFrom != null ? fmt.format(_filterDateFrom!) : 'Any';
     final to = _filterDateTo != null ? fmt.format(_filterDateTo!) : 'Any';
     return '${l10n.date}: $from → $to';
+  }
+
+  /// Accept UID or email and resolve to real users/{uid} doc id.
+  Future<String?> _resolveUidFromInput(String rawInput) async {
+    final input = rawInput.trim();
+    if (input.isEmpty) return null;
+
+    if (input.contains('@')) {
+      final byEmail = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: input)
+          .limit(1)
+          .get();
+      if (byEmail.docs.isNotEmpty) return byEmail.docs.first.id;
+
+      final byLowerEmail = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: input.toLowerCase())
+          .limit(1)
+          .get();
+      if (byLowerEmail.docs.isNotEmpty) return byLowerEmail.docs.first.id;
+      return null;
+    }
+
+    final asUidDoc = await _firestore.collection('users').doc(input).get();
+    if (asUidDoc.exists) return input;
+
+    return null;
   }
 
   Widget _buildLogTile(Map<String, dynamic> log, bool isDark) {

@@ -454,6 +454,72 @@ flutter build web --release
 ## 📝 Changelog
 
 <details open>
+<summary><b>v2.1.0</b> — April 28, 2026</summary>
+
+#### 🛡 User Management & Super Admin Edit Rules
+- **Super Admin can edit Super Admin profiles** — Updated UI and backend enforcement so only `superAdmin` can edit `superAdmin` accounts.
+- **Edit-only protection for Super Admin rows** — In User Management, `superAdmin` targets expose **Edit** only (no deactivate/role-change destructive actions).
+- **Role-change safety** — Role options in user actions/forms now exclude `admin`, `doctor`, and `superAdmin` where not allowed.
+- **Server-side enforcement** — `updateUserProfileByAdmin` now allows super-admin target updates only when caller is `superAdmin`.
+
+#### 🆔 UID UX Improvements
+- **UID copy support** — Added quick UID copy action for super admin in User Management list rows.
+- **Role-based UID visibility**:
+  - `superAdmin`: sees UID in list + copy button.
+  - `admin`: list UID hidden; UID remains available in edit dialog.
+- **Edit form normalization** — Replaced manual Student/Staff ID inputs with read-only **User UID** behavior and server-safe mapping.
+
+#### 👤 Profile Experience Refinements
+- **Admin/Super Admin profile simplification** — Removed patient-only sections for admin-like roles (language/notifications/medical docs where not applicable).
+- **Super Admin profile styling** — Added super-admin accent treatment and slot badge indicators (`PRIMARY` / `BACKUP`).
+- **Admin quick entry restored** — Profile keeps direct access to Admin Dashboard for admin-like roles.
+
+#### 🧭 Super Admin Navigation & Governance UX
+- **Bottom nav streamlined** — Removed `Permissions` item from Super Admin bottom navigation; now: Dashboard, Admins, Audit Logs, Profile.
+- **Quick Actions removed from Super Admin Dashboard** — Cleaner dashboard flow with governance focused sections.
+- **Admin Governance dialog redesign** — Modernized create admin, reset password, assign slot, and rotate slot dialogs with consistent validation and submit/loading states.
+- **UID/email resolution in governance flows** — Assign/Rotate slot inputs accept either UID or email and resolve to Firestore user doc IDs.
+
+#### 📜 Audit Logs Filtering Upgrade
+- **Actor/Target filters accept UID or email** — Improved discoverability when UIDs are not easy to find.
+- **Active filter chips styled for dark mode** — Fixed readability (text/icon contrast) in dark theme.
+
+#### 🎨 Dark Mode Readability Fixes
+- **Admin Governance preset chips (`Full`, `Ops`, `Read-Only`)** — Improved dark-mode contrast (label/background/border/disabled state).
+- **Chip/divider spacing fix** — Added vertical spacing so preset chips no longer touch divider lines.
+
+#### 🧱 Runtime & Auth Reliability
+- **Crashlytics web-safe guards** — Prevented web assertion crashes by disabling/guarding Crashlytics hooks on web and wrapping reporting calls.
+- **Hero tag collision fix** — Unique FAB hero tags for `AdminControlScreen` instances inside `IndexedStack`.
+- **Sign-out hardening** — Improved sign-out reliability with verification retries and better user feedback on failure.
+- **Stale auth load guard** — Prevented outdated async auth loads from overriding current auth state after account switches/sign-out.
+
+#### 📁 Files Changed
+
+| File | Key Changes |
+|:---|:---|
+| `functions/src/index.ts` | Super-admin-only edit enforcement for super-admin profile updates |
+| `functions/lib/index.js` | Compiled output sync |
+| `functions/lib/index.js.map` | Compiled source map sync |
+| `lib/main.dart` | Web-safe Crashlytics guards, non-fatal reporting helper, logout error feedback |
+| `lib/providers/auth_provider.dart` | Stale auth load guard, sign-out error propagation improvements |
+| `lib/providers/notification_provider.dart` | Web-safe Crashlytics wrapper |
+| `lib/services/fcm_service.dart` | Web-safe Crashlytics wrapper |
+| `lib/services/local_notification_service.dart` | Web-safe Crashlytics wrapper |
+| `lib/services/auth_service.dart` | Deterministic sign-out verification/retry flow |
+| `lib/screens/auth/link_google_screen.dart` | Safe logout error handling |
+| `lib/screens/doctor/profile/doctor_profile_screen.dart` | Safe logout error handling |
+| `lib/screens/patient/profile/profile_screen.dart` | Admin/super-admin profile simplification + super-admin visual enhancements |
+| `lib/screens/admin/users/user_management_screen.dart` | Super-admin edit rules, UID visibility/copy behavior |
+| `lib/screens/admin/users/user_form_dialog.dart` | Role-safe edit form, UID-only identity handling, super-admin edit behavior |
+| `lib/screens/super_admin/super_admin_dashboard_screen.dart` | Removed Quick Actions section |
+| `lib/screens/super_admin/super_admin_shell.dart` | Removed Permissions bottom-tab and remapped tab indexes |
+| `lib/screens/super_admin/admin_control_screen.dart` | Dialog redesign, UID/email resolution, dark-mode chip contrast + spacing, unique FAB heroTag |
+| `lib/screens/super_admin/audit_log_screen.dart` | UID/email filter resolution and dark-mode filter chip contrast |
+
+</details>
+
+<details>
 <summary><b>v2.0.0</b> — April 2026</summary>
 
 #### 🛡 Super Admin + Admin RBAC (Phases 0–8)

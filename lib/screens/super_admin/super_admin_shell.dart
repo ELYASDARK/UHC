@@ -31,8 +31,9 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _visitedScreens = {widget.initialIndex};
+    final clampedIndex = widget.initialIndex.clamp(0, 3);
+    _currentIndex = clampedIndex;
+    _visitedScreens = {clampedIndex};
   }
 
   void _onTabTapped(int index) {
@@ -48,7 +49,7 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      extendBody: true,
+      extendBody: false,
       body: IndexedStack(
         index: _currentIndex,
         children: [
@@ -60,16 +61,12 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
           _visitedScreens.contains(1)
               ? const AdminControlScreen(initialTab: 0)
               : const SizedBox.shrink(),
-          // Tab 2: Permissions
+          // Tab 2: Audit Logs
           _visitedScreens.contains(2)
-              ? const AdminControlScreen(initialTab: 1)
-              : const SizedBox.shrink(),
-          // Tab 3: Audit Logs
-          _visitedScreens.contains(3)
               ? const AuditLogScreen()
               : const SizedBox.shrink(),
-          // Tab 4: Profile
-          _visitedScreens.contains(4)
+          // Tab 3: Profile
+          _visitedScreens.contains(3)
               ? const ProfileScreen()
               : const SizedBox.shrink(),
         ],
@@ -121,20 +118,13 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
                 ),
                 _buildNavItem(
                   index: 2,
-                  icon: Icons.security_outlined,
-                  activeIcon: Icons.security,
-                  label: l10n.permissions,
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 3,
                   icon: Icons.history_outlined,
                   activeIcon: Icons.history_rounded,
                   label: l10n.auditLogs,
                   isDark: isDark,
                 ),
                 _buildNavItem(
-                  index: 4,
+                  index: 3,
                   icon: Icons.person_outline_rounded,
                   activeIcon: Icons.person_rounded,
                   label: AppLocalizations.of(context).profile,

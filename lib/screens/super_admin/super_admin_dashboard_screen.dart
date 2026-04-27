@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
-import 'admin_control_screen.dart';
 
 /// Super Admin Dashboard with governance-focused KPIs:
 /// admin count, active admins, slot health, recent audit activity.
@@ -180,13 +179,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                       !_backupSlotFilled)
                     _buildRiskSection(isDark, l10n),
 
-                  Text(l10n.quickActions,
-                      style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  _buildQuickActions(isDark, l10n),
-                  const SizedBox(height: 20),
-
                   // Recent audit activity
                   Text(l10n.recentAuditActivity,
                       style: GoogleFonts.poppins(
@@ -336,81 +328,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
         dense: true,
         leading: Icon(icon, color: color, size: 20),
         title: Text(msg, style: GoogleFonts.poppins(fontSize: 12)),
-      ),
-    );
-  }
-
-  Widget _buildQuickActions(bool isDark, AppLocalizations l10n) {
-    return Row(
-      children: [
-        Expanded(
-          child: _quickActionCard(
-            title: l10n.adminControl,
-            icon: Icons.admin_panel_settings,
-            color: const Color(0xFFD32F2F),
-            isDark: isDark,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AdminControlScreen(initialTab: 0)),
-              );
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _quickActionCard(
-            title: l10n.permissions,
-            icon: Icons.security,
-            color: AppColors.info,
-            isDark: isDark,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AdminControlScreen(initialTab: 1)),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _quickActionCard({
-    required String title,
-    required IconData icon,
-    required Color color,
-    required bool isDark,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.35)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios, size: 14, color: color),
-          ],
-        ),
       ),
     );
   }

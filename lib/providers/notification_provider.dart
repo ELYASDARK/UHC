@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -60,8 +61,7 @@ class NotificationProvider extends ChangeNotifier {
       });
     } catch (e, stack) {
       _error = e.toString();
-      FirebaseCrashlytics.instance.recordError(e, stack,
-          reason: 'NotificationProvider Error: initialize');
+      _recordError(e, stack, reason: 'NotificationProvider Error: initialize');
       notifyListeners();
     }
   }
@@ -88,7 +88,7 @@ class NotificationProvider extends ChangeNotifier {
       onError: (e, stack) {
         _error = e.toString();
         _isLoading = false;
-        FirebaseCrashlytics.instance.recordError(e, stack,
+        _recordError(e, stack,
             reason: 'NotificationProvider Error: streamNotifications');
         notifyListeners();
       },
@@ -101,7 +101,7 @@ class NotificationProvider extends ChangeNotifier {
         notifyListeners();
       },
       onError: (e, stack) {
-        FirebaseCrashlytics.instance.recordError(e, stack,
+        _recordError(e, stack,
             reason: 'NotificationProvider Error: streamUnreadCount');
       },
     );
@@ -120,7 +120,7 @@ class NotificationProvider extends ChangeNotifier {
       _error = null;
     } catch (e, stack) {
       _error = e.toString();
-      FirebaseCrashlytics.instance.recordError(e, stack,
+      _recordError(e, stack,
           reason: 'NotificationProvider Error: loadNotifications');
     } finally {
       _isLoading = false;
@@ -141,8 +141,7 @@ class NotificationProvider extends ChangeNotifier {
       }
     } catch (e, stack) {
       _error = e.toString();
-      FirebaseCrashlytics.instance.recordError(e, stack,
-          reason: 'NotificationProvider Error: markAsRead');
+      _recordError(e, stack, reason: 'NotificationProvider Error: markAsRead');
       notifyListeners();
     }
   }
@@ -158,7 +157,7 @@ class NotificationProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e, stack) {
       _error = e.toString();
-      FirebaseCrashlytics.instance.recordError(e, stack,
+      _recordError(e, stack,
           reason: 'NotificationProvider Error: markAllAsRead');
       notifyListeners();
     }
@@ -179,7 +178,7 @@ class NotificationProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e, stack) {
       _error = e.toString();
-      FirebaseCrashlytics.instance.recordError(e, stack,
+      _recordError(e, stack,
           reason: 'NotificationProvider Error: deleteNotification');
       notifyListeners();
     }
@@ -242,7 +241,7 @@ class NotificationProvider extends ChangeNotifier {
           role: _currentRole, department: _currentDepartment);
     } catch (e, stack) {
       _error = e.toString();
-      FirebaseCrashlytics.instance.recordError(e, stack,
+      _recordError(e, stack,
           reason: 'NotificationProvider Error: enablePushNotifications');
       notifyListeners();
     }
@@ -256,9 +255,21 @@ class NotificationProvider extends ChangeNotifier {
           role: _currentRole, department: _currentDepartment);
     } catch (e, stack) {
       _error = e.toString();
-      FirebaseCrashlytics.instance
-          .recordError(e, stack, reason: 'NotificationProvider Error');
+      _recordError(e, stack, reason: 'NotificationProvider Error');
       notifyListeners();
+    }
+  }
+
+  void _recordError(
+    Object error,
+    StackTrace stack, {
+    required String reason,
+  }) {
+    if (kIsWeb) return;
+    try {
+      FirebaseCrashlytics.instance.recordError(error, stack, reason: reason);
+    } catch (_) {
+      // Ignore Crashlytics secondary failures.
     }
   }
 

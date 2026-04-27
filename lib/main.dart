@@ -36,6 +36,7 @@ import 'data/models/user_model.dart';
 
 /// Global navigator key for navigation from services
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+bool _crashlyticsEnabled = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,14 +66,23 @@ void main() async {
       await GoogleSignIn.instance.initialize();
     }
 
-    // Pass all uncaught "fatal" errors from the framework to Crashlytics
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    // Crashlytics is not supported on web in this app setup.
+    // Guard all Crashlytics hooks to avoid web assertion failures.
+    if (!kIsWeb) {
+      _crashlyticsEnabled = true;
 
-    // Pass all uncaught asynchronous errors that aren't handled by the Flutter framework to Crashlytics
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
+      // Pass all uncaught "fatal" errors from the framework to Crashlytics
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details);
+        FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      };
+
+      // Pass all uncaught async errors to Crashlytics
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+    }
   } catch (e) {
     debugPrint('Failed to initialize Firebase: $e');
     // If Firebase fails, we can't use Crashlytics to report it, but we should clear the error logic
@@ -103,11 +113,11 @@ Future<void> _initializeServicesAsync() async {
     await LocalNotificationService().initialize();
   } catch (e, stack) {
     debugPrint('Failed to initialize local notifications: $e');
-    // Report non-fatal error to Crashlytics if Firebase is initialized
-    try {
-      FirebaseCrashlytics.instance.recordError(e, stack,
-          reason: 'LocalNotificationService Initialization');
-    } catch (_) {}
+    await _recordNonFatalError(
+      e,
+      stack,
+      reason: 'LocalNotificationService Initialization',
+    );
   }
 
   // Initialize FCM service
@@ -115,11 +125,25 @@ Future<void> _initializeServicesAsync() async {
     await FCMService().initialize();
   } catch (e, stack) {
     debugPrint('Failed to initialize FCM: $e');
-    // Report non-fatal error to Crashlytics if Firebase is initialized
-    try {
-      FirebaseCrashlytics.instance
-          .recordError(e, stack, reason: 'FCMService Initialization');
-    } catch (_) {}
+    await _recordNonFatalError(
+      e,
+      stack,
+      reason: 'FCMService Initialization',
+    );
+  }
+}
+
+Future<void> _recordNonFatalError(
+  Object error,
+  StackTrace stack, {
+  String? reason,
+}) async {
+  if (!_crashlyticsEnabled || kIsWeb) return;
+  try {
+    await FirebaseCrashlytics.instance
+        .recordError(error, stack, reason: reason);
+  } catch (_) {
+    // Ignore secondary reporting errors.
   }
 }
 
@@ -353,7 +377,18 @@ class _AppNavigatorState extends State<AppNavigator> {
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: () => authProvider.signOut(),
+                      onPressed: () async {
+                        try {
+                          await authProvider.signOut();
+                        } catch (_) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Logout failed. Please try again.'),
+                            ),
+                          );
+                        }
+                      },
                       child: const Text('Sign Out'),
                     ),
                   ],

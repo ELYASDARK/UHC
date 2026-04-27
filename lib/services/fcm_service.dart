@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, debugPrint, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugPrint, defaultTargetPlatform, kIsWeb;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -73,8 +74,7 @@ class FCMService {
 
       _initialized = true;
     } catch (e, stack) {
-      FirebaseCrashlytics.instance
-          .recordError(e, stack, reason: 'FCM Service Initialization Failed');
+      _recordError(e, stack, reason: 'FCM Service Initialization Failed');
     }
   }
 
@@ -141,8 +141,7 @@ class FCMService {
           'fcmTokens': FieldValue.arrayUnion([token]),
           'lastTokenUpdate': FieldValue.serverTimestamp(),
         }).catchError((e, stack) {
-          FirebaseCrashlytics.instance
-              .recordError(e, stack, reason: 'Failed to update user FCM token');
+          _recordError(e, stack, reason: 'Failed to update user FCM token');
         });
 
         // Save to user_tokens collection (for Cloud Functions)
@@ -163,7 +162,7 @@ class FCMService {
           'fcmTokens': FieldValue.arrayUnion([newToken]),
           'lastTokenUpdate': FieldValue.serverTimestamp(),
         }).catchError((e, stack) {
-          FirebaseCrashlytics.instance.recordError(e, stack,
+          _recordError(e, stack,
               reason: 'Failed to update refreshed FCM token');
         });
 
@@ -206,8 +205,7 @@ class FCMService {
         await _firestore.collection('users').doc(userId).update({
           'fcmTokens': FieldValue.arrayRemove([token]),
         }).catchError((e, stack) {
-          FirebaseCrashlytics.instance.recordError(e, stack,
-              reason: 'Failed to remove FCM token');
+          _recordError(e, stack, reason: 'Failed to remove FCM token');
         });
 
         // Remove from user_tokens collection
@@ -269,5 +267,18 @@ class FCMService {
   void dispose() {
     _tokenRefreshSubscription?.cancel();
     _messageStreamController.close();
+  }
+
+  void _recordError(
+    Object error,
+    StackTrace stack, {
+    required String reason,
+  }) {
+    if (kIsWeb) return;
+    try {
+      FirebaseCrashlytics.instance.recordError(error, stack, reason: reason);
+    } catch (_) {
+      // Ignore Crashlytics secondary failures.
+    }
   }
 }

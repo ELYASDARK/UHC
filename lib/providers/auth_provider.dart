@@ -40,6 +40,12 @@ class AuthProvider with ChangeNotifier {
     });
   }
 
+  /// Guard against stale async auth loads finishing after sign-out/switch-user.
+  bool _isStaleAuthLoad(String uid) {
+    final currentFirebaseUser = _authService.currentUser;
+    return currentFirebaseUser == null || currentFirebaseUser.uid != uid;
+  }
+
   /// Load user data from Firestore
   Future<void> _loadUserData(String uid) async {
     try {
@@ -48,6 +54,10 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
 
       _currentUser = await _authService.getUserData(uid);
+
+      if (_isStaleAuthLoad(uid)) {
+        return;
+      }
 
       if (_currentUser == null) {
         // Profile doc is missing for this auth UID.
@@ -74,6 +84,9 @@ class AuthProvider with ChangeNotifier {
 
       _state = AuthState.authenticated;
     } catch (e) {
+      if (_isStaleAuthLoad(uid)) {
+        return;
+      }
       _state = AuthState.error;
       _errorMessage = e.toString();
     }
@@ -346,12 +359,16 @@ class AuthProvider with ChangeNotifier {
     // NOTE: FCM cleanup (token removal + topic unsubscription) must be done
     // via NotificationProvider.onLogout() BEFORE calling signOut(). That method
     // properly passes the stored role & department so all topics are cleaned up.
-
+    _errorMessage = null;
     try {
       await _authService.signOut();
     } catch (e) {
       debugPrint('Sign out error: $e');
+      _errorMessage = 'Sign out failed. Please try again.';
+      notifyListeners();
+      rethrow;
     }
+
     // Always clear local state
     _currentUser = null;
     _state = AuthState.unauthenticated;

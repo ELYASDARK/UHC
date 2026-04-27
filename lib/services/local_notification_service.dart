@@ -159,7 +159,12 @@ class LocalNotificationService {
       ),
     );
 
-    await _notifications.show(id: id, title: title, body: body, notificationDetails: details, payload: payload);
+    await _notifications.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: details,
+        payload: payload);
   }
 
   /// Schedule a notification for a specific time
@@ -215,8 +220,7 @@ class LocalNotificationService {
       // would cause the user to see an error and potentially retry, creating
       // duplicate appointments.
       debugPrint('Failed to schedule notification: $e');
-      FirebaseCrashlytics.instance
-          .recordError(e, stack, reason: 'Scheduling Notification Failed');
+      _recordError(e, stack, reason: 'Scheduling Notification Failed');
     }
   }
 
@@ -393,6 +397,19 @@ class LocalNotificationService {
   Future<void> cancelDoctorDailySummaries() async {
     for (int i = 0; i < 7; i++) {
       await cancelNotification(_doctorDailySummaryBaseId + i);
+    }
+  }
+
+  void _recordError(
+    Object error,
+    StackTrace stack, {
+    required String reason,
+  }) {
+    if (kIsWeb) return;
+    try {
+      FirebaseCrashlytics.instance.recordError(error, stack, reason: reason);
+    } catch (_) {
+      // Ignore Crashlytics secondary failures.
     }
   }
 }

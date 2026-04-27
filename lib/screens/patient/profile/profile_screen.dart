@@ -11,9 +11,6 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/theme_provider.dart';
 import '../../../providers/locale_provider.dart';
 import '../../../providers/notification_provider.dart';
-import '../../../data/repositories/notification_repository.dart';
-import '../../../data/models/notification_model.dart';
-import '../../../services/local_notification_service.dart';
 import '../../admin/dashboard/admin_dashboard_screen.dart';
 import '../../shared/notification_settings_screen.dart';
 import 'edit_profile_screen.dart';
@@ -260,6 +257,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = authProvider.currentUser;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final isSuperAdmin = user?.isSuperAdmin ?? false;
+    final isAdmin = user?.isAdmin ?? false;
+    final isAdminLike = isAdmin || isSuperAdmin;
+    final accentColor = isSuperAdmin ? const Color(0xFFD32F2F) : AppColors.primary;
 
     return Scaffold(
       appBar: AppBar(
@@ -278,6 +279,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               user?.email ?? '',
               user?.photoUrl,
               isDark,
+              l10n: l10n,
+              isSuperAdmin: isSuperAdmin,
+              slotType: user?.superAdminType?.name,
+              accentColor: accentColor,
             ),
             const SizedBox(height: 32),
 
@@ -293,36 +298,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onChanged: (_) => themeProvider.toggleTheme(),
                     ),
                     isDark: isDark,
+                    accentColor: accentColor,
                   ),
-                  _buildSettingTile(
-                    icon: Icons.language_rounded,
-                    title: l10n.language,
-                    subtitle: localeProvider.languageName,
-                    onTap: () => _showLanguageDialog(context, l10n),
-                    isDark: isDark,
-                  ),
-                ],
-                isDark),
-
-            const SizedBox(height: 20),
-
-            _buildSection(
-                l10n.notificationSettings,
-                [
-                  _buildSettingTile(
-                    icon: Icons.notifications_active_rounded,
-                    title: l10n.notifications,
-                    subtitle: l10n.notificationSettings,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const NotificationSettingsScreen(),
-                      ),
+                  if (!isAdminLike)
+                    _buildSettingTile(
+                      icon: Icons.language_rounded,
+                      title: l10n.language,
+                      subtitle: localeProvider.languageName,
+                      onTap: () => _showLanguageDialog(context, l10n),
+                      isDark: isDark,
+                      accentColor: accentColor,
                     ),
-                    isDark: isDark,
-                  ),
                 ],
                 isDark),
+            if (!isAdminLike) ...[
+              const SizedBox(height: 20),
+              _buildSection(
+                  l10n.notificationSettings,
+                  [
+                    _buildSettingTile(
+                      icon: Icons.notifications_active_rounded,
+                      title: l10n.notifications,
+                      subtitle: l10n.notificationSettings,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationSettingsScreen(),
+                        ),
+                      ),
+                      isDark: isDark,
+                      accentColor: accentColor,
+                    ),
+                  ],
+                  isDark),
+            ],
 
             // Account section
             const SizedBox(height: 20),
@@ -339,6 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           builder: (_) => const EditProfileScreen()),
                     ),
                     isDark: isDark,
+                    accentColor: accentColor,
                   ),
                   _buildSettingTile(
                     icon: Icons.lock,
@@ -350,19 +360,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     isDark: isDark,
+                    accentColor: accentColor,
                   ),
-                  _buildSettingTile(
-                    icon: Icons.folder_shared_rounded,
-                    title: l10n.medicalDocuments,
-                    subtitle: l10n.manageYourMedicalRecords,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MedicalDocumentsScreen(),
+                  if (!isAdminLike)
+                    _buildSettingTile(
+                      icon: Icons.folder_shared_rounded,
+                      title: l10n.medicalDocuments,
+                      subtitle: l10n.manageYourMedicalRecords,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MedicalDocumentsScreen(),
+                        ),
                       ),
+                      isDark: isDark,
+                      accentColor: accentColor,
                     ),
-                    isDark: isDark,
-                  ),
                 ],
                 isDark),
 
@@ -376,18 +389,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: l10n.privacyPolicy,
                     onTap: () => _showPrivacyPolicy(context),
                     isDark: isDark,
+                    accentColor: accentColor,
                   ),
                   _buildSettingTile(
                     icon: Icons.description_rounded,
                     title: l10n.termsOfService,
                     onTap: () => _showTermsOfService(context),
                     isDark: isDark,
+                    accentColor: accentColor,
                   ),
                   _buildSettingTile(
                     icon: Icons.help_rounded,
                     title: l10n.helpAndSupport,
                     onTap: () => _showHelpSupport(context),
                     isDark: isDark,
+                    accentColor: accentColor,
                   ),
                   _buildSettingTile(
                     icon: Icons.info_rounded,
@@ -406,38 +422,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     onTap: () => _showVersionInfo(context),
                     isDark: isDark,
+                    accentColor: accentColor,
                   ),
                 ],
                 isDark),
 
-            // Developer Testing section - only visible to admin
-            if (user?.isAdminOrSuperAdmin == true) ...[
-              const SizedBox(height: 20),
-              _buildSection(
-                  l10n.developerTesting,
-                  [
-                    _buildSettingTile(
-                      icon: Icons.notification_add,
-                      title: l10n.sendTestNotification,
-                      onTap: () => _sendTestNotification(context),
-                      isDark: isDark,
-                    ),
-                    _buildSettingTile(
-                      icon: Icons.schedule,
-                      title: l10n.scheduleTestNotification,
-                      onTap: () => _scheduleTestNotification(context),
-                      isDark: isDark,
-                    ),
-                    _buildSettingTile(
-                      icon: Icons.delete_sweep,
-                      title: l10n.clearAll,
-                      onTap: () => _clearAllNotifications(context),
-                      isDark: isDark,
-                    ),
-                  ],
-                  isDark),
-
-              // Admin section - only visible to admin
+            // Admin section - visible to admin and super admin
+            if (isAdminLike) ...[
               const SizedBox(height: 20),
               _buildSection(
                   l10n.admin,
@@ -452,6 +443,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       isDark: isDark,
+                      accentColor: accentColor,
                     ),
                   ],
                   isDark),
@@ -477,144 +469,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _sendTestNotification(BuildContext context) async {
-    final authProvider = context.read<AuthProvider>();
-    final notificationProvider = context.read<NotificationProvider>();
-    final l10n = AppLocalizations.of(context);
-
-    if (authProvider.user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.pleaseLoginFirst)));
-      return;
-    }
-
-    final notificationRepo = NotificationRepository();
-
-    try {
-      // Create a test notification
-      final testNotification = NotificationModel(
-        id: '',
-        userId: authProvider.user!.id,
-        title: l10n.testNotificationTitle,
-        body: l10n.testNotificationBody,
-        type: NotificationType.appointmentConfirmation,
-        createdAt: DateTime.now(),
-        scheduledFor: null,
-        reminderType: ReminderType.immediate,
-        isDelivered: true,
-      );
-
-      await notificationRepo.createNotification(testNotification);
-
-      // Reload notifications
-      await notificationProvider.loadNotifications(authProvider.user!.id);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.testNotificationSent),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l10n.error}: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  void _scheduleTestNotification(BuildContext context) async {
-    final localNotificationService = LocalNotificationService();
-    final l10n = AppLocalizations.of(context);
-
-    // Schedule notification for 30 seconds from now
-    final scheduledTime = DateTime.now().add(const Duration(seconds: 30));
-
-    try {
-      await localNotificationService.scheduleNotification(
-        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        title: l10n.scheduledTestNotificationTitle,
-        body: l10n.scheduledTestNotificationBody,
-        scheduledTime: scheduledTime,
-        isAppointment: true,
-      );
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.testNotificationScheduled),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l10n.error}: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  void _clearAllNotifications(BuildContext context) async {
-    final authProvider = context.read<AuthProvider>();
-    final notificationProvider = context.read<NotificationProvider>();
-    final l10n = AppLocalizations.of(context);
-
-    if (authProvider.user == null) return;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.clearNotifications),
-        content: Text(l10n.clearNotificationsConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-
-              final notificationRepo = NotificationRepository();
-              await notificationRepo.deleteAllNotifications(
-                authProvider.user!.id,
-              );
-              await notificationProvider.loadNotifications(
-                authProvider.user!.id,
-              );
-
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.notificationsCleared),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              }
-            },
-            child: Text(
-              l10n.clearAll,
-              style: const TextStyle(color: AppColors.error),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -677,6 +531,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String email,
     String? photoUrl,
     bool isDark,
+    {
+    required AppLocalizations l10n,
+    required bool isSuperAdmin,
+    required String? slotType,
+    required Color accentColor,
+    }
   ) {
     // Get user initial for the avatar
     final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U';
@@ -707,9 +567,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                   border: Border.all(
-                    color: isDark
-                        ? Colors.white10
-                        : Colors.grey.withValues(alpha: 0.1),
+                    color: isSuperAdmin
+                        ? accentColor.withValues(alpha: isDark ? 0.55 : 0.35)
+                        : (isDark
+                            ? Colors.white10
+                            : Colors.grey.withValues(alpha: 0.1)),
                     width: 1.5,
                   ),
                 ),
@@ -722,12 +584,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               height: 100,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) =>
-                                  _buildDefaultAvatar(initial, isDark),
+                                  _buildDefaultAvatar(
+                                      initial, isDark, accentColor),
                             )
                           // Web or Mobile with local path (not supported without dart:io)
                           // See: https://github.com/flutter/flutter/issues/33646
-                          : _buildDefaultAvatar(initial, isDark))
-                      : _buildDefaultAvatar(initial, isDark),
+                          : _buildDefaultAvatar(initial, isDark, accentColor))
+                      : _buildDefaultAvatar(initial, isDark, accentColor),
                 ),
               ),
               Positioned(
@@ -736,7 +599,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
+                    color: accentColor,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -744,7 +607,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
+                        color: accentColor.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       ),
@@ -765,18 +628,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
           email,
           style: GoogleFonts.roboto(fontSize: 14, color: Colors.grey),
         ),
+        if (isSuperAdmin) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: accentColor.withValues(alpha: 0.45)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.shield, size: 14, color: accentColor),
+                const SizedBox(width: 6),
+                Text(
+                  slotType == 'backup'
+                      ? '${l10n.superAdmin} • BACKUP'
+                      : '${l10n.superAdmin} • PRIMARY',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: accentColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     ).animate().fadeIn(duration: 400.ms);
   }
 
-  Widget _buildDefaultAvatar(String initial, bool isDark) {
+  Widget _buildDefaultAvatar(String initial, bool isDark, Color accentColor) {
     return Center(
       child: Text(
         initial,
         style: GoogleFonts.outfit(
           fontSize: 40,
           fontWeight: FontWeight.bold,
-          color: isDark ? Colors.white : AppColors.primary,
+          color: isDark ? Colors.white : accentColor,
         ),
       ),
     );
@@ -812,16 +703,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Widget? trailing,
     VoidCallback? onTap,
     required bool isDark,
+    Color accentColor = AppColors.primary,
   }) {
     return ListTile(
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
+          color: accentColor.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: AppColors.primary, size: 20),
+        child: Icon(icon, color: accentColor, size: 20),
       ),
       title: Text(
         title,
@@ -873,7 +765,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }
 
-              await authProvider.signOut();
+              try {
+                await authProvider.signOut();
+              } catch (_) {
+                if (!outerContext.mounted) return;
+                ScaffoldMessenger.of(outerContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Logout failed. Please try again.'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
             },
             child: Text(
               l10n.logout,

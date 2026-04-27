@@ -492,7 +492,17 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 );
               }
 
-              await auth.signOut();
+              try {
+                await auth.signOut();
+              } catch (_) {
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('Logout failed. Please try again.'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
             },
             child: Text(l10n.logout,
                 style: const TextStyle(color: AppColors.error)),

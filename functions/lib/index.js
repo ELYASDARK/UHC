@@ -655,7 +655,7 @@ exports.setUserActiveStatus = functions.https.onCall(async (request) => {
 /**
  * Update profile-safe fields for a target user via server-side enforcement.
  * Admins can manage non-admin users only.
- * Super Admins can manage admins and non-admins (excluding super admins).
+ * Super Admins can manage all users, including super admins.
  */
 exports.updateUserProfileByAdmin = functions.https.onCall(async (request) => {
     const callerUid = requireAuth(request);
@@ -672,8 +672,8 @@ exports.updateUserProfileByAdmin = functions.https.onCall(async (request) => {
         throw new functions.https.HttpsError('not-found', 'Target user not found.');
     }
     const targetRole = targetDoc.data().role;
-    if (targetRole === 'superAdmin') {
-        throw new functions.https.HttpsError('failed-precondition', 'Cannot update Super Admin profile via this function.');
+    if (targetRole === 'superAdmin' && callerRole !== 'superAdmin') {
+        throw new functions.https.HttpsError('permission-denied', 'Only Super Admin can edit Super Admin profile.');
     }
     if (callerRole === 'admin' && targetRole === 'admin') {
         throw new functions.https.HttpsError('permission-denied', 'Admins cannot edit admin accounts.');

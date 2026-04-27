@@ -69,7 +69,10 @@ class _AdminControlScreenState extends State<AdminControlScreen>
       ),
       floatingActionButton: actorIsSuperAdmin
           ? FloatingActionButton(
-              heroTag: 'admin_governance_fab',
+              // Two AdminControlScreen instances can exist simultaneously
+              // in SuperAdminShell (Admins + Permissions tabs via IndexedStack),
+              // so hero tags must be unique per instance.
+              heroTag: 'admin_governance_fab_${widget.initialTab}',
               backgroundColor: const Color(0xFFD32F2F),
               onPressed: _showCreateAdminDialog,
               child: const Icon(Icons.person_add, color: Colors.white),
@@ -277,11 +280,14 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                     style: GoogleFonts.poppins(fontSize: 12)),
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         _presetChip(
                             'Full',
+                            isDark,
                             actorIsSuperAdmin
                                 ? () => _applyPreset(
                                     uid, AdminPermissions.fullAccess)
@@ -289,6 +295,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                         const SizedBox(width: 8),
                         _presetChip(
                             'Ops',
+                            isDark,
                             actorIsSuperAdmin
                                 ? () => _applyPreset(
                                     uid, AdminPermissions.operations)
@@ -296,6 +303,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                         const SizedBox(width: 8),
                         _presetChip(
                             'Read-Only',
+                            isDark,
                             actorIsSuperAdmin
                                 ? () =>
                                     _applyPreset(uid, AdminPermissions.readOnly)
@@ -303,7 +311,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                       ],
                     ),
                   ),
-                  const Divider(),
+                  const SizedBox(height: 4),
+                  const Divider(height: 1),
+                  const SizedBox(height: 4),
                   ...AdminPermissions.allKeys.map((key) {
                     return SwitchListTile(
                       dense: true,
@@ -328,12 +338,32 @@ class _AdminControlScreenState extends State<AdminControlScreen>
     );
   }
 
-  Widget _presetChip(String label, VoidCallback? onTap) {
+  Widget _presetChip(String label, bool isDark, VoidCallback? onTap) {
     return ActionChip(
-      label: Text(label, style: GoogleFonts.poppins(fontSize: 11)),
+      label: Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: onTap == null
+              ? (isDark ? Colors.white54 : Colors.black38)
+              : (isDark ? Colors.white : const Color(0xFF7A1616)),
+        ),
+      ),
       onPressed: onTap,
-      backgroundColor: const Color(0xFFD32F2F).withValues(alpha: 0.1),
-      side: const BorderSide(color: Color(0xFFD32F2F), width: 0.5),
+      backgroundColor: isDark
+          ? const Color(0xFFD32F2F).withValues(alpha: 0.22)
+          : const Color(0xFFD32F2F).withValues(alpha: 0.1),
+      disabledColor:
+          isDark ? Colors.white.withValues(alpha: 0.07) : Colors.grey[200],
+      side: BorderSide(
+        color: onTap == null
+            ? (isDark
+                ? Colors.white.withValues(alpha: 0.2)
+                : Colors.grey.withValues(alpha: 0.6))
+            : const Color(0xFFD32F2F),
+        width: 0.8,
+      ),
     );
   }
 
@@ -606,93 +636,361 @@ class _AdminControlScreenState extends State<AdminControlScreen>
   }
 
   void _showCreateAdminDialog() {
+    final l10n = AppLocalizations.of(context);
     final emailCtrl = TextEditingController();
     final passwordCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
-    showDialog(
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+    bool obscurePassword = true;
+
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context).createAdmin),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                    labelText: AppLocalizations.of(context).fullName)),
-            const SizedBox(height: 8),
-            TextField(
-                controller: emailCtrl,
-                decoration: InputDecoration(
-                    labelText: AppLocalizations.of(context).email)),
-            const SizedBox(height: 8),
-            TextField(
-                controller: passwordCtrl,
-                obscureText: true,
-                decoration: InputDecoration(
-                    labelText: AppLocalizations.of(context).password)),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(AppLocalizations.of(context).cancel)),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
+      barrierDismissible: true,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final inputBorder = OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.14)
+                : Colors.black.withValues(alpha: 0.12),
+          ),
+        );
+
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              setDialogState(() => isSubmitting = true);
               try {
                 await _governance.createAdminAccount(
                   email: emailCtrl.text.trim(),
                   password: passwordCtrl.text,
                   fullName: nameCtrl.text.trim(),
                 );
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
                 _showSuccess('Admin created');
               } catch (e) {
                 _showError('Failed: ${_readableError(e)}');
+              } finally {
+                if (dialogContext.mounted) {
+                  setDialogState(() => isSubmitting = false);
+                }
               }
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD32F2F),
-                foregroundColor: Colors.white),
-            child: Text(AppLocalizations.of(context).add),
-          ),
-        ],
-      ),
-    );
+            }
+
+            return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              backgroundColor:
+                  isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          l10n.createAdmin,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: nameCtrl,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                            labelText: l10n.fullName,
+                            prefixIcon: const Icon(Icons.person_outline),
+                            border: inputBorder,
+                            enabledBorder: inputBorder,
+                            focusedBorder: inputBorder.copyWith(
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFD32F2F), width: 1.2),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter full name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                            labelText: l10n.email,
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            border: inputBorder,
+                            enabledBorder: inputBorder,
+                            focusedBorder: inputBorder.copyWith(
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFD32F2F), width: 1.2),
+                            ),
+                          ),
+                          validator: (value) {
+                            final text = value?.trim() ?? '';
+                            if (text.isEmpty) return 'Please enter email';
+                            if (!text.contains('@')) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: passwordCtrl,
+                          obscureText: obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) {
+                            if (!isSubmitting) submit();
+                          },
+                          decoration: InputDecoration(
+                            labelText: l10n.password,
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility),
+                              onPressed: () => setDialogState(
+                                  () => obscurePassword = !obscurePassword),
+                            ),
+                            border: inputBorder,
+                            enabledBorder: inputBorder,
+                            focusedBorder: inputBorder.copyWith(
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFD32F2F), width: 1.2),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter password';
+                            }
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.pop(dialogContext),
+                            child: Text(l10n.cancel),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: isSubmitting ? null : submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD32F2F),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    l10n.add,
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      emailCtrl.dispose();
+      passwordCtrl.dispose();
+    });
   }
 
   void _showResetPasswordDialog(String uid, String name) {
+    final l10n = AppLocalizations.of(context);
     final pwCtrl = TextEditingController();
-    showDialog(
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+    bool obscurePassword = true;
+
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title:
-            Text('${AppLocalizations.of(context).passwordResetAction} — $name'),
-        content: TextField(
-            controller: pwCtrl,
-            obscureText: true,
-            decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).newPassword)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(AppLocalizations.of(context).cancel)),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
+      barrierDismissible: true,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final inputBorder = OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.14)
+                : Colors.black.withValues(alpha: 0.12),
+          ),
+        );
+
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              setDialogState(() => isSubmitting = true);
               try {
                 await _governance.resetAdminPassword(
                     targetUid: uid, newPassword: pwCtrl.text);
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
                 _showSuccess('Password reset for $name');
               } catch (e) {
                 _showError('Failed: ${_readableError(e)}');
+              } finally {
+                if (dialogContext.mounted) {
+                  setDialogState(() => isSubmitting = false);
+                }
               }
-            },
-            child: Text(AppLocalizations.of(context).resetPassword),
-          ),
-        ],
-      ),
-    );
+            }
+
+            return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              backgroundColor:
+                  isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '${l10n.passwordResetAction} - $name',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: pwCtrl,
+                          obscureText: obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) {
+                            if (!isSubmitting) submit();
+                          },
+                          decoration: InputDecoration(
+                            labelText: l10n.newPassword,
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility),
+                              onPressed: () => setDialogState(
+                                  () => obscurePassword = !obscurePassword),
+                            ),
+                            border: inputBorder,
+                            enabledBorder: inputBorder,
+                            focusedBorder: inputBorder.copyWith(
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFD32F2F), width: 1.2),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter password';
+                            }
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.pop(dialogContext),
+                            child: Text(l10n.cancel),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: isSubmitting ? null : submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD32F2F),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    l10n.resetPassword,
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() => pwCtrl.dispose());
   }
 
   void _showDeleteConfirmDialog(String uid, String name) {
@@ -753,69 +1051,326 @@ class _AdminControlScreenState extends State<AdminControlScreen>
   }
 
   void _showAssignSlotDialog(String slotType) {
+    final l10n = AppLocalizations.of(context);
     final uidCtrl = TextEditingController();
-    showDialog(
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+    final slotLabel = slotType == 'primary' ? 'Primary' : 'Backup';
+
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title:
-            Text('Assign ${slotType == 'primary' ? 'Primary' : 'Backup'} Slot'),
-        content: TextField(
-            controller: uidCtrl,
-            decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).targetUserUid)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(AppLocalizations.of(context).cancel)),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
+      barrierDismissible: true,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final inputBorder = OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.14)
+                : Colors.black.withValues(alpha: 0.12),
+          ),
+        );
+
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              setDialogState(() => isSubmitting = true);
               try {
+                final resolvedUid = await _resolveUidFromInput(uidCtrl.text);
+                if (resolvedUid == null) {
+                  throw Exception(
+                      'User not found. Enter a valid UID or email.');
+                }
                 await _governance.assignSuperAdminSlot(
-                    targetUid: uidCtrl.text.trim(), slotType: slotType);
+                    targetUid: resolvedUid, slotType: slotType);
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
                 _showSuccess('Slot assigned');
               } catch (e) {
                 _showError('Failed: ${_readableError(e)}');
+              } finally {
+                if (dialogContext.mounted) {
+                  setDialogState(() => isSubmitting = false);
+                }
               }
-            },
-            child: Text(AppLocalizations.of(context).assignSlot),
-          ),
-        ],
-      ),
-    );
+            }
+
+            return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              backgroundColor:
+                  isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '${l10n.assignSlot} - $slotLabel',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: uidCtrl,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) {
+                            if (!isSubmitting) submit();
+                          },
+                          decoration: InputDecoration(
+                            labelText: '${l10n.targetUserUid} / Email',
+                            hintText: 'Paste UID or email',
+                            prefixIcon:
+                                const Icon(Icons.person_search_outlined),
+                            border: inputBorder,
+                            enabledBorder: inputBorder,
+                            focusedBorder: inputBorder.copyWith(
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFD32F2F), width: 1.2),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter target UID or email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.pop(dialogContext),
+                            child: Text(l10n.cancel),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: isSubmitting ? null : submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD32F2F),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    l10n.assignSlot,
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() => uidCtrl.dispose());
   }
 
   void _showRotateSlotDialog(String slotType) {
+    final l10n = AppLocalizations.of(context);
     final uidCtrl = TextEditingController();
-    showDialog(
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+    final slotLabel = slotType == 'primary' ? 'Primary' : 'Backup';
+
+    showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title:
-            Text('Rotate ${slotType == 'primary' ? 'Primary' : 'Backup'} Slot'),
-        content: TextField(
-            controller: uidCtrl,
-            decoration: InputDecoration(
-                labelText: AppLocalizations.of(context).replacementUid)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(AppLocalizations.of(context).cancel)),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
+      barrierDismissible: true,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final inputBorder = OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.14)
+                : Colors.black.withValues(alpha: 0.12),
+          ),
+        );
+
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> submit() async {
+              if (!formKey.currentState!.validate()) return;
+              setDialogState(() => isSubmitting = true);
               try {
+                final resolvedUid = await _resolveUidFromInput(uidCtrl.text);
+                if (resolvedUid == null) {
+                  throw Exception(
+                      'User not found. Enter a valid UID or email.');
+                }
                 await _governance.rotateSuperAdminSlot(
-                    slotType: slotType, replacementUid: uidCtrl.text.trim());
+                    slotType: slotType, replacementUid: resolvedUid);
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
                 _showSuccess('Slot rotated');
               } catch (e) {
                 _showError('Failed: ${_readableError(e)}');
+              } finally {
+                if (dialogContext.mounted) {
+                  setDialogState(() => isSubmitting = false);
+                }
               }
-            },
-            child: Text(AppLocalizations.of(context).rotateSlot),
-          ),
-        ],
-      ),
-    );
+            }
+
+            return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              backgroundColor:
+                  isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '${l10n.rotateSlot} - $slotLabel',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          controller: uidCtrl,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) {
+                            if (!isSubmitting) submit();
+                          },
+                          decoration: InputDecoration(
+                            labelText: '${l10n.replacementUid} / Email',
+                            hintText: 'Paste UID or email',
+                            prefixIcon: const Icon(Icons.swap_horiz_rounded),
+                            border: inputBorder,
+                            enabledBorder: inputBorder,
+                            focusedBorder: inputBorder.copyWith(
+                              borderSide: const BorderSide(
+                                  color: Color(0xFFD32F2F), width: 1.2),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter replacement UID or email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.pop(dialogContext),
+                            child: Text(l10n.cancel),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: isSubmitting ? null : submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFD32F2F),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    l10n.rotateSlot,
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() => uidCtrl.dispose());
+  }
+
+  /// Accept UID or email and resolve to a real users/{uid} document id.
+  Future<String?> _resolveUidFromInput(String rawInput) async {
+    final input = rawInput.trim();
+    if (input.isEmpty) return null;
+
+    if (input.contains('@')) {
+      final byEmail = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: input)
+          .limit(1)
+          .get();
+      if (byEmail.docs.isNotEmpty) return byEmail.docs.first.id;
+
+      final byLowerEmail = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: input.toLowerCase())
+          .limit(1)
+          .get();
+      if (byLowerEmail.docs.isNotEmpty) return byLowerEmail.docs.first.id;
+      return null;
+    }
+
+    final asUidDoc = await _firestore.collection('users').doc(input).get();
+    if (asUidDoc.exists) return input;
+
+    return null;
   }
 
   void _showSuccess(String msg) {
