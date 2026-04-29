@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.setUserActiveStatus = exports.syncAuthEmailToLinkedGoogle = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = void 0;
+exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -614,56 +614,6 @@ exports.bootstrapSelfUserDocument = functions.https.onCall(async (request) => {
         googleEmail: null,
     });
     return { success: true, message: 'User profile initialized successfully.' };
-});
-/**
- * Sync the caller's Firebase Auth email to their linked Google email.
- * Intended for accounts that were provisioned with placeholder emails.
- */
-exports.syncAuthEmailToLinkedGoogle = functions.https.onCall(async (request) => {
-    var _a, _b;
-    const callerUid = requireAuth(request);
-    const authUser = await auth.getUser(callerUid);
-    const googleProvider = authUser.providerData.find((p) => p.providerId === 'google.com');
-    const googleEmail = (_a = googleProvider === null || googleProvider === void 0 ? void 0 : googleProvider.email) === null || _a === void 0 ? void 0 : _a.trim();
-    if (!googleEmail) {
-        throw new functions.https.HttpsError('failed-precondition', 'No linked Google email found for this account.');
-    }
-    const currentEmail = (_b = authUser.email) === null || _b === void 0 ? void 0 : _b.trim();
-    if (!currentEmail) {
-        throw new functions.https.HttpsError('failed-precondition', 'Current auth account has no email.');
-    }
-    // Already synced: still make sure Firestore has the same values.
-    if (currentEmail.toLowerCase() === googleEmail.toLowerCase()) {
-        await db.collection('users').doc(callerUid).update({
-            email: googleEmail,
-            googleEmail,
-            updatedAt: admin.firestore.Timestamp.now(),
-        });
-        return { success: true, message: 'Email already synced.', email: googleEmail };
-    }
-    try {
-        await auth.updateUser(callerUid, {
-            email: googleEmail,
-            emailVerified: true,
-        });
-    }
-    catch (error) {
-        const code = error === null || error === void 0 ? void 0 : error.code;
-        if (code === 'auth/email-already-exists') {
-            throw new functions.https.HttpsError('already-exists', 'This Google email is already used by another account.');
-        }
-        throw error;
-    }
-    await db.collection('users').doc(callerUid).update({
-        email: googleEmail,
-        googleEmail,
-        updatedAt: admin.firestore.Timestamp.now(),
-    });
-    return {
-        success: true,
-        message: 'Auth email synced to linked Google email.',
-        email: googleEmail,
-    };
 });
 /**
  * Activate/deactivate a non-admin user.

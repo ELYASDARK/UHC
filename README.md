@@ -476,8 +476,7 @@ flutter build web --release
 - **Google unlink (self, role-gated)** — Added self-unlink capability for signed-in `admin` and `superAdmin` accounts.
 - **Google unlink (admin on target user)** — Added User Management action and backend callable to unlink Google for managed non-admin users.
 
-#### 📧 Password Reset & Account Email Reliability
-- **Auth email sync to linked Google** — Added callable `syncAuthEmailToLinkedGoogle` and client trigger on Google sign-in/link for placeholder emails (for example `@test.com`), enabling real reset delivery.
+#### 📧 Password Reset & Account Reliability
 - **Forgot password from profile** — Added Forgot Password entry in both patient and doctor profile account sections.
 - **Context-aware forgot-password UX**:
   - login flow keeps **Back to Login**
@@ -486,14 +485,13 @@ flutter build web --release
 - **Reset flow stability** — Sending password reset email no longer mutates authenticated app state.
 
 #### ☁️ Cloud Functions Added
-- `syncAuthEmailToLinkedGoogle`
 - `unlinkGoogleProviderByAdmin`
 
 #### 📁 Files Changed
 
 | File | Key Changes |
 |:---|:---|
-| `functions/src/index.ts` | Added `syncAuthEmailToLinkedGoogle`; added `unlinkGoogleProviderByAdmin` with permission/role/provider guardrails |
+| `functions/src/index.ts` | Added `unlinkGoogleProviderByAdmin` with permission/role/provider guardrails |
 | `functions/lib/index.js` | Compiled output sync |
 | `functions/lib/index.js.map` | Compiled source map sync |
 | `lib/services/auth_service.dart` | Added `isPasswordLinked`, unlink logic, provider-guarded password change, best-effort auth-email sync trigger |
