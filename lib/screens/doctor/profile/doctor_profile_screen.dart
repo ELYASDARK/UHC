@@ -14,6 +14,7 @@ import '../../../providers/theme_provider.dart';
 import '../../../providers/locale_provider.dart';
 import '../../shared/change_password_screen.dart';
 import '../../shared/notification_settings_screen.dart';
+import '../../auth/forgot_password_screen.dart';
 import 'edit_doctor_profile_screen.dart';
 
 /// Doctor profile & settings screen
@@ -147,6 +148,22 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const ChangePasswordScreen(),
+                      ),
+                    ),
+                    isDark: isDark,
+                  ),
+                  _settingTile(
+                    icon: Icons.lock_reset_rounded,
+                    title: l10n.forgotPassword,
+                    subtitle: l10n.sendResetLink,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ForgotPasswordScreen(
+                          onBackTap: () => Navigator.of(context).pop(),
+                          initialEmail: auth.firebaseUser?.email ?? user?.email,
+                          launchedFromProfile: true,
+                        ),
                       ),
                     ),
                     isDark: isDark,

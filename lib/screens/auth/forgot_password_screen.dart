@@ -11,8 +11,15 @@ import 'package:uhc/l10n/app_localizations.dart';
 /// Forgot password screen
 class ForgotPasswordScreen extends StatefulWidget {
   final VoidCallback onBackTap;
+  final String? initialEmail;
+  final bool launchedFromProfile;
 
-  const ForgotPasswordScreen({super.key, required this.onBackTap});
+  const ForgotPasswordScreen({
+    super.key,
+    required this.onBackTap,
+    this.initialEmail,
+    this.launchedFromProfile = false,
+  });
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -22,6 +29,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _emailSent = false;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final authProvider = context.read<AuthProvider>();
+    _emailController.text = (widget.initialEmail?.trim().isNotEmpty ?? false)
+        ? widget.initialEmail!.trim()
+        : (authProvider.firebaseUser?.email?.trim() ?? '');
+  }
 
   @override
   void dispose() {
@@ -30,24 +47,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _handleResetPassword() async {
-    if (_formKey.currentState!.validate()) {
-      final authProvider = context.read<AuthProvider>();
-      final success = await authProvider.sendPasswordResetEmail(
-        _emailController.text.trim(),
-      );
+    if (!_formKey.currentState!.validate()) return;
 
-      if (success && mounted) {
-        setState(() {
-          _emailSent = true;
-        });
-      } else if (mounted && authProvider.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.errorMessage!),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+    setState(() => _isLoading = true);
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.sendPasswordResetEmail(
+      _emailController.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
+      setState(() {
+        _emailSent = true;
+      });
+    } else if (authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
@@ -56,6 +77,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final authProvider = context.watch<AuthProvider>();
     final l10n = AppLocalizations.of(context);
+    final showGoogleOnlyNotice =
+        authProvider.isAuthenticated && !authProvider.isPasswordLinked;
 
     // If l10n is null (shouldn't happen in valid context), we can fallback or let it throw.
     // Assuming context is valid.
@@ -83,7 +106,51 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                 const SizedBox(height: 40),
 
-                if (_emailSent) ...[
+                if (showGoogleOnlyNotice) ...[
+                  Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.link_off_rounded,
+                            size: 60,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'This account uses Google sign-in only.',
+                          style: GoogleFonts.poppins(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Password reset email is available only for email/password accounts.',
+                          style: GoogleFonts.roboto(
+                            fontSize: 15,
+                            height: 1.5,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (_emailSent) ...[
                   // Success state
                   Center(
                     child: Column(
@@ -134,8 +201,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
                         const SizedBox(height: 48),
                         PrimaryButton(
-                          text: l10n.backToLogin,
-                          onPressed: widget.onBackTap,
+                          text: widget.launchedFromProfile
+                              ? l10n.ok
+                              : l10n.backToLogin,
+                          onPressed: widget.launchedFromProfile
+                              ? () => Navigator.of(context).pop()
+                              : widget.onBackTap,
                         ).animate(delay: 400.ms).fadeIn(duration: 400.ms),
                       ],
                     ),
@@ -201,7 +272,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   PrimaryButton(
                     text: l10n.sendResetLink,
                     onPressed: _handleResetPassword,
-                    isLoading: authProvider.isLoading,
+                    isLoading: _isLoading,
                     icon: Icons.send_rounded,
                   )
                       .animate(delay: 300.ms)

@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -124,6 +124,7 @@ class AuthService {
 
       // Account exists — update last login, preserving existing photo.
       await _updateExistingUserDocument(doc, user);
+      await _syncAuthEmailToGoogleIfNeeded(user);
 
       return userCredential;
     } catch (e) {
@@ -140,6 +141,13 @@ class AuthService {
     final user = currentUser;
     if (user == null) return false;
     return user.providerData.any((info) => info.providerId == 'google.com');
+  }
+
+  /// Check if current user has email/password provider linked
+  bool get isPasswordLinked {
+    final user = currentUser;
+    if (user == null) return false;
+    return user.providerData.any((info) => info.providerId == 'password');
   }
 
   /// Get the linked Google email from Firebase Auth provider data
@@ -179,6 +187,7 @@ class AuthService {
             'updatedAt': Timestamp.fromDate(DateTime.now()),
             'googleEmail': googleInfo.email,
           });
+          await _syncAuthEmailToGoogleIfNeeded(userCredential.user!);
         }
         return userCredential;
       }
@@ -203,6 +212,7 @@ class AuthService {
           'updatedAt': Timestamp.fromDate(DateTime.now()),
           'googleEmail': googleInfo.email,
         });
+        await _syncAuthEmailToGoogleIfNeeded(userCredential.user!);
       }
 
       return userCredential;
@@ -216,6 +226,49 @@ class AuthService {
       throw _handleAuthException(e);
     } catch (e) {
       throw Exception('Failed to link Google account: $e');
+    }
+  }
+
+  /// Unlink current user's account from Google
+  Future<void> unlinkGoogle() async {
+    final user = currentUser;
+    if (user == null) {
+      throw Exception('No user logged in');
+    }
+
+    try {
+      final providerIds =
+          user.providerData.map((info) => info.providerId).toSet();
+      if (!providerIds.contains('google.com')) {
+        throw Exception('No Google account is linked.');
+      }
+      if (providerIds.length <= 1) {
+        throw Exception(
+          'Cannot unlink Google because it is your only sign-in method.',
+        );
+      }
+
+      await user.unlink('google.com');
+      await user.reload();
+
+      await _firestore.collection('users').doc(user.uid).update({
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+        'googleEmail': null,
+      });
+
+      if (!kIsWeb) {
+        try {
+          await _googleSignIn.disconnect();
+        } catch (_) {
+          try {
+            await _googleSignIn.signOut();
+          } catch (_) {}
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -236,6 +289,11 @@ class AuthService {
     final user = currentUser;
     if (user == null || user.email == null) {
       throw Exception('No user logged in or user has no email');
+    }
+    if (!isPasswordLinked) {
+      throw Exception(
+        'This account is not using email/password sign-in. Password cannot be changed here.',
+      );
     }
 
     try {
@@ -321,6 +379,46 @@ class AuthService {
     }
 
     await _firestore.collection('users').doc(user.uid).update(updates);
+  }
+
+  bool _isPlaceholderEmail(String? email) {
+    if (email == null) return false;
+    final normalized = email.trim().toLowerCase();
+    return normalized.endsWith('@test.com') ||
+        normalized.endsWith('@example.com') ||
+        normalized.endsWith('@invalid.local');
+  }
+
+  String? _linkedGoogleEmail(User user) {
+    try {
+      final googleInfo = user.providerData.firstWhere(
+        (info) => info.providerId == 'google.com',
+      );
+      return googleInfo.email;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _syncAuthEmailToGoogleIfNeeded(User user) async {
+    final currentEmail = user.email;
+    final googleLinkedEmail = _linkedGoogleEmail(user);
+    if (googleLinkedEmail == null || googleLinkedEmail.trim().isEmpty) return;
+    if (currentEmail != null &&
+        currentEmail.trim().toLowerCase() ==
+            googleLinkedEmail.trim().toLowerCase()) {
+      return;
+    }
+    if (!_isPlaceholderEmail(currentEmail)) return;
+
+    try {
+      final callable = _functions.httpsCallable('syncAuthEmailToLinkedGoogle');
+      await callable.call<Map<String, dynamic>>({});
+      await user.reload();
+    } catch (e) {
+      // Best effort only. Linking/sign-in should still succeed.
+      debugPrint('Auth email sync to Google skipped: $e');
+    }
   }
 
   /// Get user data from Firestore

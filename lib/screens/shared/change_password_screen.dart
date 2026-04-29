@@ -18,19 +18,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _confirmController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
-  bool _isSocialLogin = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Check if user is logged in via a social provider (like Google)
-    final authProvider = context.read<AuthProvider>();
-    if (authProvider.firebaseUser != null) {
-      _isSocialLogin = authProvider.firebaseUser!.providerData.any(
-        (userInfo) => userInfo.providerId == 'google.com',
-      );
-    }
-  }
 
   @override
   void dispose() {
@@ -87,10 +74,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authProvider = context.watch<AuthProvider>();
+    final canChangePassword = authProvider.isPasswordLinked;
+    final isGoogleLinked = authProvider.isGoogleLinked;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.changePassword), centerTitle: true),
-      body: _isSocialLogin
+      body: !canChangePassword
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -104,7 +94,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'You are logged in with Google.',
+                      isGoogleLinked
+                          ? 'This account is using Google sign-in.'
+                          : 'Password sign-in is not enabled.',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -114,7 +106,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'You cannot change your password here because your account is managed by Google.',
+                      'You cannot change your password here because this account does not have email/password sign-in linked.',
                       style: TextStyle(
                         fontSize: 14,
                         color: isDark ? Colors.grey[400] : Colors.grey[600],

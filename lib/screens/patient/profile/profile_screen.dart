@@ -16,6 +16,7 @@ import '../../shared/notification_settings_screen.dart';
 import 'edit_profile_screen.dart';
 import '../documents/medical_documents_screen.dart';
 import '../../shared/change_password_screen.dart';
+import '../../auth/forgot_password_screen.dart';
 
 /// Profile and settings screen
 class ProfileScreen extends StatefulWidget {
@@ -260,7 +261,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final isSuperAdmin = user?.isSuperAdmin ?? false;
     final isAdmin = user?.isAdmin ?? false;
     final isAdminLike = isAdmin || isSuperAdmin;
-    final accentColor = isSuperAdmin ? const Color(0xFFD32F2F) : AppColors.primary;
+    final accentColor =
+        isSuperAdmin ? const Color(0xFFD32F2F) : AppColors.primary;
 
     return Scaffold(
       appBar: AppBar(
@@ -357,6 +359,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const ChangePasswordScreen(),
+                      ),
+                    ),
+                    isDark: isDark,
+                    accentColor: accentColor,
+                  ),
+                  _buildSettingTile(
+                    icon: Icons.lock_reset_rounded,
+                    title: l10n.forgotPassword,
+                    subtitle: l10n.sendResetLink,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ForgotPasswordScreen(
+                          onBackTap: () => Navigator.of(context).pop(),
+                          initialEmail:
+                              authProvider.firebaseUser?.email ?? user?.email,
+                          launchedFromProfile: true,
+                        ),
                       ),
                     ),
                     isDark: isDark,
@@ -530,14 +550,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String name,
     String email,
     String? photoUrl,
-    bool isDark,
-    {
+    bool isDark, {
     required AppLocalizations l10n,
     required bool isSuperAdmin,
     required String? slotType,
     required Color accentColor,
-    }
-  ) {
+  }) {
     // Get user initial for the avatar
     final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U';
 

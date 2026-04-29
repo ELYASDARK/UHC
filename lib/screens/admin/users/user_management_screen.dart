@@ -374,6 +374,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 case 'role':
                   _changeUserRole(id, role);
                   break;
+                case 'unlink_google':
+                  _unlinkGoogleForUser(id, data);
+                  break;
               }
             },
             itemBuilder: (context) {
@@ -394,6 +397,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       ? role != UserRole.superAdmin
                       : (role != UserRole.superAdmin &&
                           role != UserRole.admin));
+              final hasLinkedGoogleEmail =
+                  (data['googleEmail'] as String?)?.trim().isNotEmpty ?? false;
               return [
                 const PopupMenuItem(
                   value: 'view',
@@ -417,6 +422,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ),
                   ),
                 if (canManageNonSuperAdminTarget) ...[
+                  if (hasLinkedGoogleEmail)
+                    const PopupMenuItem(
+                      value: 'unlink_google',
+                      child: Row(
+                        children: [
+                          Icon(Icons.link_off_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text('Unlink Google'),
+                        ],
+                      ),
+                    ),
                   PopupMenuItem(
                     value: 'toggle',
                     child: Row(
@@ -555,6 +571,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final fullName = data['fullName'] ?? 'Unknown';
     final roleStr = data['role'] as String? ?? 'student';
     final isSuperAdminRow = roleStr == 'superAdmin';
+    final canManageTarget = _canManageTarget(context, data);
+    final hasLinkedGoogleEmail =
+        (data['googleEmail'] as String?)?.trim().isNotEmpty ?? false;
 
     showModalBottomSheet(
       context: context,
@@ -692,55 +711,83 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
 
               // Actions — superAdmin can edit superAdmin rows (edit-only).
-              if (!isSuperAdminRow && _canManageTarget(context, data))
+              if (!isSuperAdminRow && canManageTarget)
                 Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _toggleUserStatus(id, isActive);
-                          },
-                          icon: Icon(
-                            isActive ? Icons.block : Icons.check_circle,
-                            color:
-                                isActive ? AppColors.error : AppColors.success,
-                          ),
-                          label: Text(
-                            isActive ? 'Deactivate' : 'Activate',
-                            style: TextStyle(
-                              color: isActive
-                                  ? AppColors.error
-                                  : AppColors.success,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: BorderSide(
-                              color: isActive
-                                  ? AppColors.error
-                                  : AppColors.success,
+                      if (hasLinkedGoogleEmail) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _unlinkGoogleForUser(id, data);
+                            },
+                            icon: const Icon(Icons.link_off_rounded),
+                            label: const Text('Unlink Google'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.warning,
+                              side: const BorderSide(
+                                color: AppColors.warning,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showEditUserDialog(id, data);
-                          },
-                          icon: const Icon(Icons.edit, color: Colors.white),
-                          label: const Text('Edit'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                        const SizedBox(height: 12),
+                      ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _toggleUserStatus(id, isActive);
+                              },
+                              icon: Icon(
+                                isActive ? Icons.block : Icons.check_circle,
+                                color: isActive
+                                    ? AppColors.error
+                                    : AppColors.success,
+                              ),
+                              label: Text(
+                                isActive ? 'Deactivate' : 'Activate',
+                                style: TextStyle(
+                                  color: isActive
+                                      ? AppColors.error
+                                      : AppColors.success,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                side: BorderSide(
+                                  color: isActive
+                                      ? AppColors.error
+                                      : AppColors.success,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _showEditUserDialog(id, data);
+                              },
+                              icon: const Icon(Icons.edit, color: Colors.white),
+                              label: const Text('Edit'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -897,7 +944,61 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
+  Future<void> _unlinkGoogleForUser(
+    String targetUid,
+    Map<String, dynamic> data,
+  ) async {
+    final name = (data['fullName'] as String?)?.trim();
+    final targetLabel = (name != null && name.isNotEmpty)
+        ? name
+        : (data['email'] as String?) ?? targetUid;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Unlink Google account?'),
+        content: Text(
+          'This will remove Google sign-in for $targetLabel. They must use email/password afterwards.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Unlink'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _userFunctionsService.unlinkGoogleProvider(targetUid: targetUid);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google provider unlinked successfully.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to unlink Google: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   void _changeUserRole(String id, UserRole currentRole) {
+    final actorIsSuperAdmin =
+        context.read<AuthProvider>().currentUser?.role == UserRole.superAdmin;
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -906,13 +1007,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           builder: (dialogContext, setState) {
             return Column(
               mainAxisSize: MainAxisSize.min,
-              // Exclude admin, doctor and superAdmin from role change options.
-              // Admin accounts are created via Admin Governance.
+              // ADMIN option is visible only to Super Admin.
+              // doctor/superAdmin are never changeable here.
               children: UserRole.values
                   .where((role) =>
-                      role != UserRole.admin &&
                       role != UserRole.doctor &&
-                      role != UserRole.superAdmin)
+                      role != UserRole.superAdmin &&
+                      (actorIsSuperAdmin || role != UserRole.admin))
                   .map((role) {
                 return RadioListTile<UserRole>(
                   title: Text(role.name.toUpperCase()),

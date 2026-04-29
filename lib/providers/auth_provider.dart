@@ -189,6 +189,9 @@ class AuthProvider with ChangeNotifier {
   /// Whether the current user has a Google provider linked
   bool get isGoogleLinked => _authService.isGoogleLinked;
 
+  /// Whether the current user has an email/password provider linked
+  bool get isPasswordLinked => _authService.isPasswordLinked;
+
   /// The linked Google email (from Firestore or Firebase Auth fallback)
   String? get googleEmail =>
       _currentUser?.googleEmail ?? _authService.googleEmail;
@@ -215,20 +218,39 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Send password reset email
-  Future<bool> sendPasswordResetEmail(String email) async {
+  /// Unlink the current user's account from Google (admin/super-admin only)
+  Future<bool> unlinkGoogle() async {
     try {
-      _state = AuthState.loading;
       _errorMessage = null;
-      notifyListeners();
 
-      await _authService.sendPasswordResetEmail(email);
+      if (_currentUser == null) {
+        throw Exception('No user logged in.');
+      }
+      if (!_currentUser!.isAdminOrSuperAdmin) {
+        throw Exception('Only admin and super admin can unlink Google.');
+      }
 
-      _state = AuthState.unauthenticated;
+      await _authService.unlinkGoogle();
+
+      // Refresh user data after unlink.
+      await _refreshUserData(_currentUser!.id);
       notifyListeners();
       return true;
     } catch (e) {
-      _state = AuthState.error;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Send password reset email
+  Future<bool> sendPasswordResetEmail(String email) async {
+    try {
+      _errorMessage = null;
+
+      await _authService.sendPasswordResetEmail(email);
+      return true;
+    } catch (e) {
       _errorMessage = e.toString();
       notifyListeners();
       return false;

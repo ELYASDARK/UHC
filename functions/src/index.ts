@@ -899,6 +899,73 @@ export const bootstrapSelfUserDocument = functions.https.onCall(
     }
 );
 
+/**
+ * Sync the caller's Firebase Auth email to their linked Google email.
+ * Intended for accounts that were provisioned with placeholder emails.
+ */
+export const syncAuthEmailToLinkedGoogle = functions.https.onCall(
+    async (request: functions.https.CallableRequest<Record<string, never>>) => {
+        const callerUid = requireAuth(request);
+
+        const authUser = await auth.getUser(callerUid);
+        const googleProvider = authUser.providerData.find((p) => p.providerId === 'google.com');
+        const googleEmail = googleProvider?.email?.trim();
+
+        if (!googleEmail) {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'No linked Google email found for this account.',
+            );
+        }
+
+        const currentEmail = authUser.email?.trim();
+        if (!currentEmail) {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Current auth account has no email.',
+            );
+        }
+
+        // Already synced: still make sure Firestore has the same values.
+        if (currentEmail.toLowerCase() === googleEmail.toLowerCase()) {
+            await db.collection('users').doc(callerUid).update({
+                email: googleEmail,
+                googleEmail,
+                updatedAt: admin.firestore.Timestamp.now(),
+            });
+            return { success: true, message: 'Email already synced.', email: googleEmail };
+        }
+
+        try {
+            await auth.updateUser(callerUid, {
+                email: googleEmail,
+                emailVerified: true,
+            });
+        } catch (error) {
+            const code = (error as { code?: string })?.code;
+            if (code === 'auth/email-already-exists') {
+                throw new functions.https.HttpsError(
+                    'already-exists',
+                    'This Google email is already used by another account.',
+                );
+            }
+            throw error;
+        }
+
+        await db.collection('users').doc(callerUid).update({
+            email: googleEmail,
+            googleEmail,
+            updatedAt: admin.firestore.Timestamp.now(),
+        });
+
+        return {
+            success: true,
+            message: 'Auth email synced to linked Google email.',
+            email: googleEmail,
+        };
+    }
+);
+
 interface SetUserActiveStatusData {
     targetUid: string;
     isActive: boolean;
@@ -957,6 +1024,100 @@ export const setUserActiveStatus = functions.https.onCall(
         return {
             success: true,
             message: isActive ? 'User activated successfully.' : 'User deactivated successfully.',
+        };
+    }
+);
+
+interface UnlinkGoogleProviderByAdminData {
+    targetUid: string;
+}
+
+/**
+ * Unlink Google sign-in provider from a non-admin user.
+ * Admin requires users.manageNonAdmin permission.
+ * Super Admin bypasses permission checks.
+ */
+export const unlinkGoogleProviderByAdmin = functions.https.onCall(
+    async (request: functions.https.CallableRequest<UnlinkGoogleProviderByAdminData>) => {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requirePermission(callerDoc, 'users.manageNonAdmin');
+        const { targetUid } = request.data;
+
+        if (!targetUid) {
+            throw new functions.https.HttpsError(
+                'invalid-argument',
+                'targetUid is required.',
+            );
+        }
+
+        const callerData = callerDoc.data()!;
+        const callerRole = callerData.role;
+        const targetRef = db.collection('users').doc(targetUid);
+        const targetDoc = await targetRef.get();
+        if (!targetDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Target user not found.');
+        }
+
+        const targetData = targetDoc.data()!;
+        const targetRole = targetData.role;
+        if (targetRole === 'superAdmin') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Cannot unlink Google for Super Admin accounts via this function.',
+            );
+        }
+        if (targetRole === 'admin') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Use governance flow for admin account provider management.',
+            );
+        }
+        if (callerRole === 'admin' && (targetRole === 'admin' || targetRole === 'superAdmin')) {
+            throw new functions.https.HttpsError(
+                'permission-denied',
+                'Admins cannot modify admin/superAdmin accounts.',
+            );
+        }
+
+        const authUser = await auth.getUser(targetUid);
+        const providerIds = new Set(authUser.providerData.map((p) => p.providerId));
+        if (!providerIds.has('google.com')) {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Target user does not have Google linked.',
+            );
+        }
+        if (!providerIds.has('password')) {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Cannot unlink Google: user has no email/password sign-in linked.',
+            );
+        }
+
+        await auth.updateUser(targetUid, {
+            providersToUnlink: ['google.com'],
+        });
+
+        await targetRef.update({
+            googleEmail: null,
+            updatedAt: admin.firestore.Timestamp.now(),
+        });
+
+        await writeAdminAuditLog({
+            actorUid: callerUid,
+            actorRole: callerRole,
+            actorName: callerData.fullName,
+            targetUid,
+            targetName: targetData.fullName,
+            targetRoleBefore: targetRole,
+            targetRoleAfter: targetRole,
+            action: 'user.googleUnlink',
+        });
+
+        return {
+            success: true,
+            message: 'Google provider unlinked successfully.',
         };
     }
 );

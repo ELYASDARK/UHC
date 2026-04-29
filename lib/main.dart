@@ -226,9 +226,6 @@ class _AppNavigatorState extends State<AppNavigator> {
   // Auth flow: 0 = login, 1 = forgot password
   int _authScreen = 0;
 
-  // Tracks if Google was just linked this session (avoids flicker)
-  bool _googleLinked = false;
-
   // Doctor role state
   final DoctorRepository _doctorRepository = DoctorRepository();
   DoctorModel? _doctorModel;
@@ -304,10 +301,10 @@ class _AppNavigatorState extends State<AppNavigator> {
     // Check auth state
     if (authProvider.isAuthenticated) {
       // Check if Google is linked — show link screen if not
-      if (!authProvider.isGoogleLinked && !_googleLinked) {
+      if (!authProvider.isGoogleLinked) {
         return LinkGoogleScreen(
           onLinked: () {
-            if (mounted) setState(() => _googleLinked = true);
+            if (mounted) setState(() {});
           },
         );
       }

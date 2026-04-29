@@ -76,7 +76,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               SnackBar(
                 content: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                    const Icon(Icons.warning_amber_rounded,
+                        color: Colors.white),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -328,9 +329,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().user;
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.user;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final isGoogleLinked = authProvider.isGoogleLinked;
+    final canUnlinkGoogle =
+        (user?.isAdminOrSuperAdmin ?? false) && isGoogleLinked;
 
     // Determine what to show in the avatar
     Widget avatarContent = _buildAvatarContent(user);
@@ -551,16 +556,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: context.read<AuthProvider>().isGoogleLinked
+                        color: isGoogleLinked
                             ? AppColors.success.withValues(alpha: 0.1)
                             : AppColors.warning.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
-                        context.read<AuthProvider>().isGoogleLinked
+                        isGoogleLinked
                             ? Icons.check_circle_rounded
                             : Icons.link_off_rounded,
-                        color: context.read<AuthProvider>().isGoogleLinked
+                        color: isGoogleLinked
                             ? AppColors.success
                             : AppColors.warning,
                         size: 22,
@@ -581,10 +586,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     ),
                           ),
                           const SizedBox(height: 2),
-                          if (context.read<AuthProvider>().isGoogleLinked)
+                          if (isGoogleLinked)
                             Text(
-                              context.read<AuthProvider>().googleEmail ??
-                                  'Linked',
+                              authProvider.googleEmail ?? 'Linked',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
@@ -604,10 +608,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ],
                       ),
                     ),
-                    if (!context.read<AuthProvider>().isGoogleLinked)
+                    if (!isGoogleLinked)
                       TextButton(
                         onPressed: () async {
-                          final authProvider = context.read<AuthProvider>();
                           final success = await authProvider.linkWithGoogle();
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -625,6 +628,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           if (success) setState(() {});
                         },
                         child: const Text('Link Now'),
+                      )
+                    else if (canUnlinkGoogle)
+                      TextButton(
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Unlink Google account?'),
+                              content: const Text(
+                                'This will remove Google sign-in from your account. You can still sign in with email/password.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.error,
+                                  ),
+                                  child: const Text('Unlink'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm != true || !context.mounted) return;
+
+                          final success = await authProvider.unlinkGoogle();
+                          if (!context.mounted) return;
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                success
+                                    ? 'Google account unlinked.'
+                                    : authProvider.errorMessage ??
+                                        'Failed to unlink',
+                              ),
+                              backgroundColor:
+                                  success ? AppColors.success : AppColors.error,
+                            ),
+                          );
+                          if (success) setState(() {});
+                        },
+                        child: const Text('Unlink'),
                       ),
                   ],
                 ),

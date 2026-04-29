@@ -365,17 +365,33 @@ class _UserFormDialogState extends State<UserFormDialog> {
           );
         }
       } else {
-        // Create new user via Cloud Function
-        await _userFunctionsService.createUserAccount(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-          fullName: _nameController.text.trim(),
-          role: _selectedRole.name,
-          phoneNumber: _phoneController.text.trim().isNotEmpty
-              ? _phoneController.text.trim()
-              : null,
-          dateOfBirth: _selectedDateOfBirth,
-        );
+        if (_selectedRole == UserRole.admin) {
+          if (!actorIsSuperAdmin) {
+            throw Exception('Only Super Admin can create admin accounts.');
+          }
+          // ADMIN creation must use governance function (server-enforced).
+          await _governanceService.createAdminAccount(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+            fullName: _nameController.text.trim(),
+            phoneNumber: _phoneController.text.trim().isNotEmpty
+                ? _phoneController.text.trim()
+                : null,
+            dateOfBirth: _selectedDateOfBirth,
+          );
+        } else {
+          // Non-admin creation via standard user function.
+          await _userFunctionsService.createUserAccount(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+            fullName: _nameController.text.trim(),
+            role: _selectedRole.name,
+            phoneNumber: _phoneController.text.trim().isNotEmpty
+                ? _phoneController.text.trim()
+                : null,
+            dateOfBirth: _selectedDateOfBirth,
+          );
+        }
 
         // Upload image if selected
         if (_imageBytes != null) {
@@ -419,9 +435,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
     final canEditRole = !isEditing || actorIsSuperAdmin;
     final roleOptions = UserRole.values
         .where((role) =>
-            role != UserRole.admin &&
             role != UserRole.doctor &&
-            role != UserRole.superAdmin)
+            role != UserRole.superAdmin &&
+            (actorIsSuperAdmin || role != UserRole.admin))
         .toList();
     final selectedRoleInOptions =
         roleOptions.contains(_selectedRole) ? _selectedRole : null;
@@ -664,11 +680,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
                               ),
                               helperText: isEditing
                                   ? (actorIsSuperAdmin
-                                      ? (_selectedRole == UserRole.admin
-                                          ? 'ADMIN removed from options. Choose STUDENT or STAFF.'
-                                          : null)
+                                      ? 'Only Super Admin can assign ADMIN role.'
                                       : 'Role changes are managed from User Management actions')
-                                  : null,
+                                  : (actorIsSuperAdmin
+                                      ? 'Only Super Admin can assign ADMIN role.'
+                                      : null),
                             ),
                             items: roleOptions.map((role) {
                               return DropdownMenuItem(

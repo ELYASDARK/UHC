@@ -62,6 +62,15 @@ class UserFunctionsService {
     });
   }
 
+  /// Unlink Google provider from a target non-admin user.
+  Future<Map<String, dynamic>> unlinkGoogleProvider({
+    required String targetUid,
+  }) async {
+    return _call('unlinkGoogleProviderByAdmin', {
+      'targetUid': targetUid,
+    });
+  }
+
   Future<Map<String, dynamic>> _call(
     String functionName,
     Map<String, dynamic> payload,
