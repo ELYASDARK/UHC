@@ -311,6 +311,20 @@ Enable the following in your [Firebase Console](https://console.firebase.google.
 | iOS | `GoogleService-Info.plist` | `ios/Runner/` | Download from Firebase Console |
 | Web | Firebase config object | `web/index.html` | Copy config from Firebase Console |
 
+### Authentication Email Deliverability (SMTP)
+
+To improve password-reset inbox delivery (and reduce spam placement), configure custom SMTP in:
+
+- `Firebase Console → Authentication → Templates → SMTP settings`
+
+Recommended:
+
+- Use a real sender mailbox (for example: `no-reply@yourdomain.com`)
+- Use your SMTP provider's real host/port/security values (not placeholders)
+- Verify sender DNS with your provider (SPF, DKIM, DMARC)
+
+Without SMTP/domain authentication, default email senders are more likely to land in spam.
+
 ### Android Configuration
 
 Ensure your `android/app/src/main/AndroidManifest.xml` includes these permissions:
@@ -452,6 +466,48 @@ flutter build web --release
 ---
 
 ## 📝 Changelog
+
+<details open>
+<summary><b>v2.2.0</b> — April 29, 2026</summary>
+
+#### 🔐 Authentication & Provider Controls
+- **Provider-aware password change** — `Change Password` is now enabled only when `password` provider is linked.
+- **Mandatory Google-link gate hardening** — Removed stale session bypass and now gate from real provider state only.
+- **Google unlink (self, role-gated)** — Added self-unlink capability for signed-in `admin` and `superAdmin` accounts.
+- **Google unlink (admin on target user)** — Added User Management action and backend callable to unlink Google for managed non-admin users.
+
+#### 📧 Password Reset & Account Email Reliability
+- **Auth email sync to linked Google** — Added callable `syncAuthEmailToLinkedGoogle` and client trigger on Google sign-in/link for placeholder emails (for example `@test.com`), enabling real reset delivery.
+- **Forgot password from profile** — Added Forgot Password entry in both patient and doctor profile account sections.
+- **Context-aware forgot-password UX**:
+  - login flow keeps **Back to Login**
+  - profile flow uses neutral completion action (no login redirect wording)
+- **Google-only account notice** — Forgot password clearly explains that reset works only for accounts with `password` provider.
+- **Reset flow stability** — Sending password reset email no longer mutates authenticated app state.
+
+#### ☁️ Cloud Functions Added
+- `syncAuthEmailToLinkedGoogle`
+- `unlinkGoogleProviderByAdmin`
+
+#### 📁 Files Changed
+
+| File | Key Changes |
+|:---|:---|
+| `functions/src/index.ts` | Added `syncAuthEmailToLinkedGoogle`; added `unlinkGoogleProviderByAdmin` with permission/role/provider guardrails |
+| `functions/lib/index.js` | Compiled output sync |
+| `functions/lib/index.js.map` | Compiled source map sync |
+| `lib/services/auth_service.dart` | Added `isPasswordLinked`, unlink logic, provider-guarded password change, best-effort auth-email sync trigger |
+| `lib/providers/auth_provider.dart` | Added `isPasswordLinked`, role-gated `unlinkGoogle`, reset-email state stabilization |
+| `lib/services/user_functions_service.dart` | Added callable wrapper for admin-side unlink |
+| `lib/screens/shared/change_password_screen.dart` | Provider-aware password UI behavior |
+| `lib/screens/patient/profile/edit_profile_screen.dart` | Added admin/super-admin self unlink action |
+| `lib/screens/admin/users/user_management_screen.dart` | Added `Unlink Google` in popup and detail bottom sheet |
+| `lib/screens/auth/forgot_password_screen.dart` | Added profile/login mode support, initial email, Google-only notice, local loading |
+| `lib/screens/patient/profile/profile_screen.dart` | Added profile-level Forgot Password entry |
+| `lib/screens/doctor/profile/doctor_profile_screen.dart` | Added profile-level Forgot Password entry |
+| `lib/main.dart` | Removed stale `_googleLinked` bypass flag |
+
+</details>
 
 <details open>
 <summary><b>v2.1.0</b> — April 28, 2026</summary>
