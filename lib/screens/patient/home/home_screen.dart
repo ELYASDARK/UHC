@@ -138,11 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Quick booking card
                 _buildQuickBookingCard(context, isDark),
 
-                const SizedBox(height: 28),
-
-                // Quick actions
-                _buildQuickActions(context, isDark),
-
                 const SizedBox(height: 20),
 
                 // Emergency Request button
@@ -445,107 +440,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     ).animate(delay: 300.ms).fadeIn(duration: 500.ms).slideY(begin: 0.1);
-  }
-
-  Widget _buildQuickActions(BuildContext context, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          AppLocalizations.of(context).quickActions,
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color:
-                isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            _buildActionCard(
-              context,
-              icon: Icons.people_alt_rounded,
-              label: AppLocalizations.of(context).doctors,
-              color: AppColors.primary,
-              onTap: widget.onDoctorsTap,
-              isDark: isDark,
-            ),
-            const SizedBox(width: 12),
-            _buildActionCard(
-              context,
-              icon: Icons.calendar_today_rounded,
-              label: AppLocalizations.of(context).appointments,
-              color: AppColors.secondary,
-              onTap: widget.onAppointmentsTap,
-              isDark: isDark,
-            ),
-            const SizedBox(width: 12),
-            _buildActionCard(
-              context,
-              icon: Icons.history_rounded,
-              label: AppLocalizations.of(context).history,
-              color: AppColors.tertiary,
-              onTap: widget.onHistoryTap,
-              isDark: isDark,
-            ),
-          ],
-        ),
-      ],
-    ).animate(delay: 400.ms).fadeIn(duration: 500.ms);
-  }
-
-  Widget _buildActionCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required bool isDark,
-    VoidCallback? onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 26),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildEmergencyButton(BuildContext context, bool isDark) {

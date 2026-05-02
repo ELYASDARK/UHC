@@ -302,7 +302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     isDark: isDark,
                     accentColor: accentColor,
                   ),
-                  if (!isAdminLike)
+                  if (!isSuperAdmin)
                     _buildSettingTile(
                       icon: Icons.language_rounded,
                       title: l10n.language,

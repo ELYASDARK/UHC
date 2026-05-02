@@ -323,6 +323,10 @@ class _UserFormDialogState extends State<UserFormDialog> {
       final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
       final originalRole =
           (widget.data?['role'] as String?) ?? _selectedRole.name;
+      final originalUserRole = UserRole.values.firstWhere(
+        (r) => r.name == originalRole,
+        orElse: () => UserRole.student,
+      );
 
       if (isEditing) {
         // Update existing user
@@ -346,13 +350,28 @@ class _UserFormDialogState extends State<UserFormDialog> {
           dateOfBirth: _selectedDateOfBirth,
         );
 
-        // Super Admin can change user role directly from edit form.
-        // ADMIN is intentionally excluded from selectable options.
-        if (actorIsSuperAdmin && originalRole != _selectedRole.name) {
-          await _governanceService.changeAdminRole(
-            targetUid: widget.id!,
-            newRole: _selectedRole.name,
-          );
+        // Role change policy:
+        // - superAdmin: can change role using governance callable.
+        // - admin: can switch only student/staff using user callable.
+        if (originalRole != _selectedRole.name) {
+          if (actorIsSuperAdmin) {
+            await _governanceService.changeAdminRole(
+              targetUid: widget.id!,
+              newRole: _selectedRole.name,
+            );
+          } else if ((originalUserRole == UserRole.student ||
+                  originalUserRole == UserRole.staff) &&
+              (_selectedRole == UserRole.student ||
+                  _selectedRole == UserRole.staff)) {
+            await _userFunctionsService.changeUserRoleByAdmin(
+              targetUid: widget.id!,
+              newRole: _selectedRole.name,
+            );
+          } else {
+            throw Exception(
+              'Only Super Admin can change admin/super admin roles.',
+            );
+          }
         }
 
         if (mounted) {
@@ -430,9 +449,23 @@ class _UserFormDialogState extends State<UserFormDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final actorRole = context.watch<AuthProvider>().currentUser?.role;
     final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
+    final actorCanManageNonAdmin = context
+            .watch<AuthProvider>()
+            .currentUser
+            ?.hasPermission('users.manageNonAdmin') ??
+        false;
     final isEditingSuperAdmin = isEditing &&
         (widget.data?['role'] as String?) == UserRole.superAdmin.name;
-    final canEditRole = !isEditing || actorIsSuperAdmin;
+    final targetRole = UserRole.values.firstWhere(
+      (r) => r.name == (widget.data?['role'] as String? ?? _selectedRole.name),
+      orElse: () => _selectedRole,
+    );
+    final isEditingNonAdminTarget = isEditing &&
+        targetRole != UserRole.admin &&
+        targetRole != UserRole.superAdmin;
+    final canEditRole = !isEditing ||
+        actorIsSuperAdmin ||
+        (actorCanManageNonAdmin && isEditingNonAdminTarget);
     final roleOptions = UserRole.values
         .where((role) =>
             role != UserRole.doctor &&
@@ -681,7 +714,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                               helperText: isEditing
                                   ? (actorIsSuperAdmin
                                       ? 'Only Super Admin can assign ADMIN role.'
-                                      : 'Role changes are managed from User Management actions')
+                                      : 'Admin can change STUDENT/STAFF only.')
                                   : (actorIsSuperAdmin
                                       ? 'Only Super Admin can assign ADMIN role.'
                                       : null),

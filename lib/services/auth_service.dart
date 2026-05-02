@@ -15,6 +15,10 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance; // Added
+  bool _googleInitialized = false;
+
+  static const String _googleServerClientId =
+      String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
 
   /// Current Firebase user
   User? get currentUser => _auth.currentUser;
@@ -90,6 +94,7 @@ class AuthService {
         final provider = GoogleAuthProvider();
         userCredential = await _auth.signInWithPopup(provider);
       } else {
+        await _ensureGoogleInitializedForMobile();
         // On mobile, use google_sign_in package
         final googleUser = await _googleSignIn.authenticate();
 
@@ -126,6 +131,21 @@ class AuthService {
       await _updateExistingUserDocument(doc, user);
 
       return userCredential;
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled ||
+          e.code == GoogleSignInExceptionCode.interrupted) {
+        return null;
+      }
+      if (e.code == GoogleSignInExceptionCode.clientConfigurationError ||
+          e.code == GoogleSignInExceptionCode.providerConfigurationError) {
+        throw Exception(
+          'Google sign-in is not configured for Android. '
+          'Please add a Web OAuth client in Firebase Auth, download a fresh android/google-services.json, '
+          'and optionally set --dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>. '
+          'Details: ${e.description ?? e.details ?? e}',
+        );
+      }
+      throw Exception('Google sign-in failed: ${e.description ?? e}');
     } catch (e) {
       // Re-throw our custom "no account" error as-is
       if (e.toString().contains('No account found')) {
@@ -190,6 +210,7 @@ class AuthService {
         return userCredential;
       }
 
+      await _ensureGoogleInitializedForMobile();
       // On mobile, use google_sign_in package
       final googleUser = await _googleSignIn.authenticate();
 
@@ -254,6 +275,7 @@ class AuthService {
       });
 
       if (!kIsWeb) {
+        await _ensureGoogleInitializedForMobile();
         try {
           await _googleSignIn.disconnect();
         } catch (_) {
@@ -267,6 +289,15 @@ class AuthService {
     } catch (e) {
       rethrow;
     }
+  }
+
+  Future<void> _ensureGoogleInitializedForMobile() async {
+    if (kIsWeb || _googleInitialized) return;
+    final serverClientId = _googleServerClientId.trim().isEmpty
+        ? null
+        : _googleServerClientId.trim();
+    await _googleSignIn.initialize(serverClientId: serverClientId);
+    _googleInitialized = true;
   }
 
   /// Send password reset email

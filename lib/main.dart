@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/kurdish_material_localizations.dart';
 import 'firebase_options.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
@@ -60,12 +59,6 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    // google_sign_in_web requires explicit web client id; the app uses
-    // Firebase Auth popup on web, so only initialize google_sign_in on non-web.
-    if (!kIsWeb) {
-      await GoogleSignIn.instance.initialize();
-    }
-
     // Crashlytics is not supported on web in this app setup.
     // Guard all Crashlytics hooks to avoid web assertion failures.
     if (!kIsWeb) {

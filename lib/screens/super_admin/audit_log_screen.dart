@@ -83,8 +83,12 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         dateTo: _filterDateTo,
       );
       final entries = (result['logs'] as List<dynamic>?) ?? [];
+      final normalizedLogs = entries
+          .whereType<Map>()
+          .map((entry) => Map<String, dynamic>.from(entry))
+          .toList();
       setState(() {
-        _logs = entries.cast<Map<String, dynamic>>();
+        _logs = normalizedLogs;
         _isLoading = false;
       });
     } catch (e) {
@@ -486,27 +490,12 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
   }
 
   Widget _buildLogTile(Map<String, dynamic> log, bool isDark) {
-    final action = log['action'] as String? ?? 'unknown';
-    final actorName = log['actorName'] as String? ?? '';
-    final targetName = log['targetName'] as String? ?? '';
-    final actorUid = log['actorUid'] as String? ?? '';
-    final targetUid = log['targetUid'] as String? ?? '';
-    final createdAt = log['createdAt'];
-    String timeStr = '';
-    if (createdAt != null) {
-      try {
-        if (createdAt is Map && createdAt['_seconds'] != null) {
-          final dt = DateTime.fromMillisecondsSinceEpoch(
-              (createdAt['_seconds'] as int) * 1000);
-          timeStr = DateFormat('MMM d, yyyy HH:mm').format(dt);
-        } else if (createdAt is String) {
-          final parsed = DateTime.tryParse(createdAt);
-          timeStr = parsed != null
-              ? DateFormat('MMM d, yyyy HH:mm').format(parsed.toLocal())
-              : createdAt;
-        }
-      } catch (_) {}
-    }
+    final action = _asString(log['action'], fallback: 'unknown');
+    final actorName = _asString(log['actorName']);
+    final targetName = _asString(log['targetName']);
+    final actorUid = _asString(log['actorUid']);
+    final targetUid = _asString(log['targetUid']);
+    final timeStr = _formatCreatedAt(log['createdAt']);
 
     final icon = _actionIcon(action);
     final color = _actionColor(action);
@@ -523,35 +512,90 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         title: Text(
           label,
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (actorName.isNotEmpty)
-              Text('By: $actorName', style: GoogleFonts.poppins(fontSize: 11))
+              Text(
+                'By: $actorName',
+                style: GoogleFonts.poppins(fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
             else if (actorUid.isNotEmpty)
               Text(
-                  'By: ${actorUid.substring(0, actorUid.length > 12 ? 12 : actorUid.length)}…',
-                  style: GoogleFonts.poppins(fontSize: 11)),
+                'By: ${actorUid.substring(0, actorUid.length > 12 ? 12 : actorUid.length)}…',
+                style: GoogleFonts.poppins(fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             if (targetName.isNotEmpty)
-              Text('Target: $targetName',
-                  style: GoogleFonts.poppins(fontSize: 11))
+              Text(
+                'Target: $targetName',
+                style: GoogleFonts.poppins(fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
             else if (targetUid.isNotEmpty)
               Text(
-                  'Target: ${targetUid.substring(0, targetUid.length > 12 ? 12 : targetUid.length)}…',
-                  style: GoogleFonts.poppins(fontSize: 11)),
+                'Target: ${targetUid.substring(0, targetUid.length > 12 ? 12 : targetUid.length)}…',
+                style: GoogleFonts.poppins(fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             if (timeStr.isNotEmpty)
-              Text(timeStr,
-                  style: GoogleFonts.poppins(
-                      fontSize: 10,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight)),
+              Text(
+                timeStr,
+                style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight),
+              ),
           ],
         ),
-        isThreeLine: true,
       ),
     );
+  }
+
+  String _asString(dynamic value, {String fallback = ''}) {
+    if (value == null) return fallback;
+    if (value is String) return value;
+    return value.toString();
+  }
+
+  String _formatCreatedAt(dynamic createdAt) {
+    try {
+      if (createdAt == null) return '';
+      if (createdAt is Timestamp) {
+        return DateFormat('MMM d, yyyy HH:mm').format(createdAt.toDate());
+      }
+      if (createdAt is DateTime) {
+        return DateFormat('MMM d, yyyy HH:mm').format(createdAt.toLocal());
+      }
+      if (createdAt is String) {
+        final parsed = DateTime.tryParse(createdAt);
+        if (parsed != null) {
+          return DateFormat('MMM d, yyyy HH:mm').format(parsed.toLocal());
+        }
+        return createdAt;
+      }
+      if (createdAt is int) {
+        final dt = DateTime.fromMillisecondsSinceEpoch(createdAt);
+        return DateFormat('MMM d, yyyy HH:mm').format(dt.toLocal());
+      }
+      if (createdAt is Map && createdAt['_seconds'] != null) {
+        final sec = createdAt['_seconds'];
+        if (sec is int) {
+          final dt = DateTime.fromMillisecondsSinceEpoch(sec * 1000);
+          return DateFormat('MMM d, yyyy HH:mm').format(dt.toLocal());
+        }
+      }
+    } catch (_) {}
+    return '';
   }
 
   IconData _actionIcon(String action) {

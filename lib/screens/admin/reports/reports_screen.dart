@@ -1,12 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 import '../../../core/constants/app_colors.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../utils/save_file.dart';
 
 /// Reports generation screen for admin
 class ReportsScreen extends StatefulWidget {
@@ -43,11 +42,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       'description': 'Registered users with roles and status',
     },
     {
-      'id': 'revenue',
-      'title': 'Revenue Report',
-      'icon': Icons.attach_money,
+      'id': 'departments',
+      'title': 'Departments Report',
+      'icon': Icons.business,
       'description':
-          'Financial summary based on completed appointments (estimated)',
+          'Department list with doctor count and appointment summary',
     },
   ];
 
@@ -142,7 +141,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Reports are exported as CSV files that can be opened in Excel or Google Sheets.',
+                      'Reports are exported as Excel (.xlsx) files that can be opened in Microsoft Excel or Google Sheets.',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark
@@ -354,44 +353,52 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Excel generation
+  // ---------------------------------------------------------------------------
+
   Future<void> _generateReport() async {
     setState(() => _isGenerating = true);
 
     try {
-      String csvContent = '';
+      final workbook = xlsio.Workbook();
       String fileName = '';
+      String reportTitle = '';
 
       switch (_selectedReportType) {
         case 'appointments':
-          csvContent = await _generateAppointmentsReport();
+          reportTitle = 'Appointments Report';
           fileName = 'appointments_report';
+          await _fillAppointmentsSheet(workbook);
           break;
         case 'doctors':
-          csvContent = await _generateDoctorsReport();
+          reportTitle = 'Doctors Report';
           fileName = 'doctors_report';
+          await _fillDoctorsSheet(workbook);
           break;
         case 'users':
-          csvContent = await _generateUsersReport();
+          reportTitle = 'Users Report';
           fileName = 'users_report';
+          await _fillUsersSheet(workbook);
           break;
-        case 'revenue':
-          csvContent = await _generateRevenueReport();
-          fileName = 'revenue_report';
+        case 'departments':
+          reportTitle = 'Departments Report';
+          fileName = 'departments_report';
+          await _fillDepartmentsSheet(workbook);
           break;
       }
 
-      // Save and share file
-      final directory = await getTemporaryDirectory();
-      final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
-      final file = File('${directory.path}/${fileName}_$dateStr.csv');
-      await file.writeAsString(csvContent);
+      // Save workbook to bytes
+      final bytes = workbook.saveAsStream();
+      workbook.dispose();
 
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          subject:
-              'UHC Report - ${DateFormat('MMM d, yyyy').format(DateTime.now())}',
-        ),
+      // Save & share (web = download, mobile = share sheet)
+      final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
+      await saveAndShareFile(
+        bytes,
+        '${fileName}_$dateStr.xlsx',
+        subject:
+            'UHC $reportTitle - ${DateFormat('MMM d, yyyy').format(DateTime.now())}',
       );
 
       if (mounted) {
@@ -418,8 +425,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
-  /// Fetch all documents matching a query using cursor-based pagination.
-  /// Fetches in batches of [batchSize] to keep each request bounded.
+  // ---------------------------------------------------------------------------
+  // Paginated Firestore fetch
+  // ---------------------------------------------------------------------------
+
   Future<List<QueryDocumentSnapshot>> _paginatedFetch(
     Query query, {
     int batchSize = 5000,
@@ -434,14 +443,138 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
       final snapshot = await batchQuery.get();
       allDocs.addAll(snapshot.docs);
-      if (snapshot.docs.length < batchSize) break; // Last page
+      if (snapshot.docs.length < batchSize) break;
       lastDoc = snapshot.docs.last;
     }
 
     return allDocs;
   }
 
-  Future<String> _generateAppointmentsReport() async {
+  // ---------------------------------------------------------------------------
+  // Styling helpers
+  // ---------------------------------------------------------------------------
+
+  /// Hex colors for styling (#RRGGBB format for Syncfusion XlsIO)
+  static const String _primaryHex = '#2196F3'; // Blue
+  static const String _headerTextHex = '#FFFFFF'; // White
+  static const String _subtitleHex = '#757575'; // Gray
+  static const String _altRowHex = '#F5F7FA'; // Light gray bg
+  static const String _borderHex = '#E0E0E0'; // Light border
+
+  /// Sets up the sheet with a title row, subtitle, and styled header row.
+  /// Returns the 0-based row index of the first data row.
+  int _setupSheet({
+    required xlsio.Worksheet sheet,
+    required String title,
+    required List<String> headers,
+    required List<double> columnWidths,
+  }) {
+    final dateFmt = DateFormat('MMM d, yyyy');
+    final periodText =
+        'Period: ${dateFmt.format(_startDate)} – ${dateFmt.format(_endDate)}';
+    final lastCol = headers.length;
+
+    // Row 1 — Title
+    final titleCell = sheet.getRangeByIndex(1, 1, 1, lastCol);
+    titleCell.merge();
+    titleCell.setText(title);
+    titleCell.cellStyle.fontSize = 16;
+    titleCell.cellStyle.bold = true;
+    titleCell.cellStyle.fontColor = _primaryHex;
+    titleCell.cellStyle.hAlign = xlsio.HAlignType.left;
+    titleCell.cellStyle.vAlign = xlsio.VAlignType.center;
+    sheet.getRangeByIndex(1, 1).rowHeight = 32;
+
+    // Row 2 — Subtitle (period)
+    final subtitleCell = sheet.getRangeByIndex(2, 1, 2, lastCol);
+    subtitleCell.merge();
+    subtitleCell.setText(periodText);
+    subtitleCell.cellStyle.fontSize = 10;
+    subtitleCell.cellStyle.fontColor = _subtitleHex;
+    subtitleCell.cellStyle.hAlign = xlsio.HAlignType.left;
+
+    // Row 3 — Spacer
+    sheet.getRangeByIndex(3, 1).rowHeight = 8;
+
+    // Row 4 — Headers
+    for (var col = 0; col < headers.length; col++) {
+      final cell = sheet.getRangeByIndex(4, col + 1);
+      cell.setText(headers[col]);
+      cell.cellStyle.bold = true;
+      cell.cellStyle.fontSize = 11;
+      cell.cellStyle.fontColor = _headerTextHex;
+      cell.cellStyle.backColor = _primaryHex;
+      cell.cellStyle.hAlign = xlsio.HAlignType.center;
+      cell.cellStyle.vAlign = xlsio.VAlignType.center;
+      cell.cellStyle.borders.all.lineStyle = xlsio.LineStyle.thin;
+      cell.cellStyle.borders.all.color = _borderHex;
+    }
+    sheet.getRangeByIndex(4, 1).rowHeight = 28;
+
+    // Column widths
+    for (var i = 0; i < columnWidths.length; i++) {
+      sheet.getRangeByIndex(1, i + 1).columnWidth = columnWidths[i];
+    }
+
+    return 5; // first data row (1-indexed)
+  }
+
+  /// Apply alternating row style + borders to a data cell.
+  void _styleDataCell(
+    xlsio.Range cell, {
+    required int rowIndex,
+    xlsio.HAlignType hAlign = xlsio.HAlignType.left,
+  }) {
+    cell.cellStyle.fontSize = 10;
+    cell.cellStyle.hAlign = hAlign;
+    cell.cellStyle.vAlign = xlsio.VAlignType.center;
+    cell.cellStyle.borders.all.lineStyle = xlsio.LineStyle.thin;
+    cell.cellStyle.borders.all.color = _borderHex;
+    if (rowIndex.isOdd) {
+      cell.cellStyle.backColor = _altRowHex;
+    }
+  }
+
+  /// Add a summary footer row at the bottom showing total records.
+  void _addFooter(xlsio.Worksheet sheet, int row, int colCount, int total) {
+    final range = sheet.getRangeByIndex(row + 1, 1, row + 1, colCount);
+    range.merge();
+    range.setText('Total Records: $total');
+    range.cellStyle.bold = true;
+    range.cellStyle.fontSize = 10;
+    range.cellStyle.fontColor = _subtitleHex;
+    range.cellStyle.hAlign = xlsio.HAlignType.right;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Report builders
+  // ---------------------------------------------------------------------------
+
+  Future<void> _fillAppointmentsSheet(xlsio.Workbook workbook) async {
+    final sheet = workbook.worksheets[0];
+    sheet.name = 'Appointments';
+
+    final headers = [
+      'ID',
+      'Patient Name',
+      'Patient Email',
+      'Doctor',
+      'Department',
+      'Date',
+      'Time Slot',
+      'Status',
+      'Type',
+      'Notes',
+    ];
+    final widths = [14.0, 22.0, 28.0, 22.0, 18.0, 14.0, 12.0, 12.0, 12.0, 30.0];
+
+    final dataRow = _setupSheet(
+      sheet: sheet,
+      title: 'UHC — Appointments Report',
+      headers: headers,
+      columnWidths: widths,
+    );
+
     final query = _firestore
         .collection('appointments')
         .where(
@@ -455,91 +588,186 @@ class _ReportsScreenState extends State<ReportsScreen> {
         .orderBy('appointmentDate', descending: true);
 
     final docs = await _paginatedFetch(query);
+    final dateFmt = DateFormat('yyyy-MM-dd');
 
-    final buffer = StringBuffer();
-    buffer.writeln(
-      'ID,Patient Name,Patient Email,Doctor Name,Department,Date,Time Slot,Status,Type,Notes',
-    );
-
-    for (final doc in docs) {
-      final data = doc.data() as Map<String, dynamic>;
+    for (var i = 0; i < docs.length; i++) {
+      final r = dataRow + i;
+      final data = docs[i].data() as Map<String, dynamic>;
       final date = (data['appointmentDate'] as Timestamp?)?.toDate();
-      buffer.writeln(
-        '${doc.id},'
-        '${_escapeCsv(data['patientName'] ?? '')},'
-        '${_escapeCsv(data['patientEmail'] ?? '')},'
-        '${_escapeCsv(data['doctorName'] ?? '')},'
-        '${_escapeCsv(data['department'] ?? '')},'
-        '${date != null ? DateFormat('yyyy-MM-dd').format(date) : ''},'
-        '${_escapeCsv(data['timeSlot'] ?? '')},'
-        '${data['status'] ?? ''},'
-        '${data['type'] ?? ''},'
-        '${_escapeCsv(data['notes'] ?? '')}',
-      );
+
+      final values = [
+        docs[i].id,
+        data['patientName'] ?? '',
+        data['patientEmail'] ?? '',
+        data['doctorName'] ?? '',
+        data['department'] ?? '',
+        date != null ? dateFmt.format(date) : '',
+        data['timeSlot'] ?? '',
+        data['status'] ?? '',
+        data['type'] ?? '',
+        data['notes'] ?? '',
+      ];
+
+      for (var col = 0; col < values.length; col++) {
+        final cell = sheet.getRangeByIndex(r, col + 1);
+        cell.setText(values[col].toString());
+        _styleDataCell(cell, rowIndex: i);
+      }
     }
 
-    return buffer.toString();
+    _addFooter(sheet, dataRow + docs.length, headers.length, docs.length);
   }
 
-  Future<String> _generateDoctorsReport() async {
+  Future<void> _fillDoctorsSheet(xlsio.Workbook workbook) async {
+    final sheet = workbook.worksheets[0];
+    sheet.name = 'Doctors';
+
+    final headers = [
+      'ID',
+      'Name',
+      'Email',
+      'Specialization',
+      'Department',
+      'Experience (Yrs)',
+      'Bio',
+      'Available',
+      'Active',
+    ];
+    final widths = [14.0, 22.0, 28.0, 22.0, 18.0, 16.0, 35.0, 11.0, 11.0];
+
+    final dataRow = _setupSheet(
+      sheet: sheet,
+      title: 'UHC — Doctors Report',
+      headers: headers,
+      columnWidths: widths,
+    );
+
     final snapshot =
         await _firestore.collection('doctors').orderBy('name').get();
 
-    final buffer = StringBuffer();
-    buffer.writeln(
-      'ID,Name,Email,Specialization,Department,Experience (Years),Bio,Available,Active',
-    );
-
-    for (final doc in snapshot.docs) {
+    for (var i = 0; i < snapshot.docs.length; i++) {
+      final r = dataRow + i;
+      final doc = snapshot.docs[i];
       final data = doc.data();
-      buffer.writeln(
-        '${doc.id},'
-        '${_escapeCsv(data['name'] ?? '')},'
-        '${_escapeCsv(data['email'] ?? '')},'
-        '${_escapeCsv(data['specialization'] ?? '')},'
-        '${_escapeCsv(data['department'] ?? '')},'
-        '${data['experienceYears'] ?? 0},'
-        '${_escapeCsv(data['bio'] ?? '')},'
-        '${data['isAvailable'] ?? true},'
-        '${data['isActive'] ?? true}',
-      );
+
+      final values = [
+        doc.id,
+        data['name'] ?? '',
+        data['email'] ?? '',
+        data['specialization'] ?? '',
+        data['department'] ?? '',
+        (data['experienceYears'] ?? 0).toString(),
+        data['bio'] ?? '',
+        (data['isAvailable'] ?? true) ? 'Yes' : 'No',
+        (data['isActive'] ?? true) ? 'Yes' : 'No',
+      ];
+
+      for (var col = 0; col < values.length; col++) {
+        final cell = sheet.getRangeByIndex(r, col + 1);
+        cell.setText(values[col].toString());
+        _styleDataCell(cell, rowIndex: i);
+      }
     }
 
-    return buffer.toString();
+    _addFooter(
+      sheet,
+      dataRow + snapshot.docs.length,
+      headers.length,
+      snapshot.docs.length,
+    );
   }
 
-  Future<String> _generateUsersReport() async {
+  Future<void> _fillUsersSheet(xlsio.Workbook workbook) async {
+    final sheet = workbook.worksheets[0];
+    sheet.name = 'Users';
+
+    final headers = [
+      'ID',
+      'Full Name',
+      'Email',
+      'Phone',
+      'Role',
+      'Blood Type',
+      'Active',
+      'Created At',
+    ];
+    final widths = [14.0, 22.0, 28.0, 16.0, 12.0, 12.0, 10.0, 14.0];
+
+    final dataRow = _setupSheet(
+      sheet: sheet,
+      title: 'UHC — Users Report',
+      headers: headers,
+      columnWidths: widths,
+    );
+
     final query = _firestore
         .collection('users')
         .orderBy('createdAt', descending: true);
-
     final docs = await _paginatedFetch(query);
+    final dateFmt = DateFormat('yyyy-MM-dd');
 
-    final buffer = StringBuffer();
-    buffer.writeln(
-      'ID,Full Name,Email,Phone,Role,Blood Type,Active,Created At',
-    );
-
-    for (final doc in docs) {
-      final data = doc.data() as Map<String, dynamic>;
+    for (var i = 0; i < docs.length; i++) {
+      final r = dataRow + i;
+      final data = docs[i].data() as Map<String, dynamic>;
       final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
-      buffer.writeln(
-        '${doc.id},'
-        '${_escapeCsv(data['fullName'] ?? '')},'
-        '${_escapeCsv(data['email'] ?? '')},'
-        '${_escapeCsv(data['phoneNumber'] ?? '')},'
-        '${data['role'] ?? ''},'
-        '${data['bloodType'] ?? ''},'
-        '${data['isActive'] ?? true},'
-        '${createdAt != null ? DateFormat('yyyy-MM-dd').format(createdAt) : ''}',
-      );
+
+      final values = [
+        docs[i].id,
+        data['fullName'] ?? '',
+        data['email'] ?? '',
+        data['phoneNumber'] ?? '',
+        data['role'] ?? '',
+        data['bloodType'] ?? '',
+        (data['isActive'] ?? true) ? 'Yes' : 'No',
+        createdAt != null ? dateFmt.format(createdAt) : '',
+      ];
+
+      for (var col = 0; col < values.length; col++) {
+        final cell = sheet.getRangeByIndex(r, col + 1);
+        cell.setText(values[col].toString());
+        _styleDataCell(cell, rowIndex: i);
+      }
     }
 
-    return buffer.toString();
+    _addFooter(sheet, dataRow + docs.length, headers.length, docs.length);
   }
 
-  Future<String> _generateRevenueReport() async {
-    final query = _firestore
+  Future<void> _fillDepartmentsSheet(xlsio.Workbook workbook) async {
+    final sheet = workbook.worksheets[0];
+    sheet.name = 'Departments';
+
+    final headers = [
+      'ID',
+      'Department Name',
+      'Doctors',
+      'Appointments',
+      'Active',
+    ];
+    final widths = [14.0, 28.0, 12.0, 14.0, 10.0];
+
+    final dataRow = _setupSheet(
+      sheet: sheet,
+      title: 'UHC — Departments Report',
+      headers: headers,
+      columnWidths: widths,
+    );
+
+    // Fetch departments
+    final deptSnapshot =
+        await _firestore.collection('departments').orderBy('name').get();
+
+    // Count doctors per department
+    final doctorSnapshot = await _firestore.collection('doctors').get();
+    final doctorsByDept = <String, int>{};
+    for (final doc in doctorSnapshot.docs) {
+      final dept = (doc.data()['department'] ?? '') as String;
+      if (dept.isNotEmpty) {
+        doctorsByDept[dept] = (doctorsByDept[dept] ?? 0) + 1;
+      }
+    }
+
+    // Count appointments per department in date range
+    final apptQuery = _firestore
         .collection('appointments')
         .where(
           'appointmentDate',
@@ -549,58 +777,50 @@ class _ReportsScreenState extends State<ReportsScreen> {
           'appointmentDate',
           isLessThanOrEqualTo: Timestamp.fromDate(_endDate),
         )
-        .where('status', isEqualTo: 'completed')
         .orderBy('appointmentDate', descending: true);
 
-    final docs = await _paginatedFetch(query);
-
-    // Group by department
-    final Map<String, Map<String, dynamic>> departmentStats = {};
-    const consultationFee = 50.0; // Mock fee
-
-    for (final doc in docs) {
+    final apptDocs = await _paginatedFetch(apptQuery);
+    final apptsByDept = <String, int>{};
+    for (final doc in apptDocs) {
       final data = doc.data() as Map<String, dynamic>;
-      final department = data['department'] ?? 'Unknown';
-
-      if (!departmentStats.containsKey(department)) {
-        departmentStats[department] = {'count': 0, 'revenue': 0.0};
+      final dept = (data['department'] ?? '') as String;
+      if (dept.isNotEmpty) {
+        apptsByDept[dept] = (apptsByDept[dept] ?? 0) + 1;
       }
-      departmentStats[department]!['count']++;
-      departmentStats[department]!['revenue'] += consultationFee;
     }
 
-    final buffer = StringBuffer();
-    buffer.writeln('Department,Appointments,Revenue (\$)');
+    for (var i = 0; i < deptSnapshot.docs.length; i++) {
+      final r = dataRow + i;
+      final doc = deptSnapshot.docs[i];
+      final data = doc.data();
+      final name = data['name'] ?? '';
 
-    int totalAppointments = 0;
-    double totalRevenue = 0;
+      final values = [
+        doc.id,
+        name,
+        (doctorsByDept[name] ?? 0).toString(),
+        (apptsByDept[name] ?? 0).toString(),
+        (data['isActive'] ?? true) ? 'Yes' : 'No',
+      ];
 
-    for (final entry in departmentStats.entries) {
-      buffer.writeln(
-        '${_escapeCsv(entry.key)},'
-        '${entry.value['count']},'
-        '${entry.value['revenue'].toStringAsFixed(2)}',
-      );
-      totalAppointments += entry.value['count'] as int;
-      totalRevenue += entry.value['revenue'] as double;
+      for (var col = 0; col < values.length; col++) {
+        final cell = sheet.getRangeByIndex(r, col + 1);
+        cell.setText(values[col].toString());
+        _styleDataCell(
+          cell,
+          rowIndex: i,
+          hAlign: col >= 2
+              ? xlsio.HAlignType.center
+              : xlsio.HAlignType.left,
+        );
+      }
     }
 
-    buffer.writeln('');
-    buffer.writeln(
-      'TOTAL,$totalAppointments,${totalRevenue.toStringAsFixed(2)}',
+    _addFooter(
+      sheet,
+      dataRow + deptSnapshot.docs.length,
+      headers.length,
+      deptSnapshot.docs.length,
     );
-    buffer.writeln('');
-    buffer.writeln(
-      'Report Period: ${DateFormat('MMM d, yyyy').format(_startDate)} - ${DateFormat('MMM d, yyyy').format(_endDate)}',
-    );
-
-    return buffer.toString();
-  }
-
-  String _escapeCsv(String value) {
-    if (value.contains(',') || value.contains('"') || value.contains('\n')) {
-      return '"${value.replaceAll('"', '""')}"';
-    }
-    return value;
   }
 }

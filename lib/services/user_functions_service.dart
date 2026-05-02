@@ -41,6 +41,17 @@ class UserFunctionsService {
     });
   }
 
+  /// Change non-admin user role between student/staff.
+  Future<Map<String, dynamic>> changeUserRoleByAdmin({
+    required String targetUid,
+    required String newRole,
+  }) async {
+    return _call('changeUserRoleByAdmin', {
+      'targetUid': targetUid,
+      'newRole': newRole,
+    });
+  }
+
   /// Update profile-safe fields for a target user through Cloud Functions.
   Future<Map<String, dynamic>> updateUserProfileByAdmin({
     required String targetUid,

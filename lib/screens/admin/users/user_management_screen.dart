@@ -444,18 +444,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       ],
                     ),
                   ),
-                  // Only superAdmin can change roles
-                  if (actorIsSuperAdmin)
-                    const PopupMenuItem(
-                      value: 'role',
-                      child: Row(
-                        children: [
-                          Icon(Icons.admin_panel_settings, size: 18),
-                          SizedBox(width: 8),
-                          Text('Change Role'),
-                        ],
-                      ),
+                  const PopupMenuItem(
+                    value: 'role',
+                    child: Row(
+                      children: [
+                        Icon(Icons.admin_panel_settings, size: 18),
+                        SizedBox(width: 8),
+                        Text('Change Role'),
+                      ],
                     ),
+                  ),
                 ],
               ];
             },
@@ -1024,11 +1022,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   onChanged: (value) async {
                     if (value != null) {
                       try {
-                        // Route through governance function (superAdmin only)
-                        await _governanceService.changeAdminRole(
-                          targetUid: id,
-                          newRole: value.name,
-                        );
+                        if (actorIsSuperAdmin) {
+                          await _governanceService.changeAdminRole(
+                            targetUid: id,
+                            newRole: value.name,
+                          );
+                        } else {
+                          await _userFunctionsService.changeUserRoleByAdmin(
+                            targetUid: id,
+                            newRole: value.name,
+                          );
+                        }
                         if (!dialogContext.mounted) return;
                         Navigator.pop(dialogContext);
                         if (!mounted) return;

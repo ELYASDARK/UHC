@@ -94,7 +94,7 @@
 - **User Management** — View all users with role-safe controls and account status management
 - **Permission-Aware UI** — Admin actions are gated by granular permission keys (`users.manageNonAdmin`, `doctors.manage`, `departments.manage`, etc.)
 - **Analytics** — Interactive charts for appointment trends and department performance
-- **Reports** — Export CSV reports for appointments, doctors, users, and revenue (permission-gated)
+- **Reports** — Export professional styled XLSX reports for appointments, doctors, users, and departments (permission-gated)
 </details>
 
 <details>
@@ -145,6 +145,7 @@
 | **Charts** | fl_chart | Admin analytics & dashboards |
 | **Calendar** | table_calendar | Date selection for appointments |
 | **QR Codes** | qr_flutter, mobile_scanner | Patient QR generation & doctor-side scanning |
+| **Excel Reports** | Syncfusion Flutter XlsIO | Professional styled XLSX report generation |
 | **Localization** | ARB files, flutter_localizations | EN / AR / KU with RTL support |
 
 ### Application Architecture
@@ -221,14 +222,18 @@ uhc/
 │   │       ├── doctors/            # Doctor CRUD with schedule dialog
 │   │       ├── users/              # User management with form dialog
 │   │       ├── analytics/          # Appointment analytics & charts
-│   │       └── reports/            # CSV report generation & export
+│   │       └── reports/            # Professional XLSX report generation & export
 │   │   └── super_admin/            # Super Admin governance shell & screens
 │   │       ├── super_admin_shell.dart
 │   │       ├── super_admin_dashboard_screen.dart
 │   │       ├── admin_control_screen.dart
 │   │       └── audit_log_screen.dart
 │   ├── services/                   # Auth, FCM, local notifications, Cloud Function wrappers
-│   └── utils/                      # Helper functions
+│   ├── utils/                      # Helper functions & cross-platform file utilities
+│   │   ├── save_file.dart          # Conditional export: routes to web or IO implementation
+│   │   ├── save_file_web.dart      # Web: Blob download via dart:js_interop
+│   │   ├── save_file_io.dart       # Mobile/Desktop: save to temp + share via share_plus
+│   │   └── save_file_stub.dart     # Stub for unsupported platforms
 ├── functions/                      # Firebase Cloud Functions (TypeScript)
 ├── assets/
 │   ├── images/                     # Static images
@@ -466,6 +471,52 @@ flutter build web --release
 ---
 
 ## 📝 Changelog
+
+<details open>
+<summary><b>v2.3.0</b> — May 2, 2026</summary>
+
+#### 📊 Professional Excel Report Export (CSV → XLSX Migration)
+- **Syncfusion XlsIO Integration** — Replaced legacy CSV exports with professional, styled `.xlsx` documents using `syncfusion_flutter_xlsio`.
+- **Branded Report Design** — All 4 report types (Appointments, Doctors, Users, Departments) now feature:
+  - Merged title row with branded blue (#2196F3) styling
+  - Date-range sub-header
+  - Bold white-on-blue header row with thin borders
+  - Alternating white/light-gray row striping for readability
+  - Footer row with total record count
+- **Cross-Platform File Handling** — Implemented conditional export pattern (`save_file.dart`) for platform-safe file operations:
+  - **Web**: Uses `package:web` + `dart:js_interop` for native browser Blob downloads
+  - **Mobile/Desktop**: Uses `path_provider` + `share_plus` for temp file save + system share sheet
+- **Revenue → Departments** — Renamed Revenue Report to Departments Report with department-specific data (name, doctor count, appointment count, status).
+
+#### 🔥 Firebase Messaging Web Fix
+- **Service Worker Registration** — Added `firebase-messaging-sw.js` to resolve `failed-service-worker-registration` errors on web. Firebase Cloud Messaging now registers correctly in the browser.
+
+#### 🎨 App Branding Updates
+- **Custom App Icons** — Updated launcher icons for Android (all density buckets) and iOS (all sizes) with new branded design.
+- **Web Assets** — Updated `favicon.png`, PWA icons (`Icon-192`, `Icon-512`, maskable variants), and `manifest.json` with updated app name and branding.
+
+#### 🛠 Dependencies
+- **Added**: `syncfusion_flutter_xlsio`, `web` (for JS interop), `share_plus`, `path_provider`
+
+#### 📁 Files Changed
+
+| File | Key Changes |
+|:---|:---|
+| `lib/screens/admin/reports/reports_screen.dart` | Full rewrite: CSV → XLSX with Syncfusion XlsIO, styled headers, alternating rows, footers |
+| `lib/utils/save_file.dart` | [NEW] Conditional export router (web vs IO) |
+| `lib/utils/save_file_web.dart` | [NEW] Web Blob download implementation |
+| `lib/utils/save_file_io.dart` | [NEW] Mobile/Desktop save + share implementation |
+| `lib/utils/save_file_stub.dart` | [NEW] Stub fallback for unsupported platforms |
+| `lib/main.dart` | Web-safe Crashlytics guards |
+| `web/firebase-messaging-sw.js` | [NEW] Firebase Cloud Messaging service worker |
+| `web/manifest.json` | Updated app name and branding |
+| `web/favicon.png` | Updated favicon |
+| `web/icons/` | Updated PWA icons (192, 512, maskable variants) |
+| `android/app/src/main/res/mipmap-*/ic_launcher.png` | Updated Android launcher icons |
+| `ios/Runner/Assets.xcassets/AppIcon.appiconset/` | Updated iOS app icons (all sizes) |
+| `pubspec.yaml` | Added syncfusion_flutter_xlsio, web, share_plus, path_provider |
+
+</details>
 
 <details open>
 <summary><b>v2.2.0</b> — April 29, 2026</summary>

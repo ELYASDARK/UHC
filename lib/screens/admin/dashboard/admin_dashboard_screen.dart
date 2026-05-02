@@ -30,7 +30,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _totalAppointments = 0;
   int _pendingAppointments = 0;
   int _todayAppointments = 0;
-  double _monthlyRevenue = 0;
+  int _completedAppointments = 0;
 
   @override
   void initState() {
@@ -74,6 +74,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             .where('appointmentDate', isLessThan: Timestamp.fromDate(endOfDay))
             .count()
             .get(),
+        // 5: Completed Appointments
+        _firestore
+            .collection('appointments')
+            .where('status', isEqualTo: 'completed')
+            .count()
+            .get(),
       ];
 
       // Wait for all futures to complete
@@ -84,9 +90,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _totalAppointments = results[2].count ?? 0;
       _pendingAppointments = results[3].count ?? 0;
       _todayAppointments = results[4].count ?? 0;
-
-      // Calculate monthly revenue (mock calculation based on total appointments)
-      _monthlyRevenue = _totalAppointments * 50.0;
+      _completedAppointments = results[5].count ?? 0;
     } catch (e) {
       debugPrint('Error loading dashboard stats: $e');
     } finally {
@@ -147,9 +151,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildStatsGrid(bool isDark) {
-    // Number formatters
+    // Number formatter
     final numberFormat = NumberFormat.compact(); // 1.2K, 1M, etc.
-    final currencyFormat = NumberFormat.simpleCurrency(decimalDigits: 0);
     final width = MediaQuery.of(context).size.width;
     final crossAxisCount = width > 1200 ? 6 : (width > 600 ? 3 : 2);
 
@@ -198,9 +201,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         _buildStatCard(
           isDark: isDark,
-          title: 'Revenue',
-          value: currencyFormat.format(_monthlyRevenue),
-          icon: Icons.attach_money,
+          title: 'Completed',
+          value: numberFormat.format(_completedAppointments),
+          icon: Icons.check_circle,
           color: AppColors.info,
         ),
       ],

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = void 0;
+exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -650,6 +650,64 @@ exports.setUserActiveStatus = functions.https.onCall(async (request) => {
     return {
         success: true,
         message: isActive ? 'User activated successfully.' : 'User deactivated successfully.',
+    };
+});
+/**
+ * Change role between student/staff for non-admin targets.
+ * Admin requires users.manageNonAdmin permission.
+ * Super Admin bypasses permission checks, but cannot use this for admin/superAdmin.
+ */
+exports.changeUserRoleByAdmin = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'users.manageNonAdmin');
+    const { targetUid, newRole } = request.data;
+    if (!targetUid || !newRole) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing targetUid or newRole.');
+    }
+    if (!['student', 'staff'].includes(newRole)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid role. Only student/staff are allowed here.');
+    }
+    const callerRole = callerDoc.data().role;
+    const targetRef = db.collection('users').doc(targetUid);
+    const targetDoc = await targetRef.get();
+    if (!targetDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Target user not found.');
+    }
+    const targetData = targetDoc.data();
+    const oldRole = targetData.role;
+    if (oldRole === 'superAdmin' || oldRole === 'admin') {
+        throw new functions.https.HttpsError('failed-precondition', 'Cannot change admin/superAdmin roles via this function.');
+    }
+    if (callerRole === 'admin' && (oldRole === 'admin' || oldRole === 'superAdmin')) {
+        throw new functions.https.HttpsError('permission-denied', 'Admins cannot modify admin/superAdmin accounts.');
+    }
+    if (oldRole === newRole) {
+        return {
+            success: true,
+            message: 'Role already set.',
+        };
+    }
+    const updates = {
+        role: newRole,
+        updatedAt: admin.firestore.Timestamp.now(),
+        studentId: newRole === 'student' ? targetUid : null,
+        staffId: newRole === 'staff' ? targetUid : null,
+    };
+    await targetRef.update(updates);
+    await writeAdminAuditLog({
+        actorUid: callerUid,
+        actorRole: callerRole,
+        actorName: callerDoc.data().fullName,
+        targetUid,
+        targetName: targetData.fullName,
+        targetRoleBefore: oldRole,
+        targetRoleAfter: newRole,
+        action: oldRole === 'student' ? 'user.promoteToStaff' : 'user.demoteToStudent',
+    });
+    return {
+        success: true,
+        message: `Role changed from ${oldRole} to ${newRole}.`,
     };
 });
 /**

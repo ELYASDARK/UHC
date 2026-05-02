@@ -965,6 +965,91 @@ interface UnlinkGoogleProviderByAdminData {
     targetUid: string;
 }
 
+interface ChangeUserRoleByAdminData {
+    targetUid: string;
+    newRole: 'student' | 'staff';
+}
+
+/**
+ * Change role between student/staff for non-admin targets.
+ * Admin requires users.manageNonAdmin permission.
+ * Super Admin bypasses permission checks, but cannot use this for admin/superAdmin.
+ */
+export const changeUserRoleByAdmin = functions.https.onCall(
+    async (request: functions.https.CallableRequest<ChangeUserRoleByAdminData>) => {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requirePermission(callerDoc, 'users.manageNonAdmin');
+
+        const { targetUid, newRole } = request.data;
+        if (!targetUid || !newRole) {
+            throw new functions.https.HttpsError(
+                'invalid-argument',
+                'Missing targetUid or newRole.',
+            );
+        }
+        if (!['student', 'staff'].includes(newRole)) {
+            throw new functions.https.HttpsError(
+                'invalid-argument',
+                'Invalid role. Only student/staff are allowed here.',
+            );
+        }
+
+        const callerRole = callerDoc.data()!.role;
+        const targetRef = db.collection('users').doc(targetUid);
+        const targetDoc = await targetRef.get();
+        if (!targetDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Target user not found.');
+        }
+        const targetData = targetDoc.data()!;
+        const oldRole = targetData.role as string;
+
+        if (oldRole === 'superAdmin' || oldRole === 'admin') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Cannot change admin/superAdmin roles via this function.',
+            );
+        }
+        if (callerRole === 'admin' && (oldRole === 'admin' || oldRole === 'superAdmin')) {
+            throw new functions.https.HttpsError(
+                'permission-denied',
+                'Admins cannot modify admin/superAdmin accounts.',
+            );
+        }
+
+        if (oldRole === newRole) {
+            return {
+                success: true,
+                message: 'Role already set.',
+            };
+        }
+
+        const updates: Record<string, unknown> = {
+            role: newRole,
+            updatedAt: admin.firestore.Timestamp.now(),
+            studentId: newRole === 'student' ? targetUid : null,
+            staffId: newRole === 'staff' ? targetUid : null,
+        };
+        await targetRef.update(updates);
+
+        await writeAdminAuditLog({
+            actorUid: callerUid,
+            actorRole: callerRole,
+            actorName: callerDoc.data()!.fullName,
+            targetUid,
+            targetName: targetData.fullName,
+            targetRoleBefore: oldRole,
+            targetRoleAfter: newRole,
+            action: oldRole === 'student' ? 'user.promoteToStaff' : 'user.demoteToStudent',
+        });
+
+        return {
+            success: true,
+            message: `Role changed from ${oldRole} to ${newRole}.`,
+        };
+    }
+);
+
 /**
  * Unlink Google sign-in provider from a non-admin user.
  * Admin requires users.manageNonAdmin permission.
