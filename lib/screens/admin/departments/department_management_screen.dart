@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -34,6 +36,7 @@ class _DepartmentManagementScreenState
 
   /// Dynamically loaded doctor counts per department key
   Map<String, int> _doctorCounts = {};
+  String? _doctorCountsWarning;
 
   @override
   void initState() {
@@ -50,7 +53,10 @@ class _DepartmentManagementScreenState
   /// Query the 'doctors' collection to count doctors per department
   Future<void> _loadDoctorCounts() async {
     try {
-      final snapshot = await _firestore.collection('doctors').get();
+      final snapshot = await _firestore
+          .collection('doctors')
+          .get(const GetOptions(source: Source.serverAndCache))
+          .timeout(const Duration(seconds: 12));
       final counts = <String, int>{};
       for (final doc in snapshot.docs) {
         final data = doc.data();
@@ -65,12 +71,34 @@ class _DepartmentManagementScreenState
           }
         }
       }
-      debugPrint('Doctor counts per department: $counts');
       if (mounted) {
-        setState(() => _doctorCounts = counts);
+        setState(() {
+          _doctorCounts = counts;
+          _doctorCountsWarning = null;
+        });
+      }
+    } on TimeoutException {
+      if (mounted) {
+        setState(() {
+          _doctorCountsWarning =
+              'Doctor counts are delayed due to a slow network. Showing available data.';
+        });
+      }
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        setState(() {
+          _doctorCountsWarning = e.code == 'unavailable'
+              ? 'Cannot reach server right now. Doctor counts may be outdated.'
+              : 'Doctor counts are temporarily unavailable.';
+        });
       }
     } catch (e) {
       debugPrint('Error loading doctor counts: $e');
+      if (mounted) {
+        setState(() {
+          _doctorCountsWarning = 'Unable to refresh doctor counts right now.';
+        });
+      }
     }
   }
 
@@ -214,6 +242,41 @@ class _DepartmentManagementScreenState
               ),
             ),
 
+          if (_doctorCountsWarning != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.orange.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off, color: Colors.orange, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _doctorCountsWarning!,
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _loadDoctorCounts,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Departments List
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
@@ -223,6 +286,48 @@ class _DepartmentManagementScreenState
                   return SkeletonList(
                     itemBuilder: (context, index) =>
                         const CardSkeleton(height: 100),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.cloud_off,
+                            size: 56,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Could not load departments right now.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Check your connection and try again.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              _loadDoctorCounts();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 }
 

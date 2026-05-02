@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/doctor_model.dart';
@@ -6,6 +8,9 @@ import '../models/doctor_model.dart';
 class DoctorRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const String _collection = 'doctors';
+  static const Duration _queryTimeout = Duration(seconds: 12);
+  static const GetOptions _readOptions =
+      GetOptions(source: Source.serverAndCache);
 
   CollectionReference<Map<String, dynamic>> get _doctorsRef =>
       _firestore.collection(_collection);
@@ -14,7 +19,8 @@ class DoctorRepository {
   Future<List<DoctorModel>> getAllDoctors() async {
     try {
       // Try simple query without ordering to avoid index issues
-      final snapshot = await _doctorsRef.get();
+      final snapshot =
+          await _doctorsRef.get(_readOptions).timeout(_queryTimeout);
       final doctors = snapshot.docs
           .map((doc) => DoctorModel.fromFirestore(doc))
           .where((d) => d.isActive) // Only show active doctors
@@ -32,7 +38,11 @@ class DoctorRepository {
   Future<DoctorModel?> getDoctorByUserId(String userId) async {
     try {
       final snapshot =
-          await _doctorsRef.where('userId', isEqualTo: userId).limit(1).get();
+          await _doctorsRef
+              .where('userId', isEqualTo: userId)
+              .limit(1)
+              .get(_readOptions)
+              .timeout(_queryTimeout);
       if (snapshot.docs.isNotEmpty) {
         return DoctorModel.fromFirestore(snapshot.docs.first);
       }
@@ -45,11 +55,19 @@ class DoctorRepository {
 
   /// Get doctor by ID
   Future<DoctorModel?> getDoctorById(String doctorId) async {
-    final doc = await _doctorsRef.doc(doctorId).get();
-    if (doc.exists) {
-      return DoctorModel.fromFirestore(doc);
+    try {
+      final doc = await _doctorsRef
+          .doc(doctorId)
+          .get(_readOptions)
+          .timeout(_queryTimeout);
+      if (doc.exists) {
+        return DoctorModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting doctor by id: $e');
+      return null;
     }
-    return null;
   }
 
   /// Get doctors by department
@@ -59,7 +77,8 @@ class DoctorRepository {
     try {
       final snapshot = await _doctorsRef
           .where('department', isEqualTo: department.name)
-          .get();
+          .get(_readOptions)
+          .timeout(_queryTimeout);
       final doctors = snapshot.docs
           .map((doc) => DoctorModel.fromFirestore(doc))
           .where((d) => d.isActive) // Only show active doctors

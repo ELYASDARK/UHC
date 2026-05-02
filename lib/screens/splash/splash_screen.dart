@@ -32,11 +32,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // Wait for both minimum delay and initialization tasks
+    // Keep a short minimum display time for visual continuity
+    // but avoid blocking app navigation for multiple seconds.
     await Future.wait([
-      Future.delayed(
-        const Duration(milliseconds: 4000),
-      ), // Minimum delay for app to fully load
+      Future.delayed(const Duration(milliseconds: 900)),
       _performInitialization(),
     ]);
 
@@ -46,9 +45,9 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _performInitialization() async {
-    // Simulate initialization tasks (e.g., fetching configs, checking user data)
-    // This is where you would put actual async initialization logic
-    await Future.delayed(const Duration(milliseconds: 1000));
+    // Intentionally no blocking work here.
+    // Startup-critical initialization is handled elsewhere.
+    return;
   }
 
   @override

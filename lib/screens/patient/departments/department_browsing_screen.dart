@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/localization_helper.dart';
 import '../../../core/widgets/loading_skeleton.dart';
@@ -84,52 +83,66 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
             )
           : RefreshIndicator(
               onRefresh: _loadDepartments,
-              child: SingleChildScrollView(
+              child: CustomScrollView(
                 physics: const BouncingScrollPhysics(
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      AppLocalizations.of(context).departments,
-                      style:
-                          Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontFamily: GoogleFonts.poppins().fontFamily,
-                              ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      AppLocalizations.of(context).findBestDoctors,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                            fontFamily: GoogleFonts.roboto().fontFamily,
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppLocalizations.of(context).departments,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: GoogleFonts.poppins().fontFamily,
+                                ),
                           ),
+                          const SizedBox(height: 8),
+                          Text(
+                            AppLocalizations.of(context).findBestDoctors,
+                            style:
+                                Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                      fontFamily:
+                                          GoogleFonts.roboto().fontFamily,
+                                    ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Department Cards Grid
-                    if (_isLoading && _departments.isEmpty)
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 0.78,
-                        children: List.generate(
-                          6,
-                          (index) => const CardSkeleton(height: 180),
-                        ),
-                      )
-                    else if (_departments.isEmpty)
-                      Center(
+                  ),
+                  if (_isLoading && _departments.isEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 0.78,
+                            ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          return const CardSkeleton(height: 180);
+                        }, childCount: 6),
+                      ),
+                    )
+                  else if (_departments.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Text(
                             AppLocalizations.of(context).noDepartments,
                             style: TextStyle(
@@ -139,31 +152,31 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
                             ),
                           ),
                         ),
-                      )
-                    else
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 0.78,
-                        children: _departments.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final dept = entry.value;
-                          return _DepartmentCard(
-                            department: dept,
-                            isDark: isDark,
-                          )
-                              .animate(
-                                delay: Duration(milliseconds: index * 50),
-                              )
-                              .fadeIn(duration: 400.ms)
-                              .slideY(begin: 0.1);
-                        }).toList(),
                       ),
-                  ],
-                ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 0.78,
+                            ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final dept = _departments[index];
+                          return RepaintBoundary(
+                            child: _DepartmentCard(
+                              department: dept,
+                              isDark: isDark,
+                            ),
+                          );
+                        }, childCount: _departments.length),
+                      ),
+                    ),
+                ],
               ),
             ),
     );
@@ -181,117 +194,74 @@ class _DepartmentCard extends StatelessWidget {
     final color = _getColorFromHex(department.colorHex);
     final l10n = AppLocalizations.of(context);
 
-    return GestureDetector(
-      onTap: () => _navigateToDepartment(context),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [color, Color.lerp(color, Colors.black, 0.2) ?? color],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.3),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // Background pattern
-            Positioned(
-              right: -20,
-              top: -20,
-              child: Container(
-                width: 100,
-                height: 100,
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _navigateToDepartment(context),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.1),
+                  color: Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _getIconFromName(department.iconName),
+                  color: Colors.white,
+                  size: 24,
                 ),
               ),
-            ),
-            Positioned(
-              left: -10,
-              bottom: -10,
-              child: Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.1),
+              const Spacer(),
+              Text(
+                LocalizationHelper.translateDepartment(
+                  department.name,
+                  l10n,
                 ),
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 4),
+              Text(
+                department.description,
+                style: GoogleFonts.roboto(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: 12,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      _getIconFromName(department.iconName),
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const Spacer(),
                   Text(
-                    LocalizationHelper.translateDepartment(
-                      department.name,
-                      l10n,
-                    ),
+                    l10n.viewAll,
                     style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    department.description,
-                    style: GoogleFonts.roboto(
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: Colors.white.withValues(alpha: 0.95),
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        l10n.viewAll, // "View Doctors" or similar
-                        style: GoogleFonts.poppins(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Colors.white.withValues(alpha: 0.9),
-                        size: 16,
-                      ),
-                    ],
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white.withValues(alpha: 0.95),
+                    size: 16,
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

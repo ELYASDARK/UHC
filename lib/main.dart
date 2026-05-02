@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
@@ -59,6 +60,7 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await _configureFirestoreDefaults();
     // Crashlytics is not supported on web in this app setup.
     // Guard all Crashlytics hooks to avoid web assertion failures.
     if (!kIsWeb) {
@@ -94,6 +96,17 @@ void main() async {
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     await _initializeServicesAsync();
   });
+}
+
+Future<void> _configureFirestoreDefaults() async {
+  try {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+  } catch (e) {
+    debugPrint('Failed to configure Firestore defaults: $e');
+  }
 }
 
 /// Initialize non-critical services asynchronously after app starts
