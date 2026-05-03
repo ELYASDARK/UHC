@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/department_icons.dart';
 import '../../../providers/auth_provider.dart';
 import 'department_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';

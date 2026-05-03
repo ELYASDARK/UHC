@@ -16,6 +16,37 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Widget _buildLogoImage() {
+    return SizedBox(
+      width: 170,
+      height: 170,
+      child: Image.asset(
+        'assets/icons/icon_splash.png',
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
+          }
+          return const Center(
+            child: Icon(
+              Icons.local_hospital_rounded,
+              size: 100,
+              color: Colors.white,
+            ),
+          );
+        },
+        errorBuilder: (_, __, ___) => const Center(
+          child: Icon(
+            Icons.local_hospital_rounded,
+            size: 100,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -68,26 +99,7 @@ class _SplashScreenState extends State<SplashScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Logo with animation
-              Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(35),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 30,
-                      offset: const Offset(0, 15),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.local_hospital_rounded,
-                  size: 80,
-                  color: AppColors.primary,
-                ),
-              )
+              _buildLogoImage()
                   .animate()
                   .scale(
                     begin: const Offset(0.5, 0.5),

@@ -12,6 +12,7 @@ import 'l10n/app_localizations.dart';
 import 'l10n/kurdish_material_localizations.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
+import 'core/constants/app_colors.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
@@ -290,6 +291,73 @@ class _AppNavigatorState extends State<AppNavigator> {
     }
   }
 
+  Widget _buildLogoImage() {
+    return SizedBox(
+      width: 170,
+      height: 170,
+      child: Image.asset(
+        'assets/icons/icon_splash.png',
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
+          }
+          return const Center(
+            child: Icon(
+              Icons.local_hospital_rounded,
+              size: 100,
+              color: Colors.white,
+            ),
+          );
+        },
+        errorBuilder: (_, __, ___) => const Center(
+          child: Icon(
+            Icons.local_hospital_rounded,
+            size: 100,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Keeps startup stable while Firebase restores an existing session.
+  Widget _buildAuthRestoringScreen() {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.primary, AppColors.primaryDark],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildLogoImage(),
+              const SizedBox(height: 80),
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -302,6 +370,16 @@ class _AppNavigatorState extends State<AppNavigator> {
     // Show onboarding if not complete (checked during splash completion)
     if (!_onboardingComplete) {
       return OnboardingScreen(onComplete: _completeOnboarding);
+    }
+
+    // Prevent login-screen flash while a persisted auth session is restoring.
+    final isRestoringAuthenticatedSession =
+        authProvider.state == AuthState.initial ||
+            (authProvider.state == AuthState.loading &&
+                authProvider.firebaseUser != null &&
+                !authProvider.isAuthenticated);
+    if (isRestoringAuthenticatedSession) {
+      return _buildAuthRestoringScreen();
     }
 
     // Check auth state

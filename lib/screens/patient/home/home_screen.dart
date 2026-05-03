@@ -12,6 +12,7 @@ import '../../../providers/notification_provider.dart';
 import '../../../data/models/department_model.dart';
 import '../../../data/repositories/department_repository.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/constants/department_icons.dart';
 import '../appointments/emergency_request_screen.dart';
 
 /// Home dashboard screen
@@ -594,22 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   IconData _getIconFromName(String iconName) {
-    switch (iconName.toLowerCase()) {
-      case 'medical_services':
-        return Icons.local_hospital_rounded;
-      case 'dentistry':
-        return Icons.sentiment_satisfied_alt_rounded;
-      case 'psychology':
-        return Icons.psychology_rounded;
-      case 'local_pharmacy':
-        return Icons.medication_rounded;
-      case 'favorite':
-        return Icons.favorite_rounded;
-      case 'face':
-        return Icons.face_rounded;
-      default:
-        return Icons.medical_services_rounded;
-    }
+    return departmentIcons[iconName.toLowerCase()] ?? Icons.medical_services;
   }
 
   Color _getColorFromHex(String hexColor) {
