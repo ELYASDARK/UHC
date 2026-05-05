@@ -12,7 +12,6 @@ import 'l10n/app_localizations.dart';
 import 'l10n/kurdish_material_localizations.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
-import 'core/constants/app_colors.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
@@ -227,7 +226,7 @@ class AppNavigator extends StatefulWidget {
 class _AppNavigatorState extends State<AppNavigator> {
   static const String _onboardingKey = 'onboarding_complete';
 
-  bool _showSplash = true;
+  bool _bootReady = false;
   bool _onboardingComplete = false;
 
   // Auth flow: 0 = login, 1 = forgot password
@@ -239,6 +238,45 @@ class _AppNavigatorState extends State<AppNavigator> {
   bool _doctorLoading = false;
   bool _doctorFetchFailed = false;
   String? _lastDoctorUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeBootState();
+  }
+
+  Future<void> _warmupBootAssets() async {
+    const bootAssets = <String>[
+      'assets/icons/icon_splash_new.png',
+    ];
+
+    for (final assetPath in bootAssets) {
+      try {
+        await rootBundle.load(assetPath);
+      } catch (e) {
+        debugPrint('Boot asset warmup failed for $assetPath: $e');
+      }
+    }
+  }
+
+  Future<void> _initializeBootState() async {
+    final prefsFuture = SharedPreferences.getInstance();
+
+    // Keep a short minimum visual startup duration for smoothness.
+    await Future.wait([
+      Future.delayed(const Duration(milliseconds: 900)),
+      _warmupBootAssets(),
+      prefsFuture,
+    ]);
+    final prefs = await prefsFuture;
+    final complete = prefs.getBool(_onboardingKey) ?? false;
+
+    if (!mounted) return;
+    setState(() {
+      _onboardingComplete = complete;
+      _bootReady = true;
+    });
+  }
 
   /// Fetch the DoctorModel for a doctor-role user.
   /// Called once per userId; results cached until user changes or retry.
@@ -266,21 +304,6 @@ class _AppNavigatorState extends State<AppNavigator> {
     }
   }
 
-  /// Called when splash screen animation/delay completes
-  /// This ensures onboarding is checked BEFORE we leave the splash
-  Future<void> _onSplashComplete() async {
-    // Check onboarding status before leaving splash
-    final prefs = await SharedPreferences.getInstance();
-    final complete = prefs.getBool(_onboardingKey) ?? false;
-
-    if (!mounted) return;
-
-    setState(() {
-      _onboardingComplete = complete;
-      _showSplash = false;
-    });
-  }
-
   Future<void> _completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onboardingKey, true);
@@ -291,95 +314,24 @@ class _AppNavigatorState extends State<AppNavigator> {
     }
   }
 
-  Widget _buildLogoImage() {
-    return SizedBox(
-      width: 170,
-      height: 170,
-      child: Image.asset(
-        'assets/icons/icon_splash.png',
-        fit: BoxFit.cover,
-        filterQuality: FilterQuality.high,
-        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-          if (wasSynchronouslyLoaded || frame != null) {
-            return child;
-          }
-          return const Center(
-            child: Icon(
-              Icons.local_hospital_rounded,
-              size: 100,
-              color: Colors.white,
-            ),
-          );
-        },
-        errorBuilder: (_, __, ___) => const Center(
-          child: Icon(
-            Icons.local_hospital_rounded,
-            size: 100,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Keeps startup stable while Firebase restores an existing session.
-  Widget _buildAuthRestoringScreen() {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.primary, AppColors.primaryDark],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildLogoImage(),
-              const SizedBox(height: 80),
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withValues(alpha: 0.8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
 
-    // Show splash screen first (onboarding check happens when splash completes)
-    if (_showSplash) {
-      return SplashScreen(onComplete: _onSplashComplete);
-    }
-
-    // Show onboarding if not complete (checked during splash completion)
-    if (!_onboardingComplete) {
-      return OnboardingScreen(onComplete: _completeOnboarding);
-    }
-
-    // Prevent login-screen flash while a persisted auth session is restoring.
     final isRestoringAuthenticatedSession =
         authProvider.state == AuthState.initial ||
             (authProvider.state == AuthState.loading &&
                 authProvider.firebaseUser != null &&
                 !authProvider.isAuthenticated);
-    if (isRestoringAuthenticatedSession) {
-      return _buildAuthRestoringScreen();
+
+    // Show one unified boot screen during startup or auth restore.
+    if (!_bootReady || isRestoringAuthenticatedSession) {
+      return const SplashScreen();
+    }
+
+    // Show onboarding if not complete.
+    if (!_onboardingComplete) {
+      return OnboardingScreen(onComplete: _completeOnboarding);
     }
 
     // Check auth state
@@ -410,16 +362,12 @@ class _AppNavigatorState extends State<AppNavigator> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _fetchDoctorModel(currentUser.id);
           });
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const SplashScreen();
         }
 
         // Loading state
         if (_doctorLoading) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const SplashScreen();
         }
 
         // Error state: doctor profile not found or fetch failed

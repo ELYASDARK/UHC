@@ -1,159 +1,129 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 
-/// Animated splash screen
-class SplashScreen extends StatefulWidget {
-  final VoidCallback onComplete;
+/// Unified boot/splash screen used during startup and auth restoration.
+class SplashScreen extends StatelessWidget {
+  static const double _logoSize = 170;
+  static const String _primaryLogo = 'assets/icons/icon_splash_new.png';
+  static const String _fallbackLogo = 'assets/icons/icon_splash.png';
+  static const String _webLogoPath = 'icons/icon_splash_new.png';
 
-  const SplashScreen({super.key, required this.onComplete});
+  const SplashScreen({super.key});
 
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
+  Widget _buildFallbackLogo() {
+    return Image.asset(
+      _fallbackLogo,
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.high,
+      gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => const Icon(
+        Icons.local_hospital_rounded,
+        size: 100,
+        color: Colors.white,
+      ),
+    );
+  }
 
-class _SplashScreenState extends State<SplashScreen> {
   Widget _buildLogoImage() {
+    if (kIsWeb) {
+      return SizedBox(
+        width: _logoSize,
+        height: _logoSize,
+        child: Image.network(
+          _webLogoPath,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+          gaplessPlayback: true,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded || frame != null) {
+              return child;
+            }
+            return _buildFallbackLogo();
+          },
+          errorBuilder: (_, __, ___) => _buildFallbackLogo(),
+        ),
+      );
+    }
+
     return SizedBox(
-      width: 170,
-      height: 170,
+      width: _logoSize,
+      height: _logoSize,
       child: Image.asset(
-        'assets/icons/icon_splash.png',
+        _primaryLogo,
         fit: BoxFit.cover,
         filterQuality: FilterQuality.high,
+        gaplessPlayback: true,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
           if (wasSynchronouslyLoaded || frame != null) {
             return child;
           }
-          return const Center(
-            child: Icon(
-              Icons.local_hospital_rounded,
-              size: 100,
-              color: Colors.white,
-            ),
-          );
+          return _buildFallbackLogo();
         },
-        errorBuilder: (_, __, ___) => const Center(
-          child: Icon(
-            Icons.local_hospital_rounded,
-            size: 100,
-            color: Colors.white,
-          ),
-        ),
+        errorBuilder: (_, __, ___) => _buildFallbackLogo(),
       ),
     );
   }
 
   @override
-  void initState() {
-    super.initState();
-    // Set system UI overlay style for immersive experience
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
         systemNavigationBarColor: AppColors.primaryDark,
         systemNavigationBarIconBrightness: Brightness.light,
       ),
-    );
-    _initializeApp();
-  }
-
-  Future<void> _initializeApp() async {
-    // Keep a short minimum display time for visual continuity
-    // but avoid blocking app navigation for multiple seconds.
-    await Future.wait([
-      Future.delayed(const Duration(milliseconds: 900)),
-      _performInitialization(),
-    ]);
-
-    if (!mounted) return;
-
-    widget.onComplete();
-  }
-
-  Future<void> _performInitialization() async {
-    // Intentionally no blocking work here.
-    // Startup-critical initialization is handled elsewhere.
-    return;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.primary, AppColors.primaryDark],
+      child: Scaffold(
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.primary, AppColors.primaryDark],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo with animation
-              _buildLogoImage()
-                  .animate()
-                  .scale(
-                    begin: const Offset(0.5, 0.5),
-                    duration: 600.ms,
-                    curve: Curves.elasticOut,
-                  )
-                  .fadeIn(duration: 400.ms),
-
-              const SizedBox(height: 32),
-
-              // App name
-              Text(
-                AppLocalizations.of(context).appFullName,
-                style: GoogleFonts.poppins(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1,
-                ),
-                textAlign: TextAlign.center,
-              )
-                  .animate(delay: 300.ms)
-                  .fadeIn(duration: 500.ms)
-                  .slideY(begin: 0.3),
-
-              const SizedBox(height: 8),
-
-              // Tagline
-              Text(
-                AppLocalizations.of(context).appTagline,
-                style: GoogleFonts.roboto(
-                  fontSize: 16,
-                  color: Colors.white.withValues(alpha: 0.9),
-                  letterSpacing: 0.5,
-                ),
-              )
-                  .animate(delay: 500.ms)
-                  .fadeIn(duration: 500.ms)
-                  .slideY(begin: 0.3),
-
-              const SizedBox(height: 80),
-
-              // Loading indicator
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withValues(alpha: 0.8),
+          child: SafeArea(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLogoImage(),
+                const SizedBox(height: 24),
+                Text(
+                  AppLocalizations.of(context).appFullName,
+                  style: const TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.6,
                   ),
                 ),
-              ).animate(delay: 800.ms).fadeIn(duration: 500.ms),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  AppLocalizations.of(context).appTagline,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 56),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
