@@ -166,23 +166,28 @@ class _DepartmentManagementScreenState
           ),
         ],
       ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton.extended(
-              onPressed: () {
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _canManage
+            ? () {
                 showDialog(
                   context: context,
                   builder: (context) => const DepartmentFormDialog(),
                 );
-              },
-              icon: const Icon(Icons.add_business, color: Colors.white),
-              label: const Text(
-                'Add Department',
-                style: TextStyle(color: Colors.white),
-              ),
-              backgroundColor: AppColors.primary,
-              shape: const StadiumBorder(),
-            )
-          : null,
+              }
+            : _showPermissionDenied,
+        icon: Icon(
+          _canManage ? Icons.add_business : Icons.lock_outline,
+          color: Colors.white,
+        ),
+        label: Text(
+          'Add Department',
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: _canManage
+            ? AppColors.primary
+            : AppColors.primary.withValues(alpha: 0.55),
+        shape: const StadiumBorder(),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -247,7 +252,8 @@ class _DepartmentManagementScreenState
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.orange.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
@@ -345,27 +351,23 @@ class _DepartmentManagementScreenState
                         const SizedBox(height: 16),
                         const Text('No departments found'),
                         const SizedBox(height: 16),
-                        if (_canManage)
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) =>
-                                    const DepartmentFormDialog(),
-                              );
-                            },
-                            icon: const Icon(Icons.add_business),
-                            label: const Text('Add Department'),
-                          )
-                        else
-                          Text(
-                            'View-only access',
-                            style: TextStyle(
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
+                        ElevatedButton.icon(
+                          onPressed: _canManage
+                              ? () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) =>
+                                        const DepartmentFormDialog(),
+                                  );
+                                }
+                              : _showPermissionDenied,
+                          icon: Icon(
+                            _canManage
+                                ? Icons.add_business
+                                : Icons.lock_outline,
                           ),
+                          label: const Text('Add Department'),
+                        ),
                       ],
                     ),
                   );
@@ -581,41 +583,55 @@ class _DepartmentManagementScreenState
                   ],
                 ),
               ),
-              if (_canManage) ...[
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
+              PopupMenuItem(
+                value: 'edit',
+                enabled: _canManage,
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit, size: 18),
+                    const SizedBox(width: 8),
+                    const Text('Edit'),
+                    if (!_canManage) ...[
+                      const Spacer(),
+                      const Icon(Icons.lock_outline, size: 16),
                     ],
-                  ),
+                  ],
                 ),
-                PopupMenuItem(
-                  value: 'toggle',
-                  child: Row(
-                    children: [
-                      Icon(
-                        isActive ? Icons.block : Icons.check_circle,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(isActive ? 'Deactivate' : 'Activate'),
+              ),
+              PopupMenuItem(
+                value: 'toggle',
+                enabled: _canManage,
+                child: Row(
+                  children: [
+                    Icon(
+                      isActive ? Icons.block : Icons.check_circle,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(isActive ? 'Deactivate' : 'Activate'),
+                    if (!_canManage) ...[
+                      const Spacer(),
+                      const Icon(Icons.lock_outline, size: 16),
                     ],
-                  ),
+                  ],
                 ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: AppColors.error),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: AppColors.error)),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                enabled: _canManage,
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete, size: 18, color: AppColors.error),
+                    const SizedBox(width: 8),
+                    const Text('Delete',
+                        style: TextStyle(color: AppColors.error)),
+                    if (!_canManage) ...[
+                      const Spacer(),
+                      const Icon(Icons.lock_outline, size: 16),
                     ],
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -1080,100 +1096,93 @@ class _DepartmentManagementScreenState
                 ),
               ),
 
-              // Actions
-              if (_canManage)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _toggleDepartmentStatus(id, isActive);
-                          },
-                          icon: Icon(
-                            isActive ? Icons.block : Icons.check_circle,
-                            color:
-                                isActive ? AppColors.error : AppColors.success,
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _canManage
+                            ? () {
+                                Navigator.pop(context);
+                                _toggleDepartmentStatus(id, isActive);
+                              }
+                            : _showPermissionDenied,
+                        icon: Icon(
+                          _canManage
+                              ? (isActive ? Icons.block : Icons.check_circle)
+                              : Icons.lock_outline,
+                          color: _canManage
+                              ? (isActive ? AppColors.error : AppColors.success)
+                              : Colors.grey,
+                        ),
+                        label: Text(
+                          _canManage
+                              ? (isActive ? 'Deactivate' : 'Activate')
+                              : (isActive ? 'Deactivate' : 'Activate'),
+                          style: TextStyle(
+                            color: _canManage
+                                ? (isActive
+                                    ? AppColors.error
+                                    : AppColors.success)
+                                : Colors.grey,
                           ),
-                          label: Text(
-                            isActive ? 'Deactivate' : 'Activate',
-                            style: TextStyle(
-                              color: isActive
-                                  ? AppColors.error
-                                  : AppColors.success,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: BorderSide(
-                              color: isActive
-                                  ? AppColors.error
-                                  : AppColors.success,
-                            ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(
+                            color: _canManage
+                                ? (isActive
+                                    ? AppColors.error
+                                    : AppColors.success)
+                                : Colors.grey,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            showDialog(
-                              context: context,
-                              builder: (context) =>
-                                  DepartmentFormDialog(id: id, data: data),
-                            );
-                          },
-                          icon: const Icon(Icons.edit, color: Colors.white),
-                          label: const Text('Edit'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _canManage
+                            ? () {
+                                Navigator.pop(context);
+                                showDialog(
+                                  context: context,
+                                  builder: (context) =>
+                                      DepartmentFormDialog(id: id, data: data),
+                                );
+                              }
+                            : _showPermissionDenied,
+                        icon: Icon(
+                          _canManage ? Icons.edit : Icons.lock_outline,
+                          color: Colors.white,
+                        ),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _canManage
+                              ? AppColors.primary
+                              : AppColors.primary.withValues(alpha: 0.55),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                       ),
-                    ],
-                  ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
                     ),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.warning.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.shield, color: AppColors.warning, size: 20),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'View-only mode for this department.',
-                            style: TextStyle(
-                              color: AppColors.warning,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showPermissionDenied() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You do not have permission for this action'),
+        backgroundColor: AppColors.warning,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

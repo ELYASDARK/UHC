@@ -531,10 +531,11 @@ class AuthService {
   /// Handle Firebase Auth exceptions
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
       case 'user-not-found':
-        return 'No user found with this email.';
       case 'wrong-password':
-        return 'Incorrect password.';
+        return 'Incorrect email or password. Please try again.';
       case 'email-already-in-use':
         return 'This email is already registered.';
       case 'weak-password':

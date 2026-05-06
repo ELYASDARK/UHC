@@ -52,20 +52,22 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
           ),
         ],
       ),
-      floatingActionButton: _canManage
-          ? FloatingActionButton.extended(
-              onPressed: () {
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _canManage
+            ? () {
                 showDialog(
                   context: context,
                   builder: (context) => const DoctorFormDialog(),
                 );
-              },
-              icon: const Icon(Icons.person_add),
-              label: const Text('Add Doctor'),
-              backgroundColor: AppColors.primary,
-              shape: const StadiumBorder(),
-            )
-          : null,
+              }
+            : _showPermissionDenied,
+        icon: Icon(_canManage ? Icons.person_add : Icons.lock_outline),
+        label: const Text('Add Doctor'),
+        backgroundColor: _canManage
+            ? AppColors.primary
+            : AppColors.primary.withValues(alpha: 0.55),
+        shape: const StadiumBorder(),
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -151,26 +153,21 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                         const SizedBox(height: 16),
                         const Text('No doctors found'),
                         const SizedBox(height: 16),
-                        if (_canManage)
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => const DoctorFormDialog(),
-                              );
-                            },
-                            icon: const Icon(Icons.person_add),
-                            label: const Text('Add Doctor'),
-                          )
-                        else
-                          Text(
-                            'View-only access',
-                            style: TextStyle(
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
+                        ElevatedButton.icon(
+                          onPressed: _canManage
+                              ? () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) =>
+                                        const DoctorFormDialog(),
+                                  );
+                                }
+                              : _showPermissionDenied,
+                          icon: Icon(
+                            _canManage ? Icons.person_add : Icons.lock_outline,
                           ),
+                          label: const Text('Add Doctor'),
+                        ),
                       ],
                     ),
                   );
@@ -315,44 +312,57 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                   ],
                 ),
               ),
-              if (_canManage) ...[
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
+              PopupMenuItem(
+                value: 'edit',
+                enabled: _canManage,
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit, size: 18),
+                    const SizedBox(width: 8),
+                    const Text('Edit'),
+                    if (!_canManage) ...[
+                      const Spacer(),
+                      const Icon(Icons.lock_outline, size: 16),
                     ],
-                  ),
+                  ],
                 ),
-                PopupMenuItem(
-                  value: 'toggle',
-                  child: Row(
-                    children: [
-                      Icon(
-                        data['isActive'] == true
-                            ? Icons.block
-                            : Icons.check_circle,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                          data['isActive'] == true ? 'Deactivate' : 'Activate'),
+              ),
+              PopupMenuItem(
+                value: 'toggle',
+                enabled: _canManage,
+                child: Row(
+                  children: [
+                    Icon(
+                      data['isActive'] == true
+                          ? Icons.block
+                          : Icons.check_circle,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(data['isActive'] == true ? 'Deactivate' : 'Activate'),
+                    if (!_canManage) ...[
+                      const Spacer(),
+                      const Icon(Icons.lock_outline, size: 16),
                     ],
-                  ),
+                  ],
                 ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: AppColors.error),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: AppColors.error)),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                enabled: _canManage,
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete, size: 18, color: AppColors.error),
+                    const SizedBox(width: 8),
+                    const Text('Delete',
+                        style: TextStyle(color: AppColors.error)),
+                    if (!_canManage) ...[
+                      const Spacer(),
+                      const Icon(Icons.lock_outline, size: 16),
                     ],
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -826,67 +836,93 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                 ),
               ),
 
-              // Actions (only shown if admin has manage permission)
-              if (_canManage)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _toggleDoctorStatus(id, isActive);
-                          },
-                          icon: Icon(
-                            isActive ? Icons.block : Icons.check_circle,
-                            color:
-                                isActive ? AppColors.error : AppColors.success,
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _canManage
+                            ? () {
+                                Navigator.pop(context);
+                                _toggleDoctorStatus(id, isActive);
+                              }
+                            : _showPermissionDenied,
+                        icon: Icon(
+                          _canManage
+                              ? (isActive ? Icons.block : Icons.check_circle)
+                              : Icons.lock_outline,
+                          color: _canManage
+                              ? (isActive ? AppColors.error : AppColors.success)
+                              : Colors.grey,
+                        ),
+                        label: Text(
+                          _canManage
+                              ? (isActive ? 'Deactivate' : 'Activate')
+                              : (isActive ? 'Deactivate' : 'Activate'),
+                          style: TextStyle(
+                            color: _canManage
+                                ? (isActive
+                                    ? AppColors.error
+                                    : AppColors.success)
+                                : Colors.grey,
                           ),
-                          label: Text(
-                            isActive ? 'Deactivate' : 'Activate',
-                            style: TextStyle(
-                              color: isActive
-                                  ? AppColors.error
-                                  : AppColors.success,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: BorderSide(
-                              color: isActive
-                                  ? AppColors.error
-                                  : AppColors.success,
-                            ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(
+                            color: _canManage
+                                ? (isActive
+                                    ? AppColors.error
+                                    : AppColors.success)
+                                : Colors.grey,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            showDialog(
-                              context: context,
-                              builder: (context) =>
-                                  DoctorFormDialog(id: id, data: data),
-                            );
-                          },
-                          icon: const Icon(Icons.edit, color: Colors.white),
-                          label: const Text('Edit'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _canManage
+                            ? () {
+                                Navigator.pop(context);
+                                showDialog(
+                                  context: context,
+                                  builder: (context) =>
+                                      DoctorFormDialog(id: id, data: data),
+                                );
+                              }
+                            : _showPermissionDenied,
+                        icon: Icon(
+                          _canManage ? Icons.edit : Icons.lock_outline,
+                          color: Colors.white,
+                        ),
+                        label: const Text('Edit'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _canManage
+                              ? AppColors.primary
+                              : AppColors.primary.withValues(alpha: 0.55),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showPermissionDenied() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You do not have permission for this action'),
+        backgroundColor: AppColors.warning,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

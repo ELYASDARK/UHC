@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/kurdish_material_localizations.dart';
 import 'firebase_options.dart';
+import 'core/constants/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
@@ -317,6 +318,15 @@ class _AppNavigatorState extends State<AppNavigator> {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final defaultOverlayStyle = SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor:
+          isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
+    );
 
     final isRestoringAuthenticatedSession =
         authProvider.state == AuthState.initial ||
@@ -324,131 +334,130 @@ class _AppNavigatorState extends State<AppNavigator> {
                 authProvider.firebaseUser != null &&
                 !authProvider.isAuthenticated);
 
+    Widget screen;
+
     // Show one unified boot screen during startup or auth restore.
     if (!_bootReady || isRestoringAuthenticatedSession) {
-      return const SplashScreen();
-    }
-
-    // Show onboarding if not complete.
-    if (!_onboardingComplete) {
-      return OnboardingScreen(onComplete: _completeOnboarding);
-    }
-
-    // Check auth state
-    if (authProvider.isAuthenticated) {
-      // Check if Google is linked — show link screen if not
+      screen = const SplashScreen();
+    } else if (!_onboardingComplete) {
+      // Show onboarding if not complete.
+      screen = OnboardingScreen(onComplete: _completeOnboarding);
+    } else if (authProvider.isAuthenticated) {
+      // Check auth state
       if (!authProvider.isGoogleLinked) {
-        return LinkGoogleScreen(
+        // Check if Google is linked — show link screen if not
+        screen = LinkGoogleScreen(
           onLinked: () {
             if (mounted) setState(() {});
           },
         );
-      }
-
-      // Route superAdmin to dedicated governance shell
-      final currentUser = authProvider.currentUser;
-      if (currentUser?.role == UserRole.superAdmin) {
-        return const SuperAdminShell();
-      }
-
-      // Route doctor role to DoctorShell
-      if (currentUser?.role == UserRole.doctor) {
-        // Trigger fetch if needed (user changed or first load)
-        if (!_doctorLoading &&
-            _doctorModel == null &&
-            !_doctorFetchFailed &&
-            _lastDoctorUserId != currentUser!.id) {
-          // Schedule fetch after this build frame
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _fetchDoctorModel(currentUser.id);
-          });
-          return const SplashScreen();
-        }
-
-        // Loading state
-        if (_doctorLoading) {
-          return const SplashScreen();
-        }
-
-        // Error state: doctor profile not found or fetch failed
-        if (_doctorFetchFailed || _doctorModel == null) {
-          return Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Doctor profile not found',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Your account has the doctor role but no linked doctor profile was found. Contact an administrator.',
-                      style: TextStyle(color: Colors.grey[600]),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        _doctorFetchFailed = false;
-                        _lastDoctorUserId = null;
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () async {
-                        try {
-                          await authProvider.signOut();
-                        } catch (_) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Logout failed. Please try again.'),
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text('Sign Out'),
-                    ),
-                  ],
+      } else {
+        final currentUser = authProvider.currentUser;
+        if (currentUser?.role == UserRole.superAdmin) {
+          // Route superAdmin to dedicated governance shell
+          screen = const SuperAdminShell();
+        } else if (currentUser?.role == UserRole.doctor) {
+          // Route doctor role to DoctorShell
+          if (!_doctorLoading &&
+              _doctorModel == null &&
+              !_doctorFetchFailed &&
+              _lastDoctorUserId != currentUser!.id) {
+            // Schedule fetch after this build frame
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _fetchDoctorModel(currentUser.id);
+            });
+            screen = const SplashScreen();
+          } else if (_doctorLoading) {
+            // Loading state
+            screen = const SplashScreen();
+          } else if (_doctorFetchFailed || _doctorModel == null) {
+            // Error state: doctor profile not found or fetch failed
+            screen = Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline,
+                          size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Doctor profile not found',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your account has the doctor role but no linked doctor profile was found. Contact an administrator.',
+                        style: TextStyle(color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _doctorFetchFailed = false;
+                          _lastDoctorUserId = null;
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () async {
+                          try {
+                            await authProvider.signOut();
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('Logout failed. Please try again.'),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Sign Out'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
+            );
+          } else {
+            screen = DoctorShell(doctor: _doctorModel!);
+          }
+        } else {
+          screen = const MainShell();
         }
-
-        return DoctorShell(doctor: _doctorModel!);
       }
+    } else {
+      // User signed out — clear cached doctor state for fresh fetch on re-login
+      _doctorModel = null;
+      _lastDoctorUserId = null;
+      _doctorFetchFailed = false;
 
-      return const MainShell();
+      // Auth screens
+      switch (_authScreen) {
+        case 1:
+          screen = ForgotPasswordScreen(
+            onBackTap: () => setState(() => _authScreen = 0),
+          );
+          break;
+        default:
+          screen = LoginScreen(
+            onForgotPasswordTap: () => setState(() => _authScreen = 1),
+            onLoginSuccess: () {},
+          );
+          break;
+      }
     }
 
-    // User signed out — clear cached doctor state for fresh fetch on re-login
-    _doctorModel = null;
-    _lastDoctorUserId = null;
-    _doctorFetchFailed = false;
-
-    // Auth screens
-    switch (_authScreen) {
-      case 1:
-        return ForgotPasswordScreen(
-          onBackTap: () => setState(() => _authScreen = 0),
-        );
-      default:
-        return LoginScreen(
-          onForgotPasswordTap: () => setState(() => _authScreen = 1),
-          onLoginSuccess: () {},
-        );
-    }
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: defaultOverlayStyle,
+      child: screen,
+    );
   }
 }

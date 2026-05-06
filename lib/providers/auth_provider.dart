@@ -14,6 +14,7 @@ class AuthProvider with ChangeNotifier {
   AuthState _state = AuthState.initial;
   UserModel? _currentUser;
   String? _errorMessage;
+  bool _skipNextAuthStateUserLoad = false;
 
   AuthState get state => _state;
   UserModel? get currentUser => _currentUser;
@@ -31,6 +32,10 @@ class AuthProvider with ChangeNotifier {
   void _init() {
     _authService.authStateChanges.listen((user) async {
       if (user != null) {
+        if (_skipNextAuthStateUserLoad) {
+          _skipNextAuthStateUserLoad = false;
+          return;
+        }
         await _loadUserData(user.uid);
       } else {
         _state = AuthState.unauthenticated;
@@ -103,6 +108,8 @@ class AuthProvider with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
+      // Prevent duplicate _loadUserData() from the immediate authStateChanges event.
+      _skipNextAuthStateUserLoad = true;
       final credential = await _authService.signInWithEmail(
         email: email,
         password: password,
@@ -117,6 +124,7 @@ class AuthProvider with ChangeNotifier {
 
       return true;
     } catch (e) {
+      _skipNextAuthStateUserLoad = false;
       _state = AuthState.error;
       _errorMessage = e.toString();
       notifyListeners();
@@ -137,6 +145,8 @@ class AuthProvider with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
+      // Prevent duplicate _loadUserData() from the immediate authStateChanges event.
+      _skipNextAuthStateUserLoad = true;
       final credential = await _authService.registerWithEmail(
         email: email,
         password: password,
@@ -148,6 +158,7 @@ class AuthProvider with ChangeNotifier {
       await _loadUserData(credential.user!.uid);
       return true;
     } catch (e) {
+      _skipNextAuthStateUserLoad = false;
       _state = AuthState.error;
       _errorMessage = e.toString();
       notifyListeners();
@@ -162,6 +173,8 @@ class AuthProvider with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
+      // Prevent duplicate _loadUserData() from the immediate authStateChanges event.
+      _skipNextAuthStateUserLoad = true;
       final credential = await _authService.signInWithGoogle();
 
       if (credential?.user != null) {
@@ -174,11 +187,13 @@ class AuthProvider with ChangeNotifier {
 
         return true;
       } else {
+        _skipNextAuthStateUserLoad = false;
         _state = AuthState.unauthenticated;
         notifyListeners();
         return false;
       }
     } catch (e) {
+      _skipNextAuthStateUserLoad = false;
       _state = AuthState.error;
       _errorMessage = e.toString();
       notifyListeners();

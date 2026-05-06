@@ -273,70 +273,66 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final user = context.read<AuthProvider>().currentUser;
 
     final actions = <Widget>[
-      if (user?.hasPermission('doctors.view') ?? false)
-        _buildActionCard(
-          isDark: isDark,
-          title: 'Manage Doctors',
-          icon: Icons.medical_services,
-          color: AppColors.primary,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DoctorManagementScreen()),
+      _buildActionCard(
+        isDark: isDark,
+        title: 'Manage Doctors',
+        icon: Icons.medical_services,
+        color: AppColors.primary,
+        isEnabled: user?.hasPermission('doctors.view') ?? false,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DoctorManagementScreen()),
+        ),
+      ),
+      _buildActionCard(
+        isDark: isDark,
+        title: 'Manage Users',
+        icon: Icons.people,
+        color: AppColors.secondary,
+        isEnabled: user?.hasPermission('users.view') ?? false,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const UserManagementScreen()),
+        ),
+      ),
+      _buildActionCard(
+        isDark: isDark,
+        title: 'Analytics',
+        icon: Icons.analytics,
+        color: AppColors.tertiary,
+        isEnabled: user?.hasPermission('analytics.view') ?? false,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AppointmentAnalyticsScreen(),
           ),
         ),
-      if (user?.hasPermission('users.view') ?? false)
-        _buildActionCard(
-          isDark: isDark,
-          title: 'Manage Users',
-          icon: Icons.people,
-          color: AppColors.secondary,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const UserManagementScreen()),
+      ),
+      _buildActionCard(
+        isDark: isDark,
+        title: 'Reports',
+        icon: Icons.description,
+        color: Colors.purple,
+        isEnabled: user?.hasPermission('reports.view') ?? false,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ReportsScreen()),
+        ),
+      ),
+      _buildActionCard(
+        isDark: isDark,
+        title: 'Departments',
+        icon: Icons.business,
+        color: Colors.teal,
+        isEnabled: user?.hasPermission('departments.view') ?? false,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DepartmentManagementScreen(),
           ),
         ),
-      if (user?.hasPermission('analytics.view') ?? false)
-        _buildActionCard(
-          isDark: isDark,
-          title: 'Analytics',
-          icon: Icons.analytics,
-          color: AppColors.tertiary,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const AppointmentAnalyticsScreen(),
-            ),
-          ),
-        ),
-      if (user?.hasPermission('reports.view') ?? false)
-        _buildActionCard(
-          isDark: isDark,
-          title: 'Reports',
-          icon: Icons.description,
-          color: Colors.purple,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ReportsScreen()),
-          ),
-        ),
-      if (user?.hasPermission('departments.view') ?? false)
-        _buildActionCard(
-          isDark: isDark,
-          title: 'Departments',
-          icon: Icons.business,
-          color: Colors.teal,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const DepartmentManagementScreen(),
-            ),
-          ),
-        ),
+      ),
     ];
-
-    if (actions.isEmpty) {
-      return const SizedBox.shrink();
-    }
 
     return GridView.count(
       crossAxisCount: crossAxisCount,
@@ -354,31 +350,54 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     required String title,
     required IconData icon,
     required Color color,
+    required bool isEnabled,
     required VoidCallback onTap,
   }) {
+    final effectiveColor =
+        isEnabled ? color : Color.lerp(color, Colors.grey, 0.35)!;
+
     return InkWell(
-      onTap: onTap,
+      onTap: isEnabled ? onTap : _showPermissionDenied,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
+          color: effectiveColor.withValues(alpha: isEnabled ? 0.1 : 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(
+            color: effectiveColor.withValues(alpha: isEnabled ? 0.3 : 0.22),
+          ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: color),
+            Icon(icon, color: effectiveColor),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(fontWeight: FontWeight.w600, color: color),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: effectiveColor,
+                ),
               ),
             ),
-            Icon(Icons.arrow_forward_ios, size: 14, color: color),
+            Icon(
+              isEnabled ? Icons.arrow_forward_ios : Icons.lock_outline,
+              size: isEnabled ? 14 : 16,
+              color: effectiveColor,
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showPermissionDenied() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You do not have permission for this action'),
+        backgroundColor: AppColors.warning,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -459,7 +478,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(status).withValues(alpha: 0.15),
+                          color:
+                              _getStatusColor(status).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(

@@ -28,6 +28,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Set<UserRole> _selectedRoles = {};
   int _displayLimit = 200;
 
+  bool get _canManageNonAdminUsers =>
+      context
+          .read<AuthProvider>()
+          .currentUser
+          ?.hasPermission('users.manageNonAdmin') ??
+      false;
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -132,8 +139,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         const Text('No users found'),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: () => _showAddUserDialog(),
-                          icon: const Icon(Icons.person_add),
+                          onPressed: _canManageNonAdminUsers
+                              ? _showAddUserDialog
+                              : _showPermissionDenied,
+                          icon: Icon(
+                            _canManageNonAdminUsers
+                                ? Icons.person_add
+                                : Icons.lock_outline,
+                          ),
                           label: const Text('Add User'),
                         ),
                       ],
@@ -199,20 +212,23 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
         ],
       ),
-      floatingActionButton: (context
-                  .read<AuthProvider>()
-                  .currentUser
-                  ?.hasPermission('users.manageNonAdmin') ??
-              false)
-          ? FloatingActionButton.extended(
-              onPressed: () => _showAddUserDialog(),
-              backgroundColor: AppColors.primary,
-              icon: const Icon(Icons.person_add, color: Colors.white),
-              label:
-                  const Text('Add User', style: TextStyle(color: Colors.white)),
-              shape: const StadiumBorder(),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _canManageNonAdminUsers
+            ? _showAddUserDialog
+            : _showPermissionDenied,
+        backgroundColor: _canManageNonAdminUsers
+            ? AppColors.primary
+            : AppColors.primary.withValues(alpha: 0.55),
+        icon: Icon(
+          _canManageNonAdminUsers ? Icons.person_add : Icons.lock_outline,
+          color: Colors.white,
+        ),
+        label: Text(
+          'Add User',
+          style: const TextStyle(color: Colors.white),
+        ),
+        shape: const StadiumBorder(),
+      ),
     );
   }
 
@@ -220,6 +236,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     showDialog(
       context: context,
       builder: (context) => const UserFormDialog(),
+    );
+  }
+
+  void _showPermissionDenied() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You do not have permission for this action'),
+        backgroundColor: AppColors.warning,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -382,11 +408,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             itemBuilder: (context) {
               final actorRole = context.read<AuthProvider>().currentUser?.role;
               final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
-              final hasManagePerm = context
-                      .read<AuthProvider>()
-                      .currentUser
-                      ?.hasPermission('users.manageNonAdmin') ??
-                  false;
+              final hasManagePerm = _canManageNonAdminUsers;
               // Super Admin can edit superAdmin rows, but destructive actions stay blocked.
               final canEditSuperAdminTarget =
                   actorIsSuperAdmin && role == UserRole.superAdmin;
@@ -410,51 +432,70 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ],
                   ),
                 ),
-                if (canEditSuperAdminTarget || canManageNonSuperAdminTarget)
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit'),
+                PopupMenuItem(
+                  value: 'edit',
+                  enabled:
+                      canEditSuperAdminTarget || canManageNonSuperAdminTarget,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('Edit'),
+                      if (!(canEditSuperAdminTarget ||
+                          canManageNonSuperAdminTarget)) ...[
+                        const Spacer(),
+                        const Icon(Icons.lock_outline, size: 16),
                       ],
-                    ),
+                    ],
                   ),
-                if (canManageNonSuperAdminTarget) ...[
-                  if (hasLinkedGoogleEmail)
-                    const PopupMenuItem(
-                      value: 'unlink_google',
-                      child: Row(
-                        children: [
-                          Icon(Icons.link_off_rounded, size: 18),
-                          SizedBox(width: 8),
-                          Text('Unlink Google'),
-                        ],
-                      ),
-                    ),
+                ),
+                if (hasLinkedGoogleEmail)
                   PopupMenuItem(
-                    value: 'toggle',
+                    value: 'unlink_google',
+                    enabled: canManageNonSuperAdminTarget,
                     child: Row(
                       children: [
-                        Icon(isActive ? Icons.block : Icons.check_circle,
-                            size: 18),
+                        const Icon(Icons.link_off_rounded, size: 18),
                         const SizedBox(width: 8),
-                        Text(isActive ? 'Deactivate' : 'Activate'),
+                        const Text('Unlink Google'),
+                        if (!canManageNonSuperAdminTarget) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
-                    value: 'role',
-                    child: Row(
-                      children: [
-                        Icon(Icons.admin_panel_settings, size: 18),
-                        SizedBox(width: 8),
-                        Text('Change Role'),
+                PopupMenuItem(
+                  value: 'toggle',
+                  enabled: canManageNonSuperAdminTarget,
+                  child: Row(
+                    children: [
+                      Icon(isActive ? Icons.block : Icons.check_circle,
+                          size: 18),
+                      const SizedBox(width: 8),
+                      Text(isActive ? 'Deactivate' : 'Activate'),
+                      if (!canManageNonSuperAdminTarget) ...[
+                        const Spacer(),
+                        const Icon(Icons.lock_outline, size: 16),
                       ],
-                    ),
+                    ],
                   ),
-                ],
+                ),
+                PopupMenuItem(
+                  value: 'role',
+                  enabled: canManageNonSuperAdminTarget,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.admin_panel_settings, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('Change Role'),
+                      if (!canManageNonSuperAdminTarget) ...[
+                        const Spacer(),
+                        const Icon(Icons.lock_outline, size: 16),
+                      ],
+                    ],
+                  ),
+                ),
               ];
             },
           ),

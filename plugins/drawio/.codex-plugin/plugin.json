@@ -1,0 +1,43 @@
+{
+  "name": "drawio",
+  "version": "0.1.0",
+  "description": "Local draw.io MCP integration for generating and opening diagrams from Codex.",
+  "author": {
+    "name": "UHC Local Setup",
+    "url": "https://github.com/jgraph/drawio-mcp"
+  },
+  "homepage": "https://github.com/jgraph/drawio-mcp",
+  "repository": "https://github.com/jgraph/drawio-mcp",
+  "license": "Apache-2.0",
+  "keywords": [
+    "drawio",
+    "diagram",
+    "mcp",
+    "mermaid",
+    "xml",
+    "csv"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "draw.io",
+    "shortDescription": "Create and open draw.io diagrams from Codex",
+    "longDescription": "Adds draw.io MCP tools so Codex can open XML, CSV, and Mermaid diagrams directly in draw.io.",
+    "developerName": "jgraph",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://www.draw.io",
+    "privacyPolicyURL": "https://www.diagrams.net/doc/faq/privacy",
+    "termsOfServiceURL": "https://www.diagrams.net/doc/faq/terms",
+    "defaultPrompt": [
+      "Create a Mermaid sequence diagram for login.",
+      "Build an org chart from CSV in draw.io.",
+      "Open draw.io XML for an architecture diagram."
+    ],
+    "brandColor": "#f08705",
+    "screenshots": []
+  }
+}
