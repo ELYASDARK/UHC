@@ -52,6 +52,9 @@ class AdminPermissions {
     notificationsSend: true,
   );
 
+  /// No-access preset — everything disabled
+  static const AdminPermissions noAccess = AdminPermissions();
+
   /// Read-only preset
   static const AdminPermissions readOnly = AdminPermissions(
     usersView: true,

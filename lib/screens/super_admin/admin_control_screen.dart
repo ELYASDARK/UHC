@@ -308,6 +308,14 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                                 ? () =>
                                     _applyPreset(uid, AdminPermissions.readOnly)
                                 : null),
+                        const SizedBox(width: 8),
+                        _presetChip(
+                            'Off',
+                            isDark,
+                            actorIsSuperAdmin
+                                ? () =>
+                                    _applyPreset(uid, AdminPermissions.noAccess)
+                                : null),
                       ],
                     ),
                   ),
