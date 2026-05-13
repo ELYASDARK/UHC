@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
+import '../../core/widgets/responsive_layout.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Onboarding screen with 3 slides
@@ -118,56 +119,59 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
 
               // Indicators and button
-              Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    // Page indicators
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        items.length,
-                        (index) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: _currentPage == index ? 32 : 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: _currentPage == index
-                                ? AppColors.primary
-                                : (isDark
-                                    ? Colors.grey[700]
-                                    : Colors.grey[300]),
-                            borderRadius: BorderRadius.circular(4),
+              ResponsiveContent(
+                maxWidth: 520,
+                child: Padding(
+                  padding: UhcResponsive.pagePadding(context, bottom: 32),
+                  child: Column(
+                    children: [
+                      // Page indicators
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          items.length,
+                          (index) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: _currentPage == index ? 32 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _currentPage == index
+                                  ? AppColors.primary
+                                  : (isDark
+                                      ? Colors.grey[700]
+                                      : Colors.grey[300]),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
-                    // Next/Get Started button
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder:
-                          (Widget child, Animation<double> animation) {
-                        return FadeTransition(
-                          opacity: animation,
-                          child: child,
-                        );
-                      },
-                      child: PrimaryButton(
-                        key: ValueKey<int>(_currentPage),
-                        text: _currentPage == items.length - 1
-                            ? l10n.getStarted
-                            : l10n.next,
-                        onPressed: _nextPage,
-                        icon: _currentPage == items.length - 1
-                            ? Icons.arrow_forward_rounded
-                            : null,
+                      // Next/Get Started button
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        transitionBuilder:
+                            (Widget child, Animation<double> animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          );
+                        },
+                        child: PrimaryButton(
+                          key: ValueKey<int>(_currentPage),
+                          text: _currentPage == items.length - 1
+                              ? l10n.getStarted
+                              : l10n.next,
+                          onPressed: _nextPage,
+                          icon: _currentPage == items.length - 1
+                              ? Icons.arrow_forward_rounded
+                              : null,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

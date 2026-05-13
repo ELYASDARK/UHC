@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/responsive_layout.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 
@@ -104,152 +105,153 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
         _handleBack();
       },
       child: Scaffold(
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              children: [
-                const Spacer(flex: 2),
+        body: ResponsivePage(
+          safeArea: true,
+          scrollable: false,
+          maxWidth: 520,
+          bottomPadding: 32,
+          child: Column(
+            children: [
+              const Spacer(flex: 2),
 
-                // Icon
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.link_rounded,
-                    size: 56,
-                    color: AppColors.primary,
-                  ),
-                ).animate().fadeIn(duration: 500.ms).scale(
-                      begin: const Offset(0.8, 0.8),
-                      end: const Offset(1.0, 1.0),
-                      duration: 500.ms,
-                    ),
-
-                const SizedBox(height: 32),
-
-                // Title
-                Text(
-                  'Link Your Google Account',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
-                  ),
-                )
-                    .animate(delay: 200.ms)
-                    .fadeIn(duration: 400.ms)
-                    .slideY(begin: 0.1),
-
-                const SizedBox(height: 16),
-
-                // Subtitle
-                Text(
-                  'For security and easy access, please link your account with Google. This is a one-time setup.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.roboto(
-                    fontSize: 15,
-                    height: 1.5,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                )
-                    .animate(delay: 350.ms)
-                    .fadeIn(duration: 400.ms)
-                    .slideY(begin: 0.1),
-
-                const SizedBox(height: 16),
-
-                // Benefits list
-                _BenefitItem(
-                  icon: Icons.security_rounded,
-                  text: 'Enhanced account security',
-                  delay: 500.ms,
+              // Icon
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
-                _BenefitItem(
-                  icon: Icons.speed_rounded,
-                  text: 'Faster login with Google',
-                  delay: 600.ms,
+                child: const Icon(
+                  Icons.link_rounded,
+                  size: 56,
+                  color: AppColors.primary,
                 ),
-                _BenefitItem(
-                  icon: Icons.sync_rounded,
-                  text: 'Keep your data synced',
-                  delay: 700.ms,
+              ).animate().fadeIn(duration: 500.ms).scale(
+                    begin: const Offset(0.8, 0.8),
+                    end: const Offset(1.0, 1.0),
+                    duration: 500.ms,
+                  ),
+
+              const SizedBox(height: 32),
+
+              // Title
+              Text(
+                'Link Your Google Account',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
                 ),
+              )
+                  .animate(delay: 200.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.1),
 
-                const Spacer(flex: 2),
+              const SizedBox(height: 16),
 
-                // Link button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _linkGoogle,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Image.asset(
-                            'assets/icons/google.svg',
-                            width: 24,
-                            height: 24,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.g_mobiledata_rounded,
-                              size: 28,
-                            ),
+              // Subtitle
+              Text(
+                'For security and easy access, please link your account with Google. This is a one-time setup.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.roboto(
+                  fontSize: 15,
+                  height: 1.5,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              )
+                  .animate(delay: 350.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.1),
+
+              const SizedBox(height: 16),
+
+              // Benefits list
+              _BenefitItem(
+                icon: Icons.security_rounded,
+                text: 'Enhanced account security',
+                delay: 500.ms,
+              ),
+              _BenefitItem(
+                icon: Icons.speed_rounded,
+                text: 'Faster login with Google',
+                delay: 600.ms,
+              ),
+              _BenefitItem(
+                icon: Icons.sync_rounded,
+                text: 'Keep your data synced',
+                delay: 700.ms,
+              ),
+
+              const Spacer(flex: 2),
+
+              // Link button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _linkGoogle,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
                           ),
-                    label: Text(
-                      _isLoading ? 'Linking...' : 'Link with Google',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 2,
-                    ),
-                  ),
-                )
-                    .animate(delay: 800.ms)
-                    .fadeIn(duration: 400.ms)
-                    .slideY(begin: 0.2),
-
-                // Sign Out Option
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: TextButton(
-                    onPressed: _handleBack,
-                    child: Text(
-                      'Sign Out',
-                      style: GoogleFonts.roboto(
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
+                        )
+                      : Image.asset(
+                          'assets/icons/google.svg',
+                          width: 24,
+                          height: 24,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.g_mobiledata_rounded,
+                            size: 28,
+                          ),
+                        ),
+                  label: Text(
+                    _isLoading ? 'Linking...' : 'Link with Google',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ).animate(delay: 1000.ms).fadeIn(duration: 400.ms),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+              )
+                  .animate(delay: 800.ms)
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.2),
 
-                const SizedBox(height: 32),
-              ],
-            ),
+              // Sign Out Option
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: TextButton(
+                  onPressed: _handleBack,
+                  child: Text(
+                    'Sign Out',
+                    style: GoogleFonts.roboto(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ).animate(delay: 1000.ms).fadeIn(duration: 400.ms),
+
+              const SizedBox(height: 32),
+            ],
           ),
         ),
       ),

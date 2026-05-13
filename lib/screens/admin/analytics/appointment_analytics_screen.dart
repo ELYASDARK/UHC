@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Appointment analytics screen for admin
 class AppointmentAnalyticsScreen extends StatefulWidget {
@@ -138,18 +139,18 @@ class _AppointmentAnalyticsScreenState
       ),
       body: _isLoading
           ? _buildAnalyticsSkeleton(isDark)
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+          : ResponsivePage(
+              maxWidth: 1120,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Period Selector
                   _buildPeriodSelector(isDark),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Summary Cards
                   _buildSummaryCards(isDark),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Status Distribution
                   Text(
@@ -160,7 +161,7 @@ class _AppointmentAnalyticsScreenState
                   ),
                   const SizedBox(height: 12),
                   _buildStatusChart(isDark),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Department Distribution
                   Text(
@@ -171,7 +172,7 @@ class _AppointmentAnalyticsScreenState
                   ),
                   const SizedBox(height: 12),
                   _buildDepartmentChart(isDark),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Daily Trend
                   Text(
@@ -233,16 +234,12 @@ class _AppointmentAnalyticsScreenState
   }
 
   Widget _buildSummaryCards(bool isDark) {
-    final width = MediaQuery.of(context).size.width;
-    final crossAxisCount = width > 900 ? 4 : 2;
-
-    return GridView.count(
-      crossAxisCount: crossAxisCount,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.6,
+    return ResponsiveGrid(
+      phoneColumns: 2,
+      tabletColumns: 2,
+      laptopColumns: 4,
+      desktopColumns: 4,
+      childAspectRatio: UhcResponsive.isWide(context) ? 2.9 : 1.6,
       children: [
         _buildSummaryCard(
           isDark: isDark,
@@ -295,25 +292,72 @@ class _AppointmentAnalyticsScreenState
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
+      child: UhcResponsive.isWide(context)
+          ? Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          height: 1.05,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.1,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              children: [
+                Icon(icon, color: color),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 

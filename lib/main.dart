@@ -1,8 +1,9 @@
 import 'dart:ui';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -61,6 +62,7 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await _initializeAppCheck();
     await _configureFirestoreDefaults();
     // Crashlytics is not supported on web in this app setup.
     // Guard all Crashlytics hooks to avoid web assertion failures.
@@ -97,6 +99,21 @@ void main() async {
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     await _initializeServicesAsync();
   });
+}
+
+Future<void> _initializeAppCheck() async {
+  // Web requires an explicit reCAPTCHA provider key; skip for now.
+  if (kIsWeb) return;
+  try {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider:
+          kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
+      appleProvider:
+          kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
+    );
+  } catch (e) {
+    debugPrint('Failed to initialize Firebase App Check: $e');
+  }
 }
 
 Future<void> _configureFirestoreDefaults() async {
@@ -207,6 +224,30 @@ class UHCApp extends StatelessWidget {
               FallbackCupertinoLocalizationsDelegate(),
               FallbackWidgetsLocalizationsDelegate(),
             ],
+
+            builder: (context, child) {
+              final width = MediaQuery.sizeOf(context).width;
+              final isWideSnackBar = width >= 720;
+              final theme = Theme.of(context);
+              final baseSnackBar = theme.snackBarTheme;
+
+              return Theme(
+                data: theme.copyWith(
+                  snackBarTheme: baseSnackBar.copyWith(
+                    behavior: SnackBarBehavior.floating,
+                    width: isWideSnackBar ? 520 : null,
+                    insetPadding: EdgeInsets.symmetric(
+                      horizontal: isWideSnackBar ? 24 : 16,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
 
             home: const AppNavigator(),
           );

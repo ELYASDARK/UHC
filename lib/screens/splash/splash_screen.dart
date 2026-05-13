@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/responsive_layout.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Unified boot/splash screen used during startup and auth restoration.
@@ -88,41 +89,44 @@ class SplashScreen extends StatelessWidget {
             ),
           ),
           child: SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLogoImage(),
-                const SizedBox(height: 24),
-                Text(
-                  AppLocalizations.of(context).appFullName,
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  AppLocalizations.of(context).appTagline,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withValues(alpha: 0.9),
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                const SizedBox(height: 56),
-                SizedBox(
-                  width: 36,
-                  height: 36,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.white.withValues(alpha: 0.8),
+            child: ResponsiveContent(
+              maxWidth: 560,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildLogoImage(),
+                  const SizedBox(height: 24),
+                  Text(
+                    AppLocalizations.of(context).appFullName,
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.6,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    AppLocalizations.of(context).appTagline,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white.withValues(alpha: 0.9),
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 56),
+                  SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

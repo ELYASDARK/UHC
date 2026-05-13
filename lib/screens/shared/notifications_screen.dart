@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/responsive_layout.dart';
 import '../../data/models/notification_model.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
@@ -90,11 +91,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               itemCount: provider.notifications.length,
               itemBuilder: (context, index) {
                 final n = provider.notifications[index];
-                return _NotificationCard(
-                  notification: n,
-                  isDark: isDark,
-                  onTap: () => _onNotificationTap(n),
-                  onConfirmDismiss: () => _onConfirmNotificationDismiss(n),
+                return ResponsiveContent(
+                  maxWidth: 900,
+                  child: _NotificationCard(
+                    notification: n,
+                    isDark: isDark,
+                    onTap: () => _onNotificationTap(n),
+                    onConfirmDismiss: () => _onConfirmNotificationDismiss(n),
+                  ),
                 )
                     .animate(delay: Duration(milliseconds: index * 50))
                     .fadeIn(duration: 300.ms);

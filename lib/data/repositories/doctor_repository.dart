@@ -37,12 +37,11 @@ class DoctorRepository {
   /// Get doctor by Firebase Auth user ID
   Future<DoctorModel?> getDoctorByUserId(String userId) async {
     try {
-      final snapshot =
-          await _doctorsRef
-              .where('userId', isEqualTo: userId)
-              .limit(1)
-              .get(_readOptions)
-              .timeout(_queryTimeout);
+      final snapshot = await _doctorsRef
+          .where('userId', isEqualTo: userId)
+          .limit(1)
+          .get(_readOptions)
+          .timeout(_queryTimeout);
       if (snapshot.docs.isNotEmpty) {
         return DoctorModel.fromFirestore(snapshot.docs.first);
       }
@@ -55,6 +54,10 @@ class DoctorRepository {
 
   /// Get doctor by ID
   Future<DoctorModel?> getDoctorById(String doctorId) async {
+    if (doctorId.trim().isEmpty) {
+      return null;
+    }
+
     try {
       final doc = await _doctorsRef
           .doc(doctorId)

@@ -7,6 +7,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../services/doctor_functions_service.dart';
 import 'doctor_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Doctor management screen for admin
 class DoctorManagementScreen extends StatefulWidget {
@@ -72,25 +73,28 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Search doctors...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          ResponsiveContent(
+            maxWidth: 1320,
+            child: Padding(
+              padding: UhcResponsive.pagePadding(context, bottom: 8),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Search doctors...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -98,34 +102,37 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
 
           // Filter Chips
           if (_selectedDepartments.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                children: _selectedDepartments.map((dept) {
-                  return Chip(
-                    label: Text(
-                      dept.name.toUpperCase(),
-                      style: TextStyle(
-                        color: isDark ? Colors.white : AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+            ResponsiveContent(
+              maxWidth: 1320,
+              child: Padding(
+                padding: UhcResponsive.pagePadding(context, top: 0, bottom: 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: _selectedDepartments.map((dept) {
+                    return Chip(
+                      label: Text(
+                        dept.name.toUpperCase(),
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                    backgroundColor: isDark
-                        ? AppColors.primary.withValues(alpha: 0.2)
-                        : AppColors.primary.withValues(alpha: 0.1),
-                    side: BorderSide(
-                      color: isDark
-                          ? AppColors.primary.withValues(alpha: 0.5)
-                          : AppColors.primary.withValues(alpha: 0.2),
-                    ),
-                    onDeleted: () =>
-                        setState(() => _selectedDepartments.remove(dept)),
-                    deleteIconColor:
-                        isDark ? Colors.white70 : AppColors.primary,
-                  );
-                }).toList(),
+                      backgroundColor: isDark
+                          ? AppColors.primary.withValues(alpha: 0.2)
+                          : AppColors.primary.withValues(alpha: 0.1),
+                      side: BorderSide(
+                        color: isDark
+                            ? AppColors.primary.withValues(alpha: 0.5)
+                            : AppColors.primary.withValues(alpha: 0.2),
+                      ),
+                      onDeleted: () =>
+                          setState(() => _selectedDepartments.remove(dept)),
+                      deleteIconColor:
+                          isDark ? Colors.white70 : AppColors.primary,
+                    );
+                  }).toList(),
+                ),
               ),
             ),
 
@@ -191,12 +198,17 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                   return matchesSearch && _selectedDepartments.contains(dept);
                 }).toList();
 
-                return ListView.builder(
-                  padding: const EdgeInsets.only(
-                    top: 16,
-                    left: 16,
-                    right: 16,
-                    bottom: 60, // Extra padding for FAB
+                return ResponsiveListView(
+                  maxWidth: 1440,
+                  gridOnWide: true,
+                  tabletColumns: 1,
+                  laptopColumns: 2,
+                  desktopColumns: 3,
+                  childAspectRatio: 4.0,
+                  padding: UhcResponsive.pagePadding(
+                    context,
+                    top: 8,
+                    bottom: UhcResponsive.isWide(context) ? 32 : 88,
                   ),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
@@ -238,130 +250,157 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.hardEdge,
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(12),
-          leading: Stack(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundImage: data['photoUrl'] != null &&
-                        (data['photoUrl'] as String).isNotEmpty
-                    ? NetworkImage(data['photoUrl'])
-                    : null,
-                child: data['photoUrl'] == null ||
-                        (data['photoUrl'] as String).isEmpty
-                    ? const Icon(Icons.person)
-                    : null,
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundImage: data['photoUrl'] != null &&
+                              (data['photoUrl'] as String).isNotEmpty
+                          ? NetworkImage(data['photoUrl'])
+                          : null,
+                      child: data['photoUrl'] == null ||
+                              (data['photoUrl'] as String).isEmpty
+                          ? const Icon(Icons.person)
+                          : null,
+                    ),
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: (data['isActive'] ?? true)
+                              ? AppColors.success
+                              : Colors.grey,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isDark ? AppColors.surfaceDark : Colors.white,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: (data['isActive'] ?? true)
-                        ? AppColors.success
-                        : Colors.grey,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? AppColors.surfaceDark : Colors.white,
-                      width: 2,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dr. ${data['name'] ?? 'Unknown'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      data['specialization'] ?? 'General',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  switch (value) {
+                    case 'view':
+                      _showDoctorDetails(context, id, data);
+                      break;
+                    case 'edit':
+                      showDialog(
+                        context: context,
+                        builder: (context) =>
+                            DoctorFormDialog(id: id, data: data),
+                      );
+                      break;
+                    case 'delete':
+                      _confirmDelete(id, data['name'] ?? 'this doctor', data);
+                      break;
+                    case 'toggle':
+                      _toggleDoctorStatus(id, data['isActive'] ?? true);
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'view',
+                    child: Row(
+                      children: [
+                        Icon(Icons.visibility, size: 18),
+                        SizedBox(width: 8),
+                        Text('View Details'),
+                      ],
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
-          title: Text(
-            'Dr. ${data['name'] ?? 'Unknown'}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Text(data['specialization'] ?? 'General')],
-          ),
-          trailing: PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'view':
-                  _showDoctorDetails(context, id, data);
-                  break;
-                case 'edit':
-                  showDialog(
-                    context: context,
-                    builder: (context) => DoctorFormDialog(id: id, data: data),
-                  );
-                  break;
-                case 'delete':
-                  _confirmDelete(id, data['name'] ?? 'this doctor', data);
-                  break;
-                case 'toggle':
-                  _toggleDoctorStatus(id, data['isActive'] ?? true);
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'view',
-                child: Row(
-                  children: [
-                    Icon(Icons.visibility, size: 18),
-                    SizedBox(width: 8),
-                    Text('View Details'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'edit',
-                enabled: _canManage,
-                child: Row(
-                  children: [
-                    const Icon(Icons.edit, size: 18),
-                    const SizedBox(width: 8),
-                    const Text('Edit'),
-                    if (!_canManage) ...[
-                      const Spacer(),
-                      const Icon(Icons.lock_outline, size: 16),
-                    ],
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'toggle',
-                enabled: _canManage,
-                child: Row(
-                  children: [
-                    Icon(
-                      data['isActive'] == true
-                          ? Icons.block
-                          : Icons.check_circle,
-                      size: 18,
+                  PopupMenuItem(
+                    value: 'edit',
+                    enabled: _canManage,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit, size: 18),
+                        const SizedBox(width: 8),
+                        const Text('Edit'),
+                        if (!_canManage) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Text(data['isActive'] == true ? 'Deactivate' : 'Activate'),
-                    if (!_canManage) ...[
-                      const Spacer(),
-                      const Icon(Icons.lock_outline, size: 16),
-                    ],
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                enabled: _canManage,
-                child: Row(
-                  children: [
-                    const Icon(Icons.delete, size: 18, color: AppColors.error),
-                    const SizedBox(width: 8),
-                    const Text('Delete',
-                        style: TextStyle(color: AppColors.error)),
-                    if (!_canManage) ...[
-                      const Spacer(),
-                      const Icon(Icons.lock_outline, size: 16),
-                    ],
-                  ],
-                ),
+                  ),
+                  PopupMenuItem(
+                    value: 'toggle',
+                    enabled: _canManage,
+                    child: Row(
+                      children: [
+                        Icon(
+                          data['isActive'] == true
+                              ? Icons.block
+                              : Icons.check_circle,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(data['isActive'] == true
+                            ? 'Deactivate'
+                            : 'Activate'),
+                        if (!_canManage) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    enabled: _canManage,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete,
+                            size: 18, color: AppColors.error),
+                        const SizedBox(width: 8),
+                        const Text('Delete',
+                            style: TextStyle(color: AppColors.error)),
+                        if (!_canManage) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

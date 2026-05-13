@@ -17,6 +17,7 @@ import 'edit_profile_screen.dart';
 import '../documents/medical_documents_screen.dart';
 import '../../shared/change_password_screen.dart';
 import '../../auth/forgot_password_screen.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Profile and settings screen
 class ProfileScreen extends StatefulWidget {
@@ -271,225 +272,312 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        child: Column(
-          children: [
-            // Profile header
-            _buildProfileHeader(
-              user?.fullName ?? 'User',
-              user?.email ?? '',
-              user?.photoUrl,
-              isDark,
-              l10n: l10n,
-              isSuperAdmin: isSuperAdmin,
-              slotType: user?.superAdminType?.name,
-              accentColor: accentColor,
-            ),
-            const SizedBox(height: 32),
-
-            // Settings sections
-            _buildSection(
-                l10n.appearance,
-                [
-                  _buildSettingTile(
-                    icon: Icons.dark_mode_rounded,
-                    title: l10n.darkMode,
-                    trailing: Switch(
-                      value: themeProvider.isDarkMode,
-                      onChanged: (_) => themeProvider.toggleTheme(),
-                    ),
-                    isDark: isDark,
-                    accentColor: accentColor,
-                  ),
-                  if (!isSuperAdmin)
-                    _buildSettingTile(
-                      icon: Icons.language_rounded,
-                      title: l10n.language,
-                      subtitle: localeProvider.languageName,
-                      onTap: () => _showLanguageDialog(context, l10n),
-                      isDark: isDark,
-                      accentColor: accentColor,
-                    ),
-                ],
-                isDark),
-            if (!isAdminLike) ...[
-              const SizedBox(height: 20),
-              _buildSection(
-                  l10n.notificationSettings,
-                  [
-                    _buildSettingTile(
-                      icon: Icons.notifications_active_rounded,
-                      title: l10n.notifications,
-                      subtitle: l10n.notificationSettings,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const NotificationSettingsScreen(),
-                        ),
-                      ),
-                      isDark: isDark,
-                      accentColor: accentColor,
-                    ),
-                  ],
-                  isDark),
-            ],
-
-            // Account section
-            const SizedBox(height: 20),
-            _buildSection(
-                l10n.account,
-                [
-                  _buildSettingTile(
-                    icon: Icons.person,
-                    title: l10n.editProfile,
-                    subtitle: l10n.updateProfile,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const EditProfileScreen()),
-                    ),
-                    isDark: isDark,
-                    accentColor: accentColor,
-                  ),
-                  _buildSettingTile(
-                    icon: Icons.lock,
-                    title: l10n.changePassword,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ChangePasswordScreen(),
-                      ),
-                    ),
-                    isDark: isDark,
-                    accentColor: accentColor,
-                  ),
-                  _buildSettingTile(
-                    icon: Icons.lock_reset_rounded,
-                    title: l10n.forgotPassword,
-                    subtitle: l10n.sendResetLink,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ForgotPasswordScreen(
-                          onBackTap: () => Navigator.of(context).pop(),
-                          initialEmail:
-                              authProvider.firebaseUser?.email ?? user?.email,
-                          launchedFromProfile: true,
-                        ),
-                      ),
-                    ),
-                    isDark: isDark,
-                    accentColor: accentColor,
-                  ),
-                  if (!isSuperAdmin)
-                    _buildSettingTile(
-                      icon: Icons.folder_shared_rounded,
-                      title: l10n.medicalDocuments,
-                      subtitle: l10n.manageYourMedicalRecords,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const MedicalDocumentsScreen(),
-                        ),
-                      ),
-                      isDark: isDark,
-                      accentColor: accentColor,
-                    ),
-                ],
-                isDark),
-
-            const SizedBox(height: 20),
-
-            _buildSection(
-                l10n.about,
-                [
-                  _buildSettingTile(
-                    icon: Icons.privacy_tip_rounded,
-                    title: l10n.privacyPolicy,
-                    onTap: () => _showPrivacyPolicy(context),
-                    isDark: isDark,
-                    accentColor: accentColor,
-                  ),
-                  _buildSettingTile(
-                    icon: Icons.description_rounded,
-                    title: l10n.termsOfService,
-                    onTap: () => _showTermsOfService(context),
-                    isDark: isDark,
-                    accentColor: accentColor,
-                  ),
-                  _buildSettingTile(
-                    icon: Icons.help_rounded,
-                    title: l10n.helpAndSupport,
-                    onTap: () => _showHelpSupport(context),
-                    isDark: isDark,
-                    accentColor: accentColor,
-                  ),
-                  _buildSettingTile(
-                    icon: Icons.info_rounded,
-                    title: l10n.version,
-                    trailing: FutureBuilder<PackageInfo>(
-                      future: PackageInfo.fromPlatform(),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          return Text(
-                            snapshot.data!.version,
-                            style: GoogleFonts.roboto(color: Colors.grey),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                    onTap: () => _showVersionInfo(context),
-                    isDark: isDark,
-                    accentColor: accentColor,
-                  ),
-                ],
-                isDark),
-
-            // Admin section - visible to admin and super admin
-            if (isAdminLike) ...[
-              const SizedBox(height: 20),
-              _buildSection(
-                  l10n.admin,
-                  [
-                    _buildSettingTile(
-                      icon: Icons.admin_panel_settings,
-                      title: l10n.adminDashboard,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AdminDashboardScreen(),
-                        ),
-                      ),
-                      isDark: isDark,
-                      accentColor: accentColor,
-                    ),
-                  ],
-                  isDark),
-            ],
-
-            const SizedBox(height: 32),
-
-            // Logout button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _showLogoutDialog(context, authProvider, l10n),
-                icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-                label: Text(
-                  l10n.logout,
-                  style: GoogleFonts.poppins(color: AppColors.error),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: const BorderSide(color: AppColors.error),
-                ),
-              ),
-            ),
-          ],
+      body: ResponsivePage(
+        maxWidth: UhcResponsive.isWide(context) ? 1080 : 980,
+        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+        alignment: UhcResponsive.isWide(context)
+            ? AlignmentDirectional.topStart
+            : Alignment.topCenter,
+        child: _buildProfileContent(
+          context: context,
+          authProvider: authProvider,
+          themeProvider: themeProvider,
+          localeProvider: localeProvider,
+          userName: user?.fullName ?? 'User',
+          userEmail: user?.email ?? '',
+          userPhotoUrl: user?.photoUrl,
+          slotType: user?.superAdminType?.name,
+          initialEmail: authProvider.firebaseUser?.email ?? user?.email,
+          isDark: isDark,
+          l10n: l10n,
+          isSuperAdmin: isSuperAdmin,
+          isAdminLike: isAdminLike,
+          accentColor: accentColor,
         ),
       ),
+    );
+  }
+
+  Widget _buildProfileContent({
+    required BuildContext context,
+    required AuthProvider authProvider,
+    required ThemeProvider themeProvider,
+    required LocaleProvider localeProvider,
+    required String userName,
+    required String userEmail,
+    required String? userPhotoUrl,
+    required String? slotType,
+    required String? initialEmail,
+    required bool isDark,
+    required AppLocalizations l10n,
+    required bool isSuperAdmin,
+    required bool isAdminLike,
+    required Color accentColor,
+  }) {
+    final header = _buildProfileHeader(
+      userName,
+      userEmail,
+      userPhotoUrl,
+      isDark,
+      l10n: l10n,
+      isSuperAdmin: isSuperAdmin,
+      slotType: slotType,
+      accentColor: accentColor,
+    );
+
+    final appearance = _buildSection(
+      l10n.appearance,
+      [
+        _buildSettingTile(
+          icon: Icons.dark_mode_rounded,
+          title: l10n.darkMode,
+          trailing: Switch(
+            value: themeProvider.isDarkMode,
+            onChanged: (_) => themeProvider.toggleTheme(),
+          ),
+          isDark: isDark,
+          accentColor: accentColor,
+        ),
+        if (!isSuperAdmin)
+          _buildSettingTile(
+            icon: Icons.language_rounded,
+            title: l10n.language,
+            subtitle: localeProvider.languageName,
+            onTap: () => _showLanguageDialog(context, l10n),
+            isDark: isDark,
+            accentColor: accentColor,
+          ),
+      ],
+      isDark,
+    );
+
+    final notifications = !isAdminLike
+        ? _buildSection(
+            l10n.notificationSettings,
+            [
+              _buildSettingTile(
+                icon: Icons.notifications_active_rounded,
+                title: l10n.notifications,
+                subtitle: l10n.notificationSettings,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationSettingsScreen(),
+                  ),
+                ),
+                isDark: isDark,
+                accentColor: accentColor,
+              ),
+            ],
+            isDark,
+          )
+        : null;
+
+    final account = _buildSection(
+      l10n.account,
+      [
+        _buildSettingTile(
+          icon: Icons.person,
+          title: l10n.editProfile,
+          subtitle: l10n.updateProfile,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+          ),
+          isDark: isDark,
+          accentColor: accentColor,
+        ),
+        _buildSettingTile(
+          icon: Icons.lock,
+          title: l10n.changePassword,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+          ),
+          isDark: isDark,
+          accentColor: accentColor,
+        ),
+        _buildSettingTile(
+          icon: Icons.lock_reset_rounded,
+          title: l10n.forgotPassword,
+          subtitle: l10n.sendResetLink,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ForgotPasswordScreen(
+                onBackTap: () => Navigator.of(context).pop(),
+                initialEmail: initialEmail,
+                launchedFromProfile: true,
+              ),
+            ),
+          ),
+          isDark: isDark,
+          accentColor: accentColor,
+        ),
+        if (!isSuperAdmin)
+          _buildSettingTile(
+            icon: Icons.folder_shared_rounded,
+            title: l10n.medicalDocuments,
+            subtitle: l10n.manageYourMedicalRecords,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MedicalDocumentsScreen()),
+            ),
+            isDark: isDark,
+            accentColor: accentColor,
+          ),
+      ],
+      isDark,
+    );
+
+    final about = _buildSection(
+      l10n.about,
+      [
+        _buildSettingTile(
+          icon: Icons.privacy_tip_rounded,
+          title: l10n.privacyPolicy,
+          onTap: () => _showPrivacyPolicy(context),
+          isDark: isDark,
+          accentColor: accentColor,
+        ),
+        _buildSettingTile(
+          icon: Icons.description_rounded,
+          title: l10n.termsOfService,
+          onTap: () => _showTermsOfService(context),
+          isDark: isDark,
+          accentColor: accentColor,
+        ),
+        _buildSettingTile(
+          icon: Icons.help_rounded,
+          title: l10n.helpAndSupport,
+          onTap: () => _showHelpSupport(context),
+          isDark: isDark,
+          accentColor: accentColor,
+        ),
+        _buildSettingTile(
+          icon: Icons.info_rounded,
+          title: l10n.version,
+          trailing: FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                return Text(
+                  snapshot.data!.version,
+                  style: GoogleFonts.roboto(color: Colors.grey),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          onTap: () => _showVersionInfo(context),
+          isDark: isDark,
+          accentColor: accentColor,
+        ),
+      ],
+      isDark,
+    );
+
+    final admin = isAdminLike
+        ? _buildSection(
+            l10n.admin,
+            [
+              _buildSettingTile(
+                icon: Icons.admin_panel_settings,
+                title: l10n.adminDashboard,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const AdminDashboardScreen()),
+                ),
+                isDark: isDark,
+                accentColor: accentColor,
+              ),
+            ],
+            isDark,
+          )
+        : null;
+
+    final logout = SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _showLogoutDialog(context, authProvider, l10n),
+        icon: const Icon(Icons.logout_rounded, color: AppColors.error),
+        label: Text(
+          l10n.logout,
+          style: GoogleFonts.poppins(color: AppColors.error),
+        ),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          side: const BorderSide(color: AppColors.error),
+        ),
+      ),
+    );
+
+    if (UhcResponsive.isWide(context)) {
+      return Column(
+        children: [
+          header,
+          const SizedBox(height: 28),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    account,
+                    const SizedBox(height: 20),
+                    about,
+                    const SizedBox(height: 24),
+                    logout,
+                  ],
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                flex: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    appearance,
+                    if (notifications != null) ...[
+                      const SizedBox(height: 20),
+                      notifications,
+                    ],
+                    if (admin != null) ...[
+                      const SizedBox(height: 20),
+                      admin,
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        header,
+        const SizedBox(height: 32),
+        appearance,
+        if (notifications != null) ...[
+          const SizedBox(height: 20),
+          notifications,
+        ],
+        const SizedBox(height: 20),
+        account,
+        const SizedBox(height: 20),
+        about,
+        if (admin != null) ...[
+          const SizedBox(height: 20),
+          admin,
+        ],
+        const SizedBox(height: 32),
+        logout,
+      ],
     );
   }
 

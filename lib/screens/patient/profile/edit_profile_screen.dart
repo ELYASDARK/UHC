@@ -357,8 +357,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      body: ResponsivePage(
+        maxWidth: 760,
+        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
         child: Form(
           key: _formKey,
           child: Column(

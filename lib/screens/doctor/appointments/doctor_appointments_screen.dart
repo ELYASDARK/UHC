@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../providers/doctor_appointment_provider.dart';
@@ -68,7 +69,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
           ),
           body: TabBarView(
             controller: _tabController,
-             children: [
+            children: [
               _buildList(
                 provider.upcomingAppointments,
                 true,
@@ -101,10 +102,17 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
     DoctorAppointmentProvider provider,
   ) {
     if (isLoading) {
-      return ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      return ResponsiveListView(
+        padding: UhcResponsive.pagePadding(
+          context,
+          bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        ),
+        maxWidth: 1320,
+        gridOnWide: true,
+        laptopColumns: 2,
+        desktopColumns: 3,
+        childAspectRatio: 2.75,
         itemCount: 3,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, __) => const AppointmentCardSkeleton(),
       );
     }
@@ -160,14 +168,20 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
 
     return RefreshIndicator(
       onRefresh: _loadAppointments,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      child: ResponsiveListView(
+        padding: UhcResponsive.pagePadding(
+          context,
+          bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        ),
+        maxWidth: 1320,
+        gridOnWide: true,
+        laptopColumns: 2,
+        desktopColumns: 3,
+        childAspectRatio: 2.75,
         itemCount: appointments.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final appointment = appointments[index];
-          final patientPhoto =
-              provider.patientPhotos[appointment.patientId];
+          final patientPhoto = provider.patientPhotos[appointment.patientId];
           return _DoctorAppointmentCard(
             appointment: appointment,
             isDark: isDark,
@@ -304,6 +318,8 @@ class _DoctorAppointmentCard extends StatelessWidget {
                     children: [
                       Text(
                         appointment.patientName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -314,6 +330,8 @@ class _DoctorAppointmentCard extends StatelessWidget {
                       ),
                       Text(
                         appointment.typeDisplay,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.roboto(
                           fontSize: 13,
                           color: isDark
@@ -366,14 +384,18 @@ class _DoctorAppointmentCard extends StatelessWidget {
                             : AppColors.textSecondaryLight,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        _formatDate(appointment.appointmentDate, l10n),
-                        style: GoogleFonts.roboto(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
+                      Expanded(
+                        child: Text(
+                          _formatDate(appointment.appointmentDate, l10n),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.roboto(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
                         ),
                       ),
                     ],
@@ -390,14 +412,18 @@ class _DoctorAppointmentCard extends StatelessWidget {
                             : AppColors.textSecondaryLight,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        appointment.timeSlot.split(' - ').first,
-                        style: GoogleFonts.roboto(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
+                      Expanded(
+                        child: Text(
+                          appointment.timeSlot.split(' - ').first,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.roboto(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
                         ),
                       ),
                     ],
@@ -405,23 +431,6 @@ class _DoctorAppointmentCard extends StatelessWidget {
                 ),
               ],
             ),
-
-            // Quick-action chips for actionable statuses
-            if (appointment.status == AppointmentStatus.pending ||
-                appointment.status == AppointmentStatus.confirmed) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
       ),

@@ -22,6 +22,9 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   // Daily notification config (set once via configureDailyNotifications)
   String? _dailyNotifDoctorUserId;
   Map<String, List<TimeSlot>>? _dailyNotifSchedule;
+  Future<void>? _dailyScheduleInFlight;
+  DateTime? _lastDailyScheduleAt;
+  static const Duration _dailyScheduleCooldown = Duration(seconds: 5);
 
   // Getters
   List<AppointmentModel> get appointments => _appointments;
@@ -315,7 +318,34 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   /// Internal routine to sync local notifications with Firestore/SharedPreferences
   Future<void> scheduleDailyNotifications() async {
     if (_dailyNotifDoctorUserId == null || _dailyNotifSchedule == null) return;
+    if (_dailyScheduleInFlight != null) {
+      debugPrint(
+        'Daily summary scheduling skipped: a previous sync is still in progress.',
+      );
+      await _dailyScheduleInFlight;
+      return;
+    }
 
+    final now = DateTime.now();
+    if (_lastDailyScheduleAt != null &&
+        now.difference(_lastDailyScheduleAt!) < _dailyScheduleCooldown) {
+      debugPrint(
+        'Daily summary scheduling skipped: cooldown active (${now.difference(_lastDailyScheduleAt!).inSeconds}s < ${_dailyScheduleCooldown.inSeconds}s).',
+      );
+      return;
+    }
+
+    final run = _scheduleDailyNotificationsInternal();
+    _dailyScheduleInFlight = run;
+    try {
+      await run;
+      _lastDailyScheduleAt = DateTime.now();
+    } finally {
+      _dailyScheduleInFlight = null;
+    }
+  }
+
+  Future<void> _scheduleDailyNotificationsInternal() async {
     final notifService = LocalNotificationService();
 
     final prefs = await SharedPreferences.getInstance();
@@ -447,7 +477,8 @@ class DoctorAppointmentProvider extends ChangeNotifier {
 
     if (overdue.isEmpty) return;
 
-    debugPrint('Auto no-show: marking ${overdue.length} overdue appointment(s)');
+    debugPrint(
+        'Auto no-show: marking ${overdue.length} overdue appointment(s)');
 
     for (final apt in overdue) {
       try {
@@ -463,8 +494,7 @@ class DoctorAppointmentProvider extends ChangeNotifier {
 
     // Re-fetch so the local list reflects the updated statuses
     try {
-      _appointments =
-          await _appointmentRepo.getAllDoctorAppointments(doctorId);
+      _appointments = await _appointmentRepo.getAllDoctorAppointments(doctorId);
     } catch (e) {
       debugPrint('Re-fetch after auto no-show failed: $e');
     }

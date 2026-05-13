@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/widgets/custom_text_field.dart';
+import '../../core/widgets/responsive_layout.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -82,8 +83,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       appBar: AppBar(title: Text(l10n.changePassword), centerTitle: true),
       body: !canChangePassword
           ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
+              child: ResponsiveContent(
+                maxWidth: 520,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -117,8 +118,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
               ),
             )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+          : ResponsivePage(
+              maxWidth: 520,
               child: Form(
                 key: _formKey,
                 child: Column(

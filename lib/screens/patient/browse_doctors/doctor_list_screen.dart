@@ -8,6 +8,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/localization_helper.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/models/department_model.dart';
 import '../../../data/repositories/doctor_repository.dart';
@@ -257,10 +258,17 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   }
 
   Widget _buildLoadingList() {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+    return ResponsiveListView(
+      padding: UhcResponsive.pagePadding(
+        context,
+        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+      ),
+      maxWidth: 1440,
+      gridOnWide: true,
+      laptopColumns: 2,
+      desktopColumns: 3,
+      childAspectRatio: 3.2,
       itemCount: 4,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) => const DoctorCardSkeleton(),
     );
   }
@@ -305,11 +313,18 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   }
 
   Widget _buildDoctorList(bool isDark) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+    return ResponsiveListView(
+      padding: UhcResponsive.pagePadding(
+        context,
+        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+      ),
+      maxWidth: 1440,
+      gridOnWide: true,
+      laptopColumns: 2,
+      desktopColumns: 3,
+      childAspectRatio: 3.1,
       itemCount: _filteredDoctors.length,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final doctor = _filteredDoctors[index];
         return _DoctorCard(
@@ -457,6 +472,10 @@ class DoctorDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (UhcResponsive.isWide(context)) {
+      return _buildWideDetail(context, isDark);
+    }
 
     return Scaffold(
       body: CustomScrollView(
@@ -752,6 +771,306 @@ class DoctorDetailScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildWideDetail(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          doctor.name,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+      ),
+      body: ResponsivePage(
+        maxWidth: 1180,
+        bottomPadding: 120,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(
+                height: 260,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: doctor.photoUrl ?? '',
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: AppColors.primary.withValues(alpha: 0.2),
+                        child: const Icon(Icons.person, size: 100),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: AppColors.primary.withValues(alpha: 0.2),
+                        child: const Icon(Icons.person, size: 100),
+                      ),
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.72),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 28,
+                      right: 28,
+                      bottom: 24,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            doctor.name,
+                            style: GoogleFonts.poppins(
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            LocalizationHelper.translateDepartment(
+                              doctor.specialization,
+                              l10n,
+                            ),
+                            style: GoogleFonts.roboto(
+                              fontSize: 17,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 22,
+                      horizontal: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.surfaceDark : Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildStatItem(
+                          LocalizationHelper.formatExperience(
+                            doctor.experienceYears,
+                            l10n,
+                          ),
+                          l10n.experience,
+                          Icons.workspace_premium_rounded,
+                          isDark,
+                        ),
+                        _buildStatItem(
+                          LocalizationHelper.translateDepartment(
+                            doctor.specialization,
+                            l10n,
+                          ),
+                          l10n.specialty,
+                          Icons.medical_services_rounded,
+                          isDark,
+                        ),
+                        _buildStatItem(
+                          doctor.isAvailable ? l10n.yes : l10n.no,
+                          l10n.available,
+                          doctor.isAvailable
+                              ? Icons.check_circle_rounded
+                              : Icons.cancel_rounded,
+                          isDark,
+                          valueColor: doctor.isAvailable
+                              ? AppColors.success
+                              : Colors.red,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                SizedBox(
+                  width: 360,
+                  child: _buildDoctorActions(context, vertical: true),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _buildWideTextPanel(
+                    context,
+                    isDark,
+                    title: l10n.aboutDoctor,
+                    child: Text(
+                      _getLocalizedBio(doctor, context),
+                      style: GoogleFonts.roboto(
+                        fontSize: 15,
+                        height: 1.6,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  flex: 2,
+                  child: _buildWideTextPanel(
+                    context,
+                    isDark,
+                    title: l10n.qualifications,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: doctor.qualifications.map((q) {
+                        return Chip(
+                          label: Text(
+                            LocalizationHelper.translateQualification(q, l10n),
+                          ),
+                          backgroundColor:
+                              AppColors.primary.withValues(alpha: 0.1),
+                          labelStyle: GoogleFonts.roboto(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWideTextPanel(
+    BuildContext context,
+    bool isDark, {
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
+            ),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDoctorActions(BuildContext context, {bool vertical = false}) {
+    final scheduleButton = SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DoctorScheduleScreen(doctor: doctor),
+            ),
+          );
+        },
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          minimumSize: const Size(0, 56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          side: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        icon: const Icon(Icons.schedule_rounded),
+        label: Text(
+          AppLocalizations.of(context).schedule,
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+    final bookButton = SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => BookingScreen(doctor: doctor)),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(0, 56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 4,
+        ),
+        icon: const Icon(Icons.calendar_today_rounded),
+        label: Text(
+          AppLocalizations.of(context).bookAppointment,
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+
+    if (vertical) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          scheduleButton,
+          const SizedBox(height: 12),
+          bookButton,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: scheduleButton),
+        const SizedBox(width: 12),
+        Expanded(child: bookButton),
+      ],
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/responsive_layout.dart';
 import '../../data/models/doctor_model.dart';
 import '../../data/repositories/doctor_repository.dart';
 import '../../providers/notification_provider.dart';
@@ -72,117 +73,154 @@ class _DoctorShellState extends State<DoctorShell> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final hasUnreadNotifications =
+        context.watch<NotificationProvider>().unreadCount > 0;
 
-    return Scaffold(
-      extendBody: true,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          // Tab 0: Dashboard
-          _visitedScreens.contains(0)
-              ? DoctorDashboardScreen(
-                  doctor: _doctor,
-                  onDoctorUpdated: _refreshDoctor,
-                  onNotificationsTap: () => _onTabTapped(3),
-                )
-              : const SizedBox.shrink(),
-          // Tab 1: Appointments
-          _visitedScreens.contains(1)
-              ? DoctorAppointmentsScreen(doctor: _doctor)
-              : const SizedBox.shrink(),
-          // Tab 2: Schedule
-          _visitedScreens.contains(2)
-              ? DoctorScheduleManagementScreen(doctor: _doctor)
-              : const SizedBox.shrink(),
-          // Tab 3: Notifications
-          _visitedScreens.contains(3)
-              ? const NotificationsScreen()
-              : const SizedBox.shrink(),
-          // Tab 4: Profile
-          _visitedScreens.contains(4)
-              ? DoctorProfileScreen(
-                  doctor: _doctor,
-                  onDoctorUpdated: _refreshDoctor,
-                )
-              : const SizedBox.shrink(),
-        ],
-      ),
-      bottomNavigationBar: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: SizedBox(
-          height: 70,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: isDark
-                    ? [
-                        AppColors.surfaceDark.withValues(alpha: 1),
-                        AppColors.surfaceDark,
-                      ]
-                    : [
-                        AppColors.surfaceLight.withValues(alpha: 1),
-                        AppColors.surfaceLight
-                      ],
-              ),
-              border: Border(
-                top: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : Colors.black.withValues(alpha: 0.05),
-                  width: 0.5,
-                ),
+    final body = IndexedStack(
+      index: _currentIndex,
+      children: [
+        // Tab 0: Dashboard
+        _visitedScreens.contains(0)
+            ? DoctorDashboardScreen(
+                doctor: _doctor,
+                onDoctorUpdated: _refreshDoctor,
+                onNotificationsTap: () => _onTabTapped(3),
+              )
+            : const SizedBox.shrink(),
+        // Tab 1: Appointments
+        _visitedScreens.contains(1)
+            ? DoctorAppointmentsScreen(doctor: _doctor)
+            : const SizedBox.shrink(),
+        // Tab 2: Schedule
+        _visitedScreens.contains(2)
+            ? DoctorScheduleManagementScreen(doctor: _doctor)
+            : const SizedBox.shrink(),
+        // Tab 3: Notifications
+        _visitedScreens.contains(3)
+            ? const NotificationsScreen()
+            : const SizedBox.shrink(),
+        // Tab 4: Profile
+        _visitedScreens.contains(4)
+            ? DoctorProfileScreen(
+                doctor: _doctor,
+                onDoctorUpdated: _refreshDoctor,
+              )
+            : const SizedBox.shrink(),
+      ],
+    );
+
+    final bottomNavigationBar = Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: SizedBox(
+        height: 70,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? [
+                      AppColors.surfaceDark.withValues(alpha: 1),
+                      AppColors.surfaceDark,
+                    ]
+                  : [
+                      AppColors.surfaceLight.withValues(alpha: 1),
+                      AppColors.surfaceLight
+                    ],
+            ),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.05),
+                width: 0.5,
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home_rounded,
-                  label: l10n.home,
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.calendar_today_outlined,
-                  activeIcon: Icons.calendar_today_rounded,
-                  label: l10n.appointments,
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.schedule_outlined,
-                  activeIcon: Icons.schedule_rounded,
-                  label: l10n.schedule,
-                  isDark: isDark,
-                ),
-                Consumer<NotificationProvider>(
-                  builder: (context, notificationProvider, _) {
-                    return _buildNavItem(
-                      index: 3,
-                      icon: Icons.notifications_outlined,
-                      activeIcon: Icons.notifications_rounded,
-                      label: l10n.alerts,
-                      isDark: isDark,
-                      showBadge: notificationProvider.unreadCount > 0,
-                    );
-                  },
-                ),
-                _buildNavItem(
-                  index: 4,
-                  icon: Icons.person_outline_rounded,
-                  activeIcon: Icons.person_rounded,
-                  label: l10n.profile,
-                  isDark: isDark,
-                ),
-              ],
-            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                index: 0,
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home_rounded,
+                label: l10n.home,
+                isDark: isDark,
+              ),
+              _buildNavItem(
+                index: 1,
+                icon: Icons.calendar_today_outlined,
+                activeIcon: Icons.calendar_today_rounded,
+                label: l10n.appointments,
+                isDark: isDark,
+              ),
+              _buildNavItem(
+                index: 2,
+                icon: Icons.schedule_outlined,
+                activeIcon: Icons.schedule_rounded,
+                label: l10n.schedule,
+                isDark: isDark,
+              ),
+              _buildNavItem(
+                index: 3,
+                icon: Icons.notifications_outlined,
+                activeIcon: Icons.notifications_rounded,
+                label: l10n.alerts,
+                isDark: isDark,
+                showBadge: hasUnreadNotifications,
+              ),
+              _buildNavItem(
+                index: 4,
+                icon: Icons.person_outline_rounded,
+                activeIcon: Icons.person_rounded,
+                label: l10n.profile,
+                isDark: isDark,
+              ),
+            ],
           ),
         ),
       ),
+    );
+
+    return AdaptiveNavigationScaffold(
+      selectedIndex: _currentIndex,
+      onDestinationSelected: _onTabTapped,
+      extendBody: true,
+      body: body,
+      bottomNavigationBar: bottomNavigationBar,
+      destinations: [
+        AdaptiveNavigationDestination(
+          index: 0,
+          icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
+          label: l10n.home,
+        ),
+        AdaptiveNavigationDestination(
+          index: 1,
+          icon: Icons.calendar_today_outlined,
+          selectedIcon: Icons.calendar_today_rounded,
+          label: l10n.appointments,
+        ),
+        AdaptiveNavigationDestination(
+          index: 2,
+          icon: Icons.schedule_outlined,
+          selectedIcon: Icons.schedule_rounded,
+          label: l10n.schedule,
+        ),
+        AdaptiveNavigationDestination(
+          index: 3,
+          icon: Icons.notifications_outlined,
+          selectedIcon: Icons.notifications_rounded,
+          label: l10n.alerts,
+          showBadge: hasUnreadNotifications,
+        ),
+        AdaptiveNavigationDestination(
+          index: 4,
+          icon: Icons.person_outline_rounded,
+          selectedIcon: Icons.person_rounded,
+          label: l10n.profile,
+        ),
+      ],
     );
   }
 

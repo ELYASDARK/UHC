@@ -6,6 +6,7 @@ import '../../../data/models/appointment_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/appointment_provider.dart';
 import 'package:uhc/l10n/app_localizations.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Emergency appointment request screen
 class EmergencyRequestScreen extends StatefulWidget {
@@ -71,8 +72,9 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
         centerTitle: true,
         backgroundColor: AppColors.error.withValues(alpha: 0.1),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      body: ResponsivePage(
+        maxWidth: 860,
+        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

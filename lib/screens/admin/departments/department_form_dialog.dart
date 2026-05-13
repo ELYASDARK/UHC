@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/department_icons.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../services/department_functions_service.dart';
 
 /// Quick-pick color palette
@@ -174,7 +175,12 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
     return AlertDialog(
       title: Text(isEditing ? 'Edit Department' : 'Add Department'),
       content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.85,
+        width: UhcResponsive.dialogWidth(
+          context,
+          tabletWidth: 560,
+          laptopWidth: 620,
+          desktopWidth: 680,
+        ),
         child: SingleChildScrollView(
           child: Form(
             key: _formKey,
@@ -628,29 +634,52 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
           ),
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
       actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _isSubmitting ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+        SizedBox(
+          width: UhcResponsive.dialogWidth(
+            context,
+            tabletWidth: 560,
+            laptopWidth: 620,
+            desktopWidth: 680,
           ),
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  isEditing ? 'Update' : 'Create',
-                  style: const TextStyle(color: Colors.white),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed:
+                      _isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
                 ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _isSubmitting ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(isEditing ? 'Update' : 'Create'),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -1018,7 +1047,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('Pick a Color'),
       content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.8,
+        width: UhcResponsive.dialogWidth(context, desktopWidth: 760),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

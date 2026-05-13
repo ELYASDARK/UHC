@@ -8,6 +8,7 @@ import '../../providers/doctor_appointment_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../services/local_notification_service.dart';
 import '../../l10n/app_localizations.dart';
+import '../../core/widgets/responsive_layout.dart';
 
 /// Notification settings model
 class NotificationSettings {
@@ -250,316 +251,324 @@ class _NotificationSettingsScreenState
       appBar: AppBar(title: Text(l10n.notificationSettings), centerTitle: true),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Permission Warning Banner
-                if (!_areNotificationsEnabled)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 24),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.warning.withValues(alpha: 0.5),
+          : ResponsivePage(
+              maxWidth: 900,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Permission Warning Banner
+                  if (!_areNotificationsEnabled)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.5),
+                        ),
                       ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.notifications_off_outlined,
+                            color: AppColors.warning,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.systemNotificationsDisabled,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color:
+                                        isDark ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  l10n.tapToEnableInSettings,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? Colors.grey[400]
+                                        : Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Core Notification Methods Section
+                  _buildSectionHeader(
+                    l10n.notificationSettings,
+                    Icons.phone_iphone_rounded,
+                  ),
+                  _buildSettingCard(
+                    isDark: isDark,
+                    children: [
+                      _buildSwitchTile(
+                        title: l10n.pushNotifications,
+                        subtitle: l10n.receiveAlertsOnDevice,
+                        value: _settings.pushEnabled,
+                        onChanged: _togglePushNotifications,
+                      ),
+                      if (isDoctor && _settings.pushEnabled) ...[
+                        const Divider(height: 1),
+                        _buildSubSwitchTile(
+                          title: l10n.dailySummaryTitle,
+                          subtitle: l10n.dailySummarySubtitle,
+                          value: _settings.dailySummary,
+                          onChanged: (value) async {
+                            setState(() {
+                              _settings =
+                                  _settings.copyWith(dailySummary: value);
+                            });
+                            await _saveSetting('notif_daily_summary', value);
+                            if (context.mounted) {
+                              context
+                                  .read<DoctorAppointmentProvider>()
+                                  .scheduleDailyNotifications();
+                            }
+                          },
+                        ),
+                        if (_settings.dailySummary) ...[
+                          const Divider(height: 1),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 24),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 0),
+                              title: Text(l10n.summaryTime,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 14)),
+                              subtitle: Text(l10n.summaryTimeSubtitle,
+                                  style: TextStyle(fontSize: 11)),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Builder(
+                                  builder: (context) {
+                                    final parts =
+                                        _settings.dailySummaryTime.split(':');
+                                    final hour = parts.isNotEmpty
+                                        ? int.tryParse(parts[0]) ?? 21
+                                        : 21;
+                                    final minute = parts.length > 1
+                                        ? int.tryParse(parts[1]) ?? 0
+                                        : 0;
+                                    final time =
+                                        TimeOfDay(hour: hour, minute: minute);
+                                    return Text(
+                                      time.format(context),
+                                      style: const TextStyle(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              onTap: () async {
+                                final parts =
+                                    _settings.dailySummaryTime.split(':');
+                                final initialTime = TimeOfDay(
+                                  hour: parts.isNotEmpty
+                                      ? int.tryParse(parts[0]) ?? 21
+                                      : 21,
+                                  minute: parts.length > 1
+                                      ? int.tryParse(parts[1]) ?? 0
+                                      : 0,
+                                );
+                                final time = await showTimePicker(
+                                  context: context,
+                                  initialTime: initialTime,
+                                );
+                                if (time != null && mounted) {
+                                  final timeStr =
+                                      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                                  setState(() {
+                                    _settings = _settings.copyWith(
+                                        dailySummaryTime: timeStr);
+                                  });
+                                  await _saveSettingString(
+                                      'notif_daily_summary_time', timeStr);
+                                  if (context.mounted) {
+                                    context
+                                        .read<DoctorAppointmentProvider>()
+                                        .scheduleDailyNotifications();
+                                  }
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                      if (!isDoctor && _settings.pushEnabled) ...[
+                        const Divider(height: 1),
+                        _buildSubSwitchTile(
+                          title: l10n.appointmentReminders,
+                          subtitle:
+                              l10n.receiveRemindersForUpcomingAppointments,
+                          value: _settings.appointmentReminders,
+                          onChanged: (value) async {
+                            setState(() {
+                              _settings = _settings.copyWith(
+                                appointmentReminders: value,
+                              );
+                            });
+                            await _saveSetting(
+                              'notif_appointment_reminders',
+                              value,
+                            );
+                          },
+                        ),
+                        if (_settings.appointmentReminders) ...[
+                          const Divider(height: 1),
+                          _buildSubSwitchTile(
+                            title: l10n.weekReminder1,
+                            subtitle: l10n.getNotified1WeekBefore,
+                            value: _settings.reminder1Week,
+                            onChanged: (value) async {
+                              setState(() {
+                                _settings = _settings.copyWith(
+                                  reminder1Week: value,
+                                );
+                              });
+                              await _saveSetting('notif_reminder_1w', value);
+                            },
+                          ),
+                          const Divider(height: 1),
+                          _buildSubSwitchTile(
+                            title: l10n.hourReminder24,
+                            subtitle: l10n.getNotified24HoursBefore,
+                            value: _settings.reminder24Hours,
+                            onChanged: (value) async {
+                              setState(() {
+                                _settings = _settings.copyWith(
+                                  reminder24Hours: value,
+                                );
+                              });
+                              await _saveSetting('notif_reminder_24h', value);
+                            },
+                          ),
+                          const Divider(height: 1),
+                          _buildSubSwitchTile(
+                            title: l10n.hourReminder1,
+                            subtitle: l10n.getNotified1HourBefore,
+                            value: _settings.reminder1Hour,
+                            onChanged: (value) async {
+                              setState(() {
+                                _settings = _settings.copyWith(
+                                  reminder1Hour: value,
+                                );
+                              });
+                              await _saveSetting('notif_reminder_1h', value);
+                            },
+                          ),
+                        ],
+                      ],
+                      const Divider(height: 1),
+                      _buildSwitchTile(
+                        title: l10n.emailNotifications,
+                        subtitle: l10n.receiveSummariesViaEmail,
+                        value: _settings.emailEnabled,
+                        onChanged: _toggleEmailNotifications,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Sound & Vibration Section
+                  _buildSectionHeader(l10n.soundAndVibration, Icons.volume_up),
+                  _buildSettingCard(
+                    isDark: isDark,
+                    children: [
+                      _buildSwitchTile(
+                        title: l10n.sound,
+                        subtitle: l10n.playSoundForNotifications,
+                        value: _settings.soundEnabled,
+                        onChanged: (value) async {
+                          setState(() {
+                            _settings = _settings.copyWith(soundEnabled: value);
+                          });
+                          await _saveSetting('notif_sound', value);
+                        },
+                      ),
+                      const Divider(height: 1),
+                      _buildSwitchTile(
+                        title: l10n.vibration,
+                        subtitle: l10n.vibrateForNotifications,
+                        value: _settings.vibrationEnabled,
+                        onChanged: (value) async {
+                          setState(() {
+                            _settings = _settings.copyWith(
+                              vibrationEnabled: value,
+                            );
+                          });
+                          await _saveSetting('notif_vibration', value);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Test Notification Button
+                  OutlinedButton.icon(
+                    onPressed: _sendTestNotification,
+                    icon: const Icon(Icons.notifications_active),
+                    label: Text(l10n.sendTestNotification),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Info Text
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
                         const Icon(
-                          Icons.notifications_off_outlined,
-                          color: AppColors.warning,
+                          Icons.info_outline,
+                          color: AppColors.info,
+                          size: 20,
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.systemNotificationsDisabled,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                l10n.tapToEnableInSettings,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark
-                                      ? Colors.grey[400]
-                                      : Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Core Notification Methods Section
-                _buildSectionHeader(
-                  l10n.notificationSettings,
-                  Icons.phone_iphone_rounded,
-                ),
-                _buildSettingCard(
-                  isDark: isDark,
-                  children: [
-                    _buildSwitchTile(
-                      title: l10n.pushNotifications,
-                      subtitle: l10n.receiveAlertsOnDevice,
-                      value: _settings.pushEnabled,
-                      onChanged: _togglePushNotifications,
-                    ),
-                    if (isDoctor && _settings.pushEnabled) ...[
-                      const Divider(height: 1),
-                      _buildSubSwitchTile(
-                        title: l10n.dailySummaryTitle,
-                        subtitle: l10n.dailySummarySubtitle,
-                        value: _settings.dailySummary,
-                        onChanged: (value) async {
-                          setState(() {
-                            _settings = _settings.copyWith(dailySummary: value);
-                          });
-                          await _saveSetting('notif_daily_summary', value);
-                          if (context.mounted) {
-                            context
-                                .read<DoctorAppointmentProvider>()
-                                .scheduleDailyNotifications();
-                          }
-                        },
-                      ),
-                      if (_settings.dailySummary) ...[
-                        const Divider(height: 1),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 24),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 0),
-                            title: Text(l10n.summaryTime,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w500, fontSize: 14)),
-                            subtitle: Text(l10n.summaryTimeSubtitle,
-                                style: TextStyle(fontSize: 11)),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Builder(
-                                builder: (context) {
-                                  final parts =
-                                      _settings.dailySummaryTime.split(':');
-                                  final hour = parts.isNotEmpty
-                                      ? int.tryParse(parts[0]) ?? 21
-                                      : 21;
-                                  final minute = parts.length > 1
-                                      ? int.tryParse(parts[1]) ?? 0
-                                      : 0;
-                                  final time =
-                                      TimeOfDay(hour: hour, minute: minute);
-                                  return Text(
-                                    time.format(context),
-                                    style: const TextStyle(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  );
-                                },
-                              ),
+                          child: Text(
+                            l10n.manageNotificationPermissionsInSettings,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                             ),
-                            onTap: () async {
-                              final parts =
-                                  _settings.dailySummaryTime.split(':');
-                              final initialTime = TimeOfDay(
-                                hour: parts.isNotEmpty
-                                    ? int.tryParse(parts[0]) ?? 21
-                                    : 21,
-                                minute: parts.length > 1
-                                    ? int.tryParse(parts[1]) ?? 0
-                                    : 0,
-                              );
-                              final time = await showTimePicker(
-                                context: context,
-                                initialTime: initialTime,
-                              );
-                              if (time != null && mounted) {
-                                final timeStr =
-                                    '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-                                setState(() {
-                                  _settings = _settings.copyWith(
-                                      dailySummaryTime: timeStr);
-                                });
-                                await _saveSettingString(
-                                    'notif_daily_summary_time', timeStr);
-                                if (context.mounted) {
-                                  context
-                                      .read<DoctorAppointmentProvider>()
-                                      .scheduleDailyNotifications();
-                                }
-                              }
-                            },
                           ),
                         ),
                       ],
-                    ],
-                    if (!isDoctor && _settings.pushEnabled) ...[
-                      const Divider(height: 1),
-                      _buildSubSwitchTile(
-                        title: l10n.appointmentReminders,
-                        subtitle: l10n.receiveRemindersForUpcomingAppointments,
-                        value: _settings.appointmentReminders,
-                        onChanged: (value) async {
-                          setState(() {
-                            _settings = _settings.copyWith(
-                              appointmentReminders: value,
-                            );
-                          });
-                          await _saveSetting(
-                            'notif_appointment_reminders',
-                            value,
-                          );
-                        },
-                      ),
-                      if (_settings.appointmentReminders) ...[
-                        const Divider(height: 1),
-                        _buildSubSwitchTile(
-                          title: l10n.weekReminder1,
-                          subtitle: l10n.getNotified1WeekBefore,
-                          value: _settings.reminder1Week,
-                          onChanged: (value) async {
-                            setState(() {
-                              _settings = _settings.copyWith(
-                                reminder1Week: value,
-                              );
-                            });
-                            await _saveSetting('notif_reminder_1w', value);
-                          },
-                        ),
-                        const Divider(height: 1),
-                        _buildSubSwitchTile(
-                          title: l10n.hourReminder24,
-                          subtitle: l10n.getNotified24HoursBefore,
-                          value: _settings.reminder24Hours,
-                          onChanged: (value) async {
-                            setState(() {
-                              _settings = _settings.copyWith(
-                                reminder24Hours: value,
-                              );
-                            });
-                            await _saveSetting('notif_reminder_24h', value);
-                          },
-                        ),
-                        const Divider(height: 1),
-                        _buildSubSwitchTile(
-                          title: l10n.hourReminder1,
-                          subtitle: l10n.getNotified1HourBefore,
-                          value: _settings.reminder1Hour,
-                          onChanged: (value) async {
-                            setState(() {
-                              _settings = _settings.copyWith(
-                                reminder1Hour: value,
-                              );
-                            });
-                            await _saveSetting('notif_reminder_1h', value);
-                          },
-                        ),
-                      ],
-                    ],
-                    const Divider(height: 1),
-                    _buildSwitchTile(
-                      title: l10n.emailNotifications,
-                      subtitle: l10n.receiveSummariesViaEmail,
-                      value: _settings.emailEnabled,
-                      onChanged: _toggleEmailNotifications,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Sound & Vibration Section
-                _buildSectionHeader(l10n.soundAndVibration, Icons.volume_up),
-                _buildSettingCard(
-                  isDark: isDark,
-                  children: [
-                    _buildSwitchTile(
-                      title: l10n.sound,
-                      subtitle: l10n.playSoundForNotifications,
-                      value: _settings.soundEnabled,
-                      onChanged: (value) async {
-                        setState(() {
-                          _settings = _settings.copyWith(soundEnabled: value);
-                        });
-                        await _saveSetting('notif_sound', value);
-                      },
-                    ),
-                    const Divider(height: 1),
-                    _buildSwitchTile(
-                      title: l10n.vibration,
-                      subtitle: l10n.vibrateForNotifications,
-                      value: _settings.vibrationEnabled,
-                      onChanged: (value) async {
-                        setState(() {
-                          _settings = _settings.copyWith(
-                            vibrationEnabled: value,
-                          );
-                        });
-                        await _saveSetting('notif_vibration', value);
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Test Notification Button
-                OutlinedButton.icon(
-                  onPressed: _sendTestNotification,
-                  icon: const Icon(Icons.notifications_active),
-                  label: Text(l10n.sendTestNotification),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                // Info Text
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.info.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.info_outline,
-                        color: AppColors.info,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          l10n.manageNotificationPermissionsInSettings,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }

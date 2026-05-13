@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Health center map/location screen
 class HealthCenterMapScreen extends StatelessWidget {
@@ -23,82 +24,86 @@ class HealthCenterMapScreen extends StatelessWidget {
         title: const Text('Health Center Location'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
+      body: ResponsivePage(
+        maxWidth: 1180,
+        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
         child: Column(
           children: [
             // Map Placeholder
-            Container(
-              height: 300,
+            SizedBox(
+              height: UhcResponsive.isWide(context) ? 420 : 300,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.grey[200],
-              ),
-              child: Stack(
-                children: [
-                  // Map placeholder image
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.map,
-                          size: 80,
-                          color: AppColors.primary.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Tap to open in Maps',
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.grey[200],
+                ),
+                child: Stack(
+                  children: [
+                    // Map placeholder image
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.map,
+                            size: 80,
+                            color: AppColors.primary.withValues(alpha: 0.5),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Tap overlay
-                  Positioned.fill(
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(onTap: () => _openInMaps(context)),
-                    ),
-                  ),
-                  // Map controls
-                  Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: Column(
-                      children: [
-                        FloatingActionButton.small(
-                          heroTag: 'directions',
-                          onPressed: () => _openDirections(context),
-                          backgroundColor: AppColors.primary,
-                          child: const Icon(
-                            Icons.directions,
-                            color: Colors.white,
+                          const SizedBox(height: 16),
+                          Text(
+                            'Tap to open in Maps',
+                            style: TextStyle(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        FloatingActionButton.small(
-                          heroTag: 'maps',
-                          onPressed: () => _openInMaps(context),
-                          backgroundColor: Colors.white,
-                          child: const Icon(
-                            Icons.open_in_new,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    // Tap overlay
+                    Positioned.fill(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(onTap: () => _openInMaps(context)),
+                      ),
+                    ),
+                    // Map controls
+                    Positioned(
+                      right: 16,
+                      bottom: 16,
+                      child: Column(
+                        children: [
+                          FloatingActionButton.small(
+                            heroTag: 'directions',
+                            onPressed: () => _openDirections(context),
+                            backgroundColor: AppColors.primary,
+                            child: const Icon(
+                              Icons.directions,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          FloatingActionButton.small(
+                            heroTag: 'maps',
+                            onPressed: () => _openInMaps(context),
+                            backgroundColor: Colors.white,
+                            child: const Icon(
+                              Icons.open_in_new,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
             // Location Details
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.only(top: 20),
               child: Column(
                 children: [
                   // Address Card
@@ -112,26 +117,24 @@ class HealthCenterMapScreen extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   // Contact Info
-                  Row(
+                  ResponsiveGrid(
+                    laptopColumns: 2,
+                    desktopColumns: 2,
+                    childAspectRatio: UhcResponsive.isWide(context) ? 3.5 : 1.8,
                     children: [
-                      Expanded(
-                        child: _buildContactCard(
-                          isDark: isDark,
-                          icon: Icons.phone,
-                          title: 'Call',
-                          subtitle: _phone,
-                          onTap: () => _makePhoneCall(context),
-                        ),
+                      _buildContactCard(
+                        isDark: isDark,
+                        icon: Icons.phone,
+                        title: 'Call',
+                        subtitle: _phone,
+                        onTap: () => _makePhoneCall(context),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildContactCard(
-                          isDark: isDark,
-                          icon: Icons.email,
-                          title: 'Email',
-                          subtitle: _email,
-                          onTap: () => _sendEmail(context),
-                        ),
+                      _buildContactCard(
+                        isDark: isDark,
+                        icon: Icons.email,
+                        title: 'Email',
+                        subtitle: _email,
+                        onTap: () => _sendEmail(context),
                       ),
                     ],
                   ),
@@ -142,27 +145,25 @@ class HealthCenterMapScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Quick Actions
-                  Row(
+                  ResponsiveGrid(
+                    laptopColumns: 2,
+                    desktopColumns: 2,
+                    childAspectRatio: UhcResponsive.isWide(context) ? 4.5 : 3.2,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _openDirections(context),
-                          icon: const Icon(Icons.directions),
-                          label: const Text('Get Directions'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
+                      OutlinedButton.icon(
+                        onPressed: () => _openDirections(context),
+                        icon: const Icon(Icons.directions),
+                        label: const Text('Get Directions'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _makePhoneCall(context),
-                          icon: const Icon(Icons.phone),
-                          label: const Text('Call Now'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
+                      ElevatedButton.icon(
+                        onPressed: () => _makePhoneCall(context),
+                        icon: const Icon(Icons.phone),
+                        label: const Text('Call Now'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ],

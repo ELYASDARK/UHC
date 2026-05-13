@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../providers/appointment_provider.dart';
@@ -156,8 +157,9 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       ),
       body: !canReschedule
           ? _buildPolicyViolation(isDark)
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+          : ResponsivePage(
+              maxWidth: 860,
+              bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

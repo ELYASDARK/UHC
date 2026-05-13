@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/localization_helper.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/department_model.dart';
 import '../../../data/repositories/department_repository.dart';
 import '../../../l10n/app_localizations.dart';
@@ -59,6 +60,12 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final breakpoint = UhcResponsive.breakpointOf(context);
+    final departmentCardAspectRatio = breakpoint.isWide
+        ? 1.05
+        : breakpoint.isTablet
+            ? 1.2
+            : 2.1;
 
     return Scaffold(
       appBar: AppBar(
@@ -84,66 +91,49 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
             )
           : RefreshIndicator(
               onRefresh: _loadDepartments,
-              child: CustomScrollView(
+              child: ResponsivePage(
+                maxWidth: 1440,
+                bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
                 physics: const BouncingScrollPhysics(
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppLocalizations.of(context).departments,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: GoogleFonts.poppins().fontFamily,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            AppLocalizations.of(context).findBestDoctors,
-                            style:
-                                Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: isDark
-                                          ? AppColors.textSecondaryDark
-                                          : AppColors.textSecondaryLight,
-                                      fontFamily:
-                                          GoogleFonts.roboto().fontFamily,
-                                    ),
-                          ),
-                          const SizedBox(height: 24),
-                        ],
-                      ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context).departments,
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontFamily: GoogleFonts.poppins().fontFamily,
+                              ),
                     ),
-                  ),
-                  if (_isLoading && _departments.isEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                              childAspectRatio: 0.78,
-                            ),
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          return const CardSkeleton(height: 180);
-                        }, childCount: 6),
-                      ),
-                    )
-                  else if (_departments.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                    const SizedBox(height: 8),
+                    Text(
+                      AppLocalizations.of(context).findBestDoctors,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                            fontFamily: GoogleFonts.roboto().fontFamily,
+                          ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (_isLoading && _departments.isEmpty)
+                      ResponsiveGrid(
+                        tabletColumns: 3,
+                        laptopColumns: 4,
+                        desktopColumns: 5,
+                        childAspectRatio: departmentCardAspectRatio,
+                        children: List.generate(
+                          6,
+                          (_) => const CardSkeleton(height: 180),
+                        ),
+                      )
+                    else if (_departments.isEmpty)
+                      SizedBox(
+                        height: 280,
+                        child: Center(
                           child: Text(
                             AppLocalizations.of(context).noDepartments,
                             style: TextStyle(
@@ -153,31 +143,25 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
                             ),
                           ),
                         ),
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                              childAspectRatio: 0.78,
+                      )
+                    else
+                      ResponsiveGrid(
+                        tabletColumns: 3,
+                        laptopColumns: 4,
+                        desktopColumns: 5,
+                        childAspectRatio: departmentCardAspectRatio,
+                        children: [
+                          for (final dept in _departments)
+                            RepaintBoundary(
+                              child: _DepartmentCard(
+                                department: dept,
+                                isDark: isDark,
+                              ),
                             ),
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final dept = _departments[index];
-                          return RepaintBoundary(
-                            child: _DepartmentCard(
-                              department: dept,
-                              isDark: isDark,
-                            ),
-                          );
-                        }, childCount: _departments.length),
+                        ],
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
     );

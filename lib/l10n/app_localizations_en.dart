@@ -69,22 +69,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingTitle1 => 'Book Appointments';
 
   @override
-  String get onboardingDesc1 =>
-      'Schedule appointments with university doctors easily and quickly';
+  String get onboardingDesc1 => 'Schedule appointments with university doctors easily and quickly';
 
   @override
   String get onboardingTitle2 => 'Get Reminders';
 
   @override
-  String get onboardingDesc2 =>
-      'Never miss an appointment with smart notifications and reminders';
+  String get onboardingDesc2 => 'Never miss an appointment with smart notifications and reminders';
 
   @override
   String get onboardingTitle3 => 'Track Your Health';
 
   @override
-  String get onboardingDesc3 =>
-      'Keep all your medical records and appointment history in one place';
+  String get onboardingDesc3 => 'Keep all your medical records and appointment history in one place';
 
   @override
   String get skip => 'Skip';
@@ -231,8 +228,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookAnAppointment => 'Book an Appointment';
 
   @override
-  String get findBestDoctors =>
-      'Find the best doctors and schedule your visit today';
+  String get findBestDoctors => 'Find the best doctors and schedule your visit today';
 
   @override
   String get howAreYouFeeling => 'How are you feeling today?';
@@ -334,8 +330,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get residency => 'Residency';
 
   @override
-  String get boardCertifiedInternalMedicine =>
-      'Board Certified Internal Medicine';
+  String get boardCertifiedInternalMedicine => 'Board Certified Internal Medicine';
 
   @override
   String get msOrthodontics => 'MS Orthodontics';
@@ -350,8 +345,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get familyMedicineSpecialist => 'Family Medicine Specialist';
 
   @override
-  String get boardCertifiedCardiovascularDisease =>
-      'Board Certified Cardiovascular Disease';
+  String get boardCertifiedCardiovascularDisease => 'Board Certified Cardiovascular Disease';
 
   @override
   String get facc => 'FACC';
@@ -441,8 +435,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deptCardiology => 'Cardiology';
 
   @override
-  String get emergencyCall911 =>
-      'For life-threatening emergencies, please call 911 immediately.';
+  String get emergencyCall911 => 'For life-threatening emergencies, please call 911 immediately.';
 
   @override
   String get severityLevel => 'Severity Level';
@@ -451,30 +444,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get describeYourSymptoms => 'Describe Your Symptoms';
 
   @override
-  String get describeSymptomsHint =>
-      'Please describe your symptoms in detail...';
+  String get describeSymptomsHint => 'Please describe your symptoms in detail...';
 
   @override
-  String get emergencyTerms =>
-      'I understand this is for urgent medical attention and not for routine appointments.';
+  String get emergencyTerms => 'I understand this is for urgent medical attention and not for routine appointments.';
 
   @override
   String get submitEmergencyRequest => 'Submit Emergency Request';
 
   @override
-  String get emergencyResponseNotification =>
-      'You will be notified once a healthcare provider responds.';
+  String get emergencyResponseNotification => 'You will be notified once a healthcare provider responds.';
 
   @override
   String get requestSubmitted => 'Request Submitted';
 
   @override
-  String get emergencyRequestSuccessMessage =>
-      'Your emergency request has been submitted. Our medical team will contact you shortly.';
+  String get emergencyRequestSuccessMessage => 'Your emergency request has been submitted. Our medical team will contact you shortly.';
 
   @override
-  String get rescheduleFailedSlotTaken =>
-      'Failed to reschedule. The slot might be taken.';
+  String get rescheduleFailedSlotTaken => 'Failed to reschedule. The slot might be taken.';
 
   @override
   String get appointmentDetails => 'Appointment Details';
@@ -486,8 +474,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancelAppointment => 'Cancel Appointment';
 
   @override
-  String get cancelAppointmentConfirm =>
-      'Are you sure you want to cancel this appointment?';
+  String get cancelAppointmentConfirm => 'Are you sure you want to cancel this appointment?';
 
   @override
   String get appointmentStatus => 'Appointment Status';
@@ -547,8 +534,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get regularExercise => 'Regular Exercise';
 
   @override
-  String get regularExerciseDesc =>
-      '30 minutes of daily activity keeps you fit';
+  String get regularExerciseDesc => '30 minutes of daily activity keeps you fit';
 
   @override
   String get getEnoughSleep => 'Get Enough Sleep';
@@ -641,8 +627,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appointmentNotifications => 'Appointment Notifications';
 
   @override
-  String get receiveRemindersForUpcomingAppointments =>
-      'Receive reminders for upcoming appointments';
+  String get receiveRemindersForUpcomingAppointments => 'Receive reminders for upcoming appointments';
 
   @override
   String get hourReminder24 => 'Hour Reminder-24';
@@ -669,8 +654,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get healthTipsNotification => 'Health Tips';
 
   @override
-  String get dailyHealthTipsAndWellnessAdvice =>
-      'Daily health tips and wellness advice';
+  String get dailyHealthTipsAndWellnessAdvice => 'Daily health tips and wellness advice';
 
   @override
   String get doctorUpdates => 'Doctor Updates';
@@ -697,8 +681,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vibrateForNotifications => 'Vibrate for notifications';
 
   @override
-  String get manageNotificationPermissionsInSettings =>
-      'You can also manage notification permissions in your device settings';
+  String get manageNotificationPermissionsInSettings => 'You can also manage notification permissions in your device settings';
 
   @override
   String get about => 'About';
@@ -794,8 +777,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteDocument => 'Delete Document';
 
   @override
-  String get deleteDocumentConfirm =>
-      'Are you sure you want to delete this document?';
+  String get deleteDocumentConfirm => 'Are you sure you want to delete this document?';
 
   @override
   String get documentDeleted => 'Document deleted';
@@ -969,8 +951,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get clearNotifications => 'Clear Notifications';
 
   @override
-  String get clearNotificationsConfirm =>
-      'Are you sure you want to clear all notifications? This action cannot be undone.';
+  String get clearNotificationsConfirm => 'Are you sure you want to clear all notifications? This action cannot be undone.';
 
   @override
   String get clearAll => 'Clear All';
@@ -1279,8 +1260,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get additionalNotesOptional => 'Additional Notes (Optional)';
 
   @override
-  String get describeSymptoms =>
-      'Describe your symptoms or reason for visit...';
+  String get describeSymptoms => 'Describe your symptoms or reason for visit...';
 
   @override
   String get pleaseSelectDateFirst => 'Please select a date first';
@@ -1289,8 +1269,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noAvailableSlotsOnThisDay => 'No available slots on this day';
 
   @override
-  String get appointmentScheduledSuccessfully =>
-      'Your appointment has been scheduled successfully';
+  String get appointmentScheduledSuccessfully => 'Your appointment has been scheduled successfully';
 
   @override
   String get showQRCodeAtCheckIn => 'Show this QR code at check-in';
@@ -1314,8 +1293,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewMyAppointments => 'View My Appointments';
 
   @override
-  String get noNotificationsDesc =>
-      'Your appointment reminders will appear here';
+  String get noNotificationsDesc => 'Your appointment reminders will appear here';
 
   @override
   String get profileSettings => 'Profile Settings';
@@ -1345,8 +1323,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pleaseLoginToBook => 'Please login to book an appointment';
 
   @override
-  String get bookingCancellationPolicy =>
-      'You can cancel or reschedule up to 24 hours before the appointment.';
+  String get bookingCancellationPolicy => 'You can cancel or reschedule up to 24 hours before the appointment.';
 
   @override
   String get saveChanges => 'Save Changes';
@@ -1433,8 +1410,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorLoadingDocuments => 'Error loading documents';
 
   @override
-  String get uploadMedicalDocumentsDescription =>
-      'Upload your medical documents to keep them organized';
+  String get uploadMedicalDocumentsDescription => 'Upload your medical documents to keep them organized';
 
   @override
   String get cancelAppointmentTitle => 'Cancel Appointment?';
@@ -1443,12 +1419,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cannotCancel => 'Cannot Cancel';
 
   @override
-  String get cancelPolicyMessage =>
-      'This appointment cannot be cancelled as it is past the cancellation window.';
+  String get cancelPolicyMessage => 'This appointment cannot be cancelled as it is past the cancellation window.';
 
   @override
-  String get lateCancellationWarning =>
-      'Late cancellation may affect your booking priority.';
+  String get lateCancellationWarning => 'Late cancellation may affect your booking priority.';
 
   @override
   String get reasonForCancellation => 'Reason for Cancellation';
@@ -1481,8 +1455,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cannotReschedule => 'Cannot Reschedule';
 
   @override
-  String get reschedulePolicyMessage =>
-      'Appointments can only be rescheduled at least 24 hours before the scheduled time.';
+  String get reschedulePolicyMessage => 'Appointments can only be rescheduled at least 24 hours before the scheduled time.';
 
   @override
   String get goBack => 'Go Back';
@@ -1509,36 +1482,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectNewTime => 'Select New Time';
 
   @override
-  String get doctorBioAmandaWhite =>
-      'Dr. Amanda White provides medication management and pharmaceutical care consultations.';
+  String get doctorBioAmandaWhite => 'Dr. Amanda White provides medication management and pharmaceutical care consultations.';
 
   @override
-  String get doctorBioLisaBrown =>
-      'Dr. Lisa Brown provides counseling for anxiety, depression, and stress management for university students.';
+  String get doctorBioLisaBrown => 'Dr. Lisa Brown provides counseling for anxiety, depression, and stress management for university students.';
 
   @override
-  String get doctorBioJamesWilson =>
-      'Dr. James Wilson is an orthodontist specializing in braces and teeth alignment for students.';
+  String get doctorBioJamesWilson => 'Dr. James Wilson is an orthodontist specializing in braces and teeth alignment for students.';
 
   @override
-  String get doctorBioRobertTaylor =>
-      'Dr. Robert Taylor specializes in academic stress, relationships, and personal development counseling.';
+  String get doctorBioRobertTaylor => 'Dr. Robert Taylor specializes in academic stress, relationships, and personal development counseling.';
 
   @override
-  String get doctorBioDavidLee =>
-      'Dr. David Lee specializes in drug interactions and medication optimization for complex cases.';
+  String get doctorBioDavidLee => 'Dr. David Lee specializes in drug interactions and medication optimization for complex cases.';
 
   @override
-  String get doctorBioSarahJohnson =>
-      'Dr. Sarah Johnson specializes in internal medicine with over 10 years of experience in treating chronic conditions.';
+  String get doctorBioSarahJohnson => 'Dr. Sarah Johnson specializes in internal medicine with over 10 years of experience in treating chronic conditions.';
 
   @override
-  String get doctorBioEmilyDavis =>
-      'Dr. Emily Davis offers comprehensive dental care, including preventive, restorative, and cosmetic dentistry.';
+  String get doctorBioEmilyDavis => 'Dr. Emily Davis offers comprehensive dental care, including preventive, restorative, and cosmetic dentistry.';
 
   @override
-  String get doctorBioMichaelChen =>
-      'Dr. Michael Chen provides comprehensive family medicine care for patients of all ages.';
+  String get doctorBioMichaelChen => 'Dr. Michael Chen provides comprehensive family medicine care for patients of all ages.';
 
   @override
   String get developerTesting => 'Developer Testing';
@@ -1547,19 +1512,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scheduleTestNotification => 'Schedule Test Notification (30s)';
 
   @override
-  String get testNotificationBody =>
-      'This is a test notification to verify the system is working!';
+  String get testNotificationBody => 'This is a test notification to verify the system is working!';
 
   @override
   String get scheduledTestNotificationTitle => 'Scheduled Test Notification';
 
   @override
-  String get scheduledTestNotificationBody =>
-      'This notification was scheduled 30 seconds ago.';
+  String get scheduledTestNotificationBody => 'This notification was scheduled 30 seconds ago.';
 
   @override
-  String get testNotificationScheduled =>
-      'Notification scheduled for 30 seconds from now!';
+  String get testNotificationScheduled => 'Notification scheduled for 30 seconds from now!';
 
   @override
   String get pleaseLoginFirst => 'Please login first';
@@ -1585,8 +1547,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sendResetLink => 'Send Reset Link';
 
   @override
-  String get resetPasswordSubtitle =>
-      'Enter your email and we\'ll send you a link to reset your password';
+  String get resetPasswordSubtitle => 'Enter your email and we\'ll send you a link to reset your password';
 
   @override
   String get welcomeBack => 'Welcome Back';
@@ -1692,8 +1653,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noScheduleTitle => 'No Schedule';
 
   @override
-  String get noTimeSlotsConfigured =>
-      'You have no time slots configured\nfor this day.';
+  String get noTimeSlotsConfigured => 'You have no time slots configured\nfor this day.';
 
   @override
   String get booked => 'Booked';
@@ -1792,15 +1752,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scanPatientQrCode => 'Scan Patient\'s QR Code';
 
   @override
-  String get pointCameraAtQr =>
-      'Point camera at the QR code on patient\'s phone';
+  String get pointCameraAtQr => 'Point camera at the QR code on patient\'s phone';
 
   @override
   String get invalidQrCode => 'Invalid QR code for this appointment';
 
   @override
-  String get manualConfirmUnlocked =>
-      'QR failed 5 times. Manual confirm enabled.';
+  String get manualConfirmUnlocked => 'QR failed 5 times. Manual confirm enabled.';
 
   @override
   String confirmAvailableInMinutes(int minutes) {
@@ -1834,8 +1792,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noAvailableSlots => 'No Available Slots';
 
   @override
-  String get doctorNotAvailableSelectAnother =>
-      'Doctor is not available on this day.\nPlease select another date.';
+  String get doctorNotAvailableSelectAnother => 'Doctor is not available on this day.\nPlease select another date.';
 
   @override
   String get alreadyBooked => 'Already booked';
@@ -1889,8 +1846,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailySummaryTitle => 'Daily Summary';
 
   @override
-  String get dailySummarySubtitle =>
-      'Get a daily summary for next day\'s appointments';
+  String get dailySummarySubtitle => 'Get a daily summary for next day\'s appointments';
 
   @override
   String get summaryTime => 'Summary Time';
@@ -1899,8 +1855,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get summaryTimeSubtitle => 'Time to receive your daily summary';
 
   @override
-  String get receiveSummariesViaEmail =>
-      'Receive summaries and updates via email';
+  String get receiveSummariesViaEmail => 'Receive summaries and updates via email';
 
   @override
   String get testNotificationSentSuccess => 'Test notification sent!';
@@ -1917,8 +1872,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get patientDocuments => 'Patient Documents';
 
   @override
-  String get viewPatientDocuments =>
-      'View and manage patient\'s medical documents';
+  String get viewPatientDocuments => 'View and manage patient\'s medical documents';
 
   @override
   String get addDocument => 'Add Document';
@@ -1935,8 +1889,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readOnlyMode => 'Read-only';
 
   @override
-  String get appointmentCompletedReadOnly =>
-      'This appointment is completed. Documents are read-only.';
+  String get appointmentCompletedReadOnly => 'This appointment is completed. Documents are read-only.';
 
   @override
   String get noEditPermission => 'You can only edit documents you added';
@@ -2018,8 +1971,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get adminControl => 'Admin Control';
 
   @override
-  String get viewOnlyMode =>
-      'View-only mode: only Super Admin can perform governance actions.';
+  String get viewOnlyMode => 'View-only mode: only Super Admin can perform governance actions.';
 
   @override
   String get createAdmin => 'Create Admin';
@@ -2148,8 +2100,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exportPermissionRequired => 'Export Permission Required';
 
   @override
-  String get noPermissionForAction =>
-      'You do not have permission for this action';
+  String get noPermissionForAction => 'You do not have permission for this action';
 
   @override
   String get generateReport => 'Generate Report';
@@ -2200,15 +2151,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirmDeleteTitle => 'Confirm Delete';
 
   @override
-  String get confirmDeleteMessage =>
-      'Are you sure you want to delete this? This action cannot be undone.';
+  String get confirmDeleteMessage => 'Are you sure you want to delete this? This action cannot be undone.';
 
   @override
   String get confirmToggleStatusTitle => 'Toggle Status';
 
   @override
-  String get confirmToggleStatusMessage =>
-      'Are you sure you want to change the status?';
+  String get confirmToggleStatusMessage => 'Are you sure you want to change the status?';
 
   @override
   String get noAdminsFound => 'No admin accounts found';

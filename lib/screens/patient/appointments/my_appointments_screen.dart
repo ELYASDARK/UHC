@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../providers/appointment_provider.dart';
 import '../../../providers/auth_provider.dart';
@@ -132,10 +133,17 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
     final l10n = AppLocalizations.of(context);
 
     if (isLoading) {
-      return ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      return ResponsiveListView(
+        padding: UhcResponsive.pagePadding(
+          context,
+          bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        ),
+        maxWidth: 1320,
+        gridOnWide: true,
+        laptopColumns: 2,
+        desktopColumns: 3,
+        childAspectRatio: 2.8,
         itemCount: 3,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) => const AppointmentCardSkeleton(),
       );
     }
@@ -196,10 +204,17 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
 
     return RefreshIndicator(
       onRefresh: _loadAppointments,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      child: ResponsiveListView(
+        padding: UhcResponsive.pagePadding(
+          context,
+          bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        ),
+        maxWidth: 1320,
+        gridOnWide: true,
+        laptopColumns: 2,
+        desktopColumns: 3,
+        childAspectRatio: isUpcoming ? 1.9 : 2.65,
         itemCount: appointments.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final appointment = appointments[index];
           final doctorPhoto = context
@@ -412,6 +427,8 @@ class _AppointmentCard extends StatelessWidget {
                     children: [
                       Text(
                         appointment.doctorName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -422,6 +439,8 @@ class _AppointmentCard extends StatelessWidget {
                       ),
                       Text(
                         appointment.department,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.roboto(
                           fontSize: 13,
                           color: isDark
@@ -443,6 +462,8 @@ class _AppointmentCard extends StatelessWidget {
                   ),
                   child: Text(
                     appointment.statusDisplay,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.roboto(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -474,14 +495,18 @@ class _AppointmentCard extends StatelessWidget {
                             : AppColors.textSecondaryLight,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        _formatDate(appointment.appointmentDate, context),
-                        style: GoogleFonts.roboto(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
+                      Expanded(
+                        child: Text(
+                          _formatDate(appointment.appointmentDate, context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.roboto(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
                         ),
                       ),
                     ],
@@ -498,14 +523,18 @@ class _AppointmentCard extends StatelessWidget {
                             : AppColors.textSecondaryLight,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        appointment.timeSlot.split(' - ').first,
-                        style: GoogleFonts.roboto(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
+                      Expanded(
+                        child: Text(
+                          appointment.timeSlot.split(' - ').first,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.roboto(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
                         ),
                       ),
                     ],
@@ -525,8 +554,13 @@ class _AppointmentCard extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.error,
                         side: const BorderSide(color: AppColors.error),
+                        minimumSize: const Size(0, 46),
                       ),
-                      child: Text(l10n.cancel),
+                      child: Text(
+                        l10n.cancel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -534,7 +568,14 @@ class _AppointmentCard extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed:
                           appointment.canReschedule ? onReschedule : null,
-                      child: Text(l10n.reschedule),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 46),
+                      ),
+                      child: Text(
+                        l10n.reschedule,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ],

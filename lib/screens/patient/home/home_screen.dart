@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/localization_helper.dart';
 import '../../../core/widgets/glassmorphic_card.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/notification_provider.dart';
 import '../../../data/models/department_model.dart';
@@ -114,20 +115,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentUser = authProvider.currentUser;
     final userName = currentUser?.fullName.split(' ').first ?? 'User';
     final photoUrl = currentUser?.photoUrl;
+    final isWide = UhcResponsive.isWide(context);
 
     return Scaffold(
       body: SafeArea(
         bottom: false, // Allow content to go behind bottom nav bar
         child: RefreshIndicator(
           onRefresh: _loadDepartments,
-          child: SingleChildScrollView(
+          child: ResponsivePage(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(
-              20,
-              20,
-              20,
-              100,
-            ), // Standard top padding, extra bottom for nav bar
+            maxWidth: 1560,
+            bottomPadding: isWide ? 32 : 100,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -146,13 +144,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 28),
 
-                // Departments section
-                _buildDepartmentsSection(context, isDark),
-
-                const SizedBox(height: 28),
-
-                // Health tips
-                _buildHealthTipsSection(context, isDark),
+                if (isWide)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: _buildDepartmentsSection(context, isDark),
+                      ),
+                      const SizedBox(width: 28),
+                      Expanded(
+                        flex: 4,
+                        child: _buildHealthTipsSection(context, isDark),
+                      ),
+                    ],
+                  )
+                else ...[
+                  _buildDepartmentsSection(context, isDark),
+                  const SizedBox(height: 28),
+                  _buildHealthTipsSection(context, isDark),
+                ],
 
                 const SizedBox(height: 20),
               ],
@@ -520,6 +531,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDepartmentsSection(BuildContext context, bool isDark) {
+    final isWide = UhcResponsive.isWide(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -550,46 +562,76 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 110,
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _error!,
-                            style: GoogleFonts.roboto(
-                              fontSize: 12,
-                              color: AppColors.error,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _loadDepartments,
-                            child: Text(AppLocalizations.of(context).retry),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _departments.isEmpty
-                      ? Center(
-                          child:
-                              Text(AppLocalizations.of(context).noDepartments))
-                      : ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          // Show max 4 departments on home, click View All for more
-                          itemCount:
-                              _departments.length > 4 ? 4 : _departments.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(width: 12),
-                          itemBuilder: (context, index) {
-                            final dept = _departments[index];
-                            return _buildDepartmentCard(dept, isDark);
-                          },
-                        ),
-        ),
+        if (_isLoading)
+          const SizedBox(
+            height: 110,
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_error != null)
+          SizedBox(
+            height: 110,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _error!,
+                    style: GoogleFonts.roboto(
+                      fontSize: 12,
+                      color: AppColors.error,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadDepartments,
+                    child: Text(AppLocalizations.of(context).retry),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else if (_departments.isEmpty)
+          SizedBox(
+            height: 110,
+            child:
+                Center(child: Text(AppLocalizations.of(context).noDepartments)),
+          )
+        else if (isWide)
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final count = _departments.length > 6 ? 6 : _departments.length;
+              final columns = constraints.maxWidth > 760 ? 4 : 3;
+              final spacing = 14.0;
+              final cardWidth =
+                  (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  for (final dept in _departments.take(count))
+                    SizedBox(
+                      width: cardWidth,
+                      height: 128,
+                      child:
+                          _buildDepartmentCard(dept, isDark, fillWidth: true),
+                    ),
+                ],
+              );
+            },
+          )
+        else
+          SizedBox(
+            height: 110,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _departments.length > 4 ? 4 : _departments.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final dept = _departments[index];
+                return _buildDepartmentCard(dept, isDark);
+              },
+            ),
+          ),
       ],
     ).animate(delay: 500.ms).fadeIn(duration: 500.ms);
   }
@@ -618,12 +660,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return LocalizationHelper.translateDepartment(dept.name, l10n);
   }
 
-  Widget _buildDepartmentCard(DepartmentModel dept, bool isDark) {
+  Widget _buildDepartmentCard(
+    DepartmentModel dept,
+    bool isDark, {
+    bool fillWidth = false,
+  }) {
     final color = _getColorFromHex(dept.colorHex);
     return GestureDetector(
       onTap: () => widget.onDepartmentTap?.call(dept.departmentKey),
       child: Container(
-        width: 110,
+        width: fillWidth ? double.infinity : 110,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
@@ -668,6 +714,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHealthTipsSection(BuildContext context, bool isDark) {
     final l10n = AppLocalizations.of(context);
+    final isWide = UhcResponsive.isWide(context);
     final tips = [
       _HealthTip(
         title: l10n.stayHydrated,
@@ -702,25 +749,39 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 145,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: tips.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final tip = tips[index];
-              return _buildHealthTipCard(tip, isDark);
-            },
+        if (isWide)
+          Column(
+            children: [
+              for (final tip in tips) ...[
+                _buildHealthTipCard(tip, isDark, fillWidth: true),
+                if (tip != tips.last) const SizedBox(height: 12),
+              ],
+            ],
+          )
+        else
+          SizedBox(
+            height: 145,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: tips.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final tip = tips[index];
+                return _buildHealthTipCard(tip, isDark);
+              },
+            ),
           ),
-        ),
       ],
     ).animate(delay: 600.ms).fadeIn(duration: 500.ms);
   }
 
-  Widget _buildHealthTipCard(_HealthTip tip, bool isDark) {
+  Widget _buildHealthTipCard(
+    _HealthTip tip,
+    bool isDark, {
+    bool fillWidth = false,
+  }) {
     return Container(
-      width: 220,
+      width: fillWidth ? double.infinity : 220,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(

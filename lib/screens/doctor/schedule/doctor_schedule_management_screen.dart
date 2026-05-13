@@ -12,6 +12,7 @@ import '../../../data/repositories/appointment_repository.dart';
 import '../../../providers/doctor_appointment_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/utils/locale_utils.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../appointments/doctor_appointment_detail_screen.dart';
 
 /// Doctor's own schedule view
@@ -119,68 +120,71 @@ class _DoctorScheduleManagementScreenState
       body: Column(
         children: [
           // Calendar
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: TableCalendar(
-              firstDay: DateTime.now().subtract(const Duration(days: 30)),
-              lastDay: DateTime.now().add(const Duration(days: 60)),
-              focusedDay: _focusedDay,
-              calendarFormat: _calendarFormat,
-              enabledDayPredicate: _isWorkingDay,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              onDaySelected: (selected, focused) {
-                if (!isSameDay(_selectedDay, selected)) {
-                  setState(() {
-                    _selectedDay = selected;
-                    _focusedDay = focused;
-                  });
-                  _loadBookedSlots(selected);
-                }
-              },
-              onFormatChanged: (fmt) => setState(() => _calendarFormat = fmt),
-              availableCalendarFormats: {
-                CalendarFormat.month: l10n.month,
-                CalendarFormat.twoWeeks: l10n.twoWeeks,
-                CalendarFormat.week: l10n.week,
-              },
-              calendarStyle: CalendarStyle(
-                selectedDecoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                todayDecoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                disabledTextStyle: TextStyle(
-                  color: isDark ? Colors.grey[700]! : Colors.grey[350]!,
-                ),
-                weekendTextStyle: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
+          ResponsiveContent(
+            maxWidth: 1180,
+            child: Container(
+              margin: UhcResponsive.pagePadding(context, top: 8, bottom: 0),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              headerStyle: HeaderStyle(
-                formatButtonVisible: true,
-                titleCentered: true,
-                formatButtonDecoration: BoxDecoration(
-                  border: Border.all(color: AppColors.primary),
-                  borderRadius: BorderRadius.circular(12),
+              child: TableCalendar(
+                firstDay: DateTime.now().subtract(const Duration(days: 30)),
+                lastDay: DateTime.now().add(const Duration(days: 60)),
+                focusedDay: _focusedDay,
+                calendarFormat: _calendarFormat,
+                enabledDayPredicate: _isWorkingDay,
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                onDaySelected: (selected, focused) {
+                  if (!isSameDay(_selectedDay, selected)) {
+                    setState(() {
+                      _selectedDay = selected;
+                      _focusedDay = focused;
+                    });
+                    _loadBookedSlots(selected);
+                  }
+                },
+                onFormatChanged: (fmt) => setState(() => _calendarFormat = fmt),
+                availableCalendarFormats: {
+                  CalendarFormat.month: l10n.month,
+                  CalendarFormat.twoWeeks: l10n.twoWeeks,
+                  CalendarFormat.week: l10n.week,
+                },
+                calendarStyle: CalendarStyle(
+                  selectedDecoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  todayDecoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  disabledTextStyle: TextStyle(
+                    color: isDark ? Colors.grey[700]! : Colors.grey[350]!,
+                  ),
+                  weekendTextStyle: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
-                formatButtonTextStyle: const TextStyle(
-                  color: AppColors.primary,
+                headerStyle: HeaderStyle(
+                  formatButtonVisible: true,
+                  titleCentered: true,
+                  formatButtonDecoration: BoxDecoration(
+                    border: Border.all(color: AppColors.primary),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  formatButtonTextStyle: const TextStyle(
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
             ),
@@ -189,54 +193,57 @@ class _DoctorScheduleManagementScreenState
           const SizedBox(height: 12),
 
           // Date header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+          ResponsiveContent(
+            maxWidth: 1180,
+            child: Padding(
+              padding: UhcResponsive.pagePadding(context, top: 0, bottom: 0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.calendar_today,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.calendar_today,
-                    color: AppColors.primary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _formatDate(_selectedDay),
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _formatDate(_selectedDay),
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
                         ),
-                      ),
-                      Text(
-                        daySlots.isEmpty
-                            ? l10n.noScheduleSet
-                            : '${l10n.slotsLabel(daySlots.length)} • ${l10n.bookedCount(_bookedSlots.length)}',
-                        style: GoogleFonts.roboto(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                        Text(
+                          daySlots.isEmpty
+                              ? l10n.noScheduleSet
+                              : '${l10n.slotsLabel(daySlots.length)} • ${l10n.bookedCount(_bookedSlots.length)}',
+                          style: GoogleFonts.roboto(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ).animate(delay: 400.ms).fadeIn(duration: 400.ms).slideY(begin: 0.02),
 
@@ -258,8 +265,18 @@ class _DoctorScheduleManagementScreenState
   // ---- slots list ----
   Widget _buildSlotsList(
       List<TimeSlot> slots, bool isDark, AppLocalizations l10n) {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+    return ResponsiveListView(
+      maxWidth: 1180,
+      gridOnWide: true,
+      tabletColumns: 1,
+      laptopColumns: 2,
+      desktopColumns: 2,
+      childAspectRatio: 6.8,
+      padding: UhcResponsive.pagePadding(
+        context,
+        top: 0,
+        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+      ),
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: slots.length,
       itemBuilder: (context, index) {
@@ -351,49 +368,42 @@ class _DoctorScheduleManagementScreenState
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
 
-            // Status line
             Container(
-              width: 3,
+              width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: statusColor,
-                borderRadius: BorderRadius.circular(2),
+                color: statusColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
+              child: Icon(statusIcon, size: 18, color: statusColor),
             ),
             const SizedBox(width: 12),
 
             // Status info
             Expanded(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(statusIcon, size: 16, color: statusColor),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          statusText,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            fontWeight:
-                                isBooked ? FontWeight.w600 : FontWeight.w400,
-                            color: isBooked
-                                ? (isDark
-                                    ? AppColors.textPrimaryDark
-                                    : AppColors.textPrimaryLight)
-                                : statusColor,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    statusText,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: isBooked ? FontWeight.w600 : FontWeight.w500,
+                      color: isBooked
+                          ? (isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight)
+                          : statusColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (isBooked && appointment != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 2, left: 22),
+                      padding: const EdgeInsets.only(top: 2),
                       child: Text(
                         '${appointment.typeDisplay} • ${appointment.statusDisplay}',
                         style: GoogleFonts.roboto(
@@ -466,8 +476,18 @@ class _DoctorScheduleManagementScreenState
   }
 
   Widget _buildSlotsSkeleton() {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+    return ResponsiveListView(
+      maxWidth: 1180,
+      gridOnWide: true,
+      tabletColumns: 1,
+      laptopColumns: 2,
+      desktopColumns: 2,
+      childAspectRatio: 6.8,
+      padding: UhcResponsive.pagePadding(
+        context,
+        top: 0,
+        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+      ),
       itemCount: 6,
       itemBuilder: (_, i) => Padding(
         padding: const EdgeInsets.only(bottom: 10),

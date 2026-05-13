@@ -9,6 +9,7 @@ import '../../data/models/admin_permissions_model.dart';
 import '../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/admin_governance_service.dart';
+import '../../core/widgets/responsive_layout.dart';
 
 /// Super Admin governance panel — manage admin accounts, permissions, and slots.
 class AdminControlScreen extends StatefulWidget {
@@ -81,16 +82,21 @@ class _AdminControlScreenState extends State<AdminControlScreen>
       body: Column(
         children: [
           if (!actorIsSuperAdmin)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ColoredBox(
               color: AppColors.warning.withValues(alpha: 0.1),
-              child: Text(
-                l10n.viewOnlyMode,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.warning,
+              child: ResponsiveContent(
+                maxWidth: 1440,
+                child: Padding(
+                  padding:
+                      UhcResponsive.pagePadding(context, top: 10, bottom: 10),
+                  child: Text(
+                    l10n.viewOnlyMode,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.warning,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -140,8 +146,14 @@ class _AdminControlScreenState extends State<AdminControlScreen>
             ),
           );
         }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
+        return ResponsiveListView(
+          maxWidth: 1440,
+          gridOnWide: true,
+          tabletColumns: 1,
+          laptopColumns: 2,
+          desktopColumns: 3,
+          childAspectRatio: 4.6,
+          padding: UhcResponsive.pagePadding(context, bottom: 32),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
@@ -258,8 +270,14 @@ class _AdminControlScreenState extends State<AdminControlScreen>
         if (docs.isEmpty) {
           return Center(child: Text(l10n.noAdminsFound));
         }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
+        return ResponsiveListView(
+          maxWidth: 1440,
+          gridOnWide: true,
+          tabletColumns: 1,
+          laptopColumns: 2,
+          desktopColumns: 2,
+          childAspectRatio: UhcResponsive.isWide(context) ? 7.2 : 4.4,
+          padding: UhcResponsive.pagePadding(context, bottom: 32),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
@@ -268,76 +286,252 @@ class _AdminControlScreenState extends State<AdminControlScreen>
             final perms = AdminPermissions.fromMap(
                 data['adminPermissions'] as Map<String, dynamic>?);
 
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-              child: ExpansionTile(
-                leading: const Icon(Icons.security, color: Color(0xFFD32F2F)),
-                title: Text(name,
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                    '${AdminPermissions.allKeys.where((k) => perms.getByKey(k)).length}/${AdminPermissions.allKeys.length} permissions',
-                    style: GoogleFonts.poppins(fontSize: 12)),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _presetChip(
-                            'Full',
-                            isDark,
-                            actorIsSuperAdmin
-                                ? () => _applyPreset(
-                                    uid, AdminPermissions.fullAccess)
-                                : null),
-                        const SizedBox(width: 8),
-                        _presetChip(
-                            'Ops',
-                            isDark,
-                            actorIsSuperAdmin
-                                ? () => _applyPreset(
-                                    uid, AdminPermissions.operations)
-                                : null),
-                        const SizedBox(width: 8),
-                        _presetChip(
-                            'Read-Only',
-                            isDark,
-                            actorIsSuperAdmin
-                                ? () =>
-                                    _applyPreset(uid, AdminPermissions.readOnly)
-                                : null),
-                        const SizedBox(width: 8),
-                        _presetChip(
-                            'Off',
-                            isDark,
-                            actorIsSuperAdmin
-                                ? () =>
-                                    _applyPreset(uid, AdminPermissions.noAccess)
-                                : null),
-                      ],
+            return _buildPermissionSummaryCard(
+              uid: uid,
+              name: name,
+              permissions: perms,
+              isDark: isDark,
+              actorIsSuperAdmin: actorIsSuperAdmin,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPermissionSummaryCard({
+    required String uid,
+    required String name,
+    required AdminPermissions permissions,
+    required bool isDark,
+    required bool actorIsSuperAdmin,
+  }) {
+    final enabledCount =
+        AdminPermissions.allKeys.where((k) => permissions.getByKey(k)).length;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showPermissionsDialog(
+          uid: uid,
+          name: name,
+          permissions: permissions,
+          actorIsSuperAdmin: actorIsSuperAdmin,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+          child: Row(
+            children: [
+              const Icon(Icons.security, color: Color(0xFFD32F2F), size: 26),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$enabledCount/${AdminPermissions.allKeys.length} permissions',
+                      style: GoogleFonts.poppins(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPermissionsDialog({
+    required String uid,
+    required String name,
+    required AdminPermissions permissions,
+    required bool actorIsSuperAdmin,
+  }) {
+    var dialogPermissions = permissions;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final isDark = Theme.of(dialogContext).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              backgroundColor:
+                  isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: UhcResponsive.dialogWidth(
+                    context,
+                    tabletWidth: 640,
+                    laptopWidth: 720,
+                    desktopWidth: 760,
                   ),
-                  const SizedBox(height: 4),
-                  const Divider(height: 1),
-                  const SizedBox(height: 4),
-                  ...AdminPermissions.allKeys.map((key) {
-                    return SwitchListTile(
-                      dense: true,
-                      activeThumbColor: const Color(0xFFD32F2F),
-                      title: Text(AdminPermissions.labels[key] ?? key,
-                          style: GoogleFonts.poppins(fontSize: 13)),
-                      subtitle: Text(AdminPermissions.descriptions[key] ?? '',
-                          style: GoogleFonts.poppins(fontSize: 11)),
-                      value: perms.getByKey(key),
-                      onChanged: actorIsSuperAdmin
-                          ? (val) => _togglePermission(uid, perms, key, val)
-                          : null,
-                    );
-                  }),
-                  const SizedBox(height: 8),
-                ],
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 22, 16, 12),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.security,
+                            color: Color(0xFFD32F2F),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: GoogleFonts.poppins(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                        shrinkWrap: true,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _presetChip(
+                                'Full',
+                                isDark,
+                                actorIsSuperAdmin
+                                    ? () {
+                                        setDialogState(() {
+                                          dialogPermissions =
+                                              AdminPermissions.fullAccess;
+                                        });
+                                        _applyPreset(
+                                          uid,
+                                          AdminPermissions.fullAccess,
+                                        );
+                                      }
+                                    : null,
+                              ),
+                              _presetChip(
+                                'Ops',
+                                isDark,
+                                actorIsSuperAdmin
+                                    ? () {
+                                        setDialogState(() {
+                                          dialogPermissions =
+                                              AdminPermissions.operations;
+                                        });
+                                        _applyPreset(
+                                          uid,
+                                          AdminPermissions.operations,
+                                        );
+                                      }
+                                    : null,
+                              ),
+                              _presetChip(
+                                'Read-Only',
+                                isDark,
+                                actorIsSuperAdmin
+                                    ? () {
+                                        setDialogState(() {
+                                          dialogPermissions =
+                                              AdminPermissions.readOnly;
+                                        });
+                                        _applyPreset(
+                                          uid,
+                                          AdminPermissions.readOnly,
+                                        );
+                                      }
+                                    : null,
+                              ),
+                              _presetChip(
+                                'Off',
+                                isDark,
+                                actorIsSuperAdmin
+                                    ? () {
+                                        setDialogState(() {
+                                          dialogPermissions =
+                                              AdminPermissions.noAccess;
+                                        });
+                                        _applyPreset(
+                                          uid,
+                                          AdminPermissions.noAccess,
+                                        );
+                                      }
+                                    : null,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          ...AdminPermissions.allKeys.map((key) {
+                            return SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              dense: true,
+                              activeThumbColor: const Color(0xFFD32F2F),
+                              title: Text(
+                                AdminPermissions.labels[key] ?? key,
+                                style: GoogleFonts.poppins(fontSize: 13),
+                              ),
+                              subtitle: Text(
+                                AdminPermissions.descriptions[key] ?? '',
+                                style: GoogleFonts.poppins(fontSize: 11),
+                              ),
+                              value: dialogPermissions.getByKey(key),
+                              onChanged: actorIsSuperAdmin
+                                  ? (val) {
+                                      final before = dialogPermissions;
+                                      final map = before.toMap();
+                                      map[key] = val;
+                                      setDialogState(() {
+                                        dialogPermissions =
+                                            AdminPermissions.fromMap(map);
+                                      });
+                                      _togglePermission(uid, before, key, val);
+                                    }
+                                  : null,
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -409,48 +603,57 @@ class _AdminControlScreenState extends State<AdminControlScreen>
           }
         }
 
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _buildSlotCard('Primary', primaryUid, primaryData, 'primary',
-                isDark, actorIsSuperAdmin),
-            const SizedBox(height: 16),
-            _buildSlotCard('Backup', backupUid, backupData, 'backup', isDark,
-                actorIsSuperAdmin),
-            const SizedBox(height: 32),
-            Card(
-              color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.info_outline,
-                            color: Color(0xFFD32F2F)),
-                        const SizedBox(width: 8),
-                        Text(l10n.superAdminSlots,
-                            style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600, fontSize: 14)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '• ${l10n.maxSlotsReached}\n'
-                      '• ${l10n.slotAssign} / ${l10n.slotRotate} use transactions\n'
-                      '• ${l10n.slotRotate} demotes old holder and promotes replacement',
-                      style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight),
-                    ),
-                  ],
+        return ResponsivePage(
+          maxWidth: 1180,
+          bottomPadding: 32,
+          child: Column(
+            children: [
+              ResponsiveGrid(
+                laptopColumns: 2,
+                desktopColumns: 2,
+                childAspectRatio: UhcResponsive.isWide(context) ? 2.6 : 1.85,
+                children: [
+                  _buildSlotCard('Primary', primaryUid, primaryData, 'primary',
+                      isDark, actorIsSuperAdmin),
+                  _buildSlotCard('Backup', backupUid, backupData, 'backup',
+                      isDark, actorIsSuperAdmin),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Card(
+                color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.info_outline,
+                              color: Color(0xFFD32F2F)),
+                          const SizedBox(width: 8),
+                          Text(l10n.superAdminSlots,
+                              style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600, fontSize: 14)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '• ${l10n.maxSlotsReached}\n'
+                        '• ${l10n.slotAssign} / ${l10n.slotRotate} use transactions\n'
+                        '• ${l10n.slotRotate} demotes old holder and promotes replacement',
+                        style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );

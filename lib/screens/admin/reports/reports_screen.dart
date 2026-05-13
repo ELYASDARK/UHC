@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../utils/save_file.dart';
 
@@ -56,8 +57,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Reports'), centerTitle: true),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: ResponsivePage(
+        maxWidth: 1180,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -88,7 +89,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               width: double.infinity,
               child: Builder(
                 builder: (context) {
-                  final canExport = context.read<AuthProvider>().currentUser
+                  final canExport = context
+                          .read<AuthProvider>()
+                          .currentUser
                           ?.hasPermission('reports.export') ??
                       false;
                   return ElevatedButton.icon(
@@ -700,9 +703,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       columnWidths: widths,
     );
 
-    final query = _firestore
-        .collection('users')
-        .orderBy('createdAt', descending: true);
+    final query =
+        _firestore.collection('users').orderBy('createdAt', descending: true);
     final docs = await _paginatedFetch(query);
     final dateFmt = DateFormat('yyyy-MM-dd');
 
@@ -809,9 +811,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _styleDataCell(
           cell,
           rowIndex: i,
-          hAlign: col >= 2
-              ? xlsio.HAlignType.center
-              : xlsio.HAlignType.left,
+          hAlign: col >= 2 ? xlsio.HAlignType.center : xlsio.HAlignType.left,
         );
       }
     }

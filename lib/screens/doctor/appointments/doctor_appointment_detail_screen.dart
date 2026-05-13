@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../providers/doctor_appointment_provider.dart';
@@ -37,8 +38,7 @@ class DoctorAppointmentDetailScreen extends StatefulWidget {
 }
 
 class _DoctorAppointmentDetailScreenState
-    extends State<DoctorAppointmentDetailScreen>
-    with WidgetsBindingObserver {
+    extends State<DoctorAppointmentDetailScreen> with WidgetsBindingObserver {
   late AppointmentModel _appointment;
   final _notesController = TextEditingController();
   bool _isSaving = false;
@@ -184,8 +184,9 @@ class _DoctorAppointmentDetailScreenState
       ),
       body: Stack(
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 320),
+          ResponsivePage(
+            maxWidth: UhcResponsive.isWide(context) ? 760 : 980,
+            bottomPadding: UhcResponsive.isWide(context) ? 120 : 320,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -557,9 +558,16 @@ class _DoctorAppointmentDetailScreenState
                 ),
                 child: SafeArea(
                   top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                    child: _buildActions(isDark, l10n),
+                  child: ResponsiveContent(
+                    maxWidth: UhcResponsive.isWide(context)
+                        ? _wideActionBarMaxWidth
+                        : 980,
+                    child: Padding(
+                      padding: UhcResponsive.isWide(context)
+                          ? const EdgeInsets.fromLTRB(24, 14, 24, 18)
+                          : const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      child: _buildActions(isDark, l10n),
+                    ),
                   ),
                 ),
               ),
@@ -584,87 +592,45 @@ class _DoctorAppointmentDetailScreenState
       return const SizedBox.shrink();
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (status == AppointmentStatus.pending) ...[
-          // ── Time-gated QR confirm button ──
-          if (!_isInConfirmWindow)
-            // Outside confirm window
-            Column(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: null,
-                  icon: const Icon(Icons.lock_clock),
-                  label: Text(
-                    _isBeforeConfirmWindow
-                        ? _formatTimeUntilConfirm(l10n)
-                        : l10n.confirmWindowExpired,
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[300],
-                    foregroundColor: Colors.grey[600],
-                    disabledBackgroundColor: Colors.grey[300],
-                    disabledForegroundColor: Colors.grey[600],
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            )
-          else if (_qrScanFailures < 5)
-            // In window — QR scan required
-            Column(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _openQrScanner,
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: Text(l10n.scanQrToConfirm),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            )
-          else
-            // In window — manual fallback after 5 failures
-            Column(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () => _updateStatus(AppointmentStatus.confirmed),
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: Text(l10n.confirmManual),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-            ),
-        ],
-        if (status == AppointmentStatus.pending ||
-            status == AppointmentStatus.confirmed) ...[
+    final actions = <Widget>[];
+
+    if (status == AppointmentStatus.pending) {
+      if (!_isInConfirmWindow) {
+        actions.add(
           ElevatedButton.icon(
-            onPressed: _completeAppointment,
-            icon: const Icon(Icons.task_alt_rounded),
-            label: Text(l10n.completed),
+            onPressed: null,
+            icon: const Icon(Icons.lock_clock),
+            label: Text(
+              _isBeforeConfirmWindow
+                  ? _formatTimeUntilConfirm(l10n)
+                  : l10n.confirmWindowExpired,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.info,
+              backgroundColor: Colors.grey[300],
+              foregroundColor: Colors.grey[600],
+              disabledBackgroundColor: Colors.grey[300],
+              disabledForegroundColor: Colors.grey[600],
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        );
+      } else if (_qrScanFailures < 5) {
+        actions.add(
+          ElevatedButton.icon(
+            onPressed: _openQrScanner,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: Text(
+              l10n.scanQrToConfirm,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(
@@ -672,52 +638,143 @@ class _DoctorAppointmentDetailScreenState
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => _updateStatus(AppointmentStatus.noShow),
-            icon: const Icon(Icons.person_off_outlined),
-            label: Text(l10n.noShowStatus),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey[700],
+        );
+      } else {
+        actions.add(
+          ElevatedButton.icon(
+            onPressed: () => _updateStatus(AppointmentStatus.confirmed),
+            icon: const Icon(Icons.check_circle_outline),
+            label: Text(
+              l10n.confirmManual,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _cancelWithReason,
-            icon: const Icon(Icons.cancel_outlined),
-            label: Text(l10n.cancel),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.error,
-              side: const BorderSide(color: AppColors.error),
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+        );
+      }
+    }
+
+    if (status == AppointmentStatus.pending ||
+        status == AppointmentStatus.confirmed) {
+      actions.addAll([
+        ElevatedButton.icon(
+          onPressed: _completeAppointment,
+          icon: const Icon(Icons.task_alt_rounded),
+          label: Text(
+            l10n.completed,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.info,
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _updateStatus(AppointmentStatus.noShow),
+          icon: const Icon(Icons.person_off_outlined),
+          label: Text(
+            l10n.noShowStatus,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.grey[700],
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _cancelWithReason,
+          icon: const Icon(Icons.cancel_outlined),
+          label: Text(
+            l10n.cancel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.error,
+            side: const BorderSide(color: AppColors.error),
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ]);
+    }
+
+    if (status == AppointmentStatus.completed) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            l10n.thisAppointmentIsCompleted,
+            style: GoogleFonts.roboto(
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (UhcResponsive.isWide(context)) {
+      return Row(
+        children: [
+          for (var i = 0; i < actions.length; i++) ...[
+            if (i > 0) const SizedBox(width: 12),
+            Expanded(
+              flex: _wideActionFlex(i),
+              child: actions[i],
+            ),
+          ],
         ],
-        if (status == AppointmentStatus.completed) ...[
-          // Already completed — only notes editing is meaningful
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                l10n.thisAppointmentIsCompleted,
-                style: GoogleFonts.roboto(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-            ),
-          ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < actions.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
+          actions[i],
         ],
       ],
     );
+  }
+
+  double get _wideActionBarMaxWidth {
+    if (_appointment.status == AppointmentStatus.pending &&
+        !_isInConfirmWindow) {
+      return 900;
+    }
+    return 760;
+  }
+
+  int _wideActionFlex(int index) {
+    if (_appointment.status == AppointmentStatus.pending &&
+        !_isInConfirmWindow &&
+        index == 0) {
+      return 7;
+    }
+    return 5;
   }
 
   // ---- handlers ----

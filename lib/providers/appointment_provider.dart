@@ -423,7 +423,10 @@ class AppointmentProvider extends ChangeNotifier {
   /// Batch-fetch profile photos for all unique doctors across appointments.
   Future<void> _fetchDoctorPhotos() async {
     final allAppointments = [..._upcomingAppointments, ..._pastAppointments];
-    final uniqueIds = allAppointments.map((a) => a.doctorId).toSet();
+    final uniqueIds = allAppointments
+        .map((a) => a.doctorId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
     // Only fetch IDs we haven't cached yet
     final idsToFetch =
         uniqueIds.where((id) => !_doctorPhotos.containsKey(id)).toList();

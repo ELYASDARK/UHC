@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/responsive_layout.dart';
 import '../../services/admin_governance_service.dart';
 
 /// Audit log viewer for Super Admin — shows admin_audit_logs entries.
@@ -166,104 +167,113 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               _filterActorUid != null ||
               _filterDateFrom != null ||
               _filterDateTo != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ColoredBox(
               color: const Color(0xFFD32F2F).withValues(alpha: 0.08),
-              child: Wrap(
-                spacing: 8,
-                children: [
-                  if (_filterAction != null)
-                    Chip(
-                      label:
-                          Text(_actionLabels[_filterAction] ?? _filterAction!,
+              child: ResponsiveContent(
+                maxWidth: 1440,
+                child: Padding(
+                  padding:
+                      UhcResponsive.pagePadding(context, top: 8, bottom: 8),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      if (_filterAction != null)
+                        Chip(
+                          label: Text(
+                              _actionLabels[_filterAction] ?? _filterAction!,
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 color: isDark ? Colors.white : Colors.black87,
                               )),
-                      backgroundColor:
-                          isDark ? AppColors.surfaceDark : Colors.white,
-                      side: BorderSide(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.35)
-                            : Colors.black.withValues(alpha: 0.15),
-                      ),
-                      deleteIconColor: isDark ? Colors.white70 : Colors.black54,
-                      deleteIcon: const Icon(Icons.close, size: 16),
-                      onDeleted: () {
-                        _filterAction = null;
-                        _loadLogs();
-                      },
-                    ),
-                  if (_filterTargetUid != null)
-                    Chip(
-                      label: Text('Target: ${_shortUid(_filterTargetUid!)}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: isDark ? Colors.white : Colors.black87,
-                          )),
-                      backgroundColor:
-                          isDark ? AppColors.surfaceDark : Colors.white,
-                      side: BorderSide(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.35)
-                            : Colors.black.withValues(alpha: 0.15),
-                      ),
-                      deleteIconColor: isDark ? Colors.white70 : Colors.black54,
-                      deleteIcon: const Icon(Icons.close, size: 16),
-                      onDeleted: () {
-                        _filterTargetUid = null;
-                        _targetUidCtrl.clear();
-                        _loadLogs();
-                      },
-                    ),
-                  if (_filterActorUid != null)
-                    Chip(
-                      label: Text('Actor: ${_shortUid(_filterActorUid!)}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: isDark ? Colors.white : Colors.black87,
-                          )),
-                      backgroundColor:
-                          isDark ? AppColors.surfaceDark : Colors.white,
-                      side: BorderSide(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.35)
-                            : Colors.black.withValues(alpha: 0.15),
-                      ),
-                      deleteIconColor: isDark ? Colors.white70 : Colors.black54,
-                      deleteIcon: const Icon(Icons.close, size: 16),
-                      onDeleted: () {
-                        _filterActorUid = null;
-                        _actorUidCtrl.clear();
-                        _loadLogs();
-                      },
-                    ),
-                  if (_filterDateFrom != null || _filterDateTo != null)
-                    Chip(
-                      label: Text(
-                        _dateRangeLabel(),
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: isDark ? Colors.white : Colors.black87,
+                          backgroundColor:
+                              isDark ? AppColors.surfaceDark : Colors.white,
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.35)
+                                : Colors.black.withValues(alpha: 0.15),
+                          ),
+                          deleteIconColor:
+                              isDark ? Colors.white70 : Colors.black54,
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () {
+                            _filterAction = null;
+                            _loadLogs();
+                          },
                         ),
-                      ),
-                      backgroundColor:
-                          isDark ? AppColors.surfaceDark : Colors.white,
-                      side: BorderSide(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.35)
-                            : Colors.black.withValues(alpha: 0.15),
-                      ),
-                      deleteIconColor: isDark ? Colors.white70 : Colors.black54,
-                      deleteIcon: const Icon(Icons.close, size: 16),
-                      onDeleted: () {
-                        _filterDateFrom = null;
-                        _filterDateTo = null;
-                        _loadLogs();
-                      },
-                    ),
-                ],
+                      if (_filterTargetUid != null)
+                        Chip(
+                          label: Text('Target: ${_shortUid(_filterTargetUid!)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: isDark ? Colors.white : Colors.black87,
+                              )),
+                          backgroundColor:
+                              isDark ? AppColors.surfaceDark : Colors.white,
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.35)
+                                : Colors.black.withValues(alpha: 0.15),
+                          ),
+                          deleteIconColor:
+                              isDark ? Colors.white70 : Colors.black54,
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () {
+                            _filterTargetUid = null;
+                            _targetUidCtrl.clear();
+                            _loadLogs();
+                          },
+                        ),
+                      if (_filterActorUid != null)
+                        Chip(
+                          label: Text('Actor: ${_shortUid(_filterActorUid!)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: isDark ? Colors.white : Colors.black87,
+                              )),
+                          backgroundColor:
+                              isDark ? AppColors.surfaceDark : Colors.white,
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.35)
+                                : Colors.black.withValues(alpha: 0.15),
+                          ),
+                          deleteIconColor:
+                              isDark ? Colors.white70 : Colors.black54,
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () {
+                            _filterActorUid = null;
+                            _actorUidCtrl.clear();
+                            _loadLogs();
+                          },
+                        ),
+                      if (_filterDateFrom != null || _filterDateTo != null)
+                        Chip(
+                          label: Text(
+                            _dateRangeLabel(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          backgroundColor:
+                              isDark ? AppColors.surfaceDark : Colors.white,
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.35)
+                                : Colors.black.withValues(alpha: 0.15),
+                          ),
+                          deleteIconColor:
+                              isDark ? Colors.white70 : Colors.black54,
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          onDeleted: () {
+                            _filterDateFrom = null;
+                            _filterDateTo = null;
+                            _loadLogs();
+                          },
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           // Log list
@@ -290,8 +300,16 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: _loadLogs,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
+                        child: ResponsiveListView(
+                          maxWidth: 1440,
+                          gridOnWide: true,
+                          tabletColumns: 1,
+                          laptopColumns: 2,
+                          desktopColumns: 3,
+                          childAspectRatio:
+                              UhcResponsive.isWide(context) ? 3.9 : 4.0,
+                          padding:
+                              UhcResponsive.pagePadding(context, bottom: 32),
                           itemCount: _logs.length,
                           itemBuilder: (context, index) =>
                               _buildLogTile(_logs[index], isDark),
@@ -504,57 +522,80 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.12),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        title: Text(
-          label,
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 13),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (actorName.isNotEmpty)
-              Text(
-                'By: $actorName',
-                style: GoogleFonts.poppins(fontSize: 11),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              )
-            else if (actorUid.isNotEmpty)
-              Text(
-                'By: ${actorUid.substring(0, actorUid.length > 12 ? 12 : actorUid.length)}…',
-                style: GoogleFonts.poppins(fontSize: 11),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: CircleAvatar(
+                backgroundColor: color.withValues(alpha: 0.12),
+                child: Icon(icon, color: color, size: 20),
               ),
-            if (targetName.isNotEmpty)
-              Text(
-                'Target: $targetName',
-                style: GoogleFonts.poppins(fontSize: 11),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              )
-            else if (targetUid.isNotEmpty)
-              Text(
-                'Target: ${targetUid.substring(0, targetUid.length > 12 ? 12 : targetUid.length)}…',
-                style: GoogleFonts.poppins(fontSize: 11),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
+                  if (actorName.isNotEmpty)
+                    Text(
+                      'By: $actorName',
+                      style: GoogleFonts.poppins(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  else if (actorUid.isNotEmpty)
+                    Text(
+                      'By: ${actorUid.substring(0, actorUid.length > 12 ? 12 : actorUid.length)}...',
+                      style: GoogleFonts.poppins(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: 1),
+                  if (targetName.isNotEmpty)
+                    Text(
+                      'Target: $targetName',
+                      style: GoogleFonts.poppins(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  else if (targetUid.isNotEmpty)
+                    Text(
+                      'Target: ${targetUid.substring(0, targetUid.length > 12 ? 12 : targetUid.length)}...',
+                      style: GoogleFonts.poppins(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: 1),
+                  if (timeStr.isNotEmpty)
+                    Text(
+                      timeStr,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
               ),
-            if (timeStr.isNotEmpty)
-              Text(
-                timeStr,
-                style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
-              ),
+            ),
           ],
         ),
       ),

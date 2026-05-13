@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/responsive_layout.dart';
 
 /// Super Admin Dashboard with governance-focused KPIs:
 /// admin count, active admins, slot health, recent audit activity.
@@ -110,96 +111,151 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadDashboard,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // Slot Health banner
-                  _buildSlotHealthBanner(isDark, l10n),
-                  const SizedBox(height: 16),
-
-                  // Admin KPI row
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _buildKpiCard(
-                              l10n.totalAdmins,
-                              '$_totalAdmins',
-                              Icons.admin_panel_settings,
-                              AppColors.primary,
-                              isDark)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: _buildKpiCard(
-                              l10n.activeAdmins,
-                              '$_activeAdmins',
-                              Icons.check_circle,
-                              AppColors.success,
-                              isDark)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: _buildKpiCard(
-                              l10n.inactiveAdmins,
-                              '$_inactiveAdmins',
-                              Icons.block,
-                              AppColors.error,
-                              isDark)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // System KPI row
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _buildKpiCard(
-                              l10n.superAdmins,
-                              '$_superAdminCount/2',
-                              Icons.shield,
-                              const Color(0xFFD32F2F),
-                              isDark)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: _buildKpiCard(l10n.manageUsers, '$_totalUsers',
-                              Icons.people, AppColors.secondary, isDark)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: _buildKpiCard(
-                              l10n.doctors,
-                              '$_totalDoctors',
-                              Icons.local_hospital,
-                              AppColors.tertiary,
-                              isDark)),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Risk warnings
-                  if (_inactiveAdmins > 0 ||
-                      !_primarySlotFilled ||
-                      !_backupSlotFilled)
-                    _buildRiskSection(isDark, l10n),
-
-                  // Recent audit activity
-                  Text(l10n.recentAuditActivity,
-                      style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  if (_recentLogs.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(l10n.noRecentActivity,
-                            style: GoogleFonts.poppins(
-                                color: isDark
-                                    ? AppColors.textSecondaryDark
-                                    : AppColors.textSecondaryLight)),
-                      ),
-                    )
-                  else
-                    ..._recentLogs.map((log) => _buildAuditRow(log, isDark)),
-                ],
+              child: ResponsivePage(
+                maxWidth: 1240,
+                child: _buildDashboardBody(isDark, l10n),
               ),
             ),
+    );
+  }
+
+  Widget _buildDashboardBody(bool isDark, AppLocalizations l10n) {
+    final metrics =
+        _buildMetricsGrid(isDark, compact: UhcResponsive.isWide(context));
+    final riskVisible =
+        _inactiveAdmins > 0 || !_primarySlotFilled || !_backupSlotFilled;
+
+    if (UhcResponsive.isWide(context)) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 6,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSlotHealthBanner(isDark, l10n),
+                const SizedBox(height: 20),
+                metrics,
+                if (riskVisible) ...[
+                  const SizedBox(height: 24),
+                  _buildRiskSection(isDark, l10n),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 28),
+          Expanded(
+            flex: 5,
+            child: _buildRecentAuditSection(isDark, l10n),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSlotHealthBanner(isDark, l10n),
+        const SizedBox(height: 20),
+        metrics,
+        const SizedBox(height: 24),
+        if (riskVisible) _buildRiskSection(isDark, l10n),
+        _buildRecentAuditSection(isDark, l10n),
+      ],
+    );
+  }
+
+  Widget _buildMetricsGrid(bool isDark, {required bool compact}) {
+    final l10n = AppLocalizations.of(context);
+    final breakpoint = UhcResponsive.breakpointOf(context);
+    final ratio = switch (breakpoint) {
+      UhcBreakpoint.phone => 1.22,
+      UhcBreakpoint.tablet => 1.75,
+      UhcBreakpoint.laptop || UhcBreakpoint.desktop => compact ? 2.85 : 1.8,
+    };
+
+    return ResponsiveGrid(
+      phoneColumns: 2,
+      tabletColumns: 3,
+      laptopColumns: compact ? 2 : 3,
+      desktopColumns: compact ? 2 : 3,
+      childAspectRatio: ratio,
+      spacing: 16,
+      runSpacing: 16,
+      children: [
+        _buildKpiCard(
+          l10n.totalAdmins,
+          '$_totalAdmins',
+          Icons.admin_panel_settings,
+          AppColors.primary,
+          isDark,
+        ),
+        _buildKpiCard(
+          l10n.activeAdmins,
+          '$_activeAdmins',
+          Icons.check_circle,
+          AppColors.success,
+          isDark,
+        ),
+        _buildKpiCard(
+          l10n.inactiveAdmins,
+          '$_inactiveAdmins',
+          Icons.block,
+          AppColors.error,
+          isDark,
+        ),
+        _buildKpiCard(
+          l10n.superAdmins,
+          '$_superAdminCount/2',
+          Icons.shield,
+          const Color(0xFFD32F2F),
+          isDark,
+        ),
+        _buildKpiCard(
+          l10n.manageUsers,
+          '$_totalUsers',
+          Icons.people,
+          AppColors.secondary,
+          isDark,
+        ),
+        _buildKpiCard(
+          l10n.doctors,
+          '$_totalDoctors',
+          Icons.local_hospital,
+          AppColors.tertiary,
+          isDark,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentAuditSection(bool isDark, AppLocalizations l10n) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.recentAuditActivity,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        const SizedBox(height: 8),
+        if (_recentLogs.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                l10n.noRecentActivity,
+                style: GoogleFonts.poppins(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              ),
+            ),
+          )
+        else
+          ..._recentLogs.map((log) => _buildAuditRow(log, isDark)),
+      ],
     );
   }
 
@@ -272,25 +328,77 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     return Card(
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(value,
-                style: GoogleFonts.poppins(
-                    fontSize: 22, fontWeight: FontWeight.w700, color: color)),
-            const SizedBox(height: 2),
-            Text(label,
-                style: GoogleFonts.poppins(
-                    fontSize: 10,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
-                textAlign: TextAlign.center),
-          ],
+        padding: const EdgeInsets.all(18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth > 260;
+            final content = [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 26),
+              ),
+              SizedBox(width: wide ? 16 : 0, height: wide ? 0 : 8),
+              if (wide)
+                Expanded(
+                  child: _buildKpiText(label, value, color, isDark, wide: true),
+                )
+              else
+                _buildKpiText(label, value, color, isDark, wide: false),
+            ];
+
+            return wide
+                ? Row(children: content)
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: content,
+                  );
+          },
         ),
       ),
+    );
+  }
+
+  Widget _buildKpiText(
+    String label,
+    String value,
+    Color color,
+    bool isDark, {
+    required bool wide,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment:
+          wide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      children: [
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: wide ? 24 : 22,
+            fontWeight: FontWeight.w700,
+            color: color,
+            height: 1.05,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: wide ? 12 : 11,
+            height: 1.15,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+          ),
+          textAlign: wide ? TextAlign.left : TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 

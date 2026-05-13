@@ -9,6 +9,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/document_provider.dart';
 import '../../../data/models/medical_document_model.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Medical document upload and management screen
 class MedicalDocumentsScreen extends StatefulWidget {
@@ -140,8 +141,17 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
   ) {
     final documentTypes = _getDocumentTypes(l10n);
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
+    return ResponsiveListView(
+      maxWidth: 1320,
+      gridOnWide: true,
+      tabletColumns: 1,
+      laptopColumns: 2,
+      desktopColumns: 3,
+      childAspectRatio: 3.0,
+      padding: UhcResponsive.pagePadding(
+        context,
+        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+      ),
       itemCount: docs.length,
       itemBuilder: (context, index) {
         final doc = docs[index];
@@ -210,114 +220,143 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.hardEdge,
-        child: ListTile(
-        onTap: () => _viewDocument(doc.url),
-        contentPadding: const EdgeInsets.all(12),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(typeInfo['icon'], color: AppColors.primary),
-        ),
-        title: Text(
-          doc.name.isNotEmpty ? doc.name : l10n.other,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(typeInfo['name']),
-            if (doc.uploadedAt != null)
-              Text(
-                DateFormat('MMM d, yyyy').format(doc.uploadedAt!),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-            // Attribution badge for doctor-added documents
-            if (isDoctorAdded)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: InkWell(
+          onTap: () => _viewDocument(doc.url),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Text(
-                    l10n.addedByDoctor(doc.addedByName),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.blue,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  child: Icon(
+                    typeInfo['icon'] as IconData,
+                    color: AppColors.primary,
+                    size: 24,
                   ),
                 ),
-              ),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            switch (value) {
-              case 'view':
-                _viewDocument(doc.url);
-                break;
-              case 'edit':
-                _showEditDialog(context, doc);
-                break;
-              case 'delete':
-                _confirmDelete(doc.id, doc.storagePath);
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'view',
-              child: Row(
-                children: [
-                  const Icon(Icons.visibility, size: 18),
-                  const SizedBox(width: 8),
-                  Text(l10n.view),
-                ],
-              ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        doc.name.isNotEmpty ? doc.name : l10n.other,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        typeInfo['name'] as String,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (doc.uploadedAt != null)
+                        Text(
+                          DateFormat('MMM d, yyyy').format(doc.uploadedAt!),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      if (isDoctorAdded)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Container(
+                            constraints: const BoxConstraints(maxWidth: 190),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              l10n.addedByDoctor(doc.addedByName),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'view':
+                        _viewDocument(doc.url);
+                        break;
+                      case 'edit':
+                        _showEditDialog(context, doc);
+                        break;
+                      case 'delete':
+                        _confirmDelete(doc.id, doc.storagePath);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'view',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.visibility, size: 18),
+                          const SizedBox(width: 8),
+                          Text(l10n.view),
+                        ],
+                      ),
+                    ),
+                    if (!isDoctorAdded)
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.edit, size: 18),
+                            const SizedBox(width: 8),
+                            Text(l10n.edit),
+                          ],
+                        ),
+                      ),
+                    if (!isDoctorAdded)
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.delete,
+                              size: 18,
+                              color: AppColors.error,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              l10n.delete,
+                              style: const TextStyle(color: AppColors.error),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
-            // Hide edit/delete for doctor-added documents
-            if (!isDoctorAdded)
-              PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    const Icon(Icons.edit, size: 18),
-                    const SizedBox(width: 8),
-                    Text(l10n.edit),
-                  ],
-                ),
-              ),
-            if (!isDoctorAdded)
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    const Icon(Icons.delete, size: 18, color: AppColors.error),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n.delete,
-                      style: const TextStyle(color: AppColors.error),
-                    ),
-                  ],
-                ),
-              ),
-          ],
+          ),
         ),
-      ),
       ),
     );
   }

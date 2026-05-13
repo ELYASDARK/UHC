@@ -105,6 +105,11 @@ class DoctorProvider extends ChangeNotifier {
 
   /// Get doctor by ID
   Future<DoctorModel?> getDoctorById(String doctorId) async {
+    if (doctorId.trim().isEmpty) {
+      _selectedDoctor = null;
+      return null;
+    }
+
     try {
       _selectedDoctor = await _doctorRepo.getDoctorById(doctorId);
       notifyListeners();

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/user_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/admin_governance_service.dart';
@@ -477,11 +478,14 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
     return Dialog(
       insetPadding: const EdgeInsets.all(16),
-      child: Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
-          maxWidth: 500,
+      child: AdaptiveDialogConstraints(
+        width: UhcResponsive.dialogWidth(
+          context,
+          tabletWidth: 560,
+          laptopWidth: 620,
+          desktopWidth: 680,
         ),
+        maxHeightFactor: 0.85,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

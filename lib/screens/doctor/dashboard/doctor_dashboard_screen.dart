@@ -13,6 +13,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../providers/doctor_appointment_provider.dart';
 import '../../../providers/notification_provider.dart';
 import '../../../core/utils/locale_utils.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../appointments/doctor_appointment_detail_screen.dart';
 
 /// Doctor dashboard — overview of today's work
@@ -81,6 +82,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
     return Consumer<DoctorAppointmentProvider>(
       builder: (context, provider, _) {
+        final isWide = UhcResponsive.isWide(context);
         return Scaffold(
           body: SafeArea(
             bottom: false,
@@ -88,19 +90,55 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                 ? _buildSkeleton(isDark)
                 : RefreshIndicator(
                     onRefresh: () => provider.loadAppointments(_doctor.id),
-                    child: SingleChildScrollView(
+                    child: ResponsivePage(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                      maxWidth: 1560,
+                      bottomPadding: isWide ? 32 : 100,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildGreetingCard(isDark, l10n),
-                          const SizedBox(height: 24),
-                          _buildStatsRow(isDark, provider, l10n),
-                          const SizedBox(height: 28),
-                          _buildNextAppointment(isDark, provider, l10n),
-                          const SizedBox(height: 28),
-                          _buildTodaysList(isDark, provider, l10n),
+                          if (isWide)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildGreetingCard(isDark, l10n),
+                                      const SizedBox(height: 24),
+                                      _buildStatsRow(isDark, provider, l10n),
+                                      const SizedBox(height: 28),
+                                      _buildNextAppointment(
+                                        isDark,
+                                        provider,
+                                        l10n,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 28),
+                                Expanded(
+                                  flex: 4,
+                                  child: _buildTodaysList(
+                                    isDark,
+                                    provider,
+                                    l10n,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else ...[
+                            _buildGreetingCard(isDark, l10n),
+                            const SizedBox(height: 24),
+                            _buildStatsRow(isDark, provider, l10n),
+                            const SizedBox(height: 28),
+                            _buildNextAppointment(isDark, provider, l10n),
+                            const SizedBox(height: 28),
+                            _buildTodaysList(isDark, provider, l10n),
+                          ],
                         ],
                       ),
                     ),

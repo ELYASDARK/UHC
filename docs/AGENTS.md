@@ -22,7 +22,7 @@
 - Follow `analysis_options.yaml` (`include: package:flutter_lints/flutter.yaml`).
 - Use standard Dart formatting: 2-space indentation and `dart format .` before PRs.
 - Naming: files `snake_case.dart`, classes/enums `PascalCase`, methods/variables `camelCase`.
-- Keep role-specific UI under `lib/screens/patient`, `lib/screens/doctor`, and `lib/screens/admin`.
+- Keep role-specific UI under `lib/screens/patient`, `lib/screens/doctor`,`lib/screens/admin` and `lib/screens/super_admin`.
 
 ## Testing Guidelines
 - Use `flutter_test` with files named `*_test.dart` in `test/`.

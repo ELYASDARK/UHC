@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/doctor_appointment_provider.dart';
 
@@ -106,8 +107,10 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
 
           // ── Semi-transparent overlay with viewfinder cutout ──
           CustomPaint(
-            size: MediaQuery.of(context).size,
-            painter: _ViewfinderPainter(),
+            size: MediaQuery.sizeOf(context),
+            painter: _ViewfinderPainter(
+              cutoutFactor: UhcResponsive.isWide(context) ? 0.42 : 0.65,
+            ),
           ),
 
           // ── Top bar ──
@@ -237,10 +240,15 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
 
 /// Paints a semi-transparent overlay with a clear square cutout in the center
 class _ViewfinderPainter extends CustomPainter {
+  final double cutoutFactor;
+
+  const _ViewfinderPainter({required this.cutoutFactor});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.black.withValues(alpha: 0.5);
-    final cutoutSize = size.width * 0.65;
+    final cutoutSize =
+        (size.shortestSide * cutoutFactor).clamp(220.0, 360.0).toDouble();
     final left = (size.width - cutoutSize) / 2;
     final top = (size.height - cutoutSize) / 2;
 

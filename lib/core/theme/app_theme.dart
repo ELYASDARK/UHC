@@ -494,14 +494,18 @@ class AppTheme {
   // SnackBar Theme
   static SnackBarThemeData get _snackBarTheme => SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 8,
         backgroundColor: AppColors.textPrimaryLight,
         contentTextStyle: GoogleFonts.roboto(fontSize: 14, color: Colors.white),
       );
 
   static SnackBarThemeData get _snackBarThemeDark => SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 8,
         backgroundColor: AppColors.surfaceLight,
         contentTextStyle: GoogleFonts.roboto(
           fontSize: 14,

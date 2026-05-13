@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../services/doctor_functions_service.dart';
 import '../../../services/user_functions_service.dart';
@@ -443,7 +444,12 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
     return AlertDialog(
       title: Text(isEditing ? 'Edit Doctor' : 'Add Doctor'),
       content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.85,
+        width: UhcResponsive.dialogWidth(
+          context,
+          tabletWidth: 560,
+          laptopWidth: 620,
+          desktopWidth: 680,
+        ),
         child: SingleChildScrollView(
           child: Form(
             key: _formKey,
@@ -922,23 +928,52 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           ),
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
       actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: (_isUploading || _isSubmitting) ? null : _submitForm,
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+        SizedBox(
+          width: UhcResponsive.dialogWidth(
+            context,
+            tabletWidth: 560,
+            laptopWidth: 620,
+            desktopWidth: 680,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed:
+                      _isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed:
+                      (_isUploading || _isSubmitting) ? null : _submitForm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                )
-              : Text(isEditing ? 'Update' : 'Add Doctor'),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(isEditing ? 'Update' : 'Add Doctor'),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -16,6 +16,7 @@ import '../../shared/change_password_screen.dart';
 import '../../shared/notification_settings_screen.dart';
 import '../../auth/forgot_password_screen.dart';
 import 'edit_doctor_profile_screen.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Doctor profile & settings screen
 ///
@@ -47,207 +48,236 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     final doctor = widget.doctor;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final isWide = UhcResponsive.isWide(context);
+
+    final header = _buildProfileHeader(
+      name: doctor.name.isNotEmpty ? doctor.name : (user?.fullName ?? 'Doctor'),
+      email: doctor.email.isNotEmpty ? doctor.email : (user?.email ?? ''),
+      photoUrl: doctor.photoUrl ?? user?.photoUrl,
+      specialization: doctor.specialization,
+      departmentName: doctor.departmentName,
+      isDark: isDark,
+    );
+
+    final appearance = _buildSection(
+      l10n.appearance,
+      [
+        _settingTile(
+          icon: Icons.dark_mode_rounded,
+          title: l10n.darkMode,
+          trailing: Switch(
+            value: theme.isDarkMode,
+            onChanged: (_) => theme.toggleTheme(),
+          ),
+          isDark: isDark,
+        ),
+        _settingTile(
+          icon: Icons.language_rounded,
+          title: l10n.language,
+          subtitle: locale.languageName,
+          onTap: () => _showLanguageDialog(context, l10n),
+          isDark: isDark,
+        ),
+      ],
+      isDark,
+    );
+
+    final notifications = _buildSection(
+      l10n.notificationSettings,
+      [
+        _settingTile(
+          icon: Icons.notifications_active_rounded,
+          title: l10n.notifications,
+          subtitle: l10n.notificationSettings,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const NotificationSettingsScreen(),
+            ),
+          ),
+          isDark: isDark,
+        ),
+      ],
+      isDark,
+    );
+
+    final account = _buildSection(
+      l10n.account,
+      [
+        _settingTile(
+          icon: Icons.edit_rounded,
+          title: l10n.editProfile,
+          onTap: () async {
+            final result = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EditDoctorProfileScreen(
+                  doctor: widget.doctor,
+                ),
+              ),
+            );
+            if (result == true) {
+              widget.onDoctorUpdated?.call();
+            }
+          },
+          isDark: isDark,
+        ),
+        _settingTile(
+          icon: Icons.lock_rounded,
+          title: l10n.changePassword,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const ChangePasswordScreen(),
+            ),
+          ),
+          isDark: isDark,
+        ),
+        _settingTile(
+          icon: Icons.lock_reset_rounded,
+          title: l10n.forgotPassword,
+          subtitle: l10n.sendResetLink,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ForgotPasswordScreen(
+                onBackTap: () => Navigator.of(context).pop(),
+                initialEmail: auth.firebaseUser?.email ?? user?.email,
+                launchedFromProfile: true,
+              ),
+            ),
+          ),
+          isDark: isDark,
+        ),
+      ],
+      isDark,
+    );
+
+    final about = _buildSection(
+      l10n.about,
+      [
+        _settingTile(
+          icon: Icons.privacy_tip_rounded,
+          title: l10n.privacyPolicy,
+          onTap: () => _showLegalSheet(
+            context,
+            l10n.privacyPolicy,
+            _privacyPolicyText,
+          ),
+          isDark: isDark,
+        ),
+        _settingTile(
+          icon: Icons.description_rounded,
+          title: l10n.termsOfService,
+          onTap: () => _showLegalSheet(
+            context,
+            l10n.termsOfService,
+            _termsOfServiceText,
+          ),
+          isDark: isDark,
+        ),
+        _settingTile(
+          icon: Icons.help_rounded,
+          title: l10n.helpAndSupport,
+          onTap: () => _showLegalSheet(
+            context,
+            l10n.helpAndSupport,
+            _helpSupportText,
+          ),
+          isDark: isDark,
+        ),
+        _settingTile(
+          icon: Icons.info_rounded,
+          title: l10n.version,
+          trailing: FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (_, snap) {
+              if (snap.hasData) {
+                return Text(
+                  snap.data!.version,
+                  style: GoogleFonts.roboto(color: Colors.grey),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          isDark: isDark,
+        ),
+      ],
+      isDark,
+    );
+
+    final logout = SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _showLogoutDialog(context, auth, l10n),
+        icon: const Icon(Icons.logout_rounded, color: AppColors.error),
+        label: Text(
+          l10n.logout,
+          style: GoogleFonts.poppins(color: AppColors.error),
+        ),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          side: const BorderSide(color: AppColors.error),
+        ),
+      ),
+    );
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        child: ResponsivePage(
+          maxWidth: isWide ? 1080 : 980,
+          bottomPadding: isWide ? 32 : 100,
+          alignment: isWide
+              ? AlignmentDirectional.topStart
+              : AlignmentDirectional.topCenter,
           child: Column(
             children: [
-              // ── profile header ──
-              _buildProfileHeader(
-                name: doctor.name.isNotEmpty
-                    ? doctor.name
-                    : (user?.fullName ?? 'Doctor'),
-                email: doctor.email.isNotEmpty
-                    ? doctor.email
-                    : (user?.email ?? ''),
-                photoUrl: doctor.photoUrl ?? user?.photoUrl,
-                specialization: doctor.specialization,
-                departmentName: doctor.departmentName,
-                isDark: isDark,
-              ),
-
-              const SizedBox(height: 32),
-
-              // ── Appearance ──
-              _buildSection(
-                l10n.appearance,
-                [
-                  _settingTile(
-                    icon: Icons.dark_mode_rounded,
-                    title: l10n.darkMode,
-                    trailing: Switch(
-                      value: theme.isDarkMode,
-                      onChanged: (_) => theme.toggleTheme(),
-                    ),
-                    isDark: isDark,
-                  ),
-                  _settingTile(
-                    icon: Icons.language_rounded,
-                    title: l10n.language,
-                    subtitle: locale.languageName,
-                    onTap: () => _showLanguageDialog(context, l10n),
-                    isDark: isDark,
-                  ),
-                ],
-                isDark,
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── Notifications ──
-              _buildSection(
-                l10n.notificationSettings,
-                [
-                  _settingTile(
-                    icon: Icons.notifications_active_rounded,
-                    title: l10n.notifications,
-                    subtitle: l10n.notificationSettings,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const NotificationSettingsScreen(),
+              header,
+              SizedBox(height: isWide ? 28 : 32),
+              if (isWide)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          account,
+                          const SizedBox(height: 20),
+                          about,
+                          const SizedBox(height: 24),
+                          logout,
+                        ],
                       ),
                     ),
-                    isDark: isDark,
-                  ),
-                ],
-                isDark,
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── Account ──
-              _buildSection(
-                l10n.account,
-                [
-                  _settingTile(
-                    icon: Icons.edit_rounded,
-                    title: l10n.editProfile,
-                    onTap: () async {
-                      final result = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => EditDoctorProfileScreen(
-                            doctor: widget.doctor,
-                          ),
-                        ),
-                      );
-                      if (result == true) {
-                        widget.onDoctorUpdated?.call();
-                      }
-                    },
-                    isDark: isDark,
-                  ),
-                  _settingTile(
-                    icon: Icons.lock_rounded,
-                    title: l10n.changePassword,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ChangePasswordScreen(),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          appearance,
+                          const SizedBox(height: 20),
+                          notifications,
+                        ],
                       ),
                     ),
-                    isDark: isDark,
-                  ),
-                  _settingTile(
-                    icon: Icons.lock_reset_rounded,
-                    title: l10n.forgotPassword,
-                    subtitle: l10n.sendResetLink,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ForgotPasswordScreen(
-                          onBackTap: () => Navigator.of(context).pop(),
-                          initialEmail: auth.firebaseUser?.email ?? user?.email,
-                          launchedFromProfile: true,
-                        ),
-                      ),
-                    ),
-                    isDark: isDark,
-                  ),
-                ],
-                isDark,
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── About ──
-              _buildSection(
-                l10n.about,
-                [
-                  _settingTile(
-                    icon: Icons.privacy_tip_rounded,
-                    title: l10n.privacyPolicy,
-                    onTap: () => _showLegalSheet(
-                      context,
-                      l10n.privacyPolicy,
-                      _privacyPolicyText,
-                    ),
-                    isDark: isDark,
-                  ),
-                  _settingTile(
-                    icon: Icons.description_rounded,
-                    title: l10n.termsOfService,
-                    onTap: () => _showLegalSheet(
-                      context,
-                      l10n.termsOfService,
-                      _termsOfServiceText,
-                    ),
-                    isDark: isDark,
-                  ),
-                  _settingTile(
-                    icon: Icons.help_rounded,
-                    title: l10n.helpAndSupport,
-                    onTap: () => _showLegalSheet(
-                      context,
-                      l10n.helpAndSupport,
-                      _helpSupportText,
-                    ),
-                    isDark: isDark,
-                  ),
-                  _settingTile(
-                    icon: Icons.info_rounded,
-                    title: l10n.version,
-                    trailing: FutureBuilder<PackageInfo>(
-                      future: PackageInfo.fromPlatform(),
-                      builder: (_, snap) {
-                        if (snap.hasData) {
-                          return Text(
-                            snap.data!.version,
-                            style: GoogleFonts.roboto(color: Colors.grey),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                    isDark: isDark,
-                  ),
-                ],
-                isDark,
-              ),
-
-              const SizedBox(height: 32),
-
-              // ── Logout ──
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showLogoutDialog(context, auth, l10n),
-                  icon:
-                      const Icon(Icons.logout_rounded, color: AppColors.error),
-                  label: Text(
-                    l10n.logout,
-                    style: GoogleFonts.poppins(color: AppColors.error),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.error),
-                  ),
-                ),
-              ),
+                  ],
+                )
+              else ...[
+                appearance,
+                const SizedBox(height: 20),
+                notifications,
+                const SizedBox(height: 20),
+                account,
+                const SizedBox(height: 20),
+                about,
+                const SizedBox(height: 32),
+                logout,
+              ],
             ],
           ),
         ),

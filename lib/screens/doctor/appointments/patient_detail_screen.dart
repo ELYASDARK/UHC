@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/glassmorphic_card.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/models/user_model.dart';
@@ -117,9 +118,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               ? _buildError(isDark, l10n)
               : RefreshIndicator(
                   onRefresh: _loadData,
-                  child: SingleChildScrollView(
+                  child: ResponsivePage(
+                    maxWidth: 1080,
+                    bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -259,6 +261,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     }
 
     if (items.isEmpty) return const SizedBox.shrink();
+    final breakpoint = UhcResponsive.breakpointOf(context);
+    final infoTileAspectRatio = breakpoint.isWide
+        ? 3.5
+        : breakpoint.isTablet
+            ? 3.0
+            : 4.2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,9 +281,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
+        ResponsiveGrid(
+          tabletColumns: 2,
+          laptopColumns: 3,
+          desktopColumns: 3,
+          childAspectRatio: infoTileAspectRatio,
           children: items.map((item) => _infoTile(item, isDark)).toList(),
         ),
       ],
@@ -284,7 +294,6 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   Widget _infoTile(_InfoItem item, bool isDark) {
     return Container(
-      width: (MediaQuery.of(context).size.width - 50) / 2, // 2 columns
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,

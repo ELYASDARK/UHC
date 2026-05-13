@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/responsive_layout.dart';
 import 'super_admin_dashboard_screen.dart';
 import '../patient/profile/profile_screen.dart';
 import 'admin_control_screen.dart';
@@ -48,93 +49,125 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      extendBody: false,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          // Tab 0: Super Admin Dashboard (governance KPIs)
-          _visitedScreens.contains(0)
-              ? const SuperAdminDashboardScreen()
-              : const SizedBox.shrink(),
-          // Tab 1: Admin Control (governance panel)
-          _visitedScreens.contains(1)
-              ? const AdminControlScreen(initialTab: 0)
-              : const SizedBox.shrink(),
-          // Tab 2: Audit Logs
-          _visitedScreens.contains(2)
-              ? const AuditLogScreen()
-              : const SizedBox.shrink(),
-          // Tab 3: Profile
-          _visitedScreens.contains(3)
-              ? const ProfileScreen()
-              : const SizedBox.shrink(),
-        ],
-      ),
-      bottomNavigationBar: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: SizedBox(
-          height: 70,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: isDark
-                    ? [
-                        AppColors.surfaceDark.withValues(alpha: 1),
-                        AppColors.surfaceDark,
-                      ]
-                    : [
-                        AppColors.surfaceLight.withValues(alpha: 1),
-                        AppColors.surfaceLight,
-                      ],
-              ),
-              border: Border(
-                top: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : Colors.black.withValues(alpha: 0.05),
-                  width: 0.5,
-                ),
+    final body = IndexedStack(
+      index: _currentIndex,
+      children: [
+        // Tab 0: Super Admin Dashboard (governance KPIs)
+        _visitedScreens.contains(0)
+            ? const SuperAdminDashboardScreen()
+            : const SizedBox.shrink(),
+        // Tab 1: Admin Control (governance panel)
+        _visitedScreens.contains(1)
+            ? const AdminControlScreen(initialTab: 0)
+            : const SizedBox.shrink(),
+        // Tab 2: Audit Logs
+        _visitedScreens.contains(2)
+            ? const AuditLogScreen()
+            : const SizedBox.shrink(),
+        // Tab 3: Profile
+        _visitedScreens.contains(3)
+            ? const ProfileScreen()
+            : const SizedBox.shrink(),
+      ],
+    );
+
+    final bottomNavigationBar = Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: SizedBox(
+        height: 70,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? [
+                      AppColors.surfaceDark.withValues(alpha: 1),
+                      AppColors.surfaceDark,
+                    ]
+                  : [
+                      AppColors.surfaceLight.withValues(alpha: 1),
+                      AppColors.surfaceLight,
+                    ],
+            ),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.05),
+                width: 0.5,
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  index: 0,
-                  icon: Icons.dashboard_outlined,
-                  activeIcon: Icons.dashboard_rounded,
-                  label: l10n.adminDashboard,
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 1,
-                  icon: Icons.admin_panel_settings_outlined,
-                  activeIcon: Icons.admin_panel_settings,
-                  label: l10n.admins,
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 2,
-                  icon: Icons.history_outlined,
-                  activeIcon: Icons.history_rounded,
-                  label: l10n.auditLogs,
-                  isDark: isDark,
-                ),
-                _buildNavItem(
-                  index: 3,
-                  icon: Icons.person_outline_rounded,
-                  activeIcon: Icons.person_rounded,
-                  label: AppLocalizations.of(context).profile,
-                  isDark: isDark,
-                ),
-              ],
-            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                index: 0,
+                icon: Icons.dashboard_outlined,
+                activeIcon: Icons.dashboard_rounded,
+                label: l10n.adminDashboard,
+                isDark: isDark,
+              ),
+              _buildNavItem(
+                index: 1,
+                icon: Icons.admin_panel_settings_outlined,
+                activeIcon: Icons.admin_panel_settings,
+                label: l10n.admins,
+                isDark: isDark,
+              ),
+              _buildNavItem(
+                index: 2,
+                icon: Icons.history_outlined,
+                activeIcon: Icons.history_rounded,
+                label: l10n.auditLogs,
+                isDark: isDark,
+              ),
+              _buildNavItem(
+                index: 3,
+                icon: Icons.person_outline_rounded,
+                activeIcon: Icons.person_rounded,
+                label: AppLocalizations.of(context).profile,
+                isDark: isDark,
+              ),
+            ],
           ),
         ),
       ),
+    );
+
+    return AdaptiveNavigationScaffold(
+      selectedIndex: _currentIndex,
+      onDestinationSelected: _onTabTapped,
+      selectedColor: _accent,
+      body: body,
+      bottomNavigationBar: bottomNavigationBar,
+      destinations: [
+        AdaptiveNavigationDestination(
+          index: 0,
+          icon: Icons.dashboard_outlined,
+          selectedIcon: Icons.dashboard_rounded,
+          label: l10n.adminDashboard,
+        ),
+        AdaptiveNavigationDestination(
+          index: 1,
+          icon: Icons.admin_panel_settings_outlined,
+          selectedIcon: Icons.admin_panel_settings,
+          label: l10n.admins,
+        ),
+        AdaptiveNavigationDestination(
+          index: 2,
+          icon: Icons.history_outlined,
+          selectedIcon: Icons.history_rounded,
+          label: l10n.auditLogs,
+        ),
+        AdaptiveNavigationDestination(
+          index: 3,
+          icon: Icons.person_outline_rounded,
+          selectedIcon: Icons.person_rounded,
+          label: l10n.profile,
+        ),
+      ],
     );
   }
 

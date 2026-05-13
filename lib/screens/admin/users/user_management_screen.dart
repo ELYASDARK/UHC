@@ -10,6 +10,7 @@ import '../../../services/admin_governance_service.dart';
 import '../../../services/user_functions_service.dart';
 import 'user_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// User management screen for admin
 class UserManagementScreen extends StatefulWidget {
@@ -181,8 +182,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 final totalFetched = snapshot.data!.docs.length;
                 final hasMore = totalFetched >= _displayLimit;
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                return ResponsiveListView(
+                  padding: UhcResponsive.pagePadding(context, bottom: 32),
+                  maxWidth: 1440,
+                  gridOnWide: true,
+                  tabletColumns: 1,
+                  laptopColumns: 2,
+                  desktopColumns: 3,
+                  childAspectRatio: 3.5,
                   itemCount: docs.length + (hasMore ? 1 : 0),
                   itemBuilder: (context, index) {
                     // "Load More" button at the end
@@ -295,209 +302,248 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.hardEdge,
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(12),
-          leading: Stack(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundImage: data['photoUrl'] != null
-                    ? NetworkImage(data['photoUrl'])
-                    : null,
-                child: data['photoUrl'] == null
-                    ? Text(
-                        (data['fullName'] ?? 'U')[0].toUpperCase(),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      )
-                    : null,
-              ),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: isActive ? AppColors.success : Colors.grey,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? AppColors.surfaceDark : Colors.white,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          title: Text(
-            data['fullName'] ?? 'Unknown User',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(data['email'] ?? ''),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _getRoleColor(role).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  role.name.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: _getRoleColor(role),
-                  ),
-                ),
-              ),
-              if (actorIsSuperAdmin) ...[
-                const SizedBox(height: 4),
-                Row(
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    Expanded(
-                      child: Text(
-                        'UID: ${_shortUid(id)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? Colors.grey[400] : Colors.grey[700],
-                        ),
-                      ),
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundImage: data['photoUrl'] != null &&
+                              (data['photoUrl'] as String).isNotEmpty
+                          ? NetworkImage(data['photoUrl'])
+                          : null,
+                      child: data['photoUrl'] == null ||
+                              (data['photoUrl'] as String).isEmpty
+                          ? Text(
+                              (data['fullName'] ?? 'U')[0].toUpperCase(),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            )
+                          : null,
                     ),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _copyUid(id),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(
-                          Icons.copy_rounded,
-                          size: 16,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: isActive ? AppColors.success : Colors.grey,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isDark ? AppColors.surfaceDark : Colors.white,
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ],
-          ),
-          trailing: PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'view':
-                  _showUserDetails(context, id, data, isDark);
-                  break;
-                case 'edit':
-                  _showEditUserDialog(id, data);
-                  break;
-                case 'toggle':
-                  _toggleUserStatus(id, isActive);
-                  break;
-                case 'role':
-                  _changeUserRole(id, role);
-                  break;
-                case 'unlink_google':
-                  _unlinkGoogleForUser(id, data);
-                  break;
-              }
-            },
-            itemBuilder: (context) {
-              final actorRole = context.read<AuthProvider>().currentUser?.role;
-              final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
-              final hasManagePerm = _canManageNonAdminUsers;
-              // Super Admin can edit superAdmin rows, but destructive actions stay blocked.
-              final canEditSuperAdminTarget =
-                  actorIsSuperAdmin && role == UserRole.superAdmin;
-              // Admins can only manage non-admin targets; superAdmins can fully
-              // manage non-superAdmin targets.
-              final canManageNonSuperAdminTarget = hasManagePerm &&
-                  (actorIsSuperAdmin
-                      ? role != UserRole.superAdmin
-                      : (role != UserRole.superAdmin &&
-                          role != UserRole.admin));
-              final hasLinkedGoogleEmail =
-                  (data['googleEmail'] as String?)?.trim().isNotEmpty ?? false;
-              return [
-                const PopupMenuItem(
-                  value: 'view',
-                  child: Row(
-                    children: [
-                      Icon(Icons.visibility, size: 18),
-                      SizedBox(width: 8),
-                      Text('View Details'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'edit',
-                  enabled:
-                      canEditSuperAdminTarget || canManageNonSuperAdminTarget,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.edit, size: 18),
-                      const SizedBox(width: 8),
-                      const Text('Edit'),
-                      if (!(canEditSuperAdminTarget ||
-                          canManageNonSuperAdminTarget)) ...[
-                        const Spacer(),
-                        const Icon(Icons.lock_outline, size: 16),
-                      ],
-                    ],
-                  ),
-                ),
-                if (hasLinkedGoogleEmail)
-                  PopupMenuItem(
-                    value: 'unlink_google',
-                    enabled: canManageNonSuperAdminTarget,
-                    child: Row(
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data['fullName'] ?? 'Unknown User',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      data['email'] ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Icon(Icons.link_off_rounded, size: 18),
-                        const SizedBox(width: 8),
-                        const Text('Unlink Google'),
-                        if (!canManageNonSuperAdminTarget) ...[
-                          const Spacer(),
-                          const Icon(Icons.lock_outline, size: 16),
-                        ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getRoleColor(role).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            role.name.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: _getRoleColor(role),
+                            ),
+                          ),
+                        ),
+                        if (actorIsSuperAdmin)
+                          InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => _copyUid(id),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                                vertical: 2,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'UID: ${_shortUid(id)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? Colors.grey[400]
+                                          : Colors.grey[700],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.copy_rounded,
+                                    size: 14,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                       ],
                     ),
-                  ),
-                PopupMenuItem(
-                  value: 'toggle',
-                  enabled: canManageNonSuperAdminTarget,
-                  child: Row(
-                    children: [
-                      Icon(isActive ? Icons.block : Icons.check_circle,
-                          size: 18),
-                      const SizedBox(width: 8),
-                      Text(isActive ? 'Deactivate' : 'Activate'),
-                      if (!canManageNonSuperAdminTarget) ...[
-                        const Spacer(),
-                        const Icon(Icons.lock_outline, size: 16),
-                      ],
-                    ],
-                  ),
+                  ],
                 ),
-                PopupMenuItem(
-                  value: 'role',
-                  enabled: canManageNonSuperAdminTarget,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.admin_panel_settings, size: 18),
-                      const SizedBox(width: 8),
-                      const Text('Change Role'),
-                      if (!canManageNonSuperAdminTarget) ...[
-                        const Spacer(),
-                        const Icon(Icons.lock_outline, size: 16),
-                      ],
-                    ],
-                  ),
-                ),
-              ];
-            },
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  switch (value) {
+                    case 'view':
+                      _showUserDetails(context, id, data, isDark);
+                      break;
+                    case 'edit':
+                      _showEditUserDialog(id, data);
+                      break;
+                    case 'toggle':
+                      _toggleUserStatus(id, isActive);
+                      break;
+                    case 'role':
+                      _changeUserRole(id, role);
+                      break;
+                    case 'unlink_google':
+                      _unlinkGoogleForUser(id, data);
+                      break;
+                  }
+                },
+                itemBuilder: (context) {
+                  final actorRole =
+                      context.read<AuthProvider>().currentUser?.role;
+                  final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
+                  final hasManagePerm = _canManageNonAdminUsers;
+                  // Super Admin can edit superAdmin rows, but destructive actions stay blocked.
+                  final canEditSuperAdminTarget =
+                      actorIsSuperAdmin && role == UserRole.superAdmin;
+                  // Admins can only manage non-admin targets; superAdmins can fully
+                  // manage non-superAdmin targets.
+                  final canManageNonSuperAdminTarget = hasManagePerm &&
+                      (actorIsSuperAdmin
+                          ? role != UserRole.superAdmin
+                          : (role != UserRole.superAdmin &&
+                              role != UserRole.admin));
+                  final hasLinkedGoogleEmail =
+                      (data['googleEmail'] as String?)?.trim().isNotEmpty ??
+                          false;
+                  return [
+                    const PopupMenuItem(
+                      value: 'view',
+                      child: Row(
+                        children: [
+                          Icon(Icons.visibility, size: 18),
+                          SizedBox(width: 8),
+                          Text('View Details'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'edit',
+                      enabled: canEditSuperAdminTarget ||
+                          canManageNonSuperAdminTarget,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit, size: 18),
+                          const SizedBox(width: 8),
+                          const Text('Edit'),
+                          if (!(canEditSuperAdminTarget ||
+                              canManageNonSuperAdminTarget)) ...[
+                            const Spacer(),
+                            const Icon(Icons.lock_outline, size: 16),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (hasLinkedGoogleEmail)
+                      PopupMenuItem(
+                        value: 'unlink_google',
+                        enabled: canManageNonSuperAdminTarget,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.link_off_rounded, size: 18),
+                            const SizedBox(width: 8),
+                            const Text('Unlink Google'),
+                            if (!canManageNonSuperAdminTarget) ...[
+                              const Spacer(),
+                              const Icon(Icons.lock_outline, size: 16),
+                            ],
+                          ],
+                        ),
+                      ),
+                    PopupMenuItem(
+                      value: 'toggle',
+                      enabled: canManageNonSuperAdminTarget,
+                      child: Row(
+                        children: [
+                          Icon(isActive ? Icons.block : Icons.check_circle,
+                              size: 18),
+                          const SizedBox(width: 8),
+                          Text(isActive ? 'Deactivate' : 'Activate'),
+                          if (!canManageNonSuperAdminTarget) ...[
+                            const Spacer(),
+                            const Icon(Icons.lock_outline, size: 16),
+                          ],
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'role',
+                      enabled: canManageNonSuperAdminTarget,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.admin_panel_settings, size: 18),
+                          const SizedBox(width: 8),
+                          const Text('Change Role'),
+                          if (!canManageNonSuperAdminTarget) ...[
+                            const Spacer(),
+                            const Icon(Icons.lock_outline, size: 16),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ];
+                },
+              ),
+            ],
           ),
         ),
       ),

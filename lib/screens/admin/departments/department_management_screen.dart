@@ -9,6 +9,7 @@ import '../../../providers/auth_provider.dart';
 import 'department_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../services/department_functions_service.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Department management screen for admin
 class DepartmentManagementScreen extends StatefulWidget {
@@ -192,25 +193,28 @@ class _DepartmentManagementScreenState
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Search departments...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          ResponsiveContent(
+            maxWidth: 1320,
+            child: Padding(
+              padding: UhcResponsive.pagePadding(context, bottom: 8),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Search departments...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -218,68 +222,75 @@ class _DepartmentManagementScreenState
 
           // Filter Chips
           if (_statusFilter != 'all')
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                children: [
-                  Chip(
-                    label: Text(
-                      _statusFilter.toUpperCase(),
-                      style: TextStyle(
-                        color: isDark ? Colors.white : AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+            ResponsiveContent(
+              maxWidth: 1320,
+              child: Padding(
+                padding: UhcResponsive.pagePadding(context, top: 0, bottom: 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    Chip(
+                      label: Text(
+                        _statusFilter.toUpperCase(),
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
+                      backgroundColor: isDark
+                          ? AppColors.primary.withValues(alpha: 0.2)
+                          : AppColors.primary.withValues(alpha: 0.1),
+                      side: BorderSide(
+                        color: isDark
+                            ? AppColors.primary.withValues(alpha: 0.5)
+                            : AppColors.primary.withValues(alpha: 0.2),
+                      ),
+                      onDeleted: () => setState(() => _statusFilter = 'all'),
+                      deleteIconColor:
+                          isDark ? Colors.white70 : AppColors.primary,
                     ),
-                    backgroundColor: isDark
-                        ? AppColors.primary.withValues(alpha: 0.2)
-                        : AppColors.primary.withValues(alpha: 0.1),
-                    side: BorderSide(
-                      color: isDark
-                          ? AppColors.primary.withValues(alpha: 0.5)
-                          : AppColors.primary.withValues(alpha: 0.2),
-                    ),
-                    onDeleted: () => setState(() => _statusFilter = 'all'),
-                    deleteIconColor:
-                        isDark ? Colors.white70 : AppColors.primary,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
           if (_doctorCountsWarning != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.orange.withValues(alpha: 0.35),
+            ResponsiveContent(
+              maxWidth: 1320,
+              child: Padding(
+                padding: UhcResponsive.pagePadding(context, top: 0, bottom: 8),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.35),
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.wifi_off, color: Colors.orange, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _doctorCountsWarning!,
-                        style: const TextStyle(
-                          color: Colors.orange,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off,
+                          color: Colors.orange, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _doctorCountsWarning!,
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: _loadDoctorCounts,
-                      child: const Text('Retry'),
-                    ),
-                  ],
+                      TextButton(
+                        onPressed: _loadDoctorCounts,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -404,12 +415,17 @@ class _DepartmentManagementScreenState
                   );
                 }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.only(
+                return ResponsiveListView(
+                  maxWidth: 1440,
+                  gridOnWide: true,
+                  tabletColumns: 1,
+                  laptopColumns: 2,
+                  desktopColumns: 3,
+                  childAspectRatio: 4.0,
+                  padding: UhcResponsive.pagePadding(
+                    context,
                     top: 8,
-                    left: 16,
-                    right: 16,
-                    bottom: 80,
+                    bottom: UhcResponsive.isWide(context) ? 32 : 88,
                   ),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
@@ -453,184 +469,203 @@ class _DepartmentManagementScreenState
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.hardEdge,
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(12),
-          leading: Stack(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: deptColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  _getIconData(iconName),
-                  color: deptColor,
-                  size: 28,
-                ),
-              ),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: isActive ? AppColors.success : Colors.grey,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? AppColors.surfaceDark : Colors.white,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          title: Text(
-            data['name'] ?? 'Unknown',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                data['description'] ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: deptColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '$doctorCount doctors',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: deptColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        _getIconData(iconName),
                         color: deptColor,
+                        size: 28,
                       ),
+                    ),
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: isActive ? AppColors.success : Colors.grey,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isDark ? AppColors.surfaceDark : Colors.white,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data['name'] ?? 'Unknown',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      data['description'] ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: deptColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '$doctorCount doctors',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: deptColor,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (isActive ? AppColors.success : Colors.grey)
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            isActive ? 'ACTIVE' : 'INACTIVE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isActive ? AppColors.success : Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  switch (value) {
+                    case 'view':
+                      _showDepartmentDetails(context, id, data);
+                      break;
+                    case 'edit':
+                      showDialog(
+                        context: context,
+                        builder: (context) =>
+                            DepartmentFormDialog(id: id, data: data),
+                      );
+                      break;
+                    case 'toggle':
+                      _toggleDepartmentStatus(id, isActive);
+                      break;
+                    case 'delete':
+                      _confirmDelete(id, data['name'] ?? 'this department');
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'view',
+                    child: Row(
+                      children: [
+                        Icon(Icons.visibility, size: 18),
+                        SizedBox(width: 8),
+                        Text('View Details'),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
+                  PopupMenuItem(
+                    value: 'edit',
+                    enabled: _canManage,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit, size: 18),
+                        const SizedBox(width: 8),
+                        const Text('Edit'),
+                        if (!_canManage) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
+                      ],
                     ),
-                    decoration: BoxDecoration(
-                      color: (isActive ? AppColors.success : Colors.grey)
-                          .withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                  ),
+                  PopupMenuItem(
+                    value: 'toggle',
+                    enabled: _canManage,
+                    child: Row(
+                      children: [
+                        Icon(
+                          isActive ? Icons.block : Icons.check_circle,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(isActive ? 'Deactivate' : 'Activate'),
+                        if (!_canManage) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
+                      ],
                     ),
-                    child: Text(
-                      isActive ? 'ACTIVE' : 'INACTIVE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: isActive ? AppColors.success : Colors.grey,
-                      ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    enabled: _canManage,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete,
+                            size: 18, color: AppColors.error),
+                        const SizedBox(width: 8),
+                        const Text('Delete',
+                            style: TextStyle(color: AppColors.error)),
+                        if (!_canManage) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
+                      ],
                     ),
                   ),
                 ],
-              ),
-            ],
-          ),
-          trailing: PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'view':
-                  _showDepartmentDetails(context, id, data);
-                  break;
-                case 'edit':
-                  showDialog(
-                    context: context,
-                    builder: (context) =>
-                        DepartmentFormDialog(id: id, data: data),
-                  );
-                  break;
-                case 'toggle':
-                  _toggleDepartmentStatus(id, isActive);
-                  break;
-                case 'delete':
-                  _confirmDelete(id, data['name'] ?? 'this department');
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'view',
-                child: Row(
-                  children: [
-                    Icon(Icons.visibility, size: 18),
-                    SizedBox(width: 8),
-                    Text('View Details'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'edit',
-                enabled: _canManage,
-                child: Row(
-                  children: [
-                    const Icon(Icons.edit, size: 18),
-                    const SizedBox(width: 8),
-                    const Text('Edit'),
-                    if (!_canManage) ...[
-                      const Spacer(),
-                      const Icon(Icons.lock_outline, size: 16),
-                    ],
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'toggle',
-                enabled: _canManage,
-                child: Row(
-                  children: [
-                    Icon(
-                      isActive ? Icons.block : Icons.check_circle,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(isActive ? 'Deactivate' : 'Activate'),
-                    if (!_canManage) ...[
-                      const Spacer(),
-                      const Icon(Icons.lock_outline, size: 16),
-                    ],
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                enabled: _canManage,
-                child: Row(
-                  children: [
-                    const Icon(Icons.delete, size: 18, color: AppColors.error),
-                    const SizedBox(width: 8),
-                    const Text('Delete',
-                        style: TextStyle(color: AppColors.error)),
-                    if (!_canManage) ...[
-                      const Spacer(),
-                      const Icon(Icons.lock_outline, size: 16),
-                    ],
-                  ],
-                ),
               ),
             ],
           ),

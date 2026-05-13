@@ -14,6 +14,7 @@ import '../../../providers/appointment_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/utils/locale_utils.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 import '../main_shell.dart';
 
@@ -234,91 +235,97 @@ class _BookingScreenState extends State<BookingScreen> {
         title: Text(AppLocalizations.of(context).bookAppointment),
         centerTitle: true,
       ),
-      body: Stepper(
-        currentStep: _currentStep,
-        onStepContinue: _onStepContinue,
-        onStepCancel: _onStepCancel,
-        controlsBuilder: (context, details) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : details.onStepContinue,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            _currentStep == 2
-                                ? AppLocalizations.of(context).confirmBooking
-                                : AppLocalizations.of(context).continueText,
-                          ),
-                  ),
-                ),
-                if (_currentStep > 0) ...[
-                  const SizedBox(width: 12),
+      body: ResponsivePage(
+        scrollable: false,
+        maxWidth: 980,
+        padding: EdgeInsets.zero,
+        child: Stepper(
+          currentStep: _currentStep,
+          onStepContinue: _onStepContinue,
+          onStepCancel: _onStepCancel,
+          controlsBuilder: (context, details) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Row(
+                children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: details.onStepCancel,
-                      style: OutlinedButton.styleFrom(
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : details.onStepContinue,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(AppLocalizations.of(context).back),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              _currentStep == 2
+                                  ? AppLocalizations.of(context).confirmBooking
+                                  : AppLocalizations.of(context).continueText,
+                            ),
                     ),
                   ),
+                  if (_currentStep > 0) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: details.onStepCancel,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(AppLocalizations.of(context).back),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
+            );
+          },
+          steps: [
+            // Step 1: Select Date
+            Step(
+              title: Text(AppLocalizations.of(context).selectDate),
+              subtitle: _selectedDay != null
+                  ? Text(_formatDate(_selectedDay!))
+                  : null,
+              isActive: _currentStep >= 0,
+              state: _currentStep > 0 ? StepState.complete : StepState.indexed,
+              content: _buildCalendarStep(isDark),
             ),
-          );
-        },
-        steps: [
-          // Step 1: Select Date
-          Step(
-            title: Text(AppLocalizations.of(context).selectDate),
-            subtitle:
-                _selectedDay != null ? Text(_formatDate(_selectedDay!)) : null,
-            isActive: _currentStep >= 0,
-            state: _currentStep > 0 ? StepState.complete : StepState.indexed,
-            content: _buildCalendarStep(isDark),
-          ),
-          // Step 2: Select Time
-          Step(
-            title: Text(AppLocalizations.of(context).selectTime),
-            subtitle: _selectedTimeSlot != null
-                ? Text(_selectedTimeSlot!.display)
-                : null,
-            isActive: _currentStep >= 1,
-            state: _currentStep > 1 ? StepState.complete : StepState.indexed,
-            content: _buildTimeSlotStep(isDark),
-          ),
-          // Step 3: Confirm
-          Step(
-            title: Text(AppLocalizations.of(context).confirmDetails),
-            isActive: _currentStep >= 2,
-            state: StepState.indexed,
-            content: _buildConfirmationStep(isDark),
-          ),
-        ],
+            // Step 2: Select Time
+            Step(
+              title: Text(AppLocalizations.of(context).selectTime),
+              subtitle: _selectedTimeSlot != null
+                  ? Text(_selectedTimeSlot!.display)
+                  : null,
+              isActive: _currentStep >= 1,
+              state: _currentStep > 1 ? StepState.complete : StepState.indexed,
+              content: _buildTimeSlotStep(isDark),
+            ),
+            // Step 3: Confirm
+            Step(
+              title: Text(AppLocalizations.of(context).confirmDetails),
+              isActive: _currentStep >= 2,
+              state: StepState.indexed,
+              content: _buildConfirmationStep(isDark),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -870,188 +877,232 @@ class BookingSuccessScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final isWide = UhcResponsive.isWide(context);
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
+      body: ResponsivePage(
+        safeArea: true,
+        maxWidth: isWide ? 980 : 640,
+        bottomPadding: isWide ? 32 : 100,
+        child: Column(
+          children: [
+            SizedBox(height: isWide ? 16 : 40),
 
-              // Success animation
-              SizedBox(
-                height: 180,
-                child: Lottie.asset(
-                  'assets/animations/success.json',
-                  repeat: false,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check_circle,
-                        size: 80,
-                        color: AppColors.success,
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              Text(
-                '${l10n.bookingConfirmed}!',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+            // Success animation
+            SizedBox(
+              height: 180,
+              child: Lottie.asset(
+                'assets/animations/success.json',
+                repeat: false,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle,
+                      size: 80,
                       color: AppColors.success,
                     ),
+                  );
+                },
               ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.appointmentScheduledSuccessfully,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-              const SizedBox(height: 32),
+            ),
+            const SizedBox(height: 24),
 
-              // Appointment Card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.surfaceDark : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // QR Code
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: QrImageView(
-                        data: 'UHC_APPOINTMENT:$appointmentId',
-                        version: QrVersions.auto,
-                        size: 180,
-                        backgroundColor: Colors.white,
-                        errorCorrectionLevel: QrErrorCorrectLevel.M,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l10n.showQRCodeAtCheckIn,
-                      style: TextStyle(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Divider(),
-                    const SizedBox(height: 20),
-
-                    // Details
-                    _buildDetailRow(
-                      context,
-                      Icons.person,
-                      l10n.doctor,
-                      'Dr. $doctorName',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(
-                      context,
-                      Icons.calendar_month,
-                      l10n.date,
-                      _formatDate(date, l10n),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(
-                      context,
-                      Icons.access_time,
-                      l10n.time,
-                      timeSlot,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(
-                      context,
-                      Icons.confirmation_number,
-                      l10n.bookingId,
-                      bookingReference ??
-                          appointmentId.substring(0, 8).toUpperCase(),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Buttons
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate to Home (Tab 0) and clear stack
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (_) => const MainShell(initialIndex: 0),
-                      ),
-                      (route) => false,
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+            Text(
+              '${l10n.bookingConfirmed}!',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.success,
                   ),
-                  child: Text(l10n.backToHome),
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.appointmentScheduledSuccessfully,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    // Navigate to Appointments (Tab 2) and clear stack
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (_) => const MainShell(initialIndex: 2),
-                      ),
-                      (route) => false,
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+            ),
+            const SizedBox(height: 32),
+
+            // Appointment Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
                   ),
-                  child: Text(l10n.viewMyAppointments),
-                ),
+                ],
               ),
-            ],
-          ),
+              child:
+                  _buildConfirmationCardContent(context, isWide, isDark, l10n),
+            ),
+            SizedBox(height: isWide ? 24 : 32),
+
+            // Buttons
+            _buildActionButtons(context, isWide, l10n),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildConfirmationCardContent(
+    BuildContext context,
+    bool isWide,
+    bool isDark,
+    AppLocalizations l10n,
+  ) {
+    if (!isWide) {
+      return Column(
+        children: [
+          _buildQrPanel(isDark, l10n),
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 20),
+          _buildDetailsPanel(context, l10n),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(child: _buildQrPanel(isDark, l10n)),
+        const SizedBox(width: 28),
+        SizedBox(
+          height: 220,
+          child: VerticalDivider(
+            color: isDark ? Colors.white12 : Colors.black12,
+          ),
+        ),
+        const SizedBox(width: 28),
+        Expanded(child: _buildDetailsPanel(context, l10n)),
+      ],
+    );
+  }
+
+  Widget _buildQrPanel(bool isDark, AppLocalizations l10n) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: QrImageView(
+            data: 'UHC_APPOINTMENT:$appointmentId',
+            version: QrVersions.auto,
+            size: 180,
+            backgroundColor: Colors.white,
+            errorCorrectionLevel: QrErrorCorrectLevel.M,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          l10n.showQRCodeAtCheckIn,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailsPanel(BuildContext context, AppLocalizations l10n) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildDetailRow(context, Icons.person, l10n.doctor, 'Dr. $doctorName'),
+        const SizedBox(height: 14),
+        _buildDetailRow(
+          context,
+          Icons.calendar_month,
+          l10n.date,
+          _formatDate(date, l10n),
+        ),
+        const SizedBox(height: 14),
+        _buildDetailRow(context, Icons.access_time, l10n.time, timeSlot),
+        const SizedBox(height: 14),
+        _buildDetailRow(
+          context,
+          Icons.confirmation_number,
+          l10n.bookingId,
+          bookingReference ?? appointmentId.substring(0, 8).toUpperCase(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(
+    BuildContext context,
+    bool isWide,
+    AppLocalizations l10n,
+  ) {
+    final homeButton = ElevatedButton(
+      onPressed: () {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainShell(initialIndex: 0)),
+          (route) => false,
+        );
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(l10n.backToHome),
+    );
+
+    final appointmentsButton = OutlinedButton(
+      onPressed: () {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainShell(initialIndex: 2)),
+          (route) => false,
+        );
+      },
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(l10n.viewMyAppointments),
+    );
+
+    if (isWide) {
+      return Row(
+        children: [
+          Expanded(child: appointmentsButton),
+          const SizedBox(width: 16),
+          Expanded(child: homeButton),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        SizedBox(width: double.infinity, child: homeButton),
+        const SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: appointmentsButton),
+      ],
     );
   }
 

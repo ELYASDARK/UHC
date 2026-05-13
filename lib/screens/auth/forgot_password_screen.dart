@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/widgets/custom_text_field.dart';
+import '../../core/widgets/responsive_layout.dart';
 import '../../providers/auth_provider.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 
@@ -86,201 +87,200 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Scaffold(
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
+        child: ResponsivePage(
+          safeArea: true,
+          maxWidth: 520,
+          bottomPadding: 32,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
 
-                // Back button
-                IconButton(
-                  onPressed: widget.onBackTap,
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  style: IconButton.styleFrom(
-                    backgroundColor:
-                        isDark ? Colors.grey[800] : Colors.grey[100],
+              // Back button
+              IconButton(
+                onPressed: widget.onBackTap,
+                icon: const Icon(Icons.arrow_back_rounded),
+                style: IconButton.styleFrom(
+                  backgroundColor: isDark ? Colors.grey[800] : Colors.grey[100],
+                ),
+              ).animate().fadeIn(duration: 300.ms),
+
+              const SizedBox(height: 40),
+
+              if (showGoogleOnlyNotice) ...[
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.link_off_rounded,
+                          size: 60,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'This account uses Google sign-in only.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Password reset email is available only for email/password accounts.',
+                        style: GoogleFonts.roboto(
+                          fontSize: 15,
+                          height: 1.5,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                ).animate().fadeIn(duration: 300.ms),
-
-                const SizedBox(height: 40),
-
-                if (showGoogleOnlyNotice) ...[
-                  Center(
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.link_off_rounded,
-                            size: 60,
-                            color: AppColors.warning,
-                          ),
+                ),
+              ] else if (_emailSent) ...[
+                // Success state
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'This account uses Google sign-in only.',
-                          style: GoogleFonts.poppins(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: isDark
-                                ? AppColors.textPrimaryDark
-                                : AppColors.textPrimaryLight,
-                          ),
-                          textAlign: TextAlign.center,
+                        child: const Icon(
+                          Icons.mark_email_read_rounded,
+                          size: 60,
+                          color: AppColors.success,
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Password reset email is available only for email/password accounts.',
+                      ).animate().scale(
+                            begin: const Offset(0.5, 0.5),
+                            duration: 500.ms,
+                            curve: Curves.elasticOut,
+                          ),
+                      const SizedBox(height: 32),
+                      Text(
+                        l10n.checkEmail,
+                        style: GoogleFonts.poppins(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
+                        ),
+                        textAlign: TextAlign.center,
+                      ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          l10n.resetEmailSentMessage(_emailController.text),
                           style: GoogleFonts.roboto(
-                            fontSize: 15,
-                            height: 1.5,
+                            fontSize: 16,
+                            height: 1.6,
                             color: isDark
                                 ? AppColors.textSecondaryDark
                                 : AppColors.textSecondaryLight,
                           ),
                           textAlign: TextAlign.center,
                         ),
-                      ],
-                    ),
+                      ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
+                      const SizedBox(height: 48),
+                      PrimaryButton(
+                        text: widget.launchedFromProfile
+                            ? l10n.ok
+                            : l10n.backToLogin,
+                        onPressed: widget.launchedFromProfile
+                            ? () => Navigator.of(context).pop()
+                            : widget.onBackTap,
+                      ).animate(delay: 400.ms).fadeIn(duration: 400.ms),
+                    ],
                   ),
-                ] else if (_emailSent) ...[
-                  // Success state
-                  Center(
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.mark_email_read_rounded,
-                            size: 60,
-                            color: AppColors.success,
-                          ),
-                        ).animate().scale(
-                              begin: const Offset(0.5, 0.5),
-                              duration: 500.ms,
-                              curve: Curves.elasticOut,
-                            ),
-                        const SizedBox(height: 32),
-                        Text(
-                          l10n.checkEmail,
-                          style: GoogleFonts.poppins(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: isDark
-                                ? AppColors.textPrimaryDark
-                                : AppColors.textPrimaryLight,
-                          ),
-                          textAlign: TextAlign.center,
-                        ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
-                        const SizedBox(height: 16),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Text(
-                            l10n.resetEmailSentMessage(_emailController.text),
-                            style: GoogleFonts.roboto(
-                              fontSize: 16,
-                              height: 1.6,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ).animate(delay: 300.ms).fadeIn(duration: 400.ms),
-                        const SizedBox(height: 48),
-                        PrimaryButton(
-                          text: widget.launchedFromProfile
-                              ? l10n.ok
-                              : l10n.backToLogin,
-                          onPressed: widget.launchedFromProfile
-                              ? () => Navigator.of(context).pop()
-                              : widget.onBackTap,
-                        ).animate(delay: 400.ms).fadeIn(duration: 400.ms),
-                      ],
-                    ),
+                ),
+              ] else ...[
+                // Reset password form
+                Text(
+                  l10n.resetPassword,
+                  style: GoogleFonts.poppins(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
                   ),
-                ] else ...[
-                  // Reset password form
-                  Text(
-                    l10n.resetPassword,
-                    style: GoogleFonts.poppins(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight,
-                    ),
-                  ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.1),
+                ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.1),
 
-                  const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-                  Text(
-                    l10n.resetPasswordSubtitle,
-                    style: GoogleFonts.roboto(
-                      fontSize: 16,
-                      height: 1.5,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
-                    ),
-                  )
-                      .animate(delay: 100.ms)
-                      .fadeIn(duration: 400.ms)
-                      .slideX(begin: -0.1),
+                Text(
+                  l10n.resetPasswordSubtitle,
+                  style: GoogleFonts.roboto(
+                    fontSize: 16,
+                    height: 1.5,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                )
+                    .animate(delay: 100.ms)
+                    .fadeIn(duration: 400.ms)
+                    .slideX(begin: -0.1),
 
-                  const SizedBox(height: 48),
+                const SizedBox(height: 48),
 
-                  Form(
-                    key: _formKey,
-                    child: CustomTextField(
-                      label: l10n.email,
-                      hintText: l10n.enterEmailHint,
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      prefixIcon: Icons.email_outlined,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _handleResetPassword(),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return l10n.fieldRequired;
-                        }
-                        if (!value.contains('@')) {
-                          return l10n.invalidEmail;
-                        }
-                        return null;
-                      },
-                    ),
-                  )
-                      .animate(delay: 200.ms)
-                      .fadeIn(duration: 400.ms)
-                      .slideX(begin: 0.1),
+                Form(
+                  key: _formKey,
+                  child: CustomTextField(
+                    label: l10n.email,
+                    hintText: l10n.enterEmailHint,
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    prefixIcon: Icons.email_outlined,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _handleResetPassword(),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return l10n.fieldRequired;
+                      }
+                      if (!value.contains('@')) {
+                        return l10n.invalidEmail;
+                      }
+                      return null;
+                    },
+                  ),
+                )
+                    .animate(delay: 200.ms)
+                    .fadeIn(duration: 400.ms)
+                    .slideX(begin: 0.1),
 
-                  const SizedBox(height: 32),
+                const SizedBox(height: 32),
 
-                  PrimaryButton(
-                    text: l10n.sendResetLink,
-                    onPressed: _handleResetPassword,
-                    isLoading: _isLoading,
-                    icon: Icons.send_rounded,
-                  )
-                      .animate(delay: 300.ms)
-                      .fadeIn(duration: 400.ms)
-                      .slideY(begin: 0.2),
-                ],
+                PrimaryButton(
+                  text: l10n.sendResetLink,
+                  onPressed: _handleResetPassword,
+                  isLoading: _isLoading,
+                  icon: Icons.send_rounded,
+                )
+                    .animate(delay: 300.ms)
+                    .fadeIn(duration: 400.ms)
+                    .slideY(begin: 0.2),
               ],
-            ),
+            ],
           ),
         ),
       ),

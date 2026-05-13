@@ -45,8 +45,8 @@ class NotificationRepository {
 
   /// Create notification
   Future<String> createNotification(NotificationModel notification) async {
-    final docRef = await _notificationsRef.add(notification.toFirestore());
-    await docRef.update({'id': docRef.id});
+    final docRef = _notificationsRef.doc();
+    await docRef.set(notification.copyWith(id: docRef.id).toFirestore());
     return docRef.id;
   }
 
@@ -361,7 +361,8 @@ class NotificationRepository {
     // Chunk into batches of 500 (Firestore batch limit)
     for (var i = 0; i < docsToDelete.length; i += 500) {
       final batch = _firestore.batch();
-      final end = (i + 500 < docsToDelete.length) ? i + 500 : docsToDelete.length;
+      final end =
+          (i + 500 < docsToDelete.length) ? i + 500 : docsToDelete.length;
       for (var j = i; j < end; j++) {
         batch.delete(docsToDelete[j].reference);
       }

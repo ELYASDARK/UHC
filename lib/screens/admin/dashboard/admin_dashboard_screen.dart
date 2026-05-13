@@ -11,6 +11,7 @@ import '../users/user_management_screen.dart';
 import '../analytics/appointment_analytics_screen.dart';
 import '../reports/reports_screen.dart';
 import '../../../core/widgets/loading_skeleton.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 /// Admin dashboard with overview and navigation
 class AdminDashboardScreen extends StatefulWidget {
@@ -113,9 +114,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ? _buildDashboardSkeleton(isDark)
           : RefreshIndicator(
               onRefresh: _loadDashboardStats,
-              child: SingleChildScrollView(
+              child: ResponsivePage(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                maxWidth: 1280,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -153,15 +154,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildStatsGrid(bool isDark) {
     // Number formatter
     final numberFormat = NumberFormat.compact(); // 1.2K, 1M, etc.
-    final width = MediaQuery.of(context).size.width;
-    final crossAxisCount = width > 1200 ? 6 : (width > 600 ? 3 : 2);
 
-    return GridView.count(
-      crossAxisCount: crossAxisCount,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
+    return ResponsiveGrid(
+      phoneColumns: 2,
+      tabletColumns: 3,
+      laptopColumns: 3,
+      desktopColumns: 6,
       childAspectRatio: 1.4,
       children: [
         _buildStatCard(
@@ -268,8 +266,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildQuickActions(bool isDark) {
-    final width = MediaQuery.of(context).size.width;
-    final crossAxisCount = width > 1200 ? 4 : (width > 600 ? 3 : 2);
     final user = context.read<AuthProvider>().currentUser;
 
     final actions = <Widget>[
@@ -334,12 +330,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     ];
 
-    return GridView.count(
-      crossAxisCount: crossAxisCount,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
+    return ResponsiveGrid(
+      phoneColumns: 2,
+      tabletColumns: 3,
+      laptopColumns: 4,
+      desktopColumns: 4,
       childAspectRatio: 2.5,
       children: actions,
     );

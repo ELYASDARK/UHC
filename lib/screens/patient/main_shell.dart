@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/responsive_layout.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import 'home/home_screen.dart';
@@ -82,139 +83,175 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final hasUnreadNotifications =
+        context.watch<NotificationProvider>().unreadCount > 0;
 
-    return Scaffold(
-      extendBody: true, // Extends body behind bottom nav bar
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          // Index 0: Home Screen (always built first - it's the initial screen)
-          _visitedScreens.contains(0)
-              ? HomeScreen(
-                  onDoctorsTap: () => _onTabTapped(1),
-                  onAppointmentsTap: () {
-                    _appointmentsKey.currentState?.switchToTab(0);
-                    _onTabTapped(2);
-                  },
-                  onHistoryTap: () {
-                    _appointmentsKey.currentState?.switchToTab(1);
-                    _onTabTapped(2);
-                  },
-                  onNotificationsTap: () => _onTabTapped(3),
-                  onBookNowTap: () => _onTabTapped(1),
-                  onDepartmentsTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const DepartmentBrowsingScreen(),
-                      ),
-                    );
-                  },
-                  onDepartmentTap: _onDepartmentTapped,
-                )
-              : const SizedBox.shrink(),
-          // Index 1: Doctors Screen (lazy loaded)
-          _visitedScreens.contains(1)
-              ? DoctorListScreen(
-                  key: ValueKey(_selectedDepartmentKey),
-                  initialDepartmentKey: _selectedDepartmentKey,
-                )
-              : const SizedBox.shrink(),
-          // Index 2: Appointments Screen (lazy loaded)
-          _visitedScreens.contains(2)
-              ? MyAppointmentsScreen(key: _appointmentsKey)
-              : const SizedBox.shrink(),
-          // Index 3: Notifications Screen (lazy loaded)
-          _visitedScreens.contains(3)
-              ? const NotificationsScreen()
-              : const SizedBox.shrink(),
-          // Index 4: Profile Screen (lazy loaded)
-          _visitedScreens.contains(4)
-              ? const ProfileScreen()
-              : const SizedBox.shrink(),
-        ],
+    final body = IndexedStack(
+      index: _currentIndex,
+      children: [
+        // Index 0: Home Screen (always built first - it's the initial screen)
+        _visitedScreens.contains(0)
+            ? HomeScreen(
+                onDoctorsTap: () => _onTabTapped(1),
+                onAppointmentsTap: () {
+                  _appointmentsKey.currentState?.switchToTab(0);
+                  _onTabTapped(2);
+                },
+                onHistoryTap: () {
+                  _appointmentsKey.currentState?.switchToTab(1);
+                  _onTabTapped(2);
+                },
+                onNotificationsTap: () => _onTabTapped(3),
+                onBookNowTap: () => _onTabTapped(1),
+                onDepartmentsTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DepartmentBrowsingScreen(),
+                    ),
+                  );
+                },
+                onDepartmentTap: _onDepartmentTapped,
+              )
+            : const SizedBox.shrink(),
+        // Index 1: Doctors Screen (lazy loaded)
+        _visitedScreens.contains(1)
+            ? DoctorListScreen(
+                key: ValueKey(_selectedDepartmentKey),
+                initialDepartmentKey: _selectedDepartmentKey,
+              )
+            : const SizedBox.shrink(),
+        // Index 2: Appointments Screen (lazy loaded)
+        _visitedScreens.contains(2)
+            ? MyAppointmentsScreen(key: _appointmentsKey)
+            : const SizedBox.shrink(),
+        // Index 3: Notifications Screen (lazy loaded)
+        _visitedScreens.contains(3)
+            ? const NotificationsScreen()
+            : const SizedBox.shrink(),
+        // Index 4: Profile Screen (lazy loaded)
+        _visitedScreens.contains(4)
+            ? const ProfileScreen()
+            : const SizedBox.shrink(),
+      ],
+    );
+
+    final bottomNavigationBar = Theme(
+      data: Theme.of(context).copyWith(
+        dividerColor: Colors.transparent, // Remove divider line
       ),
-      bottomNavigationBar: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent, // Remove divider line
-        ),
-        child: SizedBox(
-          height: 90,
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            clipBehavior: Clip.none,
-            children: [
-              // Bottom navigation bar with water/translucent effect
-              Container(
-                height: 70,
-                decoration: BoxDecoration(
-                  // Simple translucent effect (no blur for performance)
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: isDark
-                        ? [
-                            AppColors.surfaceDark.withValues(alpha: 1),
-                            AppColors.surfaceDark,
-                          ]
-                        : [Colors.white.withValues(alpha: 1), Colors.white],
-                  ),
-                  border: Border(
-                    top: BorderSide(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.black.withValues(alpha: 0.05),
-                      width: 0.5,
-                    ),
-                  ),
+      child: SizedBox(
+        height: 90,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          clipBehavior: Clip.none,
+          children: [
+            // Bottom navigation bar with water/translucent effect
+            Container(
+              height: 70,
+              decoration: BoxDecoration(
+                // Simple translucent effect (no blur for performance)
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isDark
+                      ? [
+                          AppColors.surfaceDark.withValues(alpha: 1),
+                          AppColors.surfaceDark,
+                        ]
+                      : [Colors.white.withValues(alpha: 1), Colors.white],
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildNavItem(
-                      index: 0,
-                      icon: Icons.home_outlined,
-                      activeIcon: Icons.home_rounded,
-                      label: l10n.home,
-                      isDark: isDark,
-                    ),
-                    _buildNavItem(
-                      index: 1,
-                      icon: Icons.people_outline_rounded,
-                      activeIcon: Icons.people_rounded,
-                      label: l10n.doctors,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 70), // Space for FAB
-                    // Use Consumer to reactively show badge based on unread count
-                    Consumer<NotificationProvider>(
-                      builder: (context, notificationProvider, _) {
-                        return _buildNavItem(
-                          index: 3,
-                          icon: Icons.notifications_outlined,
-                          activeIcon: Icons.notifications_rounded,
-                          label: l10n.alerts,
-                          isDark: isDark,
-                          showBadge: notificationProvider.unreadCount > 0,
-                        );
-                      },
-                    ),
-                    _buildNavItem(
-                      index: 4,
-                      icon: Icons.person_outline_rounded,
-                      activeIcon: Icons.person_rounded,
-                      label: l10n.profile,
-                      isDark: isDark,
-                    ),
-                  ],
+                border: Border(
+                  top: BorderSide(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.black.withValues(alpha: 0.05),
+                    width: 0.5,
+                  ),
                 ),
               ),
-              // Center FAB with Appointments label - positioned above
-              Positioned(bottom: 15, child: _buildCenterFabItem(isDark)),
-            ],
-          ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(
+                    index: 0,
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home_rounded,
+                    label: l10n.home,
+                    isDark: isDark,
+                  ),
+                  _buildNavItem(
+                    index: 1,
+                    icon: Icons.people_outline_rounded,
+                    activeIcon: Icons.people_rounded,
+                    label: l10n.doctors,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(width: 70), // Space for FAB
+                  _buildNavItem(
+                    index: 3,
+                    icon: Icons.notifications_outlined,
+                    activeIcon: Icons.notifications_rounded,
+                    label: l10n.alerts,
+                    isDark: isDark,
+                    showBadge: hasUnreadNotifications,
+                  ),
+                  _buildNavItem(
+                    index: 4,
+                    icon: Icons.person_outline_rounded,
+                    activeIcon: Icons.person_rounded,
+                    label: l10n.profile,
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+            ),
+            // Center FAB with Appointments label - positioned above
+            Positioned(bottom: 15, child: _buildCenterFabItem(isDark)),
+          ],
         ),
       ),
+    );
+
+    return AdaptiveNavigationScaffold(
+      selectedIndex: _currentIndex,
+      onDestinationSelected: _onTabTapped,
+      extendBody: true,
+      body: body,
+      bottomNavigationBar: bottomNavigationBar,
+      destinations: [
+        AdaptiveNavigationDestination(
+          index: 0,
+          icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
+          label: l10n.home,
+        ),
+        AdaptiveNavigationDestination(
+          index: 1,
+          icon: Icons.people_outline_rounded,
+          selectedIcon: Icons.people_rounded,
+          label: l10n.doctors,
+        ),
+        AdaptiveNavigationDestination(
+          index: 2,
+          icon: Icons.calendar_today_outlined,
+          selectedIcon: Icons.calendar_today_rounded,
+          label: l10n.appointments,
+        ),
+        AdaptiveNavigationDestination(
+          index: 3,
+          icon: Icons.notifications_outlined,
+          selectedIcon: Icons.notifications_rounded,
+          label: l10n.alerts,
+          showBadge: hasUnreadNotifications,
+        ),
+        AdaptiveNavigationDestination(
+          index: 4,
+          icon: Icons.person_outline_rounded,
+          selectedIcon: Icons.person_rounded,
+          label: l10n.profile,
+        ),
+      ],
     );
   }
 

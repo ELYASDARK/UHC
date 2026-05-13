@@ -190,7 +190,8 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
               SnackBar(
                 content: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                    const Icon(Icons.warning_amber_rounded,
+                        color: Colors.white),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -348,8 +349,9 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+      body: ResponsivePage(
+        maxWidth: 760,
+        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
         child: Form(
           key: _formKey,
           child: Column(

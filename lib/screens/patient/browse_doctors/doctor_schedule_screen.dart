@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/repositories/appointment_repository.dart';
 import '../../../l10n/app_localizations.dart';
@@ -159,111 +160,118 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
       body: Column(
         children: [
           // Calendar
-          Container(
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.surfaceDark : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 20,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: TableCalendar(
-              firstDay: DateTime.now(),
-              lastDay: DateTime.now().add(const Duration(days: 60)),
-              focusedDay: _focusedDay,
-              calendarFormat: _calendarFormat,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              onDaySelected: _onDaySelected,
-              onFormatChanged: (format) {
-                setState(() {
-                  _calendarFormat = format;
-                });
-              },
-              availableCalendarFormats: {
-                CalendarFormat.month: l10n.month,
-                CalendarFormat.twoWeeks: l10n.twoWeeks,
-                CalendarFormat.week: l10n.week,
-              },
-              calendarStyle: CalendarStyle(
-                selectedDecoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                todayDecoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                weekendTextStyle: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
+          ResponsiveContent(
+            maxWidth: 1180,
+            child: Container(
+              margin: UhcResponsive.pagePadding(context, bottom: 8),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
-              headerStyle: HeaderStyle(
-                formatButtonVisible: true,
-                titleCentered: true,
-                formatButtonDecoration: BoxDecoration(
-                  border: Border.all(color: AppColors.primary),
-                  borderRadius: BorderRadius.circular(12),
+              child: TableCalendar(
+                firstDay: DateTime.now(),
+                lastDay: DateTime.now().add(const Duration(days: 60)),
+                focusedDay: _focusedDay,
+                calendarFormat: _calendarFormat,
+                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                onDaySelected: _onDaySelected,
+                onFormatChanged: (format) {
+                  setState(() {
+                    _calendarFormat = format;
+                  });
+                },
+                availableCalendarFormats: {
+                  CalendarFormat.month: l10n.month,
+                  CalendarFormat.twoWeeks: l10n.twoWeeks,
+                  CalendarFormat.week: l10n.week,
+                },
+                calendarStyle: CalendarStyle(
+                  selectedDecoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  todayDecoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  weekendTextStyle: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
                 ),
-                formatButtonTextStyle: const TextStyle(
-                  color: AppColors.primary,
+                headerStyle: HeaderStyle(
+                  formatButtonVisible: true,
+                  titleCentered: true,
+                  formatButtonDecoration: BoxDecoration(
+                    border: Border.all(color: AppColors.primary),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  formatButtonTextStyle: const TextStyle(
+                    color: AppColors.primary,
+                  ),
                 ),
+                enabledDayPredicate: (day) {
+                  // Allow only future days
+                  return day.isAfter(
+                    DateTime.now().subtract(const Duration(days: 1)),
+                  );
+                },
               ),
-              enabledDayPredicate: (day) {
-                // Allow only future days
-                return day.isAfter(
-                  DateTime.now().subtract(const Duration(days: 1)),
-                );
-              },
             ),
           ),
 
           // Selected Date Info
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+          ResponsiveContent(
+            maxWidth: 1180,
+            child: Padding(
+              padding: UhcResponsive.pagePadding(context, top: 0, bottom: 0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.calendar_today,
+                      color: AppColors.primary,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.calendar_today,
-                    color: AppColors.primary,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _formatDate(_selectedDay),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          l10n.timeSlotsAvailable(availableSlots.length),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _formatDate(_selectedDay),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        l10n.timeSlotsAvailable(availableSlots.length),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -323,8 +331,18 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+    return ResponsiveListView(
+      maxWidth: 1180,
+      gridOnWide: true,
+      tabletColumns: 1,
+      laptopColumns: 2,
+      desktopColumns: 2,
+      childAspectRatio: 4.8,
+      padding: UhcResponsive.pagePadding(
+        context,
+        top: 0,
+        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+      ),
       itemCount: slots.length,
       itemBuilder: (context, index) {
         final slot = slots[index];
@@ -357,70 +375,70 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
             borderRadius: BorderRadius.circular(16),
             clipBehavior: Clip.hardEdge,
             child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 8,
-            ),
-            leading: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isAvailable
-                    ? AppColors.success.withValues(alpha: 0.1)
-                    : Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 8,
               ),
-              child: Icon(
-                isAvailable ? Icons.access_time_rounded : Icons.block_rounded,
-                color: isAvailable ? AppColors.success : Colors.grey,
+              leading: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isAvailable
+                      ? AppColors.success.withValues(alpha: 0.1)
+                      : Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  isAvailable ? Icons.access_time_rounded : Icons.block_rounded,
+                  color: isAvailable ? AppColors.success : Colors.grey,
+                ),
               ),
-            ),
-            title: Text(
-              slot.fullDisplay,
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600,
-                color: isAvailable
-                    ? null
-                    : (isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
-                decoration: !isAvailable ? TextDecoration.lineThrough : null,
+              title: Text(
+                slot.fullDisplay,
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  color: isAvailable
+                      ? null
+                      : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
+                  decoration: !isAvailable ? TextDecoration.lineThrough : null,
+                ),
               ),
-            ),
-            subtitle: Text(
-              isBooked
-                  ? l10n.alreadyBooked
-                  : isPast
-                      ? l10n.timeHasPassed
-                      : !slot.isAvailable
-                          ? l10n.notAvailable
-                          : l10n.availableForBooking,
-              style: GoogleFonts.roboto(
-                color: isAvailable ? AppColors.success : Colors.grey,
-                fontSize: 12,
+              subtitle: Text(
+                isBooked
+                    ? l10n.alreadyBooked
+                    : isPast
+                        ? l10n.timeHasPassed
+                        : !slot.isAvailable
+                            ? l10n.notAvailable
+                            : l10n.availableForBooking,
+                style: GoogleFonts.roboto(
+                  color: isAvailable ? AppColors.success : Colors.grey,
+                  fontSize: 12,
+                ),
               ),
-            ),
-            trailing: isAvailable
-                ? Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      l10n.book,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+              trailing: isAvailable
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
                       ),
-                    ),
-                  )
-                : const Icon(Icons.block, color: Colors.grey, size: 20),
-            onTap: isAvailable ? () => _onSlotTap(slot) : null,
-          ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        l10n.book,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.block, color: Colors.grey, size: 20),
+              onTap: isAvailable ? () => _onSlotTap(slot) : null,
+            ),
           ),
         );
       },

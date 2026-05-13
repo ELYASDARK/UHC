@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../services/doctor_functions_service.dart';
 
 /// A time slot representing a start and end time
@@ -419,10 +420,14 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
           const Expanded(child: Text('Manage Schedule')),
         ],
       ),
-      //////////
       content: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.85,
-        height: MediaQuery.of(context).size.height * 0.6,
+        width: UhcResponsive.dialogWidth(
+          context,
+          tabletWidth: 560,
+          laptopWidth: 620,
+          desktopWidth: 680,
+        ),
+        height: MediaQuery.of(context).size.height * 0.62,
         child: ListView.builder(
           itemCount: _days.length,
           itemBuilder: (context, index) {
@@ -431,23 +436,50 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
           },
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
       actions: [
-        TextButton(
-          onPressed: _isSaving ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _isSaving ? null : _saveSchedule,
-          child: _isSaving
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+        SizedBox(
+          width: UhcResponsive.dialogWidth(
+            context,
+            tabletWidth: 560,
+            laptopWidth: 620,
+            desktopWidth: 680,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: _isSaving ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveSchedule,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                )
-              : const Text('Save Schedule'),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Save Schedule'),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -555,72 +587,60 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
                 children: [
                   // Existing Slots - 2 per row
                   if (daySchedule.slots.isNotEmpty)
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        return Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: daySchedule.slots.asMap().entries.map((
-                            entry,
-                          ) {
-                            final index = entry.key;
-                            final slot = entry.value;
-                            final slotColor = slot.isAvailable
-                                ? AppColors.primary
-                                : AppColors.error;
-                            // Calculate width for 2 items per row
-                            final itemWidth = (constraints.maxWidth - 6) / 2;
-                            return SizedBox(
-                              width: itemWidth,
-                              child: GestureDetector(
-                                onTap: () =>
-                                    _toggleSlotAvailability(day, index),
-                                child: Chip(
-                                  avatar: Icon(
-                                    slot.isAvailable
-                                        ? Icons.check_circle
-                                        : Icons.cancel,
-                                    size: 14,
-                                    color: slotColor,
-                                  ),
-                                  label: Text(
-                                    slot.format(context),
-                                    style: TextStyle(
-                                      color: slotColor,
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 11,
-                                      decoration: slot.isAvailable
-                                          ? null
-                                          : TextDecoration.lineThrough,
-                                    ),
-                                  ),
-                                  backgroundColor: isDark
-                                      ? slotColor.withValues(alpha: 0.1)
-                                      : Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    side: BorderSide(
-                                      color: slotColor.withValues(alpha: 0.5),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  deleteIcon: Icon(
-                                    Icons.close,
-                                    size: 14,
-                                    color: slotColor,
-                                  ),
-                                  onDeleted: () => _removeTimeSlot(day, index),
-                                  visualDensity: VisualDensity.compact,
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  padding: EdgeInsets.zero,
-                                  labelPadding: const EdgeInsets.only(right: 2),
-                                ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: daySchedule.slots.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final slot = entry.value;
+                        final slotColor = slot.isAvailable
+                            ? AppColors.primary
+                            : AppColors.error;
+                        return GestureDetector(
+                          onTap: () => _toggleSlotAvailability(day, index),
+                          child: Chip(
+                            avatar: Icon(
+                              slot.isAvailable
+                                  ? Icons.check_circle
+                                  : Icons.cancel,
+                              size: 14,
+                              color: slotColor,
+                            ),
+                            label: Text(
+                              slot.format(context),
+                              style: TextStyle(
+                                color: slotColor,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 11,
+                                decoration: slot.isAvailable
+                                    ? null
+                                    : TextDecoration.lineThrough,
                               ),
-                            );
-                          }).toList(),
+                            ),
+                            backgroundColor: isDark
+                                ? slotColor.withValues(alpha: 0.1)
+                                : Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: slotColor.withValues(alpha: 0.5),
+                                width: 1,
+                              ),
+                            ),
+                            deleteIcon: Icon(
+                              Icons.close,
+                              size: 14,
+                              color: slotColor,
+                            ),
+                            onDeleted: () => _removeTimeSlot(day, index),
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            labelPadding: const EdgeInsets.only(right: 4),
+                          ),
                         );
-                      },
+                      }).toList(),
                     ),
 
                   const SizedBox(height: 8),
