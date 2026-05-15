@@ -333,7 +333,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           title: l10n.darkMode,
           trailing: Switch(
             value: themeProvider.isDarkMode,
-            onChanged: (_) => themeProvider.toggleTheme(),
+            onChanged: (_) => _applyThemeChange(themeProvider, authProvider),
           ),
           isDark: isDark,
           accentColor: accentColor,
@@ -598,8 +598,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? const Icon(Icons.check, color: AppColors.primary)
                   : null,
               onTap: () {
-                localeProvider.setLocaleByCode('en');
-                Navigator.pop(dialogContext);
+                _applyLanguageChange(dialogContext, 'en');
               },
             ),
             ListTile(
@@ -608,8 +607,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? const Icon(Icons.check, color: AppColors.primary)
                   : null,
               onTap: () {
-                localeProvider.setLocaleByCode('ar');
-                Navigator.pop(dialogContext);
+                _applyLanguageChange(dialogContext, 'ar');
               },
             ),
             ListTile(
@@ -618,8 +616,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? const Icon(Icons.check, color: AppColors.primary)
                   : null,
               onTap: () {
-                localeProvider.setLocaleByCode('ku');
-                Navigator.pop(dialogContext);
+                _applyLanguageChange(dialogContext, 'ku');
               },
             ),
           ],
@@ -632,6 +629,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _applyLanguageChange(
+    BuildContext dialogContext,
+    String languageCode,
+  ) async {
+    final localeProvider = context.read<LocaleProvider>();
+    final authProvider = context.read<AuthProvider>();
+
+    await localeProvider.setLocaleByCode(languageCode);
+    await authProvider.updateLanguage(languageCode);
+
+    if (!dialogContext.mounted) return;
+    Navigator.pop(dialogContext);
+  }
+
+  Future<void> _applyThemeChange(
+    ThemeProvider themeProvider,
+    AuthProvider authProvider,
+  ) async {
+    await themeProvider.toggleTheme();
+    await authProvider.updateThemeMode(themeProvider.themeMode.name);
   }
 
   Widget _buildProfileHeader(

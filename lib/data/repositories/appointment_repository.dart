@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import '../models/appointment_model.dart';
 
 /// Repository for appointment-related Firestore operations
 class AppointmentRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   static const String _collection = 'appointments';
 
   CollectionReference<Map<String, dynamic>> get _appointmentsRef =>
@@ -157,14 +159,25 @@ class AppointmentRepository {
 
   /// Create appointment
   Future<String> createAppointment(AppointmentModel appointment) async {
-    final docRef = await _appointmentsRef.add(appointment.toFirestore());
-    await docRef.update({'id': docRef.id});
-    return docRef.id;
+    final callable = _functions.httpsCallable('createAppointment');
+    final result = await callable.call<Map<String, dynamic>>({
+      'bookingReference': appointment.bookingReference,
+      'patientId': appointment.patientId,
+      'doctorId': appointment.doctorId,
+      'doctorName': appointment.doctorName,
+      'department': appointment.department,
+      'appointmentDate': appointment.appointmentDate.toIso8601String(),
+      'timeSlot': appointment.timeSlot,
+      'type': appointment.type.name,
+      'notes': appointment.notes,
+    });
+    return result.data['appointmentId'] as String;
   }
 
   /// Delete appointment permanently
   Future<void> deleteAppointment(String appointmentId) async {
-    await _appointmentsRef.doc(appointmentId).delete();
+    final callable = _functions.httpsCallable('deleteAppointment');
+    await callable.call<void>({'appointmentId': appointmentId});
   }
 
   /// Delete all appointments for a user (useful for testing cleanup)
@@ -190,14 +203,12 @@ class AppointmentRepository {
     AppointmentStatus status, {
     String? statusUpdatedBy,
   }) async {
-    final updates = <String, dynamic>{
+    final callable = _functions.httpsCallable('updateAppointmentStatus');
+    await callable.call<void>({
+      'appointmentId': appointmentId,
       'status': status.name,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
-    };
-    if (statusUpdatedBy != null) {
-      updates['statusUpdatedBy'] = statusUpdatedBy;
-    }
-    await _appointmentsRef.doc(appointmentId).update(updates);
+      'statusUpdatedBy': statusUpdatedBy,
+    });
   }
 
   /// Cancel appointment
@@ -206,15 +217,12 @@ class AppointmentRepository {
     String reason, {
     String? statusUpdatedBy,
   }) async {
-    final updates = <String, dynamic>{
-      'status': AppointmentStatus.cancelled.name,
-      'cancelReason': reason,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
-    };
-    if (statusUpdatedBy != null) {
-      updates['statusUpdatedBy'] = statusUpdatedBy;
-    }
-    await _appointmentsRef.doc(appointmentId).update(updates);
+    final callable = _functions.httpsCallable('cancelAppointment');
+    await callable.call<void>({
+      'appointmentId': appointmentId,
+      'reason': reason,
+      'statusUpdatedBy': statusUpdatedBy,
+    });
   }
 
   /// Reschedule appointment
@@ -224,11 +232,12 @@ class AppointmentRepository {
     String newTimeSlot,
     String? reason,
   ) async {
-    await _appointmentsRef.doc(appointmentId).update({
-      'appointmentDate': Timestamp.fromDate(newDate),
+    final callable = _functions.httpsCallable('rescheduleAppointment');
+    await callable.call<void>({
+      'appointmentId': appointmentId,
+      'appointmentDate': newDate.toIso8601String(),
       'timeSlot': newTimeSlot,
-      'rescheduleReason': reason,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+      'reason': reason,
     });
   }
 
@@ -238,18 +247,15 @@ class AppointmentRepository {
     String? notes,
     String? statusUpdatedBy,
   }) async {
-    final updates = <String, dynamic>{
+    final callable = _functions.httpsCallable('updateAppointmentStatus');
+    await callable.call<void>({
+      'appointmentId': appointmentId,
       'status': AppointmentStatus.completed.name,
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
-    };
+      'statusUpdatedBy': statusUpdatedBy,
+    });
     if (notes != null) {
-      updates['medicalNotes'] = notes;
-      updates['medicalNotesUpdatedAt'] = Timestamp.fromDate(DateTime.now());
+      await updateMedicalNotes(appointmentId, notes);
     }
-    if (statusUpdatedBy != null) {
-      updates['statusUpdatedBy'] = statusUpdatedBy;
-    }
-    await _appointmentsRef.doc(appointmentId).update(updates);
   }
 
   /// Get all appointments (admin)
@@ -370,10 +376,10 @@ class AppointmentRepository {
     String appointmentId,
     String notes,
   ) async {
-    await _appointmentsRef.doc(appointmentId).update({
-      'medicalNotes': notes,
-      'medicalNotesUpdatedAt': Timestamp.fromDate(DateTime.now()),
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    final callable = _functions.httpsCallable('updateMedicalNotes');
+    await callable.call<void>({
+      'appointmentId': appointmentId,
+      'notes': notes,
     });
   }
 
@@ -405,9 +411,7 @@ class AppointmentRepository {
 
   /// Atomically increment the QR scan failure counter
   Future<void> incrementQrScanFailures(String appointmentId) async {
-    await _appointmentsRef.doc(appointmentId).update({
-      'qrScanFailures': FieldValue.increment(1),
-      'updatedAt': Timestamp.fromDate(DateTime.now()),
-    });
+    final callable = _functions.httpsCallable('incrementQrScanFailures');
+    await callable.call<void>({'appointmentId': appointmentId});
   }
 }

@@ -10,6 +10,7 @@ import 'department_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../services/department_functions_service.dart';
 import '../../../core/widgets/responsive_layout.dart';
+import '../../../core/widgets/role_english_ltr_scope.dart';
 
 /// Department management screen for admin
 class DepartmentManagementScreen extends StatefulWidget {
@@ -156,288 +157,293 @@ class _DepartmentManagementScreenState
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Department Management'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterDialog,
+    return RoleEnglishLtrScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Department Management'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: _showFilterDialog,
+            ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _canManage
+              ? () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const DepartmentFormDialog(),
+                  );
+                }
+              : _showPermissionDenied,
+          icon: Icon(
+            _canManage ? Icons.add_business : Icons.lock_outline,
+            color: Colors.white,
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _canManage
-            ? () {
-                showDialog(
-                  context: context,
-                  builder: (context) => const DepartmentFormDialog(),
-                );
-              }
-            : _showPermissionDenied,
-        icon: Icon(
-          _canManage ? Icons.add_business : Icons.lock_outline,
-          color: Colors.white,
+          label: Text(
+            'Add Department',
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: _canManage
+              ? AppColors.primary
+              : AppColors.primary.withValues(alpha: 0.55),
+          shape: const StadiumBorder(),
         ),
-        label: Text(
-          'Add Department',
-          style: const TextStyle(color: Colors.white),
-        ),
-        backgroundColor: _canManage
-            ? AppColors.primary
-            : AppColors.primary.withValues(alpha: 0.55),
-        shape: const StadiumBorder(),
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Search Bar
-          ResponsiveContent(
-            maxWidth: 1320,
-            child: Padding(
-              padding: UhcResponsive.pagePadding(context, bottom: 8),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) => setState(() => _searchQuery = value),
-                decoration: InputDecoration(
-                  hintText: 'Search departments...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Search Bar
+            ResponsiveContent(
+              maxWidth: 1320,
+              child: Padding(
+                padding: UhcResponsive.pagePadding(context, bottom: 8),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  decoration: InputDecoration(
+                    hintText: 'Search departments...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          // Filter Chips
-          if (_statusFilter != 'all')
-            ResponsiveContent(
-              maxWidth: 1320,
-              child: Padding(
-                padding: UhcResponsive.pagePadding(context, top: 0, bottom: 8),
-                child: Wrap(
-                  spacing: 8,
-                  children: [
-                    Chip(
-                      label: Text(
-                        _statusFilter.toUpperCase(),
-                        style: TextStyle(
-                          color: isDark ? Colors.white : AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                      backgroundColor: isDark
-                          ? AppColors.primary.withValues(alpha: 0.2)
-                          : AppColors.primary.withValues(alpha: 0.1),
-                      side: BorderSide(
-                        color: isDark
-                            ? AppColors.primary.withValues(alpha: 0.5)
-                            : AppColors.primary.withValues(alpha: 0.2),
-                      ),
-                      onDeleted: () => setState(() => _statusFilter = 'all'),
-                      deleteIconColor:
-                          isDark ? Colors.white70 : AppColors.primary,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          if (_doctorCountsWarning != null)
-            ResponsiveContent(
-              maxWidth: 1320,
-              child: Padding(
-                padding: UhcResponsive.pagePadding(context, top: 0, bottom: 8),
-                child: Container(
+            // Filter Chips
+            if (_statusFilter != 'all')
+              ResponsiveContent(
+                maxWidth: 1320,
+                child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Row(
+                      UhcResponsive.pagePadding(context, top: 0, bottom: 8),
+                  child: Wrap(
+                    spacing: 8,
                     children: [
-                      const Icon(Icons.wifi_off,
-                          color: Colors.orange, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _doctorCountsWarning!,
-                          style: const TextStyle(
-                            color: Colors.orange,
+                      Chip(
+                        label: Text(
+                          _statusFilter.toUpperCase(),
+                          style: TextStyle(
+                            color: isDark ? Colors.white : AppColors.primary,
+                            fontWeight: FontWeight.bold,
                             fontSize: 12,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: _loadDoctorCounts,
-                        child: const Text('Retry'),
+                        backgroundColor: isDark
+                            ? AppColors.primary.withValues(alpha: 0.2)
+                            : AppColors.primary.withValues(alpha: 0.1),
+                        side: BorderSide(
+                          color: isDark
+                              ? AppColors.primary.withValues(alpha: 0.5)
+                              : AppColors.primary.withValues(alpha: 0.2),
+                        ),
+                        onDeleted: () => setState(() => _statusFilter = 'all'),
+                        deleteIconColor:
+                            isDark ? Colors.white70 : AppColors.primary,
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
 
-          // Departments List
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _getDepartmentsStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return SkeletonList(
-                    itemBuilder: (context, index) =>
-                        const CardSkeleton(height: 100),
-                  );
-                }
+            if (_doctorCountsWarning != null)
+              ResponsiveContent(
+                maxWidth: 1320,
+                child: Padding(
+                  padding:
+                      UhcResponsive.pagePadding(context, top: 0, bottom: 8),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.wifi_off,
+                            color: Colors.orange, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _doctorCountsWarning!,
+                            style: const TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _loadDoctorCounts,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
+            // Departments List
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _getDepartmentsStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return SkeletonList(
+                      itemBuilder: (context, index) =>
+                          const CardSkeleton(height: 100),
+                    );
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.cloud_off,
+                              size: 56,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Could not load departments right now.',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Check your connection and try again.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                _loadDoctorCounts();
+                                setState(() {});
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.cloud_off,
-                            size: 56,
+                            Icons.business,
+                            size: 64,
                             color: Colors.grey[400],
                           ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Could not load departments right now.',
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Check your connection and try again.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                          ),
+                          const SizedBox(height: 16),
+                          const Text('No departments found'),
                           const SizedBox(height: 16),
                           ElevatedButton.icon(
-                            onPressed: () {
-                              _loadDoctorCounts();
-                              setState(() {});
-                            },
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Retry'),
+                            onPressed: _canManage
+                                ? () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) =>
+                                          const DepartmentFormDialog(),
+                                    );
+                                  }
+                                : _showPermissionDenied,
+                            icon: Icon(
+                              _canManage
+                                  ? Icons.add_business
+                                  : Icons.lock_outline,
+                            ),
+                            label: const Text('Add Department'),
                           ),
                         ],
                       ),
-                    ),
-                  );
-                }
-
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.business,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text('No departments found'),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _canManage
-                              ? () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) =>
-                                        const DepartmentFormDialog(),
-                                  );
-                                }
-                              : _showPermissionDenied,
-                          icon: Icon(
-                            _canManage
-                                ? Icons.add_business
-                                : Icons.lock_outline,
-                          ),
-                          label: const Text('Add Department'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final docs = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final name = (data['name'] ?? '').toString().toLowerCase();
-                  final matchesSearch =
-                      name.contains(_searchQuery.toLowerCase());
-
-                  if (_statusFilter == 'active') {
-                    return matchesSearch && (data['isActive'] ?? true);
-                  } else if (_statusFilter == 'inactive') {
-                    return matchesSearch && !(data['isActive'] ?? true);
+                    );
                   }
-                  return matchesSearch;
-                }).toList();
 
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text('No matching departments'),
-                      ],
-                    ),
-                  );
-                }
-
-                return ResponsiveListView(
-                  maxWidth: 1440,
-                  gridOnWide: true,
-                  tabletColumns: 1,
-                  laptopColumns: 2,
-                  desktopColumns: 3,
-                  childAspectRatio: 4.0,
-                  padding: UhcResponsive.pagePadding(
-                    context,
-                    top: 8,
-                    bottom: UhcResponsive.isWide(context) ? 32 : 88,
-                  ),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final doc = docs[index];
+                  final docs = snapshot.data!.docs.where((doc) {
                     final data = doc.data() as Map<String, dynamic>;
-                    return _buildDepartmentCard(context, doc.id, data, isDark);
-                  },
-                );
-              },
+                    final name = (data['name'] ?? '').toString().toLowerCase();
+                    final matchesSearch =
+                        name.contains(_searchQuery.toLowerCase());
+
+                    if (_statusFilter == 'active') {
+                      return matchesSearch && (data['isActive'] ?? true);
+                    } else if (_statusFilter == 'inactive') {
+                      return matchesSearch && !(data['isActive'] ?? true);
+                    }
+                    return matchesSearch;
+                  }).toList();
+
+                  if (docs.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('No matching departments'),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ResponsiveListView(
+                    maxWidth: 1440,
+                    gridOnWide: true,
+                    tabletColumns: 1,
+                    laptopColumns: 2,
+                    desktopColumns: 3,
+                    childAspectRatio: 4.0,
+                    padding: UhcResponsive.pagePadding(
+                      context,
+                      top: 8,
+                      bottom: UhcResponsive.isWide(context) ? 32 : 88,
+                    ),
+                    itemCount: docs.length,
+                    itemBuilder: (context, index) {
+                      final doc = docs[index];
+                      final data = doc.data() as Map<String, dynamic>;
+                      return _buildDepartmentCard(
+                          context, doc.id, data, isDark);
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

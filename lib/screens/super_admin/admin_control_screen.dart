@@ -10,6 +10,7 @@ import '../../data/models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/admin_governance_service.dart';
 import '../../core/widgets/responsive_layout.dart';
+import '../../core/widgets/role_english_ltr_scope.dart';
 
 /// Super Admin governance panel — manage admin accounts, permissions, and slots.
 class AdminControlScreen extends StatefulWidget {
@@ -47,70 +48,72 @@ class _AdminControlScreenState extends State<AdminControlScreen>
     final actorIsSuperAdmin = actorRole == UserRole.superAdmin;
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          l10n.adminGovernance,
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+    return RoleEnglishLtrScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            l10n.adminGovernance,
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+          centerTitle: true,
+          bottom: TabBar(
+            controller: _tabController,
+            labelColor: const Color(0xFFD32F2F),
+            unselectedLabelColor: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+            indicatorColor: const Color(0xFFD32F2F),
+            tabs: [
+              Tab(text: l10n.admins),
+              Tab(text: l10n.permissions),
+              Tab(text: l10n.slots),
+            ],
+          ),
         ),
-        centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFFD32F2F),
-          unselectedLabelColor: isDark
-              ? AppColors.textSecondaryDark
-              : AppColors.textSecondaryLight,
-          indicatorColor: const Color(0xFFD32F2F),
-          tabs: [
-            Tab(text: l10n.admins),
-            Tab(text: l10n.permissions),
-            Tab(text: l10n.slots),
-          ],
-        ),
-      ),
-      floatingActionButton: actorIsSuperAdmin
-          ? FloatingActionButton(
-              // Two AdminControlScreen instances can exist simultaneously
-              // in SuperAdminShell (Admins + Permissions tabs via IndexedStack),
-              // so hero tags must be unique per instance.
-              heroTag: 'admin_governance_fab_${widget.initialTab}',
-              backgroundColor: const Color(0xFFD32F2F),
-              onPressed: _showCreateAdminDialog,
-              child: const Icon(Icons.person_add, color: Colors.white),
-            )
-          : null,
-      body: Column(
-        children: [
-          if (!actorIsSuperAdmin)
-            ColoredBox(
-              color: AppColors.warning.withValues(alpha: 0.1),
-              child: ResponsiveContent(
-                maxWidth: 1440,
-                child: Padding(
-                  padding:
-                      UhcResponsive.pagePadding(context, top: 10, bottom: 10),
-                  child: Text(
-                    l10n.viewOnlyMode,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.warning,
+        floatingActionButton: actorIsSuperAdmin
+            ? FloatingActionButton(
+                // Two AdminControlScreen instances can exist simultaneously
+                // in SuperAdminShell (Admins + Permissions tabs via IndexedStack),
+                // so hero tags must be unique per instance.
+                heroTag: 'admin_governance_fab_${widget.initialTab}',
+                backgroundColor: const Color(0xFFD32F2F),
+                onPressed: _showCreateAdminDialog,
+                child: const Icon(Icons.person_add, color: Colors.white),
+              )
+            : null,
+        body: Column(
+          children: [
+            if (!actorIsSuperAdmin)
+              ColoredBox(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                child: ResponsiveContent(
+                  maxWidth: 1440,
+                  child: Padding(
+                    padding:
+                        UhcResponsive.pagePadding(context, top: 10, bottom: 10),
+                    child: Text(
+                      l10n.viewOnlyMode,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.warning,
+                      ),
                     ),
                   ),
                 ),
               ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildAdminListTab(isDark, actorIsSuperAdmin),
+                  _buildPermissionsTab(isDark, actorIsSuperAdmin),
+                  _buildSlotsTab(isDark, actorIsSuperAdmin),
+                ],
+              ),
             ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildAdminListTab(isDark, actorIsSuperAdmin),
-                _buildPermissionsTab(isDark, actorIsSuperAdmin),
-                _buildSlotsTab(isDark, actorIsSuperAdmin),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -991,8 +994,8 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                             if (value == null || value.isEmpty) {
                               return 'Please enter password';
                             }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
+                            if (value.length < 12) {
+                              return 'Password must be at least 12 characters';
                             }
                             return null;
                           },
@@ -1147,8 +1150,8 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                             if (value == null || value.isEmpty) {
                               return 'Please enter password';
                             }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
+                            if (value.length < 12) {
+                              return 'Password must be at least 12 characters';
                             }
                             return null;
                           },

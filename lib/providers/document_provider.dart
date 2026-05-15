@@ -45,7 +45,12 @@ class DocumentProvider extends ChangeNotifier {
       notifyListeners();
 
       // Upload with progress tracking
-      final upload = _repo.uploadFileWithProgress(userId, bytes, fileName);
+      final upload = _repo.uploadFileWithProgress(
+        userId,
+        bytes,
+        fileName,
+        appointmentId: appointmentId,
+      );
 
       // Listen to progress
       _uploadSubscription?.cancel();
@@ -113,6 +118,7 @@ class DocumentProvider extends ChangeNotifier {
     required Uint8List bytes,
     required String fileName,
     String? oldStoragePath,
+    String? appointmentId,
   }) async {
     try {
       _isUploading = true;
@@ -121,7 +127,12 @@ class DocumentProvider extends ChangeNotifier {
       notifyListeners();
 
       // Upload new file with progress
-      final upload = _repo.uploadFileWithProgress(userId, bytes, fileName);
+      final upload = _repo.uploadFileWithProgress(
+        userId,
+        bytes,
+        fileName,
+        appointmentId: appointmentId,
+      );
 
       _uploadSubscription?.cancel();
       _uploadSubscription = upload.task.snapshotEvents.listen((event) {

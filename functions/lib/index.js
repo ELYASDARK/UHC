@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = void 0;
+exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = exports.deleteAppointment = exports.incrementQrScanFailures = exports.updateMedicalNotes = exports.updateAppointmentStatus = exports.cancelAppointment = exports.rescheduleAppointment = exports.createAppointment = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
@@ -18,9 +18,13 @@ function requireAuth(context) {
 }
 /** Fetches the caller's user document. Throws if not found. */
 async function getCallerUserDoc(uid) {
+    var _a;
     const doc = await db.collection('users').doc(uid).get();
     if (!doc.exists) {
         throw new functions.https.HttpsError('not-found', 'Caller user document not found.');
+    }
+    if (((_a = doc.data()) === null || _a === void 0 ? void 0 : _a.isActive) !== true) {
+        throw new functions.https.HttpsError('permission-denied', 'Your account is inactive.');
     }
     return doc;
 }
@@ -42,12 +46,23 @@ function requirePermission(callerDoc, permissionKey) {
         throw new functions.https.HttpsError('permission-denied', 'Only admins can perform this action.');
     }
     const perms = data.adminPermissions;
-    // Legacy admins without permissions object get full access
-    if (!perms)
-        return;
+    if (!perms) {
+        throw new functions.https.HttpsError('permission-denied', `Missing permission: ${permissionKey}`);
+    }
     if (!perms[permissionKey]) {
         throw new functions.https.HttpsError('permission-denied', `Missing permission: ${permissionKey}`);
     }
+}
+async function revokeSessionsAndClearFcm(uid) {
+    try {
+        await auth.revokeRefreshTokens(uid);
+    }
+    catch (error) {
+        if ((error === null || error === void 0 ? void 0 : error.code) !== 'auth/user-not-found') {
+            throw error;
+        }
+    }
+    await db.collection('user_tokens').doc(uid).delete().catch(() => { });
 }
 /** Writes an entry to admin_audit_logs collection. */
 async function writeAdminAuditLog(params) {
@@ -67,7 +82,7 @@ function toHttpsError(error, fallbackMessage) {
         return new functions.https.HttpsError('not-found', 'Target auth user not found.');
     }
     if (code === 'auth/invalid-password' || code === 'auth/weak-password') {
-        return new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+        return new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters.');
     }
     const message = (maybe === null || maybe === void 0 ? void 0 : maybe.message) || fallbackMessage;
     return new functions.https.HttpsError('internal', message);
@@ -84,6 +99,483 @@ const READ_ONLY_ADMIN_PERMISSIONS = {
     'reports.export': false,
     'notifications.send': false,
 };
+const APPOINTMENT_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'noShow'];
+const APPOINTMENT_TYPES = ['regularCheckup', 'followUp', 'consultation', 'emergency'];
+const ACTIVE_APPOINTMENT_STATUSES = ['pending', 'confirmed'];
+function appointmentDateKey(appointmentDate) {
+    const year = appointmentDate.getFullYear();
+    const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(appointmentDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+function slotLockComponent(value) {
+    return encodeURIComponent(value.trim());
+}
+function appointmentSlotLockRef(doctorId, appointmentDate, timeSlot) {
+    return db.collection('appointment_slot_locks').doc(`${slotLockComponent(doctorId)}_${appointmentDateKey(appointmentDate)}_${slotLockComponent(timeSlot)}`);
+}
+function firestoreDateToDate(value) {
+    if (value instanceof Date)
+        return value;
+    if (value && typeof value.toDate === 'function') {
+        return value.toDate();
+    }
+    return null;
+}
+async function lockAppointmentSlot(transaction, params) {
+    var _a, _b;
+    const slotRef = appointmentSlotLockRef(params.doctorId, params.appointmentDate, params.timeSlot);
+    const slotLockSnap = await transaction.get(slotRef);
+    const lockedAppointmentId = (_a = slotLockSnap.data()) === null || _a === void 0 ? void 0 : _a.appointmentId;
+    const lockedStatus = (_b = slotLockSnap.data()) === null || _b === void 0 ? void 0 : _b.status;
+    if (slotLockSnap.exists &&
+        lockedAppointmentId !== params.excludeAppointmentId &&
+        ACTIVE_APPOINTMENT_STATUSES.includes(lockedStatus || 'pending')) {
+        throw new functions.https.HttpsError('already-exists', 'This time slot is no longer available.');
+    }
+    transaction.set(slotRef, {
+        appointmentId: params.appointmentId,
+        doctorId: params.doctorId,
+        appointmentDateKey: appointmentDateKey(params.appointmentDate),
+        timeSlot: params.timeSlot,
+        status: params.status,
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    return slotRef;
+}
+function releaseAppointmentSlot(transaction, appointmentId, appointmentData) {
+    const appointmentDate = firestoreDateToDate(appointmentData.appointmentDate);
+    if (!appointmentData.doctorId || !appointmentDate || !appointmentData.timeSlot)
+        return;
+    const slotRef = appointmentSlotLockRef(appointmentData.doctorId, appointmentDate, appointmentData.timeSlot);
+    transaction.delete(slotRef);
+}
+function parseAppointmentDate(value) {
+    const parsed = new Date(value);
+    if (!value || Number.isNaN(parsed.getTime())) {
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentDate must be a valid ISO date string.');
+    }
+    return parsed;
+}
+function appointmentExactTime(date, timeSlot) {
+    const startTime = timeSlot.split(' - ')[0] || '00:00';
+    const [hourRaw, minuteRaw] = startTime.split(':');
+    const hour = Number.parseInt(hourRaw || '0', 10);
+    const minute = Number.parseInt(minuteRaw || '0', 10);
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number.isNaN(hour) ? 0 : hour, Number.isNaN(minute) ? 0 : minute);
+}
+function formatDateForNotification(date) {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function isAdminWithAppointmentAccess(data) {
+    if (data.role === 'superAdmin')
+        return true;
+    if (data.role !== 'admin')
+        return false;
+    const perms = data.adminPermissions;
+    return !!((perms === null || perms === void 0 ? void 0 : perms['appointments.view']) || (perms === null || perms === void 0 ? void 0 : perms['analytics.view']) || (perms === null || perms === void 0 ? void 0 : perms['reports.view']));
+}
+async function getDoctorForUser(uid) {
+    const snap = await db.collection('doctors')
+        .where('userId', '==', uid)
+        .where('isActive', '==', true)
+        .limit(1)
+        .get();
+    return snap.empty ? null : snap.docs[0];
+}
+async function canMutateAppointment(callerUid, callerDoc, appointmentData, options) {
+    const callerData = callerDoc.data();
+    if (options.allowPatient && appointmentData.patientId === callerUid)
+        return true;
+    if (options.allowAdmin && isAdminWithAppointmentAccess(callerData))
+        return true;
+    if (options.allowDoctor && callerData.role === 'doctor') {
+        const doctorDoc = await getDoctorForUser(callerUid);
+        return (doctorDoc === null || doctorDoc === void 0 ? void 0 : doctorDoc.id) === appointmentData.doctorId;
+    }
+    return false;
+}
+async function createTrustedNotification(params) {
+    const ref = db.collection('notifications').doc();
+    await ref.set({
+        id: ref.id,
+        userId: params.userId,
+        title: params.title,
+        body: params.body,
+        type: params.type,
+        data: params.data || null,
+        isRead: false,
+        createdAt: admin.firestore.Timestamp.now(),
+        appointmentId: params.appointmentId || null,
+        scheduledFor: params.scheduledFor ? admin.firestore.Timestamp.fromDate(params.scheduledFor) : null,
+        reminderType: params.reminderType || null,
+        isDelivered: params.isDelivered || false,
+        createdByBackend: true,
+    });
+    return ref.id;
+}
+async function deleteAppointmentNotifications(appointmentId) {
+    const snap = await db.collection('notifications')
+        .where('appointmentId', '==', appointmentId)
+        .limit(500)
+        .get();
+    if (snap.empty)
+        return;
+    const batch = db.batch();
+    snap.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+}
+async function createAppointmentNotifications(params) {
+    const exactTime = appointmentExactTime(params.appointmentDate, params.timeSlot);
+    const formattedDate = formatDateForNotification(exactTime);
+    if (params.includeConfirmation !== false) {
+        await createTrustedNotification({
+            userId: params.userId,
+            title: 'Booking Confirmed',
+            body: `Your appointment with Dr. ${params.doctorName} on ${formattedDate} at ${params.timeSlot} has been confirmed.`,
+            type: 'appointmentConfirmation',
+            data: { appointmentId: params.appointmentId },
+            appointmentId: params.appointmentId,
+            reminderType: 'immediate',
+        });
+    }
+    const reminders = [
+        { reminderType: 'oneWeek', scheduledFor: new Date(exactTime.getTime() - 7 * 24 * 60 * 60 * 1000), title: 'Appointment in 1 Week' },
+        { reminderType: 'oneDay', scheduledFor: new Date(exactTime.getTime() - 24 * 60 * 60 * 1000), title: 'Appointment Tomorrow' },
+        { reminderType: 'oneHour', scheduledFor: new Date(exactTime.getTime() - 60 * 60 * 1000), title: 'Appointment in 1 Hour' },
+    ];
+    const now = new Date();
+    for (const reminder of reminders) {
+        if (reminder.scheduledFor <= now)
+            continue;
+        await createTrustedNotification({
+            userId: params.userId,
+            title: reminder.title,
+            body: `Reminder: Your appointment with Dr. ${params.doctorName} is on ${formattedDate} at ${params.timeSlot}.`,
+            type: 'appointmentReminder',
+            data: { appointmentId: params.appointmentId, reminderType: reminder.reminderType },
+            appointmentId: params.appointmentId,
+            scheduledFor: reminder.scheduledFor,
+            reminderType: reminder.reminderType,
+        });
+    }
+}
+exports.createAppointment = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const callerData = callerDoc.data();
+    const data = request.data;
+    if (data.patientId !== callerUid) {
+        throw new functions.https.HttpsError('permission-denied', 'You can only create appointments for yourself.');
+    }
+    if (!data.department || !data.appointmentDate || !data.timeSlot) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required appointment fields.');
+    }
+    const type = data.type || 'regularCheckup';
+    if (!APPOINTMENT_TYPES.includes(type)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid appointment type.');
+    }
+    const appointmentDate = parseAppointmentDate(data.appointmentDate);
+    const now = admin.firestore.Timestamp.now();
+    let doctorUserId;
+    const ref = db.collection('appointments').doc();
+    const bookingReference = (data.bookingReference || ref.id.substring(0, 8)).toUpperCase();
+    let trustedDoctorName = 'Any Available';
+    let trustedDepartment = data.department;
+    await db.runTransaction(async (transaction) => {
+        if (data.doctorId) {
+            const doctorRef = db.collection('doctors').doc(data.doctorId);
+            const doctorDoc = await transaction.get(doctorRef);
+            const doctorData = doctorDoc.data();
+            if (!doctorDoc.exists || (doctorData === null || doctorData === void 0 ? void 0 : doctorData.isActive) !== true) {
+                throw new functions.https.HttpsError('failed-precondition', 'Selected doctor is unavailable.');
+            }
+            doctorUserId = doctorData.userId;
+            trustedDoctorName = typeof doctorData.name === 'string' && doctorData.name.trim()
+                ? doctorData.name.trim()
+                : 'your doctor';
+            trustedDepartment = typeof doctorData.department === 'string' && doctorData.department.trim()
+                ? doctorData.department.trim()
+                : data.department;
+            await lockAppointmentSlot(transaction, {
+                doctorId: data.doctorId,
+                appointmentDate,
+                timeSlot: data.timeSlot,
+                appointmentId: ref.id,
+                status: 'pending',
+            });
+        }
+        else if (type !== 'emergency') {
+            throw new functions.https.HttpsError('invalid-argument', 'doctorId is required for non-emergency appointments.');
+        }
+        transaction.set(ref, {
+            id: ref.id,
+            bookingReference,
+            patientId: callerUid,
+            patientName: callerData.fullName || '',
+            patientEmail: callerData.email || '',
+            doctorId: data.doctorId || '',
+            doctorName: trustedDoctorName,
+            department: trustedDepartment,
+            appointmentDate: admin.firestore.Timestamp.fromDate(appointmentDate),
+            timeSlot: data.timeSlot,
+            type,
+            status: 'pending',
+            notes: data.notes || null,
+            medicalNotes: null,
+            qrCode: null,
+            isCheckedIn: false,
+            checkedInAt: null,
+            createdAt: now,
+            updatedAt: now,
+            cancelReason: null,
+            rescheduleReason: null,
+            reminderSent24h: false,
+            reminderSent1h: false,
+            medicalNotesUpdatedAt: null,
+            statusUpdatedBy: null,
+            qrScanFailures: 0,
+        });
+        if (doctorUserId) {
+            const accessRef = db.collection('doctor_patient_access').doc(doctorUserId)
+                .collection('patients').doc(callerUid);
+            transaction.set(accessRef, {
+                doctorUserId,
+                doctorId: data.doctorId,
+                patientId: callerUid,
+                appointmentId: ref.id,
+                updatedAt: now,
+            }, { merge: true });
+        }
+    });
+    await createAppointmentNotifications({
+        userId: callerUid,
+        appointmentId: ref.id,
+        doctorName: trustedDoctorName,
+        appointmentDate,
+        timeSlot: data.timeSlot,
+    });
+    return { success: true, appointmentId: ref.id, bookingReference };
+});
+exports.rescheduleAppointment = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const { appointmentId, appointmentDate, timeSlot, reason } = request.data;
+    if (!appointmentId || !appointmentDate || !timeSlot) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required reschedule fields.');
+    }
+    const ref = db.collection('appointments').doc(appointmentId);
+    const snap = await ref.get();
+    if (!snap.exists)
+        throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+    const appointment = snap.data();
+    if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowPatient: true, allowDoctor: true, allowAdmin: true })) {
+        throw new functions.https.HttpsError('permission-denied', 'You cannot reschedule this appointment.');
+    }
+    if (!ACTIVE_APPOINTMENT_STATUSES.includes(appointment.status)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Only active appointments can be rescheduled.');
+    }
+    const parsedDate = parseAppointmentDate(appointmentDate);
+    await db.runTransaction(async (transaction) => {
+        const transactionSnap = await transaction.get(ref);
+        if (!transactionSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+        }
+        const currentAppointment = transactionSnap.data();
+        if (!ACTIVE_APPOINTMENT_STATUSES.includes(currentAppointment.status)) {
+            throw new functions.https.HttpsError('failed-precondition', 'Only active appointments can be rescheduled.');
+        }
+        let newSlotRef = null;
+        if (currentAppointment.doctorId) {
+            newSlotRef = await lockAppointmentSlot(transaction, {
+                doctorId: currentAppointment.doctorId,
+                appointmentDate: parsedDate,
+                timeSlot,
+                appointmentId,
+                status: currentAppointment.status,
+                excludeAppointmentId: appointmentId,
+            });
+        }
+        const currentDate = firestoreDateToDate(currentAppointment.appointmentDate);
+        if (currentAppointment.doctorId && currentDate && currentAppointment.timeSlot) {
+            const currentSlotRef = appointmentSlotLockRef(currentAppointment.doctorId, currentDate, currentAppointment.timeSlot);
+            if (!newSlotRef || currentSlotRef.path !== newSlotRef.path) {
+                transaction.delete(currentSlotRef);
+            }
+        }
+        transaction.update(ref, {
+            appointmentDate: admin.firestore.Timestamp.fromDate(parsedDate),
+            timeSlot,
+            rescheduleReason: reason || null,
+            updatedAt: admin.firestore.Timestamp.now(),
+            statusUpdatedBy: callerUid,
+        });
+    });
+    await deleteAppointmentNotifications(appointmentId);
+    await createTrustedNotification({
+        userId: appointment.patientId,
+        title: 'Appointment Rescheduled',
+        body: `Your appointment with Dr. ${appointment.doctorName || 'your doctor'} has been rescheduled to ${formatDateForNotification(parsedDate)} at ${timeSlot}.`,
+        type: 'appointmentRescheduled',
+        data: { appointmentId },
+        appointmentId,
+        reminderType: 'immediate',
+    });
+    await createAppointmentNotifications({
+        userId: appointment.patientId,
+        appointmentId,
+        doctorName: appointment.doctorName || 'your doctor',
+        appointmentDate: parsedDate,
+        timeSlot,
+        includeConfirmation: false,
+    });
+    return { success: true };
+});
+exports.cancelAppointment = functions.https.onCall(async (request) => {
+    var _a, _b;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const { appointmentId, reason, statusUpdatedBy } = request.data;
+    if (!appointmentId)
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentId is required.');
+    const ref = db.collection('appointments').doc(appointmentId);
+    const snap = await ref.get();
+    if (!snap.exists)
+        throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+    const appointment = snap.data();
+    if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowPatient: true, allowDoctor: true, allowAdmin: true })) {
+        throw new functions.https.HttpsError('permission-denied', 'You cannot cancel this appointment.');
+    }
+    await db.runTransaction(async (transaction) => {
+        const transactionSnap = await transaction.get(ref);
+        if (!transactionSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+        }
+        const currentAppointment = transactionSnap.data();
+        releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
+        transaction.update(ref, {
+            status: 'cancelled',
+            cancelReason: reason || null,
+            statusUpdatedBy: statusUpdatedBy || callerUid,
+            updatedAt: admin.firestore.Timestamp.now(),
+        });
+    });
+    await deleteAppointmentNotifications(appointmentId);
+    const date = (_b = (_a = appointment.appointmentDate) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a);
+    await createTrustedNotification({
+        userId: appointment.patientId,
+        title: 'Appointment Cancelled',
+        body: `Your appointment with Dr. ${appointment.doctorName || 'your doctor'}${date ? ` on ${formatDateForNotification(date)}` : ''} has been cancelled.${reason ? ` Reason: ${reason}` : ''}`,
+        type: 'appointmentCancellation',
+        data: { appointmentId },
+        appointmentId,
+        reminderType: 'immediate',
+    });
+    return { success: true };
+});
+exports.updateAppointmentStatus = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const { appointmentId, status, statusUpdatedBy } = request.data;
+    if (!appointmentId || !APPOINTMENT_STATUSES.includes(status)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid appointment status.');
+    }
+    const ref = db.collection('appointments').doc(appointmentId);
+    const snap = await ref.get();
+    if (!snap.exists)
+        throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+    const appointment = snap.data();
+    if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowDoctor: true, allowAdmin: true })) {
+        throw new functions.https.HttpsError('permission-denied', 'You cannot update this appointment status.');
+    }
+    await db.runTransaction(async (transaction) => {
+        const transactionSnap = await transaction.get(ref);
+        if (!transactionSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+        }
+        const currentAppointment = transactionSnap.data();
+        const appointmentDateForLock = firestoreDateToDate(currentAppointment.appointmentDate);
+        if (ACTIVE_APPOINTMENT_STATUSES.includes(status) &&
+            currentAppointment.doctorId &&
+            appointmentDateForLock &&
+            currentAppointment.timeSlot) {
+            await lockAppointmentSlot(transaction, {
+                doctorId: currentAppointment.doctorId,
+                appointmentDate: appointmentDateForLock,
+                timeSlot: currentAppointment.timeSlot,
+                appointmentId,
+                status,
+                excludeAppointmentId: appointmentId,
+            });
+        }
+        else {
+            releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
+        }
+        transaction.update(ref, {
+            status,
+            statusUpdatedBy: statusUpdatedBy || callerUid,
+            updatedAt: admin.firestore.Timestamp.now(),
+        });
+    });
+    return { success: true };
+});
+exports.updateMedicalNotes = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const { appointmentId, notes } = request.data;
+    if (!appointmentId || typeof notes !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentId and notes are required.');
+    }
+    const ref = db.collection('appointments').doc(appointmentId);
+    const snap = await ref.get();
+    if (!snap.exists)
+        throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+    const appointment = snap.data();
+    if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowDoctor: true, allowAdmin: true })) {
+        throw new functions.https.HttpsError('permission-denied', 'You cannot update medical notes for this appointment.');
+    }
+    await ref.update({
+        medicalNotes: notes,
+        medicalNotesUpdatedAt: admin.firestore.Timestamp.now(),
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    return { success: true };
+});
+exports.incrementQrScanFailures = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const { appointmentId } = request.data;
+    if (!appointmentId)
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentId is required.');
+    const ref = db.collection('appointments').doc(appointmentId);
+    const snap = await ref.get();
+    if (!snap.exists)
+        throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+    if (!await canMutateAppointment(callerUid, callerDoc, snap.data(), { allowDoctor: true })) {
+        throw new functions.https.HttpsError('permission-denied', 'You cannot update QR failures for this appointment.');
+    }
+    await ref.update({
+        qrScanFailures: admin.firestore.FieldValue.increment(1),
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    return { success: true };
+});
+exports.deleteAppointment = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const { appointmentId } = request.data;
+    if (!appointmentId)
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentId is required.');
+    const snap = await db.collection('appointments').doc(appointmentId).get();
+    if (!snap.exists)
+        throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+    if (!await canMutateAppointment(callerUid, callerDoc, snap.data(), { allowAdmin: true })) {
+        throw new functions.https.HttpsError('permission-denied', 'Only authorized admins can delete appointments.');
+    }
+    await db.collection('appointments').doc(appointmentId).delete();
+    await deleteAppointmentNotifications(appointmentId);
+    return { success: true };
+});
 /**
  * Cloud Function to create a doctor account
  * This creates both the Firebase Auth user and the Firestore documents
@@ -99,8 +591,8 @@ exports.createDoctorAccount = functions.https.onCall(async (request) => {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: email, password, name, specialization');
     }
     // Validate password strength
-    if (data.password.length < 6) {
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters long');
+    if (data.password.length < 12) {
+        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters long');
     }
     try {
         // Create Firebase Auth user
@@ -268,8 +760,8 @@ exports.resetDoctorPassword = functions.https.onCall(async (request) => {
     const callerUid = requireAuth(request);
     const callerDoc = await getCallerUserDoc(callerUid);
     requirePermission(callerDoc, 'doctors.manage');
-    if (!data.newPassword || data.newPassword.length < 6) {
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters long.');
+    if (!data.newPassword || data.newPassword.length < 12) {
+        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters long.');
     }
     try {
         // Get doctor document to find userId
@@ -310,8 +802,8 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
         throw new functions.https.HttpsError('invalid-argument', 'Invalid role. Must be student or staff. Use createAdminAccount for admin accounts.');
     }
     // Validate password strength
-    if (data.password.length < 6) {
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters long');
+    if (data.password.length < 12) {
+        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters long');
     }
     try {
         // Create Firebase Auth user
@@ -414,6 +906,7 @@ exports.updateDoctorProfile = functions.https.onCall(async (request) => {
  * Cloud Function to activate/deactivate a doctor record.
  */
 exports.setDoctorActiveStatus = functions.https.onCall(async (request) => {
+    var _a;
     const data = request.data;
     const callerUid = requireAuth(request);
     const callerDoc = await getCallerUserDoc(callerUid);
@@ -430,6 +923,14 @@ exports.setDoctorActiveStatus = functions.https.onCall(async (request) => {
         isActive: data.isActive,
         updatedAt: admin.firestore.Timestamp.now(),
     });
+    const doctorUserId = (_a = doctorSnap.data()) === null || _a === void 0 ? void 0 : _a.userId;
+    if (!data.isActive && doctorUserId) {
+        await db.collection('users').doc(doctorUserId).update({
+            isActive: false,
+            updatedAt: admin.firestore.Timestamp.now(),
+        }).catch(() => { });
+        await revokeSessionsAndClearFcm(doctorUserId);
+    }
     return {
         success: true,
         message: data.isActive ? 'Doctor activated successfully' : 'Doctor deactivated successfully',
@@ -647,6 +1148,9 @@ exports.setUserActiveStatus = functions.https.onCall(async (request) => {
         isActive,
         updatedAt: admin.firestore.Timestamp.now(),
     });
+    if (!isActive) {
+        await revokeSessionsAndClearFcm(targetUid);
+    }
     return {
         success: true,
         message: isActive ? 'User activated successfully.' : 'User deactivated successfully.',
@@ -851,6 +1355,10 @@ exports.onNotificationCreated = functions.firestore
         console.log('Empty notification document, skipping.');
         return;
     }
+    if (notification.createdByBackend !== true) {
+        console.log(`Notification ${notificationId} was not backend-created, skipping push delivery.`);
+        return;
+    }
     const userId = notification.userId;
     if (!userId) {
         console.log('No userId on notification, skipping.');
@@ -939,6 +1447,9 @@ exports.sendTopicNotification = functions.https.onCall(async (request) => {
     if (!data.topic || !data.title || !data.body) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: topic, title, body');
     }
+    if (!['announcements', 'health_tips', 'system_updates'].includes(data.topic)) {
+        throw new functions.https.HttpsError('permission-denied', 'Only approved non-sensitive broadcast topics are allowed.');
+    }
     try {
         const message = {
             topic: data.topic,
@@ -989,8 +1500,8 @@ exports.createAdminAccount = functions.https.onCall(async (request) => {
     if (!data.email || !data.password || !data.fullName) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields.');
     }
-    if (data.password.length < 6) {
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+    if (data.password.length < 12) {
+        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters.');
     }
     try {
         const userRecord = await auth.createUser({
@@ -1072,6 +1583,9 @@ exports.setAdminActiveStatus = functions.https.onCall(async (request) => {
         if (targetRole !== 'admin')
             throw new functions.https.HttpsError('failed-precondition', 'This function can only target admin accounts.');
         await db.collection('users').doc(targetUid).update({ isActive, updatedAt: admin.firestore.Timestamp.now() });
+        if (!isActive) {
+            await revokeSessionsAndClearFcm(targetUid);
+        }
         await writeAdminAuditLog({
             actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
             targetUid, targetName: targetDoc.data().fullName,
@@ -1093,8 +1607,8 @@ exports.resetAdminPassword = functions.https.onCall(async (request) => {
         const callerDoc = await getCallerUserDoc(callerUid);
         requireSuperAdmin(callerDoc);
         const { targetUid, newPassword } = request.data;
-        if (!targetUid || !newPassword || newPassword.length < 6)
-            throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters.');
+        if (!targetUid || !newPassword || newPassword.length < 12)
+            throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters.');
         const targetDoc = await db.collection('users').doc(targetUid).get();
         if (!targetDoc.exists)
             throw new functions.https.HttpsError('not-found', 'Target user not found.');

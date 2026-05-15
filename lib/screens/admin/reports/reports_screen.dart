@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../utils/save_file.dart';
+import '../../../core/widgets/role_english_ltr_scope.dart';
 
 /// Reports generation screen for admin
 class ReportsScreen extends StatefulWidget {
@@ -55,108 +56,110 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Reports'), centerTitle: true),
-      body: ResponsivePage(
-        maxWidth: 1180,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Date Range Selection
-            Text(
-              'Date Range',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            _buildDateRangeSelector(isDark),
-            const SizedBox(height: 24),
+    return RoleEnglishLtrScope(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Reports'), centerTitle: true),
+        body: ResponsivePage(
+          maxWidth: 1180,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Date Range Selection
+              Text(
+                'Date Range',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              _buildDateRangeSelector(isDark),
+              const SizedBox(height: 24),
 
-            // Report Types
-            Text(
-              'Select Report Type',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ..._reportTypes.map((report) => _buildReportCard(report, isDark)),
-            const SizedBox(height: 24),
+              // Report Types
+              Text(
+                'Select Report Type',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              ..._reportTypes.map((report) => _buildReportCard(report, isDark)),
+              const SizedBox(height: 24),
 
-            // Generate Button
-            SizedBox(
-              width: double.infinity,
-              child: Builder(
-                builder: (context) {
-                  final canExport = context
-                          .read<AuthProvider>()
-                          .currentUser
-                          ?.hasPermission('reports.export') ??
-                      false;
-                  return ElevatedButton.icon(
-                    onPressed: canExport
-                        ? (_isGenerating ? null : _generateReport)
-                        : null,
-                    icon: _isGenerating
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.file_download),
-                    label: Text(
-                      _isGenerating
-                          ? 'Generating...'
-                          : canExport
-                              ? 'Generate Report'
-                              : 'Export Permission Required',
+              // Generate Button
+              SizedBox(
+                width: double.infinity,
+                child: Builder(
+                  builder: (context) {
+                    final canExport = context
+                            .read<AuthProvider>()
+                            .currentUser
+                            ?.hasPermission('reports.export') ??
+                        false;
+                    return ElevatedButton.icon(
+                      onPressed: canExport
+                          ? (_isGenerating ? null : _generateReport)
+                          : null,
+                      icon: _isGenerating
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.file_download),
+                      label: Text(
+                        _isGenerating
+                            ? 'Generating...'
+                            : canExport
+                                ? 'Generate Report'
+                                : 'Export Permission Required',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Info
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: AppColors.info,
+                      size: 20,
                     ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Reports are exported as Excel (.xlsx) files that can be opened in Microsoft Excel or Google Sheets.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
                       ),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Info
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.info.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.info_outline,
-                    color: AppColors.info,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Reports are exported as Excel (.xlsx) files that can be opened in Microsoft Excel or Google Sheets.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

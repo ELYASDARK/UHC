@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/document_provider.dart';
 import '../../../data/models/medical_document_model.dart';
 import '../../../l10n/app_localizations.dart';
@@ -245,7 +245,9 @@ class _DoctorPatientDocumentsScreenState
       orElse: () => documentTypes.last,
     );
 
-    final isDoctorOwn = doc.addedBy == widget.doctorId;
+    final doctorUserId = context.read<AuthProvider>().user?.id;
+    final isDoctorOwn =
+        doc.addedBy == widget.doctorId || doc.addedBy == doctorUserId;
     final isPatientDoc = doc.addedByRole == 'patient';
 
     return Container(
@@ -521,7 +523,7 @@ class _DoctorPatientDocumentsScreenState
     final nameController = TextEditingController(text: doc.name);
     final notesController = TextEditingController(text: doc.notes);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    File? newFile;
+    PlatformFile? newFile;
     final l10n = AppLocalizations.of(context);
     String fileName = doc.fileName.isNotEmpty ? doc.fileName : l10n.currentFile;
 
@@ -633,9 +635,7 @@ class _DoctorPatientDocumentsScreenState
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          newFile != null
-                              ? newFile!.path.split(Platform.pathSeparator).last
-                              : fileName,
+                          newFile?.name ?? fileName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -657,10 +657,11 @@ class _DoctorPatientDocumentsScreenState
                               'doc',
                               'docx',
                             ],
+                            withData: true,
                           );
                           if (result != null && result.files.isNotEmpty) {
                             setSheetState(() {
-                              newFile = File(result.files.single.path!);
+                              newFile = result.files.single;
                             });
                           }
                         },
@@ -714,7 +715,7 @@ class _DoctorPatientDocumentsScreenState
     required String newName,
     required String newType,
     required String newNotes,
-    File? newFile,
+    PlatformFile? newFile,
   }) async {
     final docProvider = context.read<DocumentProvider>();
     final l10n = AppLocalizations.of(context);
@@ -722,21 +723,26 @@ class _DoctorPatientDocumentsScreenState
     bool success;
 
     if (newFile != null) {
-      final bytes = await newFile.readAsBytes();
-      final fileName = newFile.path.split(Platform.pathSeparator).last;
+      final bytes = newFile.bytes;
+      if (bytes == null) {
+        success = false;
+      } else {
+        final fileName = newFile.name;
 
-      success = await docProvider.updateDocumentWithFile(
-        docId: doc.id,
-        userId: widget.patientId,
-        metaData: {
-          'name': newName,
-          'type': newType,
-          'notes': newNotes,
-        },
-        bytes: bytes,
-        fileName: fileName,
-        oldStoragePath: doc.storagePath,
-      );
+        success = await docProvider.updateDocumentWithFile(
+          docId: doc.id,
+          userId: widget.patientId,
+          metaData: {
+            'name': newName,
+            'type': newType,
+            'notes': newNotes,
+          },
+          bytes: bytes,
+          fileName: fileName,
+          oldStoragePath: doc.storagePath,
+          appointmentId: doc.appointmentId ?? widget.appointmentId,
+        );
+      }
     } else {
       success = await docProvider.updateDocument(doc.id, {
         'name': newName,
@@ -765,18 +771,24 @@ class _DoctorPatientDocumentsScreenState
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+        withData: true,
       );
 
       if (result == null || result.files.isEmpty) return;
 
-      final file = File(result.files.single.path!);
-      final fileName = result.files.single.name;
-      final bytes = await file.readAsBytes();
+      final pickedFile = result.files.single;
+      final fileName = pickedFile.name;
+      final bytes = pickedFile.bytes;
+      if (bytes == null) {
+        throw Exception('Could not read selected file bytes.');
+      }
 
       if (!context.mounted) return;
 
       final docProvider = context.read<DocumentProvider>();
+      final doctorUser = context.read<AuthProvider>().user;
       final l10n = AppLocalizations.of(context);
+      if (doctorUser == null) return;
 
       final success = await docProvider.uploadAndAddDocument(
         userId: widget.patientId,
@@ -785,7 +797,7 @@ class _DoctorPatientDocumentsScreenState
         notes: notes,
         bytes: bytes,
         fileName: fileName,
-        addedBy: widget.doctorId,
+        addedBy: doctorUser.id,
         addedByRole: 'doctor',
         addedByName: widget.doctorName,
         appointmentId: widget.appointmentId,

@@ -12,6 +12,7 @@ import '../analytics/appointment_analytics_screen.dart';
 import '../reports/reports_screen.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
+import '../../../core/widgets/role_english_ltr_scope.dart';
 
 /// Admin dashboard with overview and navigation
 class AdminDashboardScreen extends StatefulWidget {
@@ -33,6 +34,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _todayAppointments = 0;
   int _completedAppointments = 0;
 
+  Future<int> _countSafely(
+    Future<AggregateQuerySnapshot> countFuture,
+    String label,
+  ) async {
+    try {
+      final snapshot = await countFuture;
+      return snapshot.count ?? 0;
+    } on FirebaseException catch (e) {
+      debugPrint('Dashboard stat "$label" unavailable: ${e.code}');
+      return 0;
+    } catch (e) {
+      debugPrint('Dashboard stat "$label" failed: $e');
+      return 0;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +60,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final user = context.read<AuthProvider>().user;
+      final canViewUsers = user?.hasPermission('users.view') ?? false;
+      final canViewAppointments =
+          (user?.hasPermission('appointments.view') ?? false) ||
+              (user?.hasPermission('analytics.view') ?? false) ||
+              (user?.hasPermission('reports.view') ?? false);
       final now = DateTime.now();
       final startOfDay = DateTime(now.year, now.month, now.day);
       final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -50,48 +73,76 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       // Define all futures to run in parallel
       final futures = [
         // 0: Total Users (Students)
-        _firestore
-            .collection('users')
-            .where('role', isEqualTo: UserRole.student.name)
-            .count()
-            .get(),
+        canViewUsers
+            ? _countSafely(
+                _firestore
+                    .collection('users')
+                    .where('role', isEqualTo: UserRole.student.name)
+                    .count()
+                    .get(),
+                'students',
+              )
+            : Future.value(0),
         // 1: Total Doctors
-        _firestore.collection('doctors').count().get(),
+        _countSafely(_firestore.collection('doctors').count().get(), 'doctors'),
         // 2: Total Appointments
-        _firestore.collection('appointments').count().get(),
+        canViewAppointments
+            ? _countSafely(
+                _firestore.collection('appointments').count().get(),
+                'appointments',
+              )
+            : Future.value(0),
         // 3: Pending Appointments
-        _firestore
-            .collection('appointments')
-            .where('status', isEqualTo: 'pending')
-            .count()
-            .get(),
+        canViewAppointments
+            ? _countSafely(
+                _firestore
+                    .collection('appointments')
+                    .where('status', isEqualTo: 'pending')
+                    .count()
+                    .get(),
+                'pending appointments',
+              )
+            : Future.value(0),
         // 4: Today's Appointments
-        _firestore
-            .collection('appointments')
-            .where(
-              'appointmentDate',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-            )
-            .where('appointmentDate', isLessThan: Timestamp.fromDate(endOfDay))
-            .count()
-            .get(),
+        canViewAppointments
+            ? _countSafely(
+                _firestore
+                    .collection('appointments')
+                    .where(
+                      'appointmentDate',
+                      isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+                    )
+                    .where(
+                      'appointmentDate',
+                      isLessThan: Timestamp.fromDate(endOfDay),
+                    )
+                    .count()
+                    .get(),
+                "today's appointments",
+              )
+            : Future.value(0),
         // 5: Completed Appointments
-        _firestore
-            .collection('appointments')
-            .where('status', isEqualTo: 'completed')
-            .count()
-            .get(),
+        canViewAppointments
+            ? _countSafely(
+                _firestore
+                    .collection('appointments')
+                    .where('status', isEqualTo: 'completed')
+                    .count()
+                    .get(),
+                'completed appointments',
+              )
+            : Future.value(0),
       ];
 
       // Wait for all futures to complete
       final results = await Future.wait(futures);
 
-      _totalUsers = results[0].count ?? 0;
-      _totalDoctors = results[1].count ?? 0;
-      _totalAppointments = results[2].count ?? 0;
-      _pendingAppointments = results[3].count ?? 0;
-      _todayAppointments = results[4].count ?? 0;
-      _completedAppointments = results[5].count ?? 0;
+      _totalUsers = results[0];
+      _totalDoctors = results[1];
+      _totalAppointments = results[2];
+      _pendingAppointments = results[3];
+      _todayAppointments = results[4];
+      _completedAppointments = results[5];
     } catch (e) {
       debugPrint('Error loading dashboard stats: $e');
     } finally {
@@ -105,49 +156,53 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-        centerTitle: true,
-      ),
-      body: _isLoading
-          ? _buildDashboardSkeleton(isDark)
-          : RefreshIndicator(
-              onRefresh: _loadDashboardStats,
-              child: ResponsivePage(
-                physics: const AlwaysScrollableScrollPhysics(),
-                maxWidth: 1280,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Stats Grid
-                    _buildStatsGrid(isDark),
-                    const SizedBox(height: 24),
+    return RoleEnglishLtrScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Admin Dashboard'),
+          centerTitle: true,
+        ),
+        body: _isLoading
+            ? _buildDashboardSkeleton(isDark)
+            : RefreshIndicator(
+                onRefresh: _loadDashboardStats,
+                child: ResponsivePage(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  maxWidth: 1280,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Stats Grid
+                      _buildStatsGrid(isDark),
+                      const SizedBox(height: 24),
 
-                    // Quick Actions
-                    Text(
-                      'Quick Actions',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildQuickActions(isDark),
-                    const SizedBox(height: 24),
+                      // Quick Actions
+                      Text(
+                        'Quick Actions',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildQuickActions(isDark),
+                      const SizedBox(height: 24),
 
-                    // Recent Activity
-                    Text(
-                      'Recent Activity',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildRecentActivity(isDark),
-                  ],
+                      // Recent Activity
+                      Text(
+                        'Recent Activity',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildRecentActivity(isDark),
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 

@@ -528,6 +528,22 @@ class AuthService {
     });
   }
 
+  /// Update user language preference
+  Future<void> updateUserLanguage(String uid, String languageCode) async {
+    await _firestore.collection('users').doc(uid).update({
+      'language': languageCode,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
+  /// Update user theme preference
+  Future<void> updateUserThemeMode(String uid, String themeMode) async {
+    await _firestore.collection('users').doc(uid).update({
+      'themeMode': themeMode,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    });
+  }
+
   /// Handle Firebase Auth exceptions
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {

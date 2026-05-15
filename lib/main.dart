@@ -1,9 +1,8 @@
 import 'dart:ui';
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -62,7 +61,6 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    await _initializeAppCheck();
     await _configureFirestoreDefaults();
     // Crashlytics is not supported on web in this app setup.
     // Guard all Crashlytics hooks to avoid web assertion failures.
@@ -99,21 +97,6 @@ void main() async {
   WidgetsBinding.instance.addPostFrameCallback((_) async {
     await _initializeServicesAsync();
   });
-}
-
-Future<void> _initializeAppCheck() async {
-  // Web requires an explicit reCAPTCHA provider key; skip for now.
-  if (kIsWeb) return;
-  try {
-    await FirebaseAppCheck.instance.activate(
-      androidProvider:
-          kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
-      appleProvider:
-          kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
-    );
-  } catch (e) {
-    debugPrint('Failed to initialize Firebase App Check: $e');
-  }
 }
 
 Future<void> _configureFirestoreDefaults() async {
@@ -280,6 +263,10 @@ class _AppNavigatorState extends State<AppNavigator> {
   bool _doctorLoading = false;
   bool _doctorFetchFailed = false;
   String? _lastDoctorUserId;
+  String? _lastLocaleSyncedUserId;
+  String? _lastLocaleSyncedCode;
+  String? _lastThemeSyncedUserId;
+  String? _lastThemeSyncedMode;
 
   @override
   void initState() {
@@ -356,9 +343,75 @@ class _AppNavigatorState extends State<AppNavigator> {
     }
   }
 
+  String _normalizeLanguageCode(String? languageCode) {
+    switch (languageCode) {
+      case 'ar':
+      case 'ku':
+      case 'en':
+        return languageCode!;
+      default:
+        return 'en';
+    }
+  }
+
+  void _syncLocaleForAuthenticatedUser(
+    UserModel currentUser,
+    LocaleProvider localeProvider,
+  ) {
+    final preferredCode = _normalizeLanguageCode(currentUser.language);
+    final alreadySynced = _lastLocaleSyncedUserId == currentUser.id &&
+        _lastLocaleSyncedCode == preferredCode;
+    if (alreadySynced) return;
+
+    _lastLocaleSyncedUserId = currentUser.id;
+    _lastLocaleSyncedCode = preferredCode;
+
+    if (localeProvider.locale.languageCode == preferredCode) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      localeProvider.setLocaleByCode(preferredCode);
+    });
+  }
+
+  ThemeMode _normalizeThemeMode(String? themeMode) {
+    switch (themeMode) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      case 'system':
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  void _syncThemeForAuthenticatedUser(
+    UserModel currentUser,
+    ThemeProvider themeProvider,
+  ) {
+    final preferredThemeMode = _normalizeThemeMode(currentUser.themeMode);
+    final preferredThemeCode = preferredThemeMode.name;
+    final alreadySynced = _lastThemeSyncedUserId == currentUser.id &&
+        _lastThemeSyncedMode == preferredThemeCode;
+    if (alreadySynced) return;
+
+    _lastThemeSyncedUserId = currentUser.id;
+    _lastThemeSyncedMode = preferredThemeCode;
+
+    if (themeProvider.themeMode == preferredThemeMode) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      themeProvider.setThemeMode(preferredThemeMode);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    final themeProvider = context.read<ThemeProvider>();
+    final localeProvider = context.read<LocaleProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final defaultOverlayStyle = SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -394,6 +447,10 @@ class _AppNavigatorState extends State<AppNavigator> {
         );
       } else {
         final currentUser = authProvider.currentUser;
+        if (currentUser != null) {
+          _syncThemeForAuthenticatedUser(currentUser, themeProvider);
+          _syncLocaleForAuthenticatedUser(currentUser, localeProvider);
+        }
         if (currentUser?.role == UserRole.superAdmin) {
           // Route superAdmin to dedicated governance shell
           screen = const SuperAdminShell();
@@ -479,6 +536,10 @@ class _AppNavigatorState extends State<AppNavigator> {
       _doctorModel = null;
       _lastDoctorUserId = null;
       _doctorFetchFailed = false;
+      _lastLocaleSyncedUserId = null;
+      _lastLocaleSyncedCode = null;
+      _lastThemeSyncedUserId = null;
+      _lastThemeSyncedMode = null;
 
       // Auth screens
       switch (_authScreen) {

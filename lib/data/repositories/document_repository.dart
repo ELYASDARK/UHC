@@ -64,16 +64,15 @@ class DocumentRepository {
   /// Upload file bytes to Firebase Storage
   /// Returns {'url': downloadUrl, 'storagePath': path}
   Future<Map<String, String>> uploadFile(
-    String userId,
-    Uint8List bytes,
-    String fileName,
-  ) async {
+      String userId, Uint8List bytes, String fileName,
+      {String? appointmentId}) async {
     final extension = fileName.split('.').last;
+    final scope = appointmentId?.isNotEmpty == true ? appointmentId! : 'self';
     final storagePath =
-        'medical_documents/$userId/${DateTime.now().millisecondsSinceEpoch}.$extension';
+        'medical_documents/$userId/$scope/${DateTime.now().millisecondsSinceEpoch}.$extension';
 
     final ref = _storage.ref().child(storagePath);
-    await ref.putData(bytes);
+    await ref.putData(bytes, _metadataFor(fileName));
     final url = await ref.getDownloadURL();
 
     return {'url': url, 'storagePath': storagePath};
@@ -82,14 +81,30 @@ class DocumentRepository {
   /// Upload file bytes with progress tracking
   /// Returns UploadTask for progress listening + storagePath for Firestore
   ({UploadTask task, String storagePath}) uploadFileWithProgress(
-    String userId,
-    Uint8List bytes,
-    String fileName,
-  ) {
+      String userId, Uint8List bytes, String fileName,
+      {String? appointmentId}) {
     final extension = fileName.split('.').last;
+    final scope = appointmentId?.isNotEmpty == true ? appointmentId! : 'self';
     final storagePath =
-        'medical_documents/$userId/${DateTime.now().millisecondsSinceEpoch}.$extension';
+        'medical_documents/$userId/$scope/${DateTime.now().millisecondsSinceEpoch}.$extension';
     final ref = _storage.ref().child(storagePath);
-    return (task: ref.putData(bytes), storagePath: storagePath);
+    return (
+      task: ref.putData(bytes, _metadataFor(fileName)),
+      storagePath: storagePath
+    );
+  }
+
+  SettableMetadata _metadataFor(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    final contentType = switch (extension) {
+      'pdf' => 'application/pdf',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'doc' => 'application/msword',
+      'docx' =>
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      _ => 'application/octet-stream',
+    };
+    return SettableMetadata(contentType: contentType);
   }
 }

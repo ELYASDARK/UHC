@@ -2,151 +2,151 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helper Functions ──
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function currentUserData() {
+      return userDoc(request.auth.uid).data;
+    }
+
+    function isActiveUser() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        currentUserData().isActive == true;
+    }
+
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isActiveUser() && request.auth.uid == userId;
     }
 
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    function getCurrentUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && getUserRole() == 'admin';
+    function roleIs(role) {
+      return isActiveUser() && currentUserData().role == role;
     }
 
     function isSuperAdmin() {
-      return isAuthenticated() && getUserRole() == 'superAdmin';
+      return roleIs('superAdmin');
     }
 
-    function isAdminOrSuperAdmin() {
-      return isAuthenticated() &&
-        (getUserRole() == 'admin' || getUserRole() == 'superAdmin');
+    function isDoctor() {
+      return roleIs('doctor');
     }
 
-    // Permission-map check with superAdmin bypass.
-    // Legacy admin docs without adminPermissions keep full access.
     function hasRolePermission(permissionKey) {
-      return isAuthenticated() &&
+      return isActiveUser() &&
         (
-          getCurrentUserData().role == 'superAdmin' ||
+          currentUserData().role == 'superAdmin' ||
           (
-            getCurrentUserData().role == 'admin' &&
-            (
-              !('adminPermissions' in getCurrentUserData()) ||
-              getCurrentUserData().adminPermissions[permissionKey] == true
-            )
+            currentUserData().role == 'admin' &&
+            ('adminPermissions' in currentUserData()) &&
+            currentUserData().adminPermissions[permissionKey] == true
           )
         );
     }
 
-    // Resolves a doctor's Firestore doc ID → auth UID via the userId field.
-    // appointment.doctorId stores DoctorModel.id (Firestore doc ID),
-    // NOT DoctorModel.userId (auth UID), so we must look it up.
+    function hasAnyRolePermission(keys) {
+      return hasRolePermission(keys[0]) ||
+        (keys.size() > 1 && hasRolePermission(keys[1])) ||
+        (keys.size() > 2 && hasRolePermission(keys[2]));
+    }
+
     function isDoctorForAppointment(doctorDocId) {
-      return isAuthenticated() &&
+      return isDoctor() &&
+        exists(/databases/$(database)/documents/doctors/$(doctorDocId)) &&
+        get(/databases/$(database)/documents/doctors/$(doctorDocId)).data.isActive == true &&
         get(/databases/$(database)/documents/doctors/$(doctorDocId)).data.userId == request.auth.uid;
     }
 
-    // Check if the authenticated user has the 'doctor' role in the users collection.
-    function isDoctor() {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor';
+    function hasDoctorPatientAccess(patientId) {
+      return isDoctor() &&
+        exists(/databases/$(database)/documents/doctor_patient_access/$(request.auth.uid)/patients/$(patientId));
     }
 
-    // ── Users Collection ──
-    // Owner can update profile-safe fields only.
-    // Sensitive fields (role, isActive, superAdminType, adminPermissions)
-    // can only be changed via Cloud Functions (Admin SDK bypasses rules).
+    function canReadAppointment(data) {
+      return isOwner(data.patientId) ||
+        isDoctorForAppointment(data.doctorId) ||
+        hasAnyRolePermission(['appointments.view', 'analytics.view', 'reports.view']);
+    }
+
+    function canReadMedicalDocument(data) {
+      return isOwner(data.userId) ||
+        hasDoctorPatientAccess(data.userId) ||
+        hasAnyRolePermission(['reports.view', 'appointments.view', 'analytics.view']);
+    }
+
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      // Self-registration: owner can create their own doc with student role only
-      allow create: if isOwner(userId) &&
-        request.resource.data.role == 'student';
+      allow get, list: if isOwner(userId) ||
+        hasRolePermission('users.view') ||
+        isSuperAdmin() ||
+        hasDoctorPatientAccess(userId);
+      allow create: if isAuthenticated() &&
+        request.auth.uid == userId &&
+        request.resource.data.role == 'student' &&
+        request.resource.data.isActive == true;
       allow update: if isOwner(userId) &&
-        // Block client-side changes to sensitive governance fields
         !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['role', 'isActive', 'superAdminType', 'adminPermissions']);
-      allow delete: if false; // Only Cloud Functions delete users
+          .hasAny(['role', 'isActive', 'superAdminType', 'adminPermissions', 'fcmTokens', 'lastTokenUpdate']);
+      allow delete: if false;
     }
 
-    // ── Notifications Collection ──
+    match /doctor_patient_access/{doctorUid}/patients/{patientId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
+      allow read: if isActiveUser() && resource.data.userId == request.auth.uid;
+      allow create: if false;
+      allow update: if isActiveUser() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isActiveUser() && resource.data.userId == request.auth.uid;
     }
 
-    // ── User Tokens for FCM ──
     match /user_tokens/{userId} {
       allow read, write: if isOwner(userId);
     }
 
-    // ── Appointments Collection ──
-    // Both patient and doctor can update (status changes, medical notes).
-    // doctorId stores the doctor's Firestore doc ID, not auth UID,
-    // so we resolve via get() on the doctors collection.
     match /appointments/{appointmentId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() &&
-        (resource.data.patientId == request.auth.uid ||
-         isDoctorForAppointment(resource.data.doctorId));
-      allow delete: if isAuthenticated() &&
-        (resource.data.patientId == request.auth.uid ||
-         isDoctorForAppointment(resource.data.doctorId));
+      allow read: if isActiveUser() && canReadAppointment(resource.data);
+      allow create, update, delete: if false;
     }
 
-    // ── Doctors Collection ──
-    // Anyone authenticated can read doctor profiles.
-    // Only the doctor themselves can update their own profile.
-    // Admin mutations are callable-only via Cloud Functions.
     match /doctors/{doctorId} {
-      allow read: if isAuthenticated();
-      allow update: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
+      allow read: if isActiveUser();
+      allow update: if isActiveUser() &&
+        resource.data.userId == request.auth.uid &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['userId', 'email', 'isActive']);
       allow create, delete: if false;
     }
 
-    // ── Departments Collection ──
-    // Public read; writes are callable-only via Cloud Functions.
     match /departments/{departmentId} {
       allow read: if true;
       allow write: if false;
     }
 
-    // ── Admin Audit Logs ──
-    // Read: Super Admin only (admins cannot see governance logs).
-    // Write: denied from client — only Cloud Functions write audit logs.
     match /admin_audit_logs/{logId} {
       allow read: if isSuperAdmin();
       allow write: if false;
     }
 
-    // ── Medical Documents Collection ──
-    // Read: patient reads own docs, doctor reads any.
-    // Create: patient creates own docs, doctor creates with addedBy == self.
-    // Update/Delete: only docs you personally added (addedBy == auth.uid).
-    // Backward compat: old docs without addedBy fall back to userId check.
     match /medical_documents/{docId} {
-      allow read: if isAuthenticated() &&
-        (resource.data.userId == request.auth.uid || isDoctor());
-      allow create: if isAuthenticated() &&
-        (request.resource.data.userId == request.auth.uid ||
-         (isDoctor() && request.resource.data.addedBy == request.auth.uid));
-      allow update, delete: if isAuthenticated() &&
-        (resource.data.addedBy == request.auth.uid ||
-         (!('addedBy' in resource.data) && resource.data.userId == request.auth.uid));
+      allow read: if isActiveUser() && canReadMedicalDocument(resource.data);
+      allow create: if isActiveUser() &&
+        request.resource.data.userId is string &&
+        request.resource.data.addedBy == request.auth.uid &&
+        (
+          request.resource.data.userId == request.auth.uid ||
+          hasDoctorPatientAccess(request.resource.data.userId)
+        );
+      allow update, delete: if isActiveUser() &&
+        canReadMedicalDocument(resource.data) &&
+        resource.data.addedBy == request.auth.uid;
     }
   }
 }

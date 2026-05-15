@@ -95,6 +95,7 @@
 - **Permission-Aware UI** — Admin actions are gated by granular permission keys (`users.manageNonAdmin`, `doctors.manage`, `departments.manage`, etc.)
 - **Analytics** — Interactive charts for appointment trends and department performance
 - **Reports** — Export professional styled XLSX reports for appointments, doctors, users, and departments (permission-gated)
+- **Permission-Safe Dashboard** — KPI stats gracefully degrade to zero when the admin lacks the corresponding view permission
 </details>
 
 <details>
@@ -235,6 +236,7 @@ uhc/
 │   │   ├── save_file_io.dart       # Mobile/Desktop: save to temp + share via share_plus
 │   │   └── save_file_stub.dart     # Stub for unsupported platforms
 ├── functions/                      # Firebase Cloud Functions (TypeScript)
+├── test/                           # Security regression & integration tests
 ├── assets/
 │   ├── images/                     # Static images
 │   ├── animations/                 # Lottie animation files
@@ -244,6 +246,7 @@ uhc/
 ├── web/                            # Web platform configuration
 ├── docs/                           # Internal documentation, plans, and runbooks
 ├── firestore.rules                 # Firestore security rules (role-based)
+├── storage.rules                   # Firebase Storage security rules (scoped uploads)
 ├── firestore.indexes.json          # Composite index definitions for optimized queries
 └── pubspec.yaml                    # Dependencies & metadata
 ```
@@ -367,13 +370,15 @@ Add these keys to `ios/Runner/Info.plist` for permissions:
 
 | Collection | Description |
 |:---|:---|
-| `users` | User profiles, roles, and preferences |
+| `users` | User profiles, roles, preferences, language, and theme mode |
 | `doctors` | Doctor profiles, specializations, and schedules |
 | `departments` | Department metadata — name, icon, color, working hours |
 | `appointments` | Booking records with status tracking, QR check-in, and scan failure counts |
+| `appointment_slot_locks` | Transactional slot lock documents preventing double-booking (server-managed) |
 | `notifications` | Per-user notification history |
 | `user_tokens` | FCM device tokens per user (used by Cloud Functions for push delivery) |
 | `medical_documents` | Uploaded file metadata and storage references |
+| `doctor_patient_access` | Doctor-to-patient access grants for scoped medical document visibility |
 | `admin_audit_logs` | Immutable governance audit trail for Super Admin actions |
 
 ---
@@ -384,28 +389,40 @@ Server-side functions handle privileged operations that require Firebase Admin S
 
 | Function | Description | Access |
 |:---|:---|:---|
+| **Appointment Lifecycle** | | |
+| `createAppointment` | Validates slot availability, acquires transactional slot lock, creates appointment + patient notification | 🔒 Authenticated |
+| `rescheduleAppointment` | Releases old slot lock, acquires new slot lock, updates appointment date/time atomically | 🔒 Authenticated |
+| `cancelAppointment` | Cancels appointment and releases the slot lock | 🔒 Authenticated |
+| `updateAppointmentStatus` | Updates status (confirmed, completed, noShow) with role-based access checks | 🔒 Doctor / Admin |
+| `updateMedicalNotes` | Updates doctor medical notes on an appointment | 🔒 Doctor |
+| `incrementQrScanFailures` | Atomically increments QR scan failure counter for an appointment | 🔒 Doctor |
+| `deleteAppointment` | Permanently deletes an appointment and releases the slot lock | 🔒 Admin |
+| **Doctor Management** | | |
 | `createDoctorAccount` | Creates a doctor account in Auth + Firestore with the `doctor` role | 🔒 Admin |
 | `updateDoctorEmail` | Updates a doctor's email in both Auth and Firestore | 🔒 Admin |
 | `deleteDoctorAccount` | Removes a doctor from Auth and Firestore completely | 🔒 Admin |
 | `resetDoctorPassword` | Resets a doctor's password without requiring the old one | 🔒 Admin |
+| **User Management** | | |
 | `createUserAccount` | Creates student/staff accounts in Auth + Firestore | 🔒 Admin |
 | `bootstrapSelfUserDocument` | Creates self-registration user profile document securely (`student` role) | 🔒 Authenticated |
 | `setUserActiveStatus` | Activates/deactivates non-admin users | 🔒 Admin |
 | `updateUserProfileByAdmin` | Admin-safe profile updates without direct privilege writes | 🔒 Admin |
+| **Notifications** | | |
 | `onNotificationCreated` | Firestore trigger — sends FCM push when a notification document is created | 🔄 Auto |
 | `sendTopicNotification` | Sends broadcast push notifications to FCM topics (e.g. announcements) | 🔒 Admin |
+| **Super Admin Governance** | | |
 | `createAdminAccount` | Creates admin account with default permission map | 🛡️ Super Admin |
 | `changeAdminRole` | Promotes/demotes admin role (excluding superAdmin assignment) | 🛡️ Super Admin |
 | `setAdminActiveStatus` | Activates/deactivates admin accounts | 🛡️ Super Admin |
-| `resetAdminPassword` | Resets an admin password | 🛡️ Super Admin |
+| `resetAdminPassword` | Resets an admin password (12-char minimum enforced) | 🛡️ Super Admin |
 | `deleteAdminAccount` | Deletes admin account from Auth + Firestore | 🛡️ Super Admin |
-| `forceSignOutUser` | Revokes user refresh tokens / sessions | 🛡️ Super Admin |
+| `forceSignOutUser` | Revokes user refresh tokens, clears FCM tokens | 🛡️ Super Admin |
 | `setAdminPermissions` | Updates granular admin permission map | 🛡️ Super Admin |
 | `assignSuperAdminSlot` | Assigns `primary`/`backup` super admin slot with transaction checks | 🛡️ Super Admin |
 | `rotateSuperAdminSlot` | Rotates slot holder atomically (demote + promote) | 🛡️ Super Admin |
 | `listAdminAuditLogs` | Returns filtered governance audit logs | 🛡️ Super Admin |
 
-> **Security Note:** Sensitive account/role mutations are callable-only and validated server-side. Firestore rules block client-side writes to privileged fields (`role`, `isActive`, `superAdminType`, `adminPermissions`).
+> **Security Note:** All appointment mutations and sensitive account/role operations are callable-only with server-side validation. Firestore rules block client-side writes to privileged fields (`role`, `isActive`, `superAdminType`, `adminPermissions`). Inactive accounts are rejected at the callable gateway. Storage rules enforce scoped uploads with content-type and size validation.
 
 ---
 
@@ -473,6 +490,66 @@ flutter build web --release
 ## 📝 Changelog
 
 <details open>
+<summary><b>v2.4.0</b> — May 15, 2026</summary>
+
+#### 🔒 Server-Side Appointment Lifecycle (Client → Cloud Functions Migration)
+- **All appointment mutations moved server-side** — `createAppointment`, `rescheduleAppointment`, `cancelAppointment`, `updateAppointmentStatus`, `updateMedicalNotes`, `incrementQrScanFailures`, and `deleteAppointment` are now Cloud Functions callables with full server-side validation.
+- **Transactional Slot Locking** — New `appointment_slot_locks` collection with atomic lock/release within Firestore transactions prevents double-booking race conditions. Each slot lock document is keyed by `{doctorId}_{date}_{timeSlot}`.
+- **Server-Side Notifications** — Appointment confirmation, completion, and no-show notifications are now created by Cloud Functions instead of client-side writes, ensuring trusted notification delivery.
+
+#### 🛡 Security Hardening
+- **Inactive account gateway** — All Cloud Function callables now reject requests from inactive accounts (`isActive !== true`) at the entry point.
+- **Explicit permission enforcement** — Legacy admins without an `adminPermissions` object are no longer granted implicit full access; explicit permission map is now required.
+- **Password policy tightened** — `resetAdminPassword` and `resetDoctorPassword` now enforce a 12-character minimum (up from 6).
+- **Session revocation consolidation** — `forceSignOutUser` now also clears FCM tokens from `user_tokens` collection alongside refresh token revocation.
+- **Firebase Storage rules** — Added `storage.rules` with:
+  - Content-type validation (images for profiles, PDF/DOCX/images for medical docs)
+  - File size limits (5 MB profile images, 20 MB medical documents)
+  - Scoped medical document uploads (`self` scope for patients, appointment-scoped for doctors)
+  - Doctor-patient access grants via `doctor_patient_access` subcollection checks
+  - Permission-gated admin/superAdmin read access
+
+#### 📱 FCM Token & Topic Consolidation
+- **Removed dual token storage** — FCM tokens are no longer written to the `users` collection; `user_tokens` is now the single source of truth for Cloud Functions push delivery.
+- **Removed per-user/role/department topic subscriptions** — Private notifications are now delivered by token from Cloud Functions. Only the broadcast `announcements` topic subscription remains.
+
+#### 👤 User Preferences Sync
+- **Theme mode persistence** — Added `themeMode` field to `UserModel` and Firestore `users` document, synced on change via `AuthProvider.updateThemeMode()`.
+- **Language preference persistence** — Added `AuthProvider.updateLanguage()` to write the selected language code back to Firestore.
+
+#### 🔐 Sign-Out Resilience
+- **Pre-signout state clearing** — Local user state is cleared *before* `FirebaseAuth.signOut()` so role-scoped Firestore streams are disposed while permissions are still valid. On sign-out failure, state is rolled back with error feedback.
+
+#### 🏥 Medical Documents Scoping
+- **Storage path scoping** — Medical document uploads now include a `scope` segment (`self` for patient-uploaded, `{appointmentId}` for doctor-uploaded), aligning with the new Storage rules.
+- **Upload metadata** — `contentType` metadata is now attached to Storage uploads for accurate content-type validation.
+
+#### 🧩 Admin Dashboard Reliability
+- **Permission-safe KPI stats** — Dashboard stat queries are now guarded by the admin's view permissions; stats gracefully return zero instead of throwing permission errors.
+- **Firestore exception tolerance** — Wrapped aggregation queries in `_countSafely()` to prevent a single failed stat from crashing the dashboard.
+
+#### 📁 Files Changed
+
+| File | Key Changes |
+|:---|:---|
+| `functions/src/index.ts` | 7 new appointment callables, inactive-account gateway, explicit permission enforcement, 12-char password policy, session + FCM revocation |
+| `lib/data/repositories/appointment_repository.dart` | All mutations routed through `FirebaseFunctions.httpsCallable()` |
+| `lib/data/repositories/document_repository.dart` | Scoped storage paths, `contentType` metadata on uploads |
+| `lib/data/repositories/notification_repository.dart` | Client-side notification creation stubbed out (now server-owned) |
+| `lib/data/models/user_model.dart` | Added `themeMode` field, explicit `hasPermission` now returns false for null permissions |
+| `lib/providers/auth_provider.dart` | `updateLanguage()`, `updateThemeMode()`, pre-signout state clearing with rollback |
+| `lib/services/auth_service.dart` | `updateUserLanguage()`, `updateUserThemeMode()` Firestore helpers |
+| `lib/services/fcm_service.dart` | Removed dual `users` collection token writes, removed per-user/role/department topic subscriptions |
+| `lib/screens/admin/dashboard/admin_dashboard_screen.dart` | Permission-gated KPI queries, `_countSafely()` wrapper |
+| `lib/screens/admin/reports/reports_screen.dart` | Updated to work with server-side appointment lifecycle |
+| `lib/screens/super_admin/*` | UI refinements across all governance screens |
+| `storage.rules` | [NEW] Firebase Storage security rules |
+| `lib/core/widgets/role_english_ltr_scope.dart` | [NEW] LTR text scope widget for role/status labels in RTL layouts |
+| `pubspec.yaml` | Dependency updates |
+
+</details>
+
+<details>
 <summary><b>v2.3.0</b> — May 2, 2026</summary>
 
 #### 📊 Professional Excel Report Export (CSV → XLSX Migration)
@@ -518,7 +595,7 @@ flutter build web --release
 
 </details>
 
-<details open>
+<details>
 <summary><b>v2.2.0</b> — April 29, 2026</summary>
 
 #### 🔐 Authentication & Provider Controls
@@ -558,7 +635,7 @@ flutter build web --release
 
 </details>
 
-<details open>
+<details>
 <summary><b>v2.1.0</b> — April 28, 2026</summary>
 
 #### 🛡 User Management & Super Admin Edit Rules

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/responsive_layout.dart';
+import '../../core/widgets/role_english_ltr_scope.dart';
 import '../../services/admin_governance_service.dart';
 
 /// Audit log viewer for Super Admin — shows admin_audit_logs entries.
@@ -109,214 +110,219 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.auditLogs,
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        centerTitle: true,
-        actions: [
-          // Target UID filter
-          IconButton(
-            icon: Icon(Icons.person_search,
-                color:
-                    _filterTargetUid != null ? const Color(0xFFD32F2F) : null),
-            onPressed: _showTargetFilter,
-            tooltip: l10n.filterByTarget,
-          ),
-          // Actor UID filter
-          IconButton(
-            icon: Icon(Icons.manage_accounts_outlined,
-                color:
-                    _filterActorUid != null ? const Color(0xFFD32F2F) : null),
-            onPressed: _showActorFilter,
-            tooltip: l10n.filterByActor,
-          ),
-          // Date range filter
-          IconButton(
-            icon: Icon(Icons.date_range,
-                color: (_filterDateFrom != null || _filterDateTo != null)
-                    ? const Color(0xFFD32F2F)
-                    : null),
-            onPressed: _showDateRangeFilter,
-            tooltip: l10n.filterByDateRange,
-          ),
-          // Action filter
-          PopupMenuButton<String?>(
-            icon: Icon(Icons.filter_list,
-                color: _filterAction != null ? const Color(0xFFD32F2F) : null),
-            onSelected: (val) {
-              _filterAction = val;
-              _loadLogs();
-            },
-            itemBuilder: (_) => _actionFilters.map((a) {
-              return PopupMenuItem(
-                value: a,
-                child:
-                    Text(a == null ? l10n.allActions : (_actionLabels[a] ?? a)),
-              );
-            }).toList(),
-          ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadLogs),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Active filters bar
-          if (_filterAction != null ||
-              _filterTargetUid != null ||
-              _filterActorUid != null ||
-              _filterDateFrom != null ||
-              _filterDateTo != null)
-            ColoredBox(
-              color: const Color(0xFFD32F2F).withValues(alpha: 0.08),
-              child: ResponsiveContent(
-                maxWidth: 1440,
-                child: Padding(
-                  padding:
-                      UhcResponsive.pagePadding(context, top: 8, bottom: 8),
-                  child: Wrap(
-                    spacing: 8,
-                    children: [
-                      if (_filterAction != null)
-                        Chip(
-                          label: Text(
-                              _actionLabels[_filterAction] ?? _filterAction!,
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: isDark ? Colors.white : Colors.black87,
-                              )),
-                          backgroundColor:
-                              isDark ? AppColors.surfaceDark : Colors.white,
-                          side: BorderSide(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.35)
-                                : Colors.black.withValues(alpha: 0.15),
-                          ),
-                          deleteIconColor:
-                              isDark ? Colors.white70 : Colors.black54,
-                          deleteIcon: const Icon(Icons.close, size: 16),
-                          onDeleted: () {
-                            _filterAction = null;
-                            _loadLogs();
-                          },
-                        ),
-                      if (_filterTargetUid != null)
-                        Chip(
-                          label: Text('Target: ${_shortUid(_filterTargetUid!)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: isDark ? Colors.white : Colors.black87,
-                              )),
-                          backgroundColor:
-                              isDark ? AppColors.surfaceDark : Colors.white,
-                          side: BorderSide(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.35)
-                                : Colors.black.withValues(alpha: 0.15),
-                          ),
-                          deleteIconColor:
-                              isDark ? Colors.white70 : Colors.black54,
-                          deleteIcon: const Icon(Icons.close, size: 16),
-                          onDeleted: () {
-                            _filterTargetUid = null;
-                            _targetUidCtrl.clear();
-                            _loadLogs();
-                          },
-                        ),
-                      if (_filterActorUid != null)
-                        Chip(
-                          label: Text('Actor: ${_shortUid(_filterActorUid!)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: isDark ? Colors.white : Colors.black87,
-                              )),
-                          backgroundColor:
-                              isDark ? AppColors.surfaceDark : Colors.white,
-                          side: BorderSide(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.35)
-                                : Colors.black.withValues(alpha: 0.15),
-                          ),
-                          deleteIconColor:
-                              isDark ? Colors.white70 : Colors.black54,
-                          deleteIcon: const Icon(Icons.close, size: 16),
-                          onDeleted: () {
-                            _filterActorUid = null;
-                            _actorUidCtrl.clear();
-                            _loadLogs();
-                          },
-                        ),
-                      if (_filterDateFrom != null || _filterDateTo != null)
-                        Chip(
-                          label: Text(
-                            _dateRangeLabel(),
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: isDark ? Colors.white : Colors.black87,
+    return RoleEnglishLtrScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.auditLogs,
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          centerTitle: true,
+          actions: [
+            // Target UID filter
+            IconButton(
+              icon: Icon(Icons.person_search,
+                  color: _filterTargetUid != null
+                      ? const Color(0xFFD32F2F)
+                      : null),
+              onPressed: _showTargetFilter,
+              tooltip: l10n.filterByTarget,
+            ),
+            // Actor UID filter
+            IconButton(
+              icon: Icon(Icons.manage_accounts_outlined,
+                  color:
+                      _filterActorUid != null ? const Color(0xFFD32F2F) : null),
+              onPressed: _showActorFilter,
+              tooltip: l10n.filterByActor,
+            ),
+            // Date range filter
+            IconButton(
+              icon: Icon(Icons.date_range,
+                  color: (_filterDateFrom != null || _filterDateTo != null)
+                      ? const Color(0xFFD32F2F)
+                      : null),
+              onPressed: _showDateRangeFilter,
+              tooltip: l10n.filterByDateRange,
+            ),
+            // Action filter
+            PopupMenuButton<String?>(
+              icon: Icon(Icons.filter_list,
+                  color:
+                      _filterAction != null ? const Color(0xFFD32F2F) : null),
+              onSelected: (val) {
+                _filterAction = val;
+                _loadLogs();
+              },
+              itemBuilder: (_) => _actionFilters.map((a) {
+                return PopupMenuItem(
+                  value: a,
+                  child: Text(
+                      a == null ? l10n.allActions : (_actionLabels[a] ?? a)),
+                );
+              }).toList(),
+            ),
+            IconButton(icon: const Icon(Icons.refresh), onPressed: _loadLogs),
+          ],
+        ),
+        body: Column(
+          children: [
+            // Active filters bar
+            if (_filterAction != null ||
+                _filterTargetUid != null ||
+                _filterActorUid != null ||
+                _filterDateFrom != null ||
+                _filterDateTo != null)
+              ColoredBox(
+                color: const Color(0xFFD32F2F).withValues(alpha: 0.08),
+                child: ResponsiveContent(
+                  maxWidth: 1440,
+                  child: Padding(
+                    padding:
+                        UhcResponsive.pagePadding(context, top: 8, bottom: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        if (_filterAction != null)
+                          Chip(
+                            label: Text(
+                                _actionLabels[_filterAction] ?? _filterAction!,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                )),
+                            backgroundColor:
+                                isDark ? AppColors.surfaceDark : Colors.white,
+                            side: BorderSide(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.35)
+                                  : Colors.black.withValues(alpha: 0.15),
                             ),
+                            deleteIconColor:
+                                isDark ? Colors.white70 : Colors.black54,
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            onDeleted: () {
+                              _filterAction = null;
+                              _loadLogs();
+                            },
                           ),
-                          backgroundColor:
-                              isDark ? AppColors.surfaceDark : Colors.white,
-                          side: BorderSide(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.35)
-                                : Colors.black.withValues(alpha: 0.15),
+                        if (_filterTargetUid != null)
+                          Chip(
+                            label: Text(
+                                'Target: ${_shortUid(_filterTargetUid!)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                )),
+                            backgroundColor:
+                                isDark ? AppColors.surfaceDark : Colors.white,
+                            side: BorderSide(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.35)
+                                  : Colors.black.withValues(alpha: 0.15),
+                            ),
+                            deleteIconColor:
+                                isDark ? Colors.white70 : Colors.black54,
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            onDeleted: () {
+                              _filterTargetUid = null;
+                              _targetUidCtrl.clear();
+                              _loadLogs();
+                            },
                           ),
-                          deleteIconColor:
-                              isDark ? Colors.white70 : Colors.black54,
-                          deleteIcon: const Icon(Icons.close, size: 16),
-                          onDeleted: () {
-                            _filterDateFrom = null;
-                            _filterDateTo = null;
-                            _loadLogs();
-                          },
-                        ),
-                    ],
+                        if (_filterActorUid != null)
+                          Chip(
+                            label: Text('Actor: ${_shortUid(_filterActorUid!)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                )),
+                            backgroundColor:
+                                isDark ? AppColors.surfaceDark : Colors.white,
+                            side: BorderSide(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.35)
+                                  : Colors.black.withValues(alpha: 0.15),
+                            ),
+                            deleteIconColor:
+                                isDark ? Colors.white70 : Colors.black54,
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            onDeleted: () {
+                              _filterActorUid = null;
+                              _actorUidCtrl.clear();
+                              _loadLogs();
+                            },
+                          ),
+                        if (_filterDateFrom != null || _filterDateTo != null)
+                          Chip(
+                            label: Text(
+                              _dateRangeLabel(),
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            backgroundColor:
+                                isDark ? AppColors.surfaceDark : Colors.white,
+                            side: BorderSide(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.35)
+                                  : Colors.black.withValues(alpha: 0.15),
+                            ),
+                            deleteIconColor:
+                                isDark ? Colors.white70 : Colors.black54,
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            onDeleted: () {
+                              _filterDateFrom = null;
+                              _filterDateTo = null;
+                              _loadLogs();
+                            },
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            // Log list
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _logs.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.history,
+                                  size: 64,
+                                  color:
+                                      isDark ? Colors.white24 : Colors.black12),
+                              const SizedBox(height: 16),
+                              Text(l10n.noAuditLogsFound,
+                                  style: GoogleFonts.poppins(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight)),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _loadLogs,
+                          child: ResponsiveListView(
+                            maxWidth: 1440,
+                            gridOnWide: true,
+                            tabletColumns: 1,
+                            laptopColumns: 2,
+                            desktopColumns: 3,
+                            childAspectRatio:
+                                UhcResponsive.isWide(context) ? 3.9 : 4.0,
+                            padding:
+                                UhcResponsive.pagePadding(context, bottom: 32),
+                            itemCount: _logs.length,
+                            itemBuilder: (context, index) =>
+                                _buildLogTile(_logs[index], isDark),
+                          ),
+                        ),
             ),
-          // Log list
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _logs.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.history,
-                                size: 64,
-                                color:
-                                    isDark ? Colors.white24 : Colors.black12),
-                            const SizedBox(height: 16),
-                            Text(l10n.noAuditLogsFound,
-                                style: GoogleFonts.poppins(
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondaryLight)),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadLogs,
-                        child: ResponsiveListView(
-                          maxWidth: 1440,
-                          gridOnWide: true,
-                          tabletColumns: 1,
-                          laptopColumns: 2,
-                          desktopColumns: 3,
-                          childAspectRatio:
-                              UhcResponsive.isWide(context) ? 3.9 : 4.0,
-                          padding:
-                              UhcResponsive.pagePadding(context, bottom: 32),
-                          itemCount: _logs.length,
-                          itemBuilder: (context, index) =>
-                              _buildLogTile(_logs[index], isDark),
-                        ),
-                      ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

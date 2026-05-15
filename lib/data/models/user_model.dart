@@ -25,6 +25,7 @@ class UserModel {
   final bool isActive;
   final Map<String, dynamic>? notificationSettings;
   final String language;
+  final String themeMode;
   final String? googleEmail;
 
   /// Only set when role == superAdmin
@@ -50,6 +51,7 @@ class UserModel {
     this.isActive = true,
     this.notificationSettings,
     this.language = 'en',
+    this.themeMode = 'system',
     this.googleEmail,
     this.superAdminType,
     this.adminPermissions,
@@ -79,6 +81,7 @@ class UserModel {
       isActive: data['isActive'] ?? true,
       notificationSettings: data['notificationSettings'],
       language: data['language'] ?? 'en',
+      themeMode: data['themeMode'] ?? 'system',
       googleEmail: data['googleEmail'],
       superAdminType: data['superAdminType'] != null
           ? SuperAdminType.values.firstWhere(
@@ -111,6 +114,7 @@ class UserModel {
       'isActive': isActive,
       'notificationSettings': notificationSettings,
       'language': language,
+      'themeMode': themeMode,
       'googleEmail': googleEmail,
       'superAdminType': superAdminType?.name,
       'adminPermissions': adminPermissions?.toMap(),
@@ -134,6 +138,7 @@ class UserModel {
     bool? isActive,
     Map<String, dynamic>? notificationSettings,
     String? language,
+    String? themeMode,
     String? googleEmail,
     SuperAdminType? superAdminType,
     AdminPermissions? adminPermissions,
@@ -155,6 +160,7 @@ class UserModel {
       isActive: isActive ?? this.isActive,
       notificationSettings: notificationSettings ?? this.notificationSettings,
       language: language ?? this.language,
+      themeMode: themeMode ?? this.themeMode,
       googleEmail: googleEmail ?? this.googleEmail,
       superAdminType: superAdminType ?? this.superAdminType,
       adminPermissions: adminPermissions ?? this.adminPermissions,
@@ -176,8 +182,8 @@ class UserModel {
   bool hasPermission(String permissionKey) {
     if (isSuperAdmin) return true;
     if (!isAdmin) return false;
-    // If no permissions object yet (legacy admin), grant full access
-    if (adminPermissions == null) return true;
+    // Firestore rules require explicit adminPermissions for admin access.
+    if (adminPermissions == null) return false;
     return adminPermissions!.getByKey(permissionKey);
   }
 

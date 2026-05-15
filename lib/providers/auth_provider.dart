@@ -391,25 +391,63 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Update user language preference
+  Future<bool> updateLanguage(String languageCode) async {
+    if (_currentUser == null) return false;
+
+    try {
+      await _authService.updateUserLanguage(_currentUser!.id, languageCode);
+      _currentUser = _currentUser!.copyWith(language: languageCode);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Update user theme preference
+  Future<bool> updateThemeMode(String themeMode) async {
+    if (_currentUser == null) return false;
+
+    try {
+      await _authService.updateUserThemeMode(_currentUser!.id, themeMode);
+      _currentUser = _currentUser!.copyWith(themeMode: themeMode);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Sign out
   Future<void> signOut() async {
     // NOTE: FCM cleanup (token removal + topic unsubscription) must be done
     // via NotificationProvider.onLogout() BEFORE calling signOut(). That method
     // properly passes the stored role & department so all topics are cleaned up.
     _errorMessage = null;
+    final previousUser = _currentUser;
+    final previousState = _state;
+
+    // Clear local state before FirebaseAuth.signOut() so role-scoped Firestore
+    // streams are disposed while the user still has permissions.
+    _currentUser = null;
+    _state = AuthState.unauthenticated;
+    notifyListeners();
+
     try {
       await _authService.signOut();
     } catch (e) {
       debugPrint('Sign out error: $e');
+      _currentUser = previousUser;
+      _state = previousState;
       _errorMessage = 'Sign out failed. Please try again.';
       notifyListeners();
       rethrow;
     }
-
-    // Always clear local state
-    _currentUser = null;
-    _state = AuthState.unauthenticated;
-    notifyListeners();
   }
 
   /// Clear error message

@@ -11,6 +11,7 @@ import '../../../services/user_functions_service.dart';
 import 'user_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
+import '../../../core/widgets/role_english_ltr_scope.dart';
 
 /// User management screen for admin
 class UserManagementScreen extends StatefulWidget {
@@ -46,195 +47,197 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('User Management'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterDialog,
-          ),
-        ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Search users...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+    return RoleEnglishLtrScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('User Management'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: _showFilterDialog,
+            ),
+          ],
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Search users...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Filter Chips
-          if (_selectedRoles.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 8,
-                children: _selectedRoles.map((role) {
-                  return Chip(
-                    label: Text(
-                      role.name.toUpperCase(),
-                      style: TextStyle(
-                        color: isDark ? Colors.white : AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                    backgroundColor: isDark
-                        ? AppColors.primary.withValues(alpha: 0.2)
-                        : AppColors.primary.withValues(alpha: 0.1),
-                    side: BorderSide(
-                      color: isDark
-                          ? AppColors.primary.withValues(alpha: 0.5)
-                          : AppColors.primary.withValues(alpha: 0.2),
-                    ),
-                    onDeleted: () =>
-                        setState(() => _selectedRoles.remove(role)),
-                    deleteIconColor:
-                        isDark ? Colors.white70 : AppColors.primary,
-                  );
-                }).toList(),
-              ),
-            ),
-
-          // Users List
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _getUsersStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return SkeletonList(
-                    itemBuilder: (context, index) =>
-                        const CardSkeleton(height: 80),
-                  );
-                }
-
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.people, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        const Text('No users found'),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: _canManageNonAdminUsers
-                              ? _showAddUserDialog
-                              : _showPermissionDenied,
-                          icon: Icon(
-                            _canManageNonAdminUsers
-                                ? Icons.person_add
-                                : Icons.lock_outline,
-                          ),
-                          label: const Text('Add User'),
+            // Filter Chips
+            if (_selectedRoles.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Wrap(
+                  spacing: 8,
+                  children: _selectedRoles.map((role) {
+                    return Chip(
+                      label: Text(
+                        role.name.toUpperCase(),
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
                         ),
-                      ],
-                    ),
-                  );
-                }
+                      ),
+                      backgroundColor: isDark
+                          ? AppColors.primary.withValues(alpha: 0.2)
+                          : AppColors.primary.withValues(alpha: 0.1),
+                      side: BorderSide(
+                        color: isDark
+                            ? AppColors.primary.withValues(alpha: 0.5)
+                            : AppColors.primary.withValues(alpha: 0.2),
+                      ),
+                      onDeleted: () =>
+                          setState(() => _selectedRoles.remove(role)),
+                      deleteIconColor:
+                          isDark ? Colors.white70 : AppColors.primary,
+                    );
+                  }).toList(),
+                ),
+              ),
 
-                final docs = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
+            // Users List
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _getUsersStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return SkeletonList(
+                      itemBuilder: (context, index) =>
+                          const CardSkeleton(height: 80),
+                    );
+                  }
 
-                  // Exclude doctors - they are managed in Doctor Management
-                  final roleStr = data['role'] as String? ?? 'student';
-                  if (roleStr == 'doctor') return false;
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.people, size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          const Text('No users found'),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _canManageNonAdminUsers
+                                ? _showAddUserDialog
+                                : _showPermissionDenied,
+                            icon: Icon(
+                              _canManageNonAdminUsers
+                                  ? Icons.person_add
+                                  : Icons.lock_outline,
+                            ),
+                            label: const Text('Add User'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
 
-                  final name = (data['fullName'] ?? data['email'] ?? '')
-                      .toString()
-                      .toLowerCase();
-                  final matchesSearch = name.contains(
-                    _searchQuery.toLowerCase(),
-                  );
+                  final docs = snapshot.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
 
-                  if (_selectedRoles.isEmpty) return matchesSearch;
+                    // Exclude doctors - they are managed in Doctor Management
+                    final roleStr = data['role'] as String? ?? 'student';
+                    if (roleStr == 'doctor') return false;
 
-                  final role = UserRole.values.firstWhere(
-                    (r) => r.name == roleStr,
-                    orElse: () => UserRole.student,
-                  );
-                  return matchesSearch && _selectedRoles.contains(role);
-                }).toList();
+                    final name = (data['fullName'] ?? data['email'] ?? '')
+                        .toString()
+                        .toLowerCase();
+                    final matchesSearch = name.contains(
+                      _searchQuery.toLowerCase(),
+                    );
 
-                // Check if there might be more users to load
-                final totalFetched = snapshot.data!.docs.length;
-                final hasMore = totalFetched >= _displayLimit;
+                    if (_selectedRoles.isEmpty) return matchesSearch;
 
-                return ResponsiveListView(
-                  padding: UhcResponsive.pagePadding(context, bottom: 32),
-                  maxWidth: 1440,
-                  gridOnWide: true,
-                  tabletColumns: 1,
-                  laptopColumns: 2,
-                  desktopColumns: 3,
-                  childAspectRatio: 3.5,
-                  itemCount: docs.length + (hasMore ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    // "Load More" button at the end
-                    if (index == docs.length) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              setState(() => _displayLimit += 200);
-                            },
-                            icon: const Icon(Icons.expand_more),
-                            label: Text(
-                              'Load More (showing $totalFetched)',
+                    final role = UserRole.values.firstWhere(
+                      (r) => r.name == roleStr,
+                      orElse: () => UserRole.student,
+                    );
+                    return matchesSearch && _selectedRoles.contains(role);
+                  }).toList();
+
+                  // Check if there might be more users to load
+                  final totalFetched = snapshot.data!.docs.length;
+                  final hasMore = totalFetched >= _displayLimit;
+
+                  return ResponsiveListView(
+                    padding: UhcResponsive.pagePadding(context, bottom: 32),
+                    maxWidth: 1440,
+                    gridOnWide: true,
+                    tabletColumns: 1,
+                    laptopColumns: 2,
+                    desktopColumns: 3,
+                    childAspectRatio: 3.5,
+                    itemCount: docs.length + (hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      // "Load More" button at the end
+                      if (index == docs.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                setState(() => _displayLimit += 200);
+                              },
+                              icon: const Icon(Icons.expand_more),
+                              label: Text(
+                                'Load More (showing $totalFetched)',
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }
-                    final doc = docs[index];
-                    final data = doc.data() as Map<String, dynamic>;
-                    return _buildUserCard(context, doc.id, data, isDark);
-                  },
-                );
-              },
+                        );
+                      }
+                      final doc = docs[index];
+                      final data = doc.data() as Map<String, dynamic>;
+                      return _buildUserCard(context, doc.id, data, isDark);
+                    },
+                  );
+                },
+              ),
             ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _canManageNonAdminUsers
+              ? _showAddUserDialog
+              : _showPermissionDenied,
+          backgroundColor: _canManageNonAdminUsers
+              ? AppColors.primary
+              : AppColors.primary.withValues(alpha: 0.55),
+          icon: Icon(
+            _canManageNonAdminUsers ? Icons.person_add : Icons.lock_outline,
+            color: Colors.white,
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _canManageNonAdminUsers
-            ? _showAddUserDialog
-            : _showPermissionDenied,
-        backgroundColor: _canManageNonAdminUsers
-            ? AppColors.primary
-            : AppColors.primary.withValues(alpha: 0.55),
-        icon: Icon(
-          _canManageNonAdminUsers ? Icons.person_add : Icons.lock_outline,
-          color: Colors.white,
+          label: Text(
+            'Add User',
+            style: const TextStyle(color: Colors.white),
+          ),
+          shape: const StadiumBorder(),
         ),
-        label: Text(
-          'Add User',
-          style: const TextStyle(color: Colors.white),
-        ),
-        shape: const StadiumBorder(),
       ),
     );
   }

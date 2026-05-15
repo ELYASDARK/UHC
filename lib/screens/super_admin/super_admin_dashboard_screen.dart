@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/responsive_layout.dart';
+import '../../core/widgets/role_english_ltr_scope.dart';
 
 /// Super Admin Dashboard with governance-focused KPIs:
 /// admin count, active admins, slot health, recent audit activity.
@@ -97,25 +98,27 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.superAdmin,
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        centerTitle: true,
-        actions: [
-          IconButton(
-              icon: const Icon(Icons.refresh), onPressed: _loadDashboard),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadDashboard,
-              child: ResponsivePage(
-                maxWidth: 1240,
-                child: _buildDashboardBody(isDark, l10n),
+    return RoleEnglishLtrScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.superAdmin,
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+          centerTitle: true,
+          actions: [
+            IconButton(
+                icon: const Icon(Icons.refresh), onPressed: _loadDashboard),
+          ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadDashboard,
+                child: ResponsivePage(
+                  maxWidth: 1240,
+                  child: _buildDashboardBody(isDark, l10n),
+                ),
               ),
-            ),
+      ),
     );
   }
 

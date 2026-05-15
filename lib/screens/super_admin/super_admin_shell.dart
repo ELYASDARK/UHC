@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/responsive_layout.dart';
+import '../../core/widgets/role_english_ltr_scope.dart';
 import 'super_admin_dashboard_screen.dart';
 import '../patient/profile/profile_screen.dart';
 import 'admin_control_screen.dart';
@@ -136,38 +137,40 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
       ),
     );
 
-    return AdaptiveNavigationScaffold(
-      selectedIndex: _currentIndex,
-      onDestinationSelected: _onTabTapped,
-      selectedColor: _accent,
-      body: body,
-      bottomNavigationBar: bottomNavigationBar,
-      destinations: [
-        AdaptiveNavigationDestination(
-          index: 0,
-          icon: Icons.dashboard_outlined,
-          selectedIcon: Icons.dashboard_rounded,
-          label: l10n.adminDashboard,
-        ),
-        AdaptiveNavigationDestination(
-          index: 1,
-          icon: Icons.admin_panel_settings_outlined,
-          selectedIcon: Icons.admin_panel_settings,
-          label: l10n.admins,
-        ),
-        AdaptiveNavigationDestination(
-          index: 2,
-          icon: Icons.history_outlined,
-          selectedIcon: Icons.history_rounded,
-          label: l10n.auditLogs,
-        ),
-        AdaptiveNavigationDestination(
-          index: 3,
-          icon: Icons.person_outline_rounded,
-          selectedIcon: Icons.person_rounded,
-          label: l10n.profile,
-        ),
-      ],
+    return RoleEnglishLtrScope(
+      child: AdaptiveNavigationScaffold(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: _onTabTapped,
+        selectedColor: _accent,
+        body: body,
+        bottomNavigationBar: bottomNavigationBar,
+        destinations: [
+          AdaptiveNavigationDestination(
+            index: 0,
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard_rounded,
+            label: l10n.adminDashboard,
+          ),
+          AdaptiveNavigationDestination(
+            index: 1,
+            icon: Icons.admin_panel_settings_outlined,
+            selectedIcon: Icons.admin_panel_settings,
+            label: l10n.admins,
+          ),
+          AdaptiveNavigationDestination(
+            index: 2,
+            icon: Icons.history_outlined,
+            selectedIcon: Icons.history_rounded,
+            label: l10n.auditLogs,
+          ),
+          AdaptiveNavigationDestination(
+            index: 3,
+            icon: Icons.person_outline_rounded,
+            selectedIcon: Icons.person_rounded,
+            label: l10n.profile,
+          ),
+        ],
+      ),
     );
   }
 

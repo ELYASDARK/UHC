@@ -1,0 +1,92 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userExists() {
+      return signedIn() &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUser() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function activeUser() {
+      return userExists() && currentUser().isActive == true;
+    }
+
+    function hasPermission(permissionKey) {
+      return activeUser() &&
+        (
+          currentUser().role == 'superAdmin' ||
+          (
+            currentUser().role == 'admin' &&
+            ('adminPermissions' in currentUser()) &&
+            currentUser().adminPermissions[permissionKey] == true
+          )
+        );
+    }
+
+    function doctorHasPatientAccess(userId) {
+      return activeUser() &&
+        currentUser().role == 'doctor' &&
+        firestore.exists(/databases/(default)/documents/doctor_patient_access/$(request.auth.uid)/patients/$(userId));
+    }
+
+    function validProfileImage() {
+      return request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    function validMedicalDocument() {
+      return request.resource.size < 20 * 1024 * 1024 &&
+        request.resource.contentType.matches(
+          'application/pdf|image/(jpeg|png)|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        );
+    }
+
+    match /profile_images/{fileName} {
+      allow read: if activeUser();
+      allow write: if activeUser() &&
+        fileName.matches(request.auth.uid + '\\.(jpg|jpeg|png|webp)') &&
+        validProfileImage();
+    }
+
+    match /medical_documents/{userId}/{scope}/{fileName} {
+      allow read: if activeUser() &&
+        (
+          request.auth.uid == userId ||
+          doctorHasPatientAccess(userId) ||
+          hasPermission('reports.view') ||
+          hasPermission('appointments.view')
+        );
+      allow write: if activeUser() &&
+        validMedicalDocument() &&
+        (
+          (request.auth.uid == userId && scope == 'self') ||
+          (scope != 'self' && doctorHasPatientAccess(userId))
+        );
+      allow delete: if activeUser() &&
+        (
+          request.auth.uid == userId ||
+          doctorHasPatientAccess(userId) ||
+          hasPermission('reports.view') ||
+          hasPermission('appointments.view')
+        );
+    }
+
+    match /medical_documents/{userId}/{fileName} {
+      allow read, delete: if activeUser() && request.auth.uid == userId;
+      allow write: if activeUser() &&
+        request.auth.uid == userId &&
+        validMedicalDocument();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

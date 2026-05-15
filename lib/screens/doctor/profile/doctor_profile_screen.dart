@@ -67,7 +67,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           title: l10n.darkMode,
           trailing: Switch(
             value: theme.isDarkMode,
-            onChanged: (_) => theme.toggleTheme(),
+            onChanged: (_) => _applyThemeChange(theme, auth),
           ),
           isDark: isDark,
         ),
@@ -500,11 +500,27 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       title: Text(label),
       trailing:
           selected ? const Icon(Icons.check, color: AppColors.primary) : null,
-      onTap: () {
-        lp.setLocale(Locale(code));
-        Navigator.pop(context);
-      },
+      onTap: () => _applyLanguageChange(code),
     );
+  }
+
+  Future<void> _applyLanguageChange(String languageCode) async {
+    final localeProvider = context.read<LocaleProvider>();
+    final authProvider = context.read<AuthProvider>();
+
+    await localeProvider.setLocaleByCode(languageCode);
+    await authProvider.updateLanguage(languageCode);
+
+    if (!mounted) return;
+    Navigator.pop(context);
+  }
+
+  Future<void> _applyThemeChange(
+    ThemeProvider themeProvider,
+    AuthProvider authProvider,
+  ) async {
+    await themeProvider.toggleTheme();
+    await authProvider.updateThemeMode(themeProvider.themeMode.name);
   }
 
   void _showLogoutDialog(

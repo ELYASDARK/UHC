@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
+import '../../../core/widgets/role_english_ltr_scope.dart';
 
 /// Appointment analytics screen for admin
 class AppointmentAnalyticsScreen extends StatefulWidget {
@@ -126,66 +127,68 @@ class _AppointmentAnalyticsScreenState
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Appointment Analytics'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAnalytics,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? _buildAnalyticsSkeleton(isDark)
-          : ResponsivePage(
-              maxWidth: 1120,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Period Selector
-                  _buildPeriodSelector(isDark),
-                  const SizedBox(height: 20),
-
-                  // Summary Cards
-                  _buildSummaryCards(isDark),
-                  const SizedBox(height: 20),
-
-                  // Status Distribution
-                  Text(
-                    'Status Distribution',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildStatusChart(isDark),
-                  const SizedBox(height: 20),
-
-                  // Department Distribution
-                  Text(
-                    'By Department',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDepartmentChart(isDark),
-                  const SizedBox(height: 20),
-
-                  // Daily Trend
-                  Text(
-                    'Daily Trend',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDailyTrend(isDark),
-                ],
-              ),
+    return RoleEnglishLtrScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Appointment Analytics'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadAnalytics,
             ),
+          ],
+        ),
+        body: _isLoading
+            ? _buildAnalyticsSkeleton(isDark)
+            : ResponsivePage(
+                maxWidth: 1120,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Period Selector
+                    _buildPeriodSelector(isDark),
+                    const SizedBox(height: 20),
+
+                    // Summary Cards
+                    _buildSummaryCards(isDark),
+                    const SizedBox(height: 20),
+
+                    // Status Distribution
+                    Text(
+                      'Status Distribution',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildStatusChart(isDark),
+                    const SizedBox(height: 20),
+
+                    // Department Distribution
+                    Text(
+                      'By Department',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDepartmentChart(isDark),
+                    const SizedBox(height: 20),
+
+                    // Daily Trend
+                    Text(
+                      'Daily Trend',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildDailyTrend(isDark),
+                  ],
+                ),
+              ),
+      ),
     );
   }
 

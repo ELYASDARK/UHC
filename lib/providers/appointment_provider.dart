@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import '../data/models/appointment_model.dart';
 import '../data/repositories/appointment_repository.dart';
@@ -105,71 +107,14 @@ class AppointmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Check if time slot is available
-      final isAvailable = await _appointmentRepo.isTimeSlotAvailable(
-        appointment.doctorId,
-        appointment.appointmentDate,
-        appointment.timeSlot,
-      );
-
-      if (!isAvailable) {
-        _error = 'This time slot is no longer available';
-        _isLoading = false;
-        notifyListeners();
-        return null;
-      }
-
-      // Create appointment
+      // The backend transaction is the source of truth for slot availability.
+      // If two users book at once, only the one that gets the slot lock succeeds.
       final appointmentId = await _appointmentRepo.createAppointment(
         appointment,
       );
 
-      // Schedule local device notifications (1 week, 1 day, 1 hour before)
-      // Use exactAppointmentTime (date + timeSlot) so reminders fire relative
-      // to the real appointment hour, not midnight.
-      // Wrap in try-catch: notification failures should NOT fail the booking
-      // since the appointment is already created in Firestore.
-      try {
-        await _notificationService.scheduleAppointmentReminders(
-          appointmentId: appointmentId,
-          doctorName: appointment.doctorName,
-          appointmentTime: appointment.exactAppointmentTime,
-          timeSlot: appointment.timeSlot,
-        );
-      } catch (e) {
-        debugPrint('Failed to schedule local reminders: $e');
-      }
-
-      // Create Firebase notifications:
-      // 1. Immediate confirmation notification
-      try {
-        await _notificationRepo.sendAppointmentConfirmation(
-          userId: appointment.patientId,
-          appointmentId: appointmentId,
-          doctorName: appointment.doctorName,
-          appointmentTime: appointment.exactAppointmentTime,
-          timeSlot: appointment.timeSlot,
-        );
-
-        // 2. Schedule 3 reminder notifications in Firebase (1 week, 1 day, 1 hour before)
-        await _notificationRepo.scheduleAppointmentReminders(
-          userId: appointment.patientId,
-          appointmentId: appointmentId,
-          doctorName: appointment.doctorName,
-          appointmentTime: appointment.exactAppointmentTime,
-          timeSlot: appointment.timeSlot,
-        );
-      } catch (e) {
-        debugPrint('Failed to send Firebase notifications: $e');
-      }
-
-      // Refresh upcoming appointments (pass email for fallback query)
-      await loadUpcomingAppointments(
-        appointment.patientId,
-        email: appointment.patientEmail,
-      );
-
       _error = null;
+      unawaited(_runPostBookingTasks(appointment, appointmentId));
       return appointmentId;
     } catch (e) {
       _error = e.toString();
@@ -177,6 +122,51 @@ class AppointmentProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> _runPostBookingTasks(
+    AppointmentModel appointment,
+    String appointmentId,
+  ) async {
+    try {
+      await _notificationService.scheduleAppointmentReminders(
+        appointmentId: appointmentId,
+        doctorName: appointment.doctorName,
+        appointmentTime: appointment.exactAppointmentTime,
+        timeSlot: appointment.timeSlot,
+      );
+    } catch (e) {
+      debugPrint('Failed to schedule local reminders: $e');
+    }
+
+    try {
+      await _notificationRepo.sendAppointmentConfirmation(
+        userId: appointment.patientId,
+        appointmentId: appointmentId,
+        doctorName: appointment.doctorName,
+        appointmentTime: appointment.exactAppointmentTime,
+        timeSlot: appointment.timeSlot,
+      );
+      await _notificationRepo.scheduleAppointmentReminders(
+        userId: appointment.patientId,
+        appointmentId: appointmentId,
+        doctorName: appointment.doctorName,
+        appointmentTime: appointment.exactAppointmentTime,
+        timeSlot: appointment.timeSlot,
+      );
+    } catch (e) {
+      debugPrint('Failed to send Firebase notifications: $e');
+    }
+
+    try {
+      _upcomingAppointments = await _appointmentRepo.getUpcomingAppointments(
+        appointment.patientId,
+        email: appointment.patientEmail,
+      );
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to refresh appointments after booking: $e');
     }
   }
 

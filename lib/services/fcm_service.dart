@@ -136,16 +136,6 @@ class FCMService {
     try {
       final token = await getToken();
       if (token != null) {
-        // Save to users collection (legacy support)
-        await _firestore.collection('users').doc(userId).update({
-          'fcmTokens': FieldValue.arrayUnion([token]),
-          'lastTokenUpdate': FieldValue.serverTimestamp(),
-        }).catchError((e, stack) {
-          _recordError(e, stack, reason: 'Failed to update user FCM token');
-        });
-
-        // Save to user_tokens collection (for Cloud Functions)
-        // dart:io Platform is not available on web, so use 'web' as a fallback.
         final platform = kIsWeb ? 'web' : _getNativePlatform();
         await _firestore.collection('user_tokens').doc(userId).set({
           'token': token,
@@ -158,15 +148,6 @@ class FCMService {
       _tokenRefreshSubscription?.cancel();
       _tokenRefreshSubscription =
           _messaging.onTokenRefresh.listen((newToken) async {
-        await _firestore.collection('users').doc(userId).update({
-          'fcmTokens': FieldValue.arrayUnion([newToken]),
-          'lastTokenUpdate': FieldValue.serverTimestamp(),
-        }).catchError((e, stack) {
-          _recordError(e, stack,
-              reason: 'Failed to update refreshed FCM token');
-        });
-
-        // Update user_tokens collection
         final refreshPlatform = kIsWeb ? 'web' : _getNativePlatform();
         await _firestore.collection('user_tokens').doc(userId).set({
           'token': newToken,
@@ -202,13 +183,6 @@ class FCMService {
     try {
       final token = await getToken();
       if (token != null) {
-        await _firestore.collection('users').doc(userId).update({
-          'fcmTokens': FieldValue.arrayRemove([token]),
-        }).catchError((e, stack) {
-          _recordError(e, stack, reason: 'Failed to remove FCM token');
-        });
-
-        // Remove from user_tokens collection
         await _firestore
             .collection('user_tokens')
             .doc(userId)
@@ -228,21 +202,9 @@ class FCMService {
     String? role,
     String? department,
   }) async {
-    // Subscribe to general announcements
+    // Keep topic subscriptions limited to non-sensitive broadcasts.
+    // Private/user/role/department messages are delivered by token from Cloud Functions.
     await subscribeToTopic('announcements');
-
-    // Subscribe to user-specific topic
-    await subscribeToTopic('user_$userId');
-
-    // Subscribe to role-based topic (e.g. role_student, role_doctor)
-    if (role != null && role.isNotEmpty) {
-      await subscribeToTopic('role_$role');
-    }
-
-    // Subscribe to department if provided
-    if (department != null) {
-      await subscribeToTopic('department_$department');
-    }
   }
 
   /// Unsubscribe user from all topics
@@ -252,15 +214,6 @@ class FCMService {
     String? department,
   }) async {
     await unsubscribeFromTopic('announcements');
-    await unsubscribeFromTopic('user_$userId');
-
-    if (role != null && role.isNotEmpty) {
-      await unsubscribeFromTopic('role_$role');
-    }
-
-    if (department != null) {
-      await unsubscribeFromTopic('department_$department');
-    }
   }
 
   /// Dispose resources
