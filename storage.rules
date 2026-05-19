@@ -72,9 +72,7 @@ service firebase.storage {
       allow delete: if activeUser() &&
         (
           request.auth.uid == userId ||
-          doctorHasPatientAccess(userId) ||
-          hasPermission('reports.view') ||
-          hasPermission('appointments.view')
+          (scope != 'self' && doctorHasPatientAccess(userId))
         );
     }
 
