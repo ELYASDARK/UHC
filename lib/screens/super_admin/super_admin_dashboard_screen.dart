@@ -39,20 +39,38 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   }
 
   Future<void> _loadDashboard() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      // All admins
-      final adminsSnap = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: 'admin')
-          .get();
-      final activeAdmins =
-          adminsSnap.docs.where((d) => d.data()['isActive'] == true).length;
+      // Use count() aggregations where possible to avoid downloading docs
+      final futures = await Future.wait([
+        // 0: Total admin count
+        _firestore
+            .collection('users')
+            .where('role', isEqualTo: 'admin')
+            .count()
+            .get(),
+        // 1: Active admin count
+        _firestore
+            .collection('users')
+            .where('role', isEqualTo: 'admin')
+            .where('isActive', isEqualTo: true)
+            .count()
+            .get(),
+        // 2: Total users count
+        _firestore.collection('users').count().get(),
+        // 3: Total doctors count
+        _firestore.collection('doctors').count().get(),
+      ]);
 
-      // Super admins
+      final totalAdminCount = futures[0].count ?? 0;
+      final activeAdminCount = futures[1].count ?? 0;
+
+      // Super admins: need actual docs for slot type detection (max 2 docs)
       final saSnap = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'superAdmin')
+          .limit(5)
           .get();
       bool primaryFilled = false;
       bool backupFilled = false;
@@ -61,10 +79,6 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
         if (slot == 'primary') primaryFilled = true;
         if (slot == 'backup') backupFilled = true;
       }
-
-      // Total users & doctors
-      final usersCount = await _firestore.collection('users').count().get();
-      final doctorsCount = await _firestore.collection('doctors').count().get();
 
       // Recent audit logs (last 7 days)
       final weekAgo = DateTime.now().subtract(const Duration(days: 7));
@@ -75,20 +89,21 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
           .limit(5)
           .get();
 
+      if (!mounted) return;
       setState(() {
-        _totalAdmins = adminsSnap.docs.length;
-        _activeAdmins = activeAdmins;
-        _inactiveAdmins = adminsSnap.docs.length - activeAdmins;
+        _totalAdmins = totalAdminCount;
+        _activeAdmins = activeAdminCount;
+        _inactiveAdmins = totalAdminCount - activeAdminCount;
         _superAdminCount = saSnap.docs.length;
         _primarySlotFilled = primaryFilled;
         _backupSlotFilled = backupFilled;
-        _totalUsers = usersCount.count ?? 0;
-        _totalDoctors = doctorsCount.count ?? 0;
+        _totalUsers = futures[2].count ?? 0;
+        _totalDoctors = futures[3].count ?? 0;
         _recentLogs = auditSnap.docs.map((d) => d.data()).toList();
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       debugPrint('Dashboard load error: $e');
     }
   }
@@ -138,16 +153,16 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildSlotHealthBanner(isDark, l10n),
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
                 metrics,
                 if (riskVisible) ...[
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 18),
                   _buildRiskSection(isDark, l10n),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 28),
+          const SizedBox(width: 20),
           Expanded(
             flex: 5,
             child: _buildRecentAuditSection(isDark, l10n),
@@ -160,10 +175,12 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSlotHealthBanner(isDark, l10n),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         metrics,
-        const SizedBox(height: 24),
-        if (riskVisible) _buildRiskSection(isDark, l10n),
+        const SizedBox(height: 18),
+        if (riskVisible) ...[
+          _buildRiskSection(isDark, l10n),
+        ],
         _buildRecentAuditSection(isDark, l10n),
       ],
     );
@@ -173,19 +190,20 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     final l10n = AppLocalizations.of(context);
     final breakpoint = UhcResponsive.breakpointOf(context);
     final ratio = switch (breakpoint) {
-      UhcBreakpoint.phone => 1.22,
-      UhcBreakpoint.tablet => 1.75,
-      UhcBreakpoint.laptop || UhcBreakpoint.desktop => compact ? 2.85 : 1.8,
+      UhcBreakpoint.phone => 1.95,
+      UhcBreakpoint.tablet => 2.0,
+      UhcBreakpoint.laptop || UhcBreakpoint.desktop => compact ? 3.15 : 2.2,
     };
+    final gap = breakpoint.isPhone ? 10.0 : 12.0;
 
-    return ResponsiveGrid(
+    final grid = ResponsiveGrid(
       phoneColumns: 2,
       tabletColumns: 3,
       laptopColumns: compact ? 2 : 3,
       desktopColumns: compact ? 2 : 3,
       childAspectRatio: ratio,
-      spacing: 16,
-      runSpacing: 16,
+      spacing: gap,
+      runSpacing: gap,
       children: [
         _buildKpiCard(
           l10n.totalAdmins,
@@ -231,6 +249,16 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
         ),
       ],
     );
+
+    if (!breakpoint.isPhone) return grid;
+
+    return Align(
+      alignment: Alignment.topCenter,
+      child: FractionallySizedBox(
+        widthFactor: 0.93,
+        child: grid,
+      ),
+    );
   }
 
   Widget _buildRecentAuditSection(bool isDark, AppLocalizations l10n) {
@@ -267,7 +295,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     final color = allFilled ? AppColors.success : AppColors.warning;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -278,9 +306,9 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
           Icon(
             allFilled ? Icons.verified_user : Icons.warning_amber_rounded,
             color: color,
-            size: 32,
+            size: 28,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,13 +316,13 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 Text(
                   allFilled ? l10n.slotHealthy : l10n.slotAttentionNeeded,
                   style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600, fontSize: 14, color: color),
+                      fontWeight: FontWeight.w600, fontSize: 13, color: color),
                 ),
                 const SizedBox(height: 2),
                 Row(
                   children: [
                     _slotDot(l10n.primarySlot, _primarySlotFilled),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     _slotDot(l10n.backupSlot, _backupSlotFilled),
                   ],
                 ),
@@ -331,35 +359,60 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     return Card(
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth > 260;
-            final content = [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color, size: 26),
+            final dense = constraints.maxWidth < 240;
+            final iconSize = dense ? 36.0 : 44.0;
+            final iconBox = Container(
+              width: iconSize,
+              height: iconSize,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
               ),
-              SizedBox(width: wide ? 16 : 0, height: wide ? 0 : 8),
-              if (wide)
-                Expanded(
-                  child: _buildKpiText(label, value, color, isDark, wide: true),
-                )
-              else
-                _buildKpiText(label, value, color, isDark, wide: false),
-            ];
+              child: Icon(icon, color: color, size: dense ? 20 : 24),
+            );
 
-            return wide
-                ? Row(children: content)
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: content,
-                  );
+            if (wide) {
+              final groupWidth =
+                  constraints.maxWidth < 190 ? constraints.maxWidth : 190.0;
+              return Center(
+                child: SizedBox(
+                  width: groupWidth,
+                  child: Row(
+                    children: [
+                      iconBox,
+                      const SizedBox(width: 14),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: groupWidth - iconSize - 14,
+                        ),
+                        child: _buildKpiText(label, value, color, isDark,
+                            wide: true),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                iconBox,
+                SizedBox(height: dense ? 4 : 6),
+                _buildKpiText(
+                  label,
+                  value,
+                  color,
+                  isDark,
+                  wide: false,
+                  dense: dense,
+                ),
+              ],
+            );
           },
         ),
       ),
@@ -372,6 +425,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     Color color,
     bool isDark, {
     required bool wide,
+    bool dense = false,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -381,18 +435,18 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
         Text(
           value,
           style: GoogleFonts.poppins(
-            fontSize: wide ? 24 : 22,
+            fontSize: wide ? 22 : (dense ? 18 : 20),
             fontWeight: FontWeight.w700,
             color: color,
-            height: 1.05,
+            height: dense ? 1.0 : 1.05,
           ),
         ),
-        const SizedBox(height: 3),
+        SizedBox(height: dense ? 1 : 2),
         Text(
           label,
           style: GoogleFonts.poppins(
-            fontSize: wide ? 12 : 11,
-            height: 1.15,
+            fontSize: wide ? 11.5 : (dense ? 10 : 10.5),
+            height: dense ? 1.05 : 1.15,
             color: isDark
                 ? AppColors.textSecondaryDark
                 : AppColors.textSecondaryLight,
@@ -407,7 +461,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
 
   Widget _buildRiskSection(bool isDark, AppLocalizations l10n) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -450,13 +504,13 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
 
     return Card(
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 4),
       child: ListTile(
         dense: true,
         leading: CircleAvatar(
-          radius: 16,
+          radius: 15,
           backgroundColor: const Color(0xFFD32F2F).withValues(alpha: 0.1),
-          child: const Icon(Icons.history, size: 16, color: Color(0xFFD32F2F)),
+          child: const Icon(Icons.history, size: 15, color: Color(0xFFD32F2F)),
         ),
         title: Text(
           action
@@ -465,11 +519,12 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               .map((w) =>
                   w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
               .join(' '),
-          style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
+          style:
+              GoogleFonts.poppins(fontSize: 11.5, fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
           '${actorName.isNotEmpty ? 'By $actorName' : ''}${targetName.isNotEmpty ? ' → $targetName' : ''}',
-          style: GoogleFonts.poppins(fontSize: 10),
+          style: GoogleFonts.poppins(fontSize: 9.5),
         ),
       ),
     );

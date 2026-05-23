@@ -6,6 +6,8 @@ enum NotificationType {
   appointmentConfirmation,
   appointmentCancellation,
   appointmentRescheduled,
+  appointmentCompleted,
+  appointmentNoShow,
   newMessage,
   systemUpdate,
   healthTip,

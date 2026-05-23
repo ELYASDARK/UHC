@@ -26,6 +26,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
   String? _filterActorUid;
   DateTime? _filterDateFrom;
   DateTime? _filterDateTo;
+  int _displayLimit = 50;
+  bool _hasMore = false;
   final _targetUidCtrl = TextEditingController();
   final _actorUidCtrl = TextEditingController();
 
@@ -73,11 +75,35 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     super.dispose();
   }
 
+  EdgeInsets _auditListPadding({double bottom = 24}) {
+    final breakpoint = UhcResponsive.breakpointOf(context);
+    final top = switch (breakpoint) {
+      UhcBreakpoint.phone => 12.0,
+      UhcBreakpoint.tablet => 14.0,
+      UhcBreakpoint.laptop || UhcBreakpoint.desktop => 18.0,
+    };
+    return UhcResponsive.pagePadding(context, top: top, bottom: bottom);
+  }
+
+  double _listGap() {
+    return UhcResponsive.breakpointOf(context).isPhone ? 10 : 12;
+  }
+
+  double _logTileAspectRatio() {
+    return switch (UhcResponsive.breakpointOf(context)) {
+      UhcBreakpoint.phone => 4.8,
+      UhcBreakpoint.tablet => 7.2,
+      UhcBreakpoint.laptop => 5.2,
+      UhcBreakpoint.desktop => 4.55,
+    };
+  }
+
   Future<void> _loadLogs() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final result = await _governance.listAdminAuditLogs(
-        limit: 50,
+        limit: _displayLimit,
         action: _filterAction,
         targetUid: _filterTargetUid,
         actorUid: _filterActorUid,
@@ -89,12 +115,14 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
           .whereType<Map>()
           .map((entry) => Map<String, dynamic>.from(entry))
           .toList();
+      if (!mounted) return;
       setState(() {
         _logs = normalizedLogs;
+        _hasMore = result['hasMore'] == true;
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -103,6 +131,16 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         );
       }
     }
+  }
+
+  void _loadMore() {
+    setState(() => _displayLimit += 50);
+    _loadLogs();
+  }
+
+  void _resetAndReload() {
+    _displayLimit = 50;
+    _loadLogs();
   }
 
   @override
@@ -150,7 +188,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                       _filterAction != null ? const Color(0xFFD32F2F) : null),
               onSelected: (val) {
                 _filterAction = val;
-                _loadLogs();
+                _resetAndReload();
               },
               itemBuilder: (_) => _actionFilters.map((a) {
                 return PopupMenuItem(
@@ -201,7 +239,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                             deleteIcon: const Icon(Icons.close, size: 16),
                             onDeleted: () {
                               _filterAction = null;
-                              _loadLogs();
+                              _resetAndReload();
                             },
                           ),
                         if (_filterTargetUid != null)
@@ -225,7 +263,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                             onDeleted: () {
                               _filterTargetUid = null;
                               _targetUidCtrl.clear();
-                              _loadLogs();
+                              _resetAndReload();
                             },
                           ),
                         if (_filterActorUid != null)
@@ -248,7 +286,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                             onDeleted: () {
                               _filterActorUid = null;
                               _actorUidCtrl.clear();
-                              _loadLogs();
+                              _resetAndReload();
                             },
                           ),
                         if (_filterDateFrom != null || _filterDateTo != null)
@@ -273,7 +311,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                             onDeleted: () {
                               _filterDateFrom = null;
                               _filterDateTo = null;
-                              _loadLogs();
+                              _resetAndReload();
                             },
                           ),
                       ],
@@ -311,13 +349,34 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                             tabletColumns: 1,
                             laptopColumns: 2,
                             desktopColumns: 3,
-                            childAspectRatio:
-                                UhcResponsive.isWide(context) ? 3.9 : 4.0,
-                            padding:
-                                UhcResponsive.pagePadding(context, bottom: 32),
-                            itemCount: _logs.length,
-                            itemBuilder: (context, index) =>
-                                _buildLogTile(_logs[index], isDark),
+                            spacing: _listGap(),
+                            runSpacing: _listGap(),
+                            childAspectRatio: _logTileAspectRatio(),
+                            padding: _auditListPadding(bottom: 24),
+                            itemCount: _logs.length + (_hasMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == _logs.length) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
+                                    child: TextButton.icon(
+                                      onPressed: _loadMore,
+                                      icon: const Icon(Icons.expand_more,
+                                          color: Color(0xFFD32F2F)),
+                                      label: Text(
+                                        'Load More',
+                                        style: GoogleFonts.poppins(
+                                          color: const Color(0xFFD32F2F),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return _buildLogTile(_logs[index], isDark);
+                            },
                           ),
                         ),
             ),
@@ -346,7 +405,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               _targetUidCtrl.clear();
               _filterTargetUid = null;
               Navigator.pop(ctx);
-              _loadLogs();
+              _resetAndReload();
             },
             child: Text(l10n.clear),
           ),
@@ -356,7 +415,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               if (raw.isEmpty) {
                 _filterTargetUid = null;
                 if (ctx.mounted) Navigator.pop(ctx);
-                _loadLogs();
+                _resetAndReload();
                 return;
               }
 
@@ -374,7 +433,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               }
               _filterTargetUid = resolvedUid;
               if (ctx.mounted) Navigator.pop(ctx);
-              _loadLogs();
+              _resetAndReload();
             },
             child: Text(l10n.apply),
           ),
@@ -402,7 +461,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               _actorUidCtrl.clear();
               _filterActorUid = null;
               Navigator.pop(ctx);
-              _loadLogs();
+              _resetAndReload();
             },
             child: Text(l10n.clear),
           ),
@@ -412,7 +471,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               if (raw.isEmpty) {
                 _filterActorUid = null;
                 if (ctx.mounted) Navigator.pop(ctx);
-                _loadLogs();
+                _resetAndReload();
                 return;
               }
 
@@ -430,7 +489,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               }
               _filterActorUid = resolvedUid;
               if (ctx.mounted) Navigator.pop(ctx);
-              _loadLogs();
+              _resetAndReload();
             },
             child: Text(l10n.apply),
           ),
@@ -469,7 +528,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
       59,
       999,
     );
-    _loadLogs();
+    _resetAndReload();
   }
 
   String _shortUid(String uid) {
@@ -526,22 +585,22 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     final label = _actionLabels[action] ?? action;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: EdgeInsets.zero,
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               child: CircleAvatar(
                 backgroundColor: color.withValues(alpha: 0.12),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: 18),
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -551,7 +610,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                     label,
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                      fontSize: 12.5,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -560,14 +619,14 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                   if (actorName.isNotEmpty)
                     Text(
                       'By: $actorName',
-                      style: GoogleFonts.poppins(fontSize: 11),
+                      style: GoogleFonts.poppins(fontSize: 10.5),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     )
                   else if (actorUid.isNotEmpty)
                     Text(
                       'By: ${actorUid.substring(0, actorUid.length > 12 ? 12 : actorUid.length)}...',
-                      style: GoogleFonts.poppins(fontSize: 11),
+                      style: GoogleFonts.poppins(fontSize: 10.5),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -575,14 +634,14 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                   if (targetName.isNotEmpty)
                     Text(
                       'Target: $targetName',
-                      style: GoogleFonts.poppins(fontSize: 11),
+                      style: GoogleFonts.poppins(fontSize: 10.5),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     )
                   else if (targetUid.isNotEmpty)
                     Text(
                       'Target: ${targetUid.substring(0, targetUid.length > 12 ? 12 : targetUid.length)}...',
-                      style: GoogleFonts.poppins(fontSize: 11),
+                      style: GoogleFonts.poppins(fontSize: 10.5),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -591,7 +650,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                     Text(
                       timeStr,
                       style: GoogleFonts.poppins(
-                        fontSize: 10,
+                        fontSize: 9.5,
                         color: isDark
                             ? AppColors.textSecondaryDark
                             : AppColors.textSecondaryLight,

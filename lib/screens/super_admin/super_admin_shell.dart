@@ -75,7 +75,7 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
     final bottomNavigationBar = Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: SizedBox(
-        height: 70,
+        height: 64,
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -101,7 +101,6 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
             ),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(
                 index: 0,
@@ -184,58 +183,59 @@ class _SuperAdminShellState extends State<SuperAdminShell> {
   }) {
     final isSelected = _currentIndex == index;
 
-    return GestureDetector(
-      onTap: () => _onTabTapped(index),
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 65,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  isSelected ? activeIcon : icon,
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _onTabTapped(index),
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox.expand(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    isSelected ? activeIcon : icon,
+                    color: isSelected
+                        ? _accent
+                        : (isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight),
+                    size: 22,
+                  ),
+                  if (showBadge)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 9.5,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   color: isSelected
                       ? _accent
                       : (isDark
                           ? AppColors.textSecondaryDark
                           : AppColors.textSecondaryLight),
-                  size: 24,
                 ),
-                if (showBadge)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.error,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected
-                    ? _accent
-                    : (isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = exports.deleteAppointment = exports.incrementQrScanFailures = exports.updateMedicalNotes = exports.updateAppointmentStatus = exports.cancelAppointment = exports.rescheduleAppointment = exports.createAppointment = void 0;
+exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.deliverScheduledNotifications = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = exports.deleteAppointment = exports.incrementQrScanFailures = exports.updateMedicalNotes = exports.updateAppointmentStatus = exports.cancelAppointment = exports.rescheduleAppointment = exports.createAppointment = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
 admin.initializeApp();
 const db = admin.firestore();
 const auth = admin.auth();
@@ -260,6 +261,48 @@ async function createAppointmentNotifications(params) {
         });
     }
 }
+async function createAppointmentStatusNotification(params) {
+    const patientId = params.appointment.patientId;
+    if (!patientId)
+        return;
+    const doctorName = params.appointment.doctorName || 'your doctor';
+    const appointmentDate = firestoreDateToDate(params.appointment.appointmentDate);
+    const timeSlot = params.appointment.timeSlot;
+    const when = appointmentDate
+        ? `${formatDateForNotification(appointmentDate)}${timeSlot ? ` at ${timeSlot}` : ''}`
+        : null;
+    const withDoctor = `with Dr. ${doctorName}`;
+    const suffix = when ? ` ${withDoctor} on ${when}` : ` ${withDoctor}`;
+    const notificationByStatus = {
+        confirmed: {
+            title: 'Appointment Confirmed',
+            body: `Your appointment${suffix} has been confirmed.`,
+            type: 'appointmentConfirmation',
+        },
+        completed: {
+            title: 'Appointment Completed',
+            body: `Your appointment${suffix} has been marked as completed.`,
+            type: 'appointmentCompleted',
+        },
+        noShow: {
+            title: 'Appointment Marked No-Show',
+            body: `Your appointment${suffix} has been marked as no-show. Please contact the health center if you need help rebooking.`,
+            type: 'appointmentNoShow',
+        },
+    };
+    const notification = notificationByStatus[params.status];
+    if (!notification)
+        return;
+    await createTrustedNotification({
+        userId: patientId,
+        title: notification.title,
+        body: notification.body,
+        type: notification.type,
+        data: { appointmentId: params.appointmentId, status: params.status },
+        appointmentId: params.appointmentId,
+        reminderType: 'immediate',
+    });
+}
 exports.createAppointment = functions.https.onCall(async (request) => {
     const callerUid = requireAuth(request);
     const callerDoc = await getCallerUserDoc(callerUid);
@@ -488,12 +531,16 @@ exports.updateAppointmentStatus = functions.https.onCall(async (request) => {
     if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowDoctor: true, allowAdmin: true })) {
         throw new functions.https.HttpsError('permission-denied', 'You cannot update this appointment status.');
     }
+    let previousStatus = appointment.status;
+    let updatedAppointment = appointment;
     await db.runTransaction(async (transaction) => {
         const transactionSnap = await transaction.get(ref);
         if (!transactionSnap.exists) {
             throw new functions.https.HttpsError('not-found', 'Appointment not found.');
         }
         const currentAppointment = transactionSnap.data();
+        previousStatus = currentAppointment.status;
+        updatedAppointment = Object.assign(Object.assign({}, currentAppointment), { status });
         const appointmentDateForLock = firestoreDateToDate(currentAppointment.appointmentDate);
         if (ACTIVE_APPOINTMENT_STATUSES.includes(status) &&
             currentAppointment.doctorId &&
@@ -517,6 +564,16 @@ exports.updateAppointmentStatus = functions.https.onCall(async (request) => {
             updatedAt: admin.firestore.Timestamp.now(),
         });
     });
+    if (previousStatus !== status) {
+        if (status === 'completed' || status === 'noShow') {
+            await deleteAppointmentNotifications(appointmentId);
+        }
+        await createAppointmentStatusNotification({
+            appointmentId,
+            appointment: updatedAppointment,
+            status,
+        });
+    }
     return { success: true };
 });
 exports.updateMedicalNotes = functions.https.onCall(async (request) => {
@@ -566,13 +623,21 @@ exports.deleteAppointment = functions.https.onCall(async (request) => {
     const { appointmentId } = request.data;
     if (!appointmentId)
         throw new functions.https.HttpsError('invalid-argument', 'appointmentId is required.');
-    const snap = await db.collection('appointments').doc(appointmentId).get();
+    const ref = db.collection('appointments').doc(appointmentId);
+    const snap = await ref.get();
     if (!snap.exists)
         throw new functions.https.HttpsError('not-found', 'Appointment not found.');
     if (!await canMutateAppointment(callerUid, callerDoc, snap.data(), { allowAdmin: true })) {
         throw new functions.https.HttpsError('permission-denied', 'Only authorized admins can delete appointments.');
     }
-    await db.collection('appointments').doc(appointmentId).delete();
+    await db.runTransaction(async (transaction) => {
+        const transactionSnap = await transaction.get(ref);
+        if (!transactionSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+        }
+        releaseAppointmentSlot(transaction, appointmentId, transactionSnap.data());
+        transaction.delete(ref);
+    });
     await deleteAppointmentNotifications(appointmentId);
     return { success: true };
 });
@@ -1334,6 +1399,98 @@ exports.updateUserProfileByAdmin = functions.https.onCall(async (request) => {
 // FCM Push Notification Functions
 // ─────────────────────────────────────────────────────────
 const messaging = admin.messaging();
+function scheduledForDate(notification) {
+    const scheduledFor = notification.scheduledFor;
+    if (!scheduledFor)
+        return null;
+    if (typeof scheduledFor.toDate === 'function') {
+        return scheduledFor.toDate();
+    }
+    const parsed = new Date(scheduledFor);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+async function deliverNotificationPush(snap, notificationId) {
+    const notification = snap.data();
+    if (!notification) {
+        console.log(`Notification ${notificationId} is empty, skipping push.`);
+        return;
+    }
+    if (notification.createdByBackend !== true) {
+        console.log(`Notification ${notificationId} was not backend-created, skipping push delivery.`);
+        return;
+    }
+    if (notification.isDelivered === true) {
+        console.log(`Notification ${notificationId} already delivered, skipping push.`);
+        return;
+    }
+    const userId = notification.userId;
+    if (!userId) {
+        console.log(`Notification ${notificationId} has no userId, skipping push.`);
+        return;
+    }
+    try {
+        const tokenDoc = await db.collection('user_tokens').doc(userId).get();
+        const tokenData = tokenDoc.data();
+        if (!tokenDoc.exists || !(tokenData === null || tokenData === void 0 ? void 0 : tokenData.token)) {
+            console.log(`No FCM token found for user ${userId}, skipping push.`);
+            await snap.ref.update({
+                isDelivered: true,
+                deliveredAt: admin.firestore.Timestamp.now(),
+            });
+            return;
+        }
+        const fcmToken = tokenData.token;
+        const message = {
+            token: fcmToken,
+            notification: {
+                title: notification.title || 'UHC Notification',
+                body: notification.body || '',
+            },
+            data: Object.assign(Object.assign({ notificationId, type: notification.type || 'systemUpdate' }, (notification.appointmentId && { appointmentId: notification.appointmentId })), (notification.data && Object.fromEntries(Object.entries(notification.data).map(([k, v]) => [k, String(v)])))),
+            android: {
+                priority: 'high',
+                notification: {
+                    channelId: 'uhc_notifications',
+                    priority: 'high',
+                    sound: 'default',
+                },
+            },
+            apns: {
+                payload: {
+                    aps: {
+                        alert: {
+                            title: notification.title || 'UHC Notification',
+                            body: notification.body || '',
+                        },
+                        sound: 'default',
+                        badge: 1,
+                    },
+                },
+            },
+        };
+        await messaging.send(message);
+        console.log(`FCM sent to user ${userId} for notification ${notificationId}`);
+        await snap.ref.update({
+            isDelivered: true,
+            deliveredAt: admin.firestore.Timestamp.now(),
+        });
+    }
+    catch (error) {
+        console.error(`Error sending FCM for notification ${notificationId}:`, error);
+        if (error && typeof error === 'object' && 'code' in error) {
+            const fcmError = error;
+            if (fcmError.code === 'messaging/invalid-registration-token' ||
+                fcmError.code === 'messaging/registration-token-not-registered') {
+                console.log(`Removing stale FCM token for user ${userId}`);
+                await db.collection('user_tokens').doc(userId).delete().catch(() => { });
+            }
+        }
+        await snap.ref.update({
+            isDelivered: true,
+            deliveredAt: admin.firestore.Timestamp.now(),
+        });
+    }
+}
 /**
  * Firestore trigger: whenever a new notification document is created,
  * look up the target user's FCM token and send a push notification.
@@ -1359,81 +1516,31 @@ exports.onNotificationCreated = functions.firestore
         console.log(`Notification ${notificationId} was not backend-created, skipping push delivery.`);
         return;
     }
-    const userId = notification.userId;
-    if (!userId) {
-        console.log('No userId on notification, skipping.');
+    const scheduledTime = scheduledForDate(notification);
+    if (scheduledTime && scheduledTime > new Date()) {
+        console.log(`Notification ${notificationId} is scheduled for the future, scheduled worker will deliver it.`);
         return;
     }
-    // If scheduledFor is in the future, skip sending now.
-    // A scheduled Cloud Task or cron job should handle future delivery.
-    if (notification.scheduledFor) {
-        const scheduledTime = notification.scheduledFor.toDate
-            ? notification.scheduledFor.toDate()
-            : new Date(notification.scheduledFor);
-        if (scheduledTime > new Date()) {
-            console.log(`Notification ${notificationId} is scheduled for the future, skipping immediate send.`);
-            return;
-        }
+    await deliverNotificationPush(snap, notificationId);
+});
+exports.deliverScheduledNotifications = (0, scheduler_1.onSchedule)({
+    schedule: 'every 5 minutes',
+    timeZone: 'Asia/Baghdad',
+    retryCount: 0,
+}, async () => {
+    const now = admin.firestore.Timestamp.now();
+    const snap = await db.collection('notifications')
+        .where('isDelivered', '==', false)
+        .where('scheduledFor', '<=', now)
+        .orderBy('scheduledFor', 'asc')
+        .limit(100)
+        .get();
+    if (snap.empty) {
+        console.log('No scheduled notifications due for delivery.');
+        return;
     }
-    try {
-        // Look up the user's FCM token from user_tokens collection
-        const tokenDoc = await db.collection('user_tokens').doc(userId).get();
-        const tokenData = tokenDoc.data();
-        if (!tokenDoc.exists || !(tokenData === null || tokenData === void 0 ? void 0 : tokenData.token)) {
-            console.log(`No FCM token found for user ${userId}, skipping push.`);
-            // Still mark as delivered so the in-app notification list shows it
-            await snap.ref.update({ isDelivered: true });
-            return;
-        }
-        const fcmToken = tokenData.token;
-        // Build the FCM message
-        const message = {
-            token: fcmToken,
-            notification: {
-                title: notification.title || 'UHC Notification',
-                body: notification.body || '',
-            },
-            data: Object.assign(Object.assign({ notificationId: notificationId, type: notification.type || 'systemUpdate' }, (notification.appointmentId && { appointmentId: notification.appointmentId })), (notification.data && Object.fromEntries(Object.entries(notification.data).map(([k, v]) => [k, String(v)])))),
-            android: {
-                priority: 'high',
-                notification: {
-                    channelId: 'uhc_notifications',
-                    priority: 'high',
-                    sound: 'default',
-                },
-            },
-            apns: {
-                payload: {
-                    aps: {
-                        alert: {
-                            title: notification.title || 'UHC Notification',
-                            body: notification.body || '',
-                        },
-                        sound: 'default',
-                        badge: 1,
-                    },
-                },
-            },
-        };
-        await messaging.send(message);
-        console.log(`FCM sent to user ${userId} for notification ${notificationId}`);
-        // Mark the notification as delivered in Firestore
-        await snap.ref.update({ isDelivered: true });
-    }
-    catch (error) {
-        console.error(`Error sending FCM for notification ${notificationId}:`, error);
-        // If the token is invalid/expired, clean it up
-        if (error && typeof error === 'object' && 'code' in error) {
-            const fcmError = error;
-            if (fcmError.code === 'messaging/invalid-registration-token' ||
-                fcmError.code === 'messaging/registration-token-not-registered') {
-                console.log(`Removing stale FCM token for user ${userId}`);
-                await db.collection('user_tokens').doc(userId).delete().catch(() => { });
-            }
-        }
-        // Still mark as delivered so it shows in the in-app list
-        await snap.ref.update({ isDelivered: true });
-    }
+    console.log(`Delivering ${snap.docs.length} scheduled notification(s).`);
+    await Promise.all(snap.docs.map((doc) => deliverNotificationPush(doc, doc.id)));
 });
 /**
  * Callable Cloud Function for admins to send notifications to FCM topics
@@ -1871,6 +1978,7 @@ exports.rotateSuperAdminSlot = functions.https.onCall(async (request) => {
  * List admin audit logs with optional filtering. Super Admin only.
  */
 exports.listAdminAuditLogs = functions.https.onCall(async (request) => {
+    var _a, _b;
     try {
         const callerUid = requireAuth(request);
         const callerDoc = await getCallerUserDoc(callerUid);
@@ -1895,34 +2003,72 @@ exports.listAdminAuditLogs = functions.https.onCall(async (request) => {
         if (dateFromValue && dateToValue && dateFromValue > dateToValue) {
             throw new functions.https.HttpsError('invalid-argument', 'dateFrom cannot be later than dateTo.');
         }
-        // Query only by createdAt desc to avoid composite index failures;
-        // apply additional filters in memory.
-        const snap = await db
-            .collection('admin_audit_logs')
-            .orderBy('createdAt', 'desc')
-            .limit(Math.min(queryLimit || 100, 500))
-            .get();
-        const filteredDocs = snap.docs.filter((doc) => {
-            var _a, _b;
-            const data = doc.data();
-            if (targetUid && data.targetUid !== targetUid)
-                return false;
-            if (actorUid && data.actorUid !== actorUid)
-                return false;
-            if (action && data.action !== action)
-                return false;
-            const createdAtDate = (_b = (_a = data.createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a);
-            if (dateFromValue && (!createdAtDate || createdAtDate < dateFromValue))
-                return false;
-            if (dateToValue && (!createdAtDate || createdAtDate > dateToValue))
-                return false;
-            return true;
-        });
-        const logs = filteredDocs.map(doc => {
+        const requestedLimit = Math.min(Math.max(queryLimit || 100, 1), 500);
+        const pageSize = Math.min(Math.max(requestedLimit * 2, 100), 500);
+        const maxScannedDocs = 3000;
+        let query = db.collection('admin_audit_logs');
+        const indexedFilters = [
+            { field: 'targetUid', value: targetUid },
+            { field: 'actorUid', value: actorUid },
+            { field: 'action', value: action },
+        ].filter((filter) => Boolean(filter.value));
+        const primaryIndexedFilter = indexedFilters[0];
+        if (primaryIndexedFilter) {
+            query = query.where(primaryIndexedFilter.field, '==', primaryIndexedFilter.value);
+        }
+        if (dateFromValue) {
+            query = query.where('createdAt', '>=', admin.firestore.Timestamp.fromDate(dateFromValue));
+        }
+        if (dateToValue) {
+            query = query.where('createdAt', '<=', admin.firestore.Timestamp.fromDate(dateToValue));
+        }
+        query = query.orderBy('createdAt', 'desc');
+        const filteredDocs = [];
+        let scannedDocs = 0;
+        let lastDoc = null;
+        while (filteredDocs.length <= requestedLimit && scannedDocs < maxScannedDocs) {
+            const remainingScanBudget = maxScannedDocs - scannedDocs;
+            let pageQuery = query.limit(Math.min(pageSize, remainingScanBudget));
+            if (lastDoc) {
+                pageQuery = pageQuery.startAfter(lastDoc);
+            }
+            const snap = await pageQuery.get();
+            if (snap.empty)
+                break;
+            scannedDocs += snap.docs.length;
+            lastDoc = snap.docs[snap.docs.length - 1];
+            for (const doc of snap.docs) {
+                const data = doc.data();
+                if (targetUid && data.targetUid !== targetUid)
+                    continue;
+                if (actorUid && data.actorUid !== actorUid)
+                    continue;
+                if (action && data.action !== action)
+                    continue;
+                const createdAtDate = (_b = (_a = data.createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a);
+                if (dateFromValue && (!createdAtDate || createdAtDate < dateFromValue))
+                    continue;
+                if (dateToValue && (!createdAtDate || createdAtDate > dateToValue))
+                    continue;
+                filteredDocs.push(doc);
+                if (filteredDocs.length > requestedLimit)
+                    break;
+            }
+            if (snap.docs.length < Math.min(pageSize, remainingScanBudget))
+                break;
+        }
+        const visibleDocs = filteredDocs.slice(0, requestedLimit);
+        const logs = visibleDocs.map(doc => {
             var _a, _b, _c;
             return (Object.assign(Object.assign({ id: doc.id }, doc.data()), { createdAt: ((_c = (_b = (_a = doc.data().createdAt) === null || _a === void 0 ? void 0 : _a.toDate) === null || _b === void 0 ? void 0 : _b.call(_a)) === null || _c === void 0 ? void 0 : _c.toISOString()) || null }));
         });
-        return { success: true, logs };
+        return {
+            success: true,
+            logs,
+            hasMore: filteredDocs.length > requestedLimit || scannedDocs >= maxScannedDocs,
+            scanned: scannedDocs,
+            scanLimit: maxScannedDocs,
+        };
     }
     catch (error) {
         console.error('listAdminAuditLogs failed:', error);

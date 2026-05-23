@@ -274,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: ResponsivePage(
         maxWidth: UhcResponsive.isWide(context) ? 1080 : 980,
-        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+        bottomPadding: UhcResponsive.isWide(context) ? 32 : 24,
         alignment: UhcResponsive.isWide(context)
             ? AlignmentDirectional.topStart
             : Alignment.topCenter,
@@ -507,7 +507,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: GoogleFonts.poppins(color: AppColors.error),
         ),
         style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          minimumSize: const Size.fromHeight(48),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           side: const BorderSide(color: AppColors.error),
         ),
       ),
@@ -517,7 +518,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return Column(
         children: [
           header,
-          const SizedBox(height: 28),
+          const SizedBox(height: 22),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -527,14 +528,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     account,
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     about,
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
                     logout,
                   ],
                 ),
               ),
-              const SizedBox(width: 24),
+              const SizedBox(width: 20),
               Expanded(
                 flex: 4,
                 child: Column(
@@ -542,11 +543,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     appearance,
                     if (notifications != null) ...[
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       notifications,
                     ],
                     if (admin != null) ...[
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       admin,
                     ],
                   ],
@@ -561,21 +562,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       children: [
         header,
-        const SizedBox(height: 32),
+        const SizedBox(height: 20),
         appearance,
         if (notifications != null) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           notifications,
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         account,
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         about,
         if (admin != null) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           admin,
         ],
-        const SizedBox(height: 32),
+        const SizedBox(height: 20),
         logout,
       ],
     );
@@ -810,10 +811,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: Colors.grey,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Material(
           color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           clipBehavior: Clip.antiAlias,
           child: Column(children: children),
         ),
@@ -831,23 +832,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Color accentColor = AppColors.primary,
   }) {
     return ListTile(
+      dense: true,
+      visualDensity: const VisualDensity(horizontal: -1, vertical: -1),
+      minLeadingWidth: 38,
+      minVerticalPadding: 8,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
-        width: 40,
-        height: 40,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: accentColor.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(9),
         ),
-        child: Icon(icon, color: accentColor, size: 20),
+        child: Icon(icon, color: accentColor, size: 18),
       ),
       title: Text(
         title,
-        style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500),
+        style: GoogleFonts.poppins(fontSize: 13.5, fontWeight: FontWeight.w500),
       ),
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: GoogleFonts.roboto(fontSize: 12, color: Colors.grey),
+              style: GoogleFonts.roboto(fontSize: 11.5, color: Colors.grey),
             )
           : null,
       trailing: trailing ?? const Icon(Icons.chevron_right_rounded),

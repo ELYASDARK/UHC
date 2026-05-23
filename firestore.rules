@@ -24,6 +24,10 @@ service cloud.firestore {
       return isActiveUser() && request.auth.uid == userId;
     }
 
+    function isSelf(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
     function roleIs(role) {
       return isActiveUser() && currentUserData().role == role;
     }
@@ -79,10 +83,12 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get, list: if isOwner(userId) ||
+      allow get: if isSelf(userId) ||
         hasRolePermission('users.view') ||
         isSuperAdmin() ||
         hasDoctorPatientAccess(userId);
+      allow list: if hasRolePermission('users.view') ||
+        isSuperAdmin();
       allow create: if false;
       allow update: if isOwner(userId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([

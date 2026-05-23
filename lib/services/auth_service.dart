@@ -19,6 +19,12 @@ class AuthService {
 
   static const String _googleServerClientId =
       String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+  static const String _googleNoAccountMessage =
+      'No UHC account is linked to this Google account. Sign in with email and password first, then link Google from your profile.';
+  static const String _googleAccessBlockedMessage =
+      'This account cannot access UHC. Please contact your administrator.';
+  static const String _deactivatedAccountMessage =
+      'Your account has been deactivated. Please contact support.';
 
   /// Current Firebase user
   User? get currentUser => _auth.currentUser;
@@ -108,29 +114,53 @@ class AuthService {
       }
 
       final user = userCredential.user!;
+      final isNewAuthUser =
+          userCredential.additionalUserInfo?.isNewUser ?? false;
 
       // Check if this user already has an account in Firestore
       // (created by admin or via email/password registration).
       // Google sign-in must NOT create new accounts.
       final docRef = _firestore.collection('users').doc(user.uid);
-      final doc = await docRef.get();
+      late final DocumentSnapshot doc;
+      try {
+        doc = await docRef.get();
+      } on FirebaseException catch (e) {
+        if (e.code == 'permission-denied') {
+          await _rejectGoogleSignIn(
+            user,
+            deleteAuthUser: isNewAuthUser,
+          );
+          throw _AuthMessageException(
+            isNewAuthUser
+                ? _googleNoAccountMessage
+                : _googleAccessBlockedMessage,
+          );
+        }
+        rethrow;
+      }
 
       if (!doc.exists) {
-        // No account exists — reject this sign-in.
-        // Delete the Firebase Auth user that was just created and sign out.
-        await user.delete();
-        try {
-          await _googleSignIn.signOut();
-        } catch (_) {}
-        throw Exception(
-          'No account found. Please contact your administrator to create an account.',
+        // No app account exists. Remove fresh Google-only Auth users so the
+        // console does not keep accounts that admins did not create.
+        await _rejectGoogleSignIn(
+          user,
+          deleteAuthUser: isNewAuthUser || _isGoogleOnlyUser(user),
         );
+        throw _AuthMessageException(_googleNoAccountMessage);
+      }
+
+      final existingData = doc.data() as Map<String, dynamic>?;
+      if (existingData?['isActive'] != true) {
+        await _rejectGoogleSignIn(user, deleteAuthUser: false);
+        throw _AuthMessageException(_deactivatedAccountMessage);
       }
 
       // Account exists — update last login, preserving existing photo.
       await _updateExistingUserDocument(doc, user);
 
       return userCredential;
+    } on _AuthMessageException {
+      rethrow;
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled ||
           e.code == GoogleSignInExceptionCode.interrupted) {
@@ -138,20 +168,17 @@ class AuthService {
       }
       if (e.code == GoogleSignInExceptionCode.clientConfigurationError ||
           e.code == GoogleSignInExceptionCode.providerConfigurationError) {
-        throw Exception(
+        throw _AuthMessageException(
           'Google sign-in is not configured for Android. '
           'Please add a Web OAuth client in Firebase Auth, download a fresh android/google-services.json, '
           'and optionally set --dart-define=GOOGLE_SERVER_CLIENT_ID=<web-client-id>. '
           'Details: ${e.description ?? e.details ?? e}',
         );
       }
-      throw Exception('Google sign-in failed: ${e.description ?? e}');
+      throw _AuthMessageException(
+          'Google sign-in failed: ${e.description ?? e}');
     } catch (e) {
-      // Re-throw our custom "no account" error as-is
-      if (e.toString().contains('No account found')) {
-        rethrow;
-      }
-      throw Exception('Google sign-in failed: $e');
+      throw _AuthMessageException('Google sign-in failed: $e');
     }
   }
 
@@ -300,6 +327,29 @@ class AuthService {
     _googleInitialized = true;
   }
 
+  bool _isGoogleOnlyUser(User user) {
+    final providerIds =
+        user.providerData.map((info) => info.providerId).toSet();
+    return providerIds.length == 1 && providerIds.contains('google.com');
+  }
+
+  Future<void> _rejectGoogleSignIn(
+    User user, {
+    required bool deleteAuthUser,
+  }) async {
+    if (deleteAuthUser) {
+      await user.delete();
+    }
+
+    if (!kIsWeb) {
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+    }
+
+    await _auth.signOut();
+  }
+
   /// Send password reset email
   Future<void> sendPasswordResetEmail(String email) async {
     try {
@@ -420,11 +470,19 @@ class AuthService {
     // does not match auth.uid (common when created manually in console).
     final email = currentUser?.email;
     if (email != null && email.isNotEmpty) {
-      final emailMatch = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: email)
-          .limit(2)
-          .get();
+      late final QuerySnapshot emailMatch;
+      try {
+        emailMatch = await _firestore
+            .collection('users')
+            .where('email', isEqualTo: email)
+            .limit(2)
+            .get();
+      } on FirebaseException catch (e) {
+        if (e.code == 'permission-denied') {
+          return null;
+        }
+        rethrow;
+      }
       if (emailMatch.docs.length == 1) {
         final wrongDocId = emailMatch.docs.first.id;
         throw Exception(
@@ -566,4 +624,13 @@ class AuthService {
         return e.message ?? 'An error occurred.';
     }
   }
+}
+
+class _AuthMessageException implements Exception {
+  final String message;
+
+  const _AuthMessageException(this.message);
+
+  @override
+  String toString() => message;
 }

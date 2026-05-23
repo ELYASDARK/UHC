@@ -47,7 +47,7 @@
 | | |
 |---|---|
 | 🌐 **Multilingual** | Full RTL support with English, Arabic, and Kurdish translations |
-| ⚡ **Performant** | Scalability-audited for large users, bounded Firestore queries, parallel fetching, and composite indexes |
+| ⚡ **Performant** | Scalability-audited for large users, cursor-paginated Firestore queries, scheduled push delivery, parallel fetching, and composite indexes |
 | 🔒 **Secure** | Role-based access control with server-side Cloud Functions for privileged operations |
 | 🎨 **Modern UI** | Material Design 3, smooth animations, dark mode, and responsive layouts |
 | 📱 **Cross-Platform** | Single codebase for Android, iOS, and Web |
@@ -310,6 +310,7 @@ Enable the following in your [Firebase Console](https://console.firebase.google.
 - ✅ **Firebase Storage** — Enable for file uploads
 - ✅ **Cloud Messaging** — Enable for push notifications
 - ✅ **Cloud Functions** — Upgrade project to Blaze plan (required for Node.js functions)
+- ✅ **Cloud Scheduler** — Required by scheduled notification delivery (`deliverScheduledNotifications`)
 
 ### Platform Configuration
 
@@ -408,7 +409,8 @@ Server-side functions handle privileged operations that require Firebase Admin S
 | `setUserActiveStatus` | Activates/deactivates non-admin users | 🔒 Admin |
 | `updateUserProfileByAdmin` | Admin-safe profile updates without direct privilege writes | 🔒 Admin |
 | **Notifications** | | |
-| `onNotificationCreated` | Firestore trigger — sends FCM push when a notification document is created | 🔄 Auto |
+| `onNotificationCreated` | Firestore trigger — sends immediate FCM push and defers future scheduled notifications | 🔄 Auto |
+| `deliverScheduledNotifications` | Scheduled function — delivers due notification documents every 5 minutes | 🔄 Auto |
 | `sendTopicNotification` | Sends broadcast push notifications to FCM topics (e.g. announcements) | 🔒 Admin |
 | **Super Admin Governance** | | |
 | `createAdminAccount` | Creates admin account with default permission map | 🛡️ Super Admin |
@@ -492,6 +494,15 @@ flutter build web --release
 <details open>
 <summary><b>v2.4.0</b> — May 15, 2026</summary>
 
+#### 🩺 Stability Follow-Up (May 24, 2026)
+- **Scheduled reminder delivery** — Added `deliverScheduledNotifications` so future notification documents are delivered when due instead of being skipped by the create trigger.
+- **Cursor-paginated appointment reads** — Patient, doctor, admin, slot-availability, and doctor/patient history queries now page through bounded Firestore batches with server-side filters instead of applying hard `.limit(500/1000)` before in-memory filtering.
+- **Admin hard-delete slot release** — `deleteAppointment` releases its `appointment_slot_locks` document before deleting the appointment so the same doctor/date/time does not stay blocked.
+- **Doctor status notification reliability** — Confirmed, completed, and no-show status updates create patient notifications from trusted backend code.
+- **Super Admin list completeness** — Admin/permission lists support Load More, and audit logs use backend `hasMore` pagination so filtered views do not silently hide older matches.
+- **Android notification channel alignment** — Local Android channel setup now includes the backend FCM channel ID (`uhc_notifications`) to avoid fallback-channel behavior.
+- **Release metadata aligned** — `pubspec.yaml` is now `2.4.0+24`; Android package ID and release signing remain intentionally unchanged until the final Play Store package, Firebase config, and keystore are chosen.
+
 #### 🔒 Server-Side Appointment Lifecycle (Client → Cloud Functions Migration)
 - **All appointment mutations moved server-side** — `createAppointment`, `rescheduleAppointment`, `cancelAppointment`, `updateAppointmentStatus`, `updateMedicalNotes`, `incrementQrScanFailures`, and `deleteAppointment` are now Cloud Functions callables with full server-side validation.
 - **Transactional Slot Locking** — New `appointment_slot_locks` collection with atomic lock/release within Firestore transactions prevents double-booking race conditions. Each slot lock document is keyed by `{doctorId}_{date}_{timeSlot}`.
@@ -532,17 +543,19 @@ flutter build web --release
 
 | File | Key Changes |
 |:---|:---|
-| `functions/src/index.ts` | 7 new appointment callables, inactive-account gateway, explicit permission enforcement, 12-char password policy, session + FCM revocation |
-| `lib/data/repositories/appointment_repository.dart` | All mutations routed through `FirebaseFunctions.httpsCallable()` |
+| `functions/src/index.ts` | Appointment callables, slot-lock release on hard delete, scheduled notification delivery, inactive-account gateway, explicit permission enforcement, 12-char password policy, session + FCM revocation |
+| `lib/data/repositories/appointment_repository.dart` | All mutations routed through `FirebaseFunctions.httpsCallable()`; appointment reads use cursor-paginated bounded batches |
 | `lib/data/repositories/document_repository.dart` | Scoped storage paths, `contentType` metadata on uploads |
 | `lib/data/repositories/notification_repository.dart` | Client-side notification creation stubbed out (now server-owned) |
 | `lib/data/models/user_model.dart` | Added `themeMode` field, explicit `hasPermission` now returns false for null permissions |
 | `lib/providers/auth_provider.dart` | `updateLanguage()`, `updateThemeMode()`, pre-signout state clearing with rollback |
 | `lib/services/auth_service.dart` | `updateUserLanguage()`, `updateUserThemeMode()` Firestore helpers |
 | `lib/services/fcm_service.dart` | Removed dual `users` collection token writes, removed per-user/role/department topic subscriptions |
+| `lib/services/local_notification_service.dart` | Android channel registration aligned with backend FCM channel ID |
 | `lib/screens/admin/dashboard/admin_dashboard_screen.dart` | Permission-gated KPI queries, `_countSafely()` wrapper |
 | `lib/screens/admin/reports/reports_screen.dart` | Updated to work with server-side appointment lifecycle |
-| `lib/screens/super_admin/*` | UI refinements across all governance screens |
+| `lib/screens/super_admin/*` | UI refinements, Load More governance lists, and audit-log pagination handling |
+| `firestore.indexes.json` | Composite indexes for appointment pagination, slot availability checks, audit queries, and scheduled notification scans |
 | `storage.rules` | [NEW] Firebase Storage security rules |
 | `lib/core/widgets/role_english_ltr_scope.dart` | [NEW] LTR text scope widget for role/status labels in RTL layouts |
 | `pubspec.yaml` | Dependency updates |

@@ -12,6 +12,31 @@ class AppointmentRepository {
   CollectionReference<Map<String, dynamic>> get _appointmentsRef =>
       _firestore.collection(_collection);
 
+  static const int _queryBatchSize = 500;
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchAllPages(
+    Query<Map<String, dynamic>> query, {
+    int batchSize = _queryBatchSize,
+  }) async {
+    final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    DocumentSnapshot<Map<String, dynamic>>? lastDoc;
+
+    while (true) {
+      var pageQuery = query.limit(batchSize);
+      if (lastDoc != null) {
+        pageQuery = pageQuery.startAfterDocument(lastDoc);
+      }
+
+      final snapshot = await pageQuery.get();
+      docs.addAll(snapshot.docs);
+
+      if (snapshot.docs.length < batchSize) break;
+      lastDoc = snapshot.docs.last;
+    }
+
+    return docs;
+  }
+
   /// Get appointment by ID
   Future<AppointmentModel?> getAppointmentById(String appointmentId) async {
     final doc = await _appointmentsRef.doc(appointmentId).get();
@@ -33,24 +58,30 @@ class AppointmentRepository {
     final now = DateTime.now();
     final startOfToday = DateTime(now.year, now.month, now.day);
     try {
-      // First try by patientId only (no date filter to avoid index)
-      var snapshot = await _appointmentsRef
+      // Query by date on the server, then page through bounded batches so
+      // older limited pages cannot hide valid upcoming appointments.
+      var docs = await _fetchAllPages(_appointmentsRef
           .where('patientId', isEqualTo: userId)
-          .limit(500)
-          .get();
+          .where(
+            'appointmentDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
+          )
+          .orderBy('appointmentDate', descending: true));
 
       // If no results and email is provided, try by patientEmail only
-      if (snapshot.docs.isEmpty && email != null) {
-        snapshot = await _appointmentsRef
+      if (docs.isEmpty && email != null) {
+        docs = await _fetchAllPages(_appointmentsRef
             .where('patientEmail', isEqualTo: email)
-            .limit(500)
-            .get();
+            .where(
+              'appointmentDate',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
+            )
+            .orderBy('appointmentDate', descending: true));
       }
 
       // Filter for upcoming appointments and pending/confirmed status in-memory
-      final appointments = snapshot.docs
-          .map((doc) => AppointmentModel.fromFirestore(doc))
-          .where((apt) {
+      final appointments =
+          docs.map((doc) => AppointmentModel.fromFirestore(doc)).where((apt) {
         // Appointment is upcoming if its date is today or later
         final isUpcoming = !apt.appointmentDate.isBefore(startOfToday);
         final isActive = apt.status == AppointmentStatus.pending ||
@@ -81,18 +112,16 @@ class AppointmentRepository {
     final now = DateTime.now();
     final startOfToday = DateTime(now.year, now.month, now.day);
     try {
-      // First try by patientId only (no date filter to avoid index)
-      var snapshot = await _appointmentsRef
+      // Page by appointmentDate so history is complete without one huge read.
+      var docs = await _fetchAllPages(_appointmentsRef
           .where('patientId', isEqualTo: userId)
-          .limit(500)
-          .get();
+          .orderBy('appointmentDate', descending: true));
 
       // If no results and email is provided, try by patientEmail only
-      if (snapshot.docs.isEmpty && email != null) {
-        snapshot = await _appointmentsRef
+      if (docs.isEmpty && email != null) {
+        docs = await _fetchAllPages(_appointmentsRef
             .where('patientEmail', isEqualTo: email)
-            .limit(500)
-            .get();
+            .orderBy('appointmentDate', descending: true));
       }
 
       // Filter for past/history appointments in-memory:
@@ -100,9 +129,8 @@ class AppointmentRepository {
       // - Cancelled appointments (any date), OR
       // - Completed appointments, OR
       // - No-show appointments
-      final appointments = snapshot.docs
-          .map((doc) => AppointmentModel.fromFirestore(doc))
-          .where((apt) {
+      final appointments =
+          docs.map((doc) => AppointmentModel.fromFirestore(doc)).where((apt) {
         final isPastDate = apt.appointmentDate.isBefore(startOfToday);
         final isCancelled = apt.status == AppointmentStatus.cancelled;
         final isCompleted = apt.status == AppointmentStatus.completed;
@@ -132,14 +160,20 @@ class AppointmentRepository {
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     try {
-      // Simplified query - only filter by doctorId
-      final snapshot = await _appointmentsRef
+      final docs = await _fetchAllPages(_appointmentsRef
           .where('doctorId', isEqualTo: doctorId)
-          .limit(500)
-          .get();
+          .where(
+            'appointmentDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+          )
+          .where(
+            'appointmentDate',
+            isLessThan: Timestamp.fromDate(endOfDay),
+          )
+          .orderBy('appointmentDate', descending: true));
 
       // Filter by date and status in-memory
-      return snapshot.docs
+      return docs
           .map((doc) => AppointmentModel.fromFirestore(doc))
           .where((apt) {
         final isOnDate = apt.appointmentDate.isAfter(
@@ -282,13 +316,11 @@ class AppointmentRepository {
       query = query.where('status', isEqualTo: status.name);
     }
 
-    final snapshot = await query
-        .orderBy('appointmentDate', descending: true)
-        .limit(1000)
-        .get();
-    return snapshot.docs
-        .map((doc) => AppointmentModel.fromFirestore(doc))
-        .toList();
+    final docs = await _fetchAllPages(
+      query.orderBy('appointmentDate', descending: true),
+      batchSize: 1000,
+    );
+    return docs.map((doc) => AppointmentModel.fromFirestore(doc)).toList();
   }
 
   /// Stream user's appointments for real-time updates
@@ -315,12 +347,18 @@ class AppointmentRepository {
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     try {
-      // Simplified query - only filter by doctorId and timeSlot
-      // Filter by date and status in-memory to avoid composite index requirement
       final snapshot = await _appointmentsRef
           .where('doctorId', isEqualTo: doctorId)
           .where('timeSlot', isEqualTo: timeSlot)
-          .limit(200)
+          .where(
+            'appointmentDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+          )
+          .where(
+            'appointmentDate',
+            isLessThan: Timestamp.fromDate(endOfDay),
+          )
+          .orderBy('appointmentDate')
           .get();
 
       // Filter results in-memory for date range and status
@@ -354,13 +392,11 @@ class AppointmentRepository {
     String doctorId,
   ) async {
     try {
-      final snapshot = await _appointmentsRef
+      final docs = await _fetchAllPages(_appointmentsRef
           .where('doctorId', isEqualTo: doctorId)
-          .limit(1000)
-          .get();
-      final appointments = snapshot.docs
-          .map((doc) => AppointmentModel.fromFirestore(doc))
-          .toList();
+          .orderBy('appointmentDate', descending: true));
+      final appointments =
+          docs.map((doc) => AppointmentModel.fromFirestore(doc)).toList();
       appointments.sort(
         (a, b) => b.appointmentDate.compareTo(a.appointmentDate),
       );
@@ -389,16 +425,12 @@ class AppointmentRepository {
     String doctorId,
   ) async {
     try {
-      // Query by doctorId, then filter by patientId in-memory
-      // (avoids composite index requirement)
-      final snapshot = await _appointmentsRef
+      final docs = await _fetchAllPages(_appointmentsRef
           .where('doctorId', isEqualTo: doctorId)
-          .limit(500)
-          .get();
-      final appointments = snapshot.docs
-          .map((doc) => AppointmentModel.fromFirestore(doc))
-          .where((apt) => apt.patientId == patientId)
-          .toList();
+          .where('patientId', isEqualTo: patientId)
+          .orderBy('appointmentDate', descending: true));
+      final appointments =
+          docs.map((doc) => AppointmentModel.fromFirestore(doc)).toList();
       appointments.sort(
         (a, b) => b.appointmentDate.compareTo(a.appointmentDate),
       );

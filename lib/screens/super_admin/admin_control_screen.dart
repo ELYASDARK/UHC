@@ -26,6 +26,10 @@ class _AdminControlScreenState extends State<AdminControlScreen>
   final _firestore = FirebaseFirestore.instance;
   final _governance = AdminGovernanceService();
   late TabController _tabController;
+  static const int _governancePageSize = 100;
+  static const int _maxGovernanceRows = 1000;
+  int _adminListLimit = _governancePageSize;
+  int _permissionsListLimit = _governancePageSize;
 
   @override
   void initState() {
@@ -39,6 +43,63 @@ class _AdminControlScreenState extends State<AdminControlScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  EdgeInsets _governancePagePadding({double bottom = 24}) {
+    final breakpoint = UhcResponsive.breakpointOf(context);
+    final top = switch (breakpoint) {
+      UhcBreakpoint.phone => 12.0,
+      UhcBreakpoint.tablet => 14.0,
+      UhcBreakpoint.laptop || UhcBreakpoint.desktop => 18.0,
+    };
+    return UhcResponsive.pagePadding(context, top: top, bottom: bottom);
+  }
+
+  double _listGap() {
+    return UhcResponsive.breakpointOf(context).isPhone ? 10 : 12;
+  }
+
+  double _adminCardAspectRatio() {
+    return switch (UhcResponsive.breakpointOf(context)) {
+      UhcBreakpoint.phone => 4.8,
+      UhcBreakpoint.tablet => 7.8,
+      UhcBreakpoint.laptop => 5.8,
+      UhcBreakpoint.desktop => 5.4,
+    };
+  }
+
+  double _permissionCardAspectRatio() {
+    return switch (UhcResponsive.breakpointOf(context)) {
+      UhcBreakpoint.phone => 4.8,
+      UhcBreakpoint.tablet => 8.2,
+      UhcBreakpoint.laptop || UhcBreakpoint.desktop => 7.4,
+    };
+  }
+
+  double _slotCardAspectRatio() {
+    return switch (UhcResponsive.breakpointOf(context)) {
+      UhcBreakpoint.phone => 3.55,
+      UhcBreakpoint.tablet => 2.65,
+      UhcBreakpoint.laptop || UhcBreakpoint.desktop => 3.4,
+    };
+  }
+
+  Widget _buildLoadMoreTile({
+    required VoidCallback onPressed,
+  }) {
+    return Center(
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.expand_more, color: Color(0xFFD32F2F)),
+        label: Text(
+          'Load More',
+          style: GoogleFonts.poppins(
+            color: const Color(0xFFD32F2F),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -126,7 +187,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore
           .collection('users')
-          .where('role', whereIn: ['admin', 'superAdmin']).snapshots(),
+          .where('role', whereIn: ['admin', 'superAdmin'])
+          .limit(_adminListLimit)
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -149,16 +212,30 @@ class _AdminControlScreenState extends State<AdminControlScreen>
             ),
           );
         }
+        final hasMore = docs.length >= _adminListLimit &&
+            _adminListLimit < _maxGovernanceRows;
         return ResponsiveListView(
           maxWidth: 1440,
           gridOnWide: true,
           tabletColumns: 1,
           laptopColumns: 2,
           desktopColumns: 3,
-          childAspectRatio: 4.6,
-          padding: UhcResponsive.pagePadding(context, bottom: 32),
-          itemCount: docs.length,
+          spacing: _listGap(),
+          runSpacing: _listGap(),
+          childAspectRatio: _adminCardAspectRatio(),
+          padding: _governancePagePadding(bottom: 24),
+          itemCount: docs.length + (hasMore ? 1 : 0),
           itemBuilder: (context, index) {
+            if (index == docs.length) {
+              return _buildLoadMoreTile(
+                onPressed: () {
+                  setState(() {
+                    _adminListLimit = (_adminListLimit + _governancePageSize)
+                        .clamp(_governancePageSize, _maxGovernanceRows);
+                  });
+                },
+              );
+            }
             final data = docs[index].data() as Map<String, dynamic>;
             final uid = docs[index].id;
             final name = data['fullName'] ?? 'Unknown';
@@ -169,10 +246,17 @@ class _AdminControlScreenState extends State<AdminControlScreen>
             final slotType = data['superAdminType'] as String?;
 
             return Card(
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: EdgeInsets.zero,
               color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
               child: ListTile(
+                dense: true,
+                visualDensity:
+                    const VisualDensity(horizontal: -1, vertical: -1),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                minLeadingWidth: 40,
                 leading: CircleAvatar(
+                  radius: 19,
                   backgroundColor: isSuperAdmin
                       ? const Color(0xFFD32F2F).withValues(alpha: 0.15)
                       : (isActive
@@ -189,9 +273,14 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                 ),
                 title: Row(
                   children: [
-                    Text(name,
-                        style:
-                            GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     if (isSuperAdmin) ...[
                       const SizedBox(width: 6),
                       Container(
@@ -264,6 +353,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
       stream: _firestore
           .collection('users')
           .where('role', isEqualTo: 'admin')
+          .limit(_permissionsListLimit)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -273,16 +363,31 @@ class _AdminControlScreenState extends State<AdminControlScreen>
         if (docs.isEmpty) {
           return Center(child: Text(l10n.noAdminsFound));
         }
+        final hasMore = docs.length >= _permissionsListLimit &&
+            _permissionsListLimit < _maxGovernanceRows;
         return ResponsiveListView(
           maxWidth: 1440,
           gridOnWide: true,
           tabletColumns: 1,
           laptopColumns: 2,
           desktopColumns: 2,
-          childAspectRatio: UhcResponsive.isWide(context) ? 7.2 : 4.4,
-          padding: UhcResponsive.pagePadding(context, bottom: 32),
-          itemCount: docs.length,
+          spacing: _listGap(),
+          runSpacing: _listGap(),
+          childAspectRatio: _permissionCardAspectRatio(),
+          padding: _governancePagePadding(bottom: 24),
+          itemCount: docs.length + (hasMore ? 1 : 0),
           itemBuilder: (context, index) {
+            if (index == docs.length) {
+              return _buildLoadMoreTile(
+                onPressed: () {
+                  setState(() {
+                    _permissionsListLimit =
+                        (_permissionsListLimit + _governancePageSize)
+                            .clamp(_governancePageSize, _maxGovernanceRows);
+                  });
+                },
+              );
+            }
             final data = docs[index].data() as Map<String, dynamic>;
             final uid = docs[index].id;
             final name = data['fullName'] ?? 'Unknown';
@@ -313,7 +418,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
         AdminPermissions.allKeys.where((k) => permissions.getByKey(k)).length;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.zero,
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -324,11 +429,11 @@ class _AdminControlScreenState extends State<AdminControlScreen>
           actorIsSuperAdmin: actorIsSuperAdmin,
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
           child: Row(
             children: [
-              const Icon(Icons.security, color: Color(0xFFD32F2F), size: 26),
-              const SizedBox(width: 16),
+              const Icon(Icons.security, color: Color(0xFFD32F2F), size: 24),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -608,57 +713,120 @@ class _AdminControlScreenState extends State<AdminControlScreen>
 
         return ResponsivePage(
           maxWidth: 1180,
-          bottomPadding: 32,
+          padding: _governancePagePadding(bottom: 24),
           child: Column(
             children: [
-              ResponsiveGrid(
-                laptopColumns: 2,
-                desktopColumns: 2,
-                childAspectRatio: UhcResponsive.isWide(context) ? 2.6 : 1.85,
-                children: [
-                  _buildSlotCard('Primary', primaryUid, primaryData, 'primary',
-                      isDark, actorIsSuperAdmin),
-                  _buildSlotCard('Backup', backupUid, backupData, 'backup',
-                      isDark, actorIsSuperAdmin),
-                ],
+              _buildSlotCardsLayout(
+                primaryUid: primaryUid,
+                primaryData: primaryData,
+                backupUid: backupUid,
+                backupData: backupData,
+                isDark: isDark,
+                actorIsSuperAdmin: actorIsSuperAdmin,
               ),
-              const SizedBox(height: 24),
-              Card(
-                color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.info_outline,
-                              color: Color(0xFFD32F2F)),
-                          const SizedBox(width: 8),
-                          Text(l10n.superAdminSlots,
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600, fontSize: 14)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '• ${l10n.maxSlotsReached}\n'
-                        '• ${l10n.slotAssign} / ${l10n.slotRotate} use transactions\n'
-                        '• ${l10n.slotRotate} demotes old holder and promotes replacement',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const SizedBox(height: 16),
+              _buildSlotInfoCard(isDark, l10n),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSlotInfoCard(bool isDark, AppLocalizations l10n) {
+    final card = Card(
+      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.info_outline, color: Color(0xFFD32F2F)),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.superAdminSlots,
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '• ${l10n.maxSlotsReached}\n'
+              '• ${l10n.slotAssign} / ${l10n.slotRotate} use transactions\n'
+              '• ${l10n.slotRotate} demotes old holder and promotes replacement',
+              style: GoogleFonts.poppins(
+                fontSize: 11.5,
+                height: 1.25,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!UhcResponsive.isWide(context)) return card;
+
+    return Align(
+      alignment: AlignmentDirectional.topStart,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: card,
+      ),
+    );
+  }
+
+  Widget _buildSlotCardsLayout({
+    required String? primaryUid,
+    required Map<String, dynamic>? primaryData,
+    required String? backupUid,
+    required Map<String, dynamic>? backupData,
+    required bool isDark,
+    required bool actorIsSuperAdmin,
+  }) {
+    final cards = [
+      _buildSlotCard(
+        'Primary',
+        primaryUid,
+        primaryData,
+        'primary',
+        isDark,
+        actorIsSuperAdmin,
+      ),
+      _buildSlotCard(
+        'Backup',
+        backupUid,
+        backupData,
+        'backup',
+        isDark,
+        actorIsSuperAdmin,
+      ),
+    ];
+
+    if (UhcResponsive.breakpointOf(context).isPhone) {
+      return Column(
+        children: [
+          cards[0],
+          const SizedBox(height: 12),
+          cards[1],
+        ],
+      );
+    }
+
+    return ResponsiveGrid(
+      laptopColumns: 2,
+      desktopColumns: 2,
+      spacing: 12,
+      runSpacing: 12,
+      childAspectRatio: _slotCardAspectRatio(),
+      children: cards,
     );
   }
 
@@ -673,7 +841,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
     return Card(
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -686,10 +854,10 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                 const SizedBox(width: 8),
                 Text('$label ${l10n.superAdmin}',
                     style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600, fontSize: 16)),
+                        fontWeight: FontWeight.w600, fontSize: 15)),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             if (uid == null || userData == null)
               Text(l10n.notFound,
                   style: GoogleFonts.poppins(
@@ -698,7 +866,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 20,
+                    radius: 18,
                     backgroundImage: userData['photoUrl'] != null
                         ? NetworkImage(userData['photoUrl'] as String)
                         : null,
@@ -706,14 +874,14 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                         ? const Icon(Icons.person)
                         : null,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(userData['fullName'] ?? 'Unknown',
                             style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600)),
+                                fontWeight: FontWeight.w600, fontSize: 14)),
                         Text(userData['email'] ?? '',
                             style: GoogleFonts.poppins(
                                 fontSize: 12,
@@ -725,7 +893,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                   ),
                 ],
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             if (!actorIsSuperAdmin)
               Text(
                 l10n.readOnlyMode,
@@ -743,6 +911,8 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                   icon: const Icon(Icons.person_add, size: 18),
                   label: Text(l10n.assignSlot),
                   style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       backgroundColor: const Color(0xFFD32F2F),
                       foregroundColor: Colors.white),
                 ),
@@ -755,6 +925,8 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                   icon: const Icon(Icons.swap_horiz, size: 18),
                   label: Text(l10n.rotateSlot),
                   style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       foregroundColor: const Color(0xFFD32F2F)),
                 ),
               ),

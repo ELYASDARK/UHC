@@ -207,6 +207,10 @@ class _NotificationCard extends StatelessWidget {
         return Icons.cancel;
       case NotificationType.appointmentRescheduled:
         return Icons.update;
+      case NotificationType.appointmentCompleted:
+        return Icons.task_alt;
+      case NotificationType.appointmentNoShow:
+        return Icons.person_off;
       case NotificationType.healthTip:
         return Icons.lightbulb;
       case NotificationType.dailySummary:
@@ -226,6 +230,10 @@ class _NotificationCard extends StatelessWidget {
         return Colors.red;
       case NotificationType.appointmentRescheduled:
         return Colors.orange;
+      case NotificationType.appointmentCompleted:
+        return Colors.green;
+      case NotificationType.appointmentNoShow:
+        return Colors.deepOrange;
       case NotificationType.healthTip:
         return Colors.purple;
       case NotificationType.dailySummary:

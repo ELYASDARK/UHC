@@ -21,6 +21,8 @@ class LocalNotificationService {
   static const String _appointmentChannelName = 'Appointment Reminders';
   static const String _generalChannelId = 'general_notifications';
   static const String _generalChannelName = 'General Notifications';
+  static const String _backendChannelId = 'uhc_notifications';
+  static const String _backendChannelName = 'UHC Notifications';
 
   // Callback for notification taps
   Function(String? payload)? onNotificationTap;
@@ -83,6 +85,18 @@ class LocalNotificationService {
           _generalChannelName,
           description: 'General app notifications',
           importance: Importance.defaultImportance,
+        ),
+      );
+
+      // Backend FCM payloads target this channel ID.
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _backendChannelId,
+          _backendChannelName,
+          description: 'Notifications delivered by University Health Center',
+          importance: Importance.high,
+          playSound: true,
+          enableVibration: true,
         ),
       );
     }
