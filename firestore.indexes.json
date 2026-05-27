@@ -11,6 +11,10 @@
                 {
                     "fieldPath": "appointmentDate",
                     "order": "DESCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "DESCENDING"
                 }
             ]
         },
@@ -163,6 +167,20 @@
                 {
                     "fieldPath": "type",
                     "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "medical_documents",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "userId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "uploadedAt",
+                    "order": "DESCENDING"
                 }
             ]
         },

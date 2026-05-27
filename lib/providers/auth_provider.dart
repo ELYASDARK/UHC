@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart'; // Added
 import '../services/auth_service.dart';
+import '../services/fcm_service.dart';
+import '../services/local_notification_service.dart';
 import '../data/models/user_model.dart';
 
 /// Authentication state
@@ -291,6 +293,23 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Complete the one-time password change required for admin-created accounts.
+  Future<bool> completeInitialPasswordChange(String newPassword) async {
+    try {
+      _errorMessage = null;
+      await _authService.completeInitialPasswordChange(newPassword);
+      if (_currentUser != null) {
+        await _refreshUserData(_currentUser!.id);
+      }
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      debugPrint('Initial password change error: $e');
+      return false;
+    }
+  }
+
   /// Refresh user data without triggering loading state
   Future<void> _refreshUserData(String uid) async {
     try {
@@ -424,13 +443,29 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Sign out
-  Future<void> signOut() async {
-    // NOTE: FCM cleanup (token removal + topic unsubscription) must be done
-    // via NotificationProvider.onLogout() BEFORE calling signOut(). That method
-    // properly passes the stored role & department so all topics are cleaned up.
+  Future<void> signOut({
+    Future<void> Function(String userId)? beforeSignOut,
+  }) async {
     _errorMessage = null;
     final previousUser = _currentUser;
     final previousState = _state;
+
+    if (previousUser != null) {
+      var notificationProviderCleanedUp = false;
+      if (beforeSignOut != null) {
+        try {
+          await beforeSignOut(previousUser.id);
+          notificationProviderCleanedUp = true;
+        } catch (e) {
+          debugPrint(
+              'Notification provider cleanup before sign out failed: $e');
+        }
+      }
+
+      if (!notificationProviderCleanedUp) {
+        await _cleanupNotificationSession(previousUser);
+      }
+    }
 
     // Clear local state before FirebaseAuth.signOut() so role-scoped Firestore
     // streams are disposed while the user still has permissions.
@@ -447,6 +482,29 @@ class AuthProvider with ChangeNotifier {
       _errorMessage = 'Sign out failed. Please try again.';
       notifyListeners();
       rethrow;
+    }
+  }
+
+  Future<void> _cleanupNotificationSession(UserModel user) async {
+    try {
+      await FCMService().unsubscribeUserFromTopics(
+        user.id,
+        role: user.role.name,
+      );
+    } catch (e) {
+      debugPrint('Topic unsubscribe before sign out failed: $e');
+    }
+
+    try {
+      await FCMService().removeTokenFromDatabase(user.id);
+    } catch (e) {
+      debugPrint('FCM token cleanup before sign out failed: $e');
+    }
+
+    try {
+      await LocalNotificationService().cancelAllNotifications();
+    } catch (e) {
+      debugPrint('Local notification cleanup before sign out failed: $e');
     }
   }
 

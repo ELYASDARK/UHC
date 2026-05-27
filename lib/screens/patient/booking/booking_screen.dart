@@ -82,6 +82,9 @@ class _BookingScreenState extends State<BookingScreen> {
       if (snapshot.exists && mounted) {
         setState(() {
           _doctor = DoctorModel.fromFirestore(snapshot);
+          if (!_doctorCanBook) {
+            _selectedTimeSlot = null;
+          }
           // Reset selected time slot if it's no longer available
           if (_selectedDay != null && _selectedTimeSlot != null) {
             final availableSlots = _getAvailableSlots(_selectedDay!);
@@ -109,7 +112,7 @@ class _BookingScreenState extends State<BookingScreen> {
       // One-time fetch instead of subscription to avoid performance issues
       final snapshot = await FirebaseFirestore.instance
           .collection('appointments')
-          .where('doctorId', isEqualTo: widget.doctor.id)
+          .where('doctorId', isEqualTo: _doctor.id)
           .limit(500)
           .get();
 
@@ -180,6 +183,10 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   List<TimeSlot> _getAvailableSlots(DateTime date) {
+    if (!_doctorCanBook) {
+      return [];
+    }
+
     final dayName = _getDayName(date);
     final doctorSlots = _doctor.weeklySchedule[dayName];
 
@@ -226,103 +233,167 @@ class _BookingScreenState extends State<BookingScreen> {
     return slotTime.isBefore(DateTime.now());
   }
 
+  bool get _doctorCanBook => _doctor.isActive && _doctor.isAvailable;
+
+  String get _doctorUnavailableMessage =>
+      'This doctor is not available for booking right now.';
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final body = !_doctorCanBook
+        ? ResponsivePage(
+            maxWidth: 720,
+            child: _buildDoctorUnavailableState(isDark),
+          )
+        : ResponsivePage(
+            scrollable: false,
+            maxWidth: 980,
+            padding: EdgeInsets.zero,
+            child: Stepper(
+              currentStep: _currentStep,
+              onStepContinue: _onStepContinue,
+              onStepCancel: _onStepCancel,
+              controlsBuilder: (context, details) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : details.onStepContinue,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  _currentStep == 2
+                                      ? AppLocalizations.of(context)
+                                          .confirmBooking
+                                      : AppLocalizations.of(context)
+                                          .continueText,
+                                ),
+                        ),
+                      ),
+                      if (_currentStep > 0) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: details.onStepCancel,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(AppLocalizations.of(context).back),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+              steps: [
+                // Step 1: Select Date
+                Step(
+                  title: Text(AppLocalizations.of(context).selectDate),
+                  subtitle: _selectedDay != null
+                      ? Text(_formatDate(_selectedDay!))
+                      : null,
+                  isActive: _currentStep >= 0,
+                  state:
+                      _currentStep > 0 ? StepState.complete : StepState.indexed,
+                  content: _buildCalendarStep(isDark),
+                ),
+                // Step 2: Select Time
+                Step(
+                  title: Text(AppLocalizations.of(context).selectTime),
+                  subtitle: _selectedTimeSlot != null
+                      ? Text(_selectedTimeSlot!.display)
+                      : null,
+                  isActive: _currentStep >= 1,
+                  state:
+                      _currentStep > 1 ? StepState.complete : StepState.indexed,
+                  content: _buildTimeSlotStep(isDark),
+                ),
+                // Step 3: Confirm
+                Step(
+                  title: Text(AppLocalizations.of(context).confirmDetails),
+                  isActive: _currentStep >= 2,
+                  state: StepState.indexed,
+                  content: _buildConfirmationStep(isDark),
+                ),
+              ],
+            ),
+          );
 
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context).bookAppointment),
         centerTitle: true,
       ),
-      body: ResponsivePage(
-        scrollable: false,
-        maxWidth: 980,
-        padding: EdgeInsets.zero,
-        child: Stepper(
-          currentStep: _currentStep,
-          onStepContinue: _onStepContinue,
-          onStepCancel: _onStepCancel,
-          controlsBuilder: (context, details) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : details.onStepContinue,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : Text(
-                              _currentStep == 2
-                                  ? AppLocalizations.of(context).confirmBooking
-                                  : AppLocalizations.of(context).continueText,
-                            ),
-                    ),
-                  ),
-                  if (_currentStep > 0) ...[
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: details.onStepCancel,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(AppLocalizations.of(context).back),
-                      ),
-                    ),
-                  ],
-                ],
+      body: body,
+    );
+  }
+
+  Widget _buildDoctorUnavailableState(bool isDark) {
+    return Center(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
               ),
-            );
-          },
-          steps: [
-            // Step 1: Select Date
-            Step(
-              title: Text(AppLocalizations.of(context).selectDate),
-              subtitle: _selectedDay != null
-                  ? Text(_formatDate(_selectedDay!))
-                  : null,
-              isActive: _currentStep >= 0,
-              state: _currentStep > 0 ? StepState.complete : StepState.indexed,
-              content: _buildCalendarStep(isDark),
+              child: const Icon(
+                Icons.event_busy_rounded,
+                color: AppColors.error,
+                size: 34,
+              ),
             ),
-            // Step 2: Select Time
-            Step(
-              title: Text(AppLocalizations.of(context).selectTime),
-              subtitle: _selectedTimeSlot != null
-                  ? Text(_selectedTimeSlot!.display)
-                  : null,
-              isActive: _currentStep >= 1,
-              state: _currentStep > 1 ? StepState.complete : StepState.indexed,
-              content: _buildTimeSlotStep(isDark),
+            const SizedBox(height: 16),
+            Text(
+              _doctor.name,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              textAlign: TextAlign.center,
             ),
-            // Step 3: Confirm
-            Step(
-              title: Text(AppLocalizations.of(context).confirmDetails),
-              isActive: _currentStep >= 2,
-              state: StepState.indexed,
-              content: _buildConfirmationStep(isDark),
+            const SizedBox(height: 8),
+            Text(
+              _doctorUnavailableMessage,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -413,6 +484,8 @@ class _BookingScreenState extends State<BookingScreen> {
           titleCentered: true,
         ),
         enabledDayPredicate: (day) {
+          if (!_doctorCanBook) return false;
+
           // Check if this day is in the future
           final isFuture = day.isAfter(
             DateTime.now().subtract(const Duration(days: 1)),
@@ -612,10 +685,10 @@ class _BookingScreenState extends State<BookingScreen> {
             children: [
               CircleAvatar(
                 radius: 30,
-                backgroundImage: widget.doctor.photoUrl != null
-                    ? NetworkImage(widget.doctor.photoUrl!)
+                backgroundImage: _doctor.photoUrl != null
+                    ? NetworkImage(_doctor.photoUrl!)
                     : null,
-                child: widget.doctor.photoUrl == null
+                child: _doctor.photoUrl == null
                     ? const Icon(Icons.person, size: 30)
                     : null,
               ),
@@ -625,13 +698,13 @@ class _BookingScreenState extends State<BookingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.doctor.name,
+                      _doctor.name,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                     ),
                     Text(
-                      widget.doctor.specialization,
+                      _doctor.specialization,
                       style: TextStyle(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -727,6 +800,10 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   void _onStepContinue() {
+    if (!_doctorCanBook) {
+      _showError(_doctorUnavailableMessage);
+      return;
+    }
     if (_currentStep == 0 && _selectedDay == null) {
       _showError(AppLocalizations.of(context).pleaseSelectDate);
       return;
@@ -769,6 +846,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Future<void> _submitBooking() async {
     if (_isLoading) return;
+    if (!_doctorCanBook) {
+      _showError(_doctorUnavailableMessage);
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -792,9 +873,9 @@ class _BookingScreenState extends State<BookingScreen> {
         patientId: user.id,
         patientName: user.fullName,
         patientEmail: user.email,
-        doctorId: widget.doctor.id,
-        doctorName: widget.doctor.name,
-        department: widget.doctor.department.name,
+        doctorId: _doctor.id,
+        doctorName: _doctor.name,
+        department: _doctor.department.name,
         appointmentDate: _selectedDay!,
         timeSlot: _selectedTimeSlot!.display,
         type: _appointmentType,
@@ -815,7 +896,7 @@ class _BookingScreenState extends State<BookingScreen> {
             builder: (_) => BookingSuccessScreen(
               appointmentId: appointmentId,
               bookingReference: bookingReference,
-              doctorName: widget.doctor.name,
+              doctorName: _doctor.name,
               date: _selectedDay!,
               timeSlot: _selectedTimeSlot!.display,
             ),

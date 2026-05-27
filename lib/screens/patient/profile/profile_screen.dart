@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -274,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: ResponsivePage(
         maxWidth: UhcResponsive.isWide(context) ? 1080 : 980,
-        bottomPadding: UhcResponsive.isWide(context) ? 32 : 24,
+        bottomPadding: UhcResponsive.isWide(context) ? 32 : 120,
         alignment: UhcResponsive.isWide(context)
             ? AlignmentDirectional.topStart
             : Alignment.topCenter,
@@ -883,21 +881,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () async {
               Navigator.of(dialogContext).pop();
 
-              final userId = authProvider.user?.id;
               final notificationProvider =
                   outerContext.read<NotificationProvider>();
 
-              // Run cleanup in background so web logout is never blocked.
-              if (userId != null) {
-                unawaited(
-                  notificationProvider.onLogout(userId).catchError((e) {
-                    debugPrint('Notification cleanup on logout failed: $e');
-                  }),
-                );
-              }
-
               try {
-                await authProvider.signOut();
+                await authProvider.signOut(
+                  beforeSignOut: notificationProvider.onLogout,
+                );
               } catch (_) {
                 if (!outerContext.mounted) return;
                 ScaffoldMessenger.of(outerContext).showSnackBar(

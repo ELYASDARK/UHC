@@ -55,6 +55,20 @@ service firebase.storage {
         validProfileImage();
     }
 
+    match /doctor_photos/{fileName} {
+      allow read: if activeUser();
+      allow create, update: if hasPermission('doctors.manage') &&
+        validProfileImage();
+      allow delete: if hasPermission('doctors.manage');
+    }
+
+    match /user_photos/{fileName} {
+      allow read: if activeUser();
+      allow create, update: if hasPermission('users.manageNonAdmin') &&
+        validProfileImage();
+      allow delete: if hasPermission('users.manageNonAdmin');
+    }
+
     match /medical_documents/{userId}/{scope}/{fileName} {
       allow read: if activeUser() &&
         (

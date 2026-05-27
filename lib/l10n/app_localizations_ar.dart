@@ -69,21 +69,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get onboardingTitle1 => 'حجز المواعيد';
 
   @override
-  String get onboardingDesc1 => 'احجز مواعيدك مع أطباء الجامعة بسهولة وسرعة';
+  String get onboardingDesc1 =>
+      'تصفّح الأطباء المتاحين في جميع الأقسام، اختر التاريخ والوقت المناسب لك، واحجز موعدك بضغطات قليلة فقط — دون الحاجة لمكالمات هاتفية أو الانتظار في الطابور.';
 
   @override
   String get onboardingTitle2 => 'تذكيرات ذكية';
 
   @override
   String get onboardingDesc2 =>
-      'لا تفوت أي موعد مع الإشعارات والتذكيرات الذكية';
+      'احصل على إشعارات ذكية قبل كل موعد حتى لا تفوّت أي زيارة. استلم تذكيرات قبل ٢٤ ساعة وقبل ساعة واحدة، بالإضافة إلى ملخصات يومية لجدولك الصحي.';
 
   @override
   String get onboardingTitle3 => 'تتبع صحتك';
 
   @override
   String get onboardingDesc3 =>
-      'احتفظ بجميع سجلاتك الطبية وتاريخ مواعيدك في مكان واحد';
+      'احتفظ بجميع سجلاتك الطبية والوصفات ونتائج الفحوصات وتاريخ مواعيدك منظمة في مكان واحد آمن. يمكنك الوصول إليها في أي وقت ومن أي مكان — مباشرة من هاتفك.';
 
   @override
   String get skip => 'تخطي';

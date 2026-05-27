@@ -448,6 +448,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     case 'unlink_google':
                       _unlinkGoogleForUser(id, data);
                       break;
+                    case 'delete':
+                      _confirmDeleteUser(id, data);
+                      break;
                   }
                 },
                 itemBuilder: (context) {
@@ -536,6 +539,28 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           const Icon(Icons.admin_panel_settings, size: 18),
                           const SizedBox(width: 8),
                           const Text('Change Role'),
+                          if (!canManageNonSuperAdminTarget) ...[
+                            const Spacer(),
+                            const Icon(Icons.lock_outline, size: 16),
+                          ],
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      enabled: canManageNonSuperAdminTarget,
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.delete,
+                            size: 18,
+                            color: AppColors.error,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Delete',
+                            style: TextStyle(color: AppColors.error),
+                          ),
                           if (!canManageNonSuperAdminTarget) ...[
                             const Spacer(),
                             const Icon(Icons.lock_outline, size: 16),
@@ -1078,6 +1103,96 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to unlink Google: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteUser(
+    String targetUid,
+    Map<String, dynamic> data,
+  ) async {
+    final name = (data['fullName'] as String?)?.trim();
+    final email = (data['email'] as String?)?.trim();
+    final targetLabel = name?.isNotEmpty == true
+        ? name!
+        : (email?.isNotEmpty == true ? email! : targetUid);
+    final role = data['role'] as String? ?? 'student';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete User'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete $targetLabel?'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber,
+                    color: AppColors.warning,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This will also delete the login account.',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      if (role == UserRole.admin.name) {
+        await _governanceService.deleteAdminAccount(targetUid: targetUid);
+      } else {
+        await _userFunctionsService.deleteUserAccount(targetUid: targetUid);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User deleted successfully'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete user: $e'),
           backgroundColor: AppColors.error,
         ),
       );

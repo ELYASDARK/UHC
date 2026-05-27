@@ -60,7 +60,7 @@
 <summary><b>👤 Patient Portal</b></summary>
 
 - **Smart Authentication** — Email/password, Google Sign-In, and password recovery
-- **Appointment Booking** — Browse by department or doctor, pick available time slots, and confirm instantly
+- **Appointment Booking** — Browse by department or doctor, pick available time slots, and confirm instantly; unavailable or inactive doctors are locked in the UI and rejected by the backend
 - **Appointment Management** — View upcoming/past appointments, reschedule, or cancel with reason tracking
 - **Medical Documents** — Upload and organize lab results, prescriptions, and imaging reports
 - **Push Notifications** — Appointment reminders and in-app notification center
@@ -80,6 +80,7 @@
 - **Appointment Details** — Full appointment view with patient info, medical notes editor, and action buttons (confirm, complete, cancel, no-show)
 - **Patient Profiles** — View patient details, profile photos, medical info, and appointment history from within appointment context
 - **Doctor Profile & Settings** — Edit specialization, bio, qualifications; configure notifications, language, and theme
+- **Availability Requests** — Request unavailable status with a note for admin approval, stay available while pending, and sync the dashboard switch in real time when admin changes availability
 - **Push Notifications** — Real-time alerts for new bookings, cancellations, and status changes
 - **Consistent Design Language** — Matches patient/staff UI with shared widgets, staggered animations, skeleton loaders, and theme-aware styling
 
@@ -90,7 +91,8 @@
 
 - **Real-Time Dashboard** — Live KPIs: total users, doctors, appointments, and revenue
 - **Department Management** — Create departments with custom color, icon (155+ options), and per-day working hours
-- **Doctor Management** — Full CRUD with schedule constraints tied to department hours
+- **Doctor Management** — Full CRUD with schedule constraints, active/inactive filters, visible availability badges, and admin controls to make doctors available or unavailable
+- **Doctor Availability Review** — High-priority availability request notifications let doctor-managing admins approve or reject unavailable requests
 - **User Management** — View all users with role-safe controls and account status management
 - **Permission-Aware UI** — Admin actions are gated by granular permission keys (`users.manageNonAdmin`, `doctors.manage`, `departments.manage`, etc.)
 - **Analytics** — Interactive charts for appointment trends and department performance
@@ -193,7 +195,11 @@ uhc/
 │   │   └── app_localizations*.dart # Generated localization classes
 │   ├── providers/                  # ChangeNotifier providers (auth, appointments, doctor, theme, locale, notifications)
 │   ├── screens/
-│   │   ├── auth/                   # Login, forgot password, Google linking
+│   │   ├── auth/                   # Login, forgot password, Google linking, initial password change
+│   │   │   ├── login_screen.dart
+│   │   │   ├── forgot_password_screen.dart
+│   │   │   ├── link_google_screen.dart
+│   │   │   └── initial_password_change_screen.dart
 │   │   ├── splash/                 # Animated splash screen
 │   │   ├── onboarding/             # First-launch walkthrough
 │   │   ├── shared/                 # Screens used by ALL roles
@@ -222,6 +228,7 @@ uhc/
 │   │       ├── departments/        # Department CRUD with form dialog
 │   │       ├── doctors/            # Doctor CRUD with schedule dialog
 │   │       ├── users/              # User management with form dialog
+│   │       ├── notifications/      # Admin notification sender and recipient targeting
 │   │       ├── analytics/          # Appointment analytics & charts
 │   │       └── reports/            # Professional XLSX report generation & export
 │   │   └── super_admin/            # Super Admin governance shell & screens
@@ -229,14 +236,21 @@ uhc/
 │   │       ├── super_admin_dashboard_screen.dart
 │   │       ├── admin_control_screen.dart
 │   │       └── audit_log_screen.dart
-│   ├── services/                   # Auth, FCM, local notifications, Cloud Function wrappers
+│   ├── services/                   # Auth, FCM, local notifications, admin notifications, Cloud Function wrappers
+│   │   ├── admin_notification_service.dart
+│   │   ├── doctor_functions_service.dart
+│   │   ├── user_functions_service.dart
+│   │   ├── admin_governance_service.dart
+│   │   ├── auth_service.dart
+│   │   ├── fcm_service.dart
+│   │   └── local_notification_service.dart
 │   ├── utils/                      # Helper functions & cross-platform file utilities
 │   │   ├── save_file.dart          # Conditional export: routes to web or IO implementation
 │   │   ├── save_file_web.dart      # Web: Blob download via dart:js_interop
 │   │   ├── save_file_io.dart       # Mobile/Desktop: save to temp + share via share_plus
 │   │   └── save_file_stub.dart     # Stub for unsupported platforms
 ├── functions/                      # Firebase Cloud Functions (TypeScript)
-├── test/                           # Security regression & integration tests
+├── test/                           # Security, notification theme, and integration tests
 ├── assets/
 │   ├── images/                     # Static images
 │   ├── animations/                 # Lottie animation files
@@ -378,6 +392,10 @@ Add these keys to `ios/Runner/Info.plist` for permissions:
 | `appointment_slot_locks` | Transactional slot lock documents preventing double-booking (server-managed) |
 | `notifications` | Per-user notification history |
 | `user_tokens` | FCM device tokens per user (used by Cloud Functions for push delivery) |
+| `doctor_availability_requests` | Server-owned doctor unavailable requests with admin review status and request notes |
+| `doctor_availability_usage` | Monthly usage counters enforcing the two approved unavailable requests per doctor per calendar month |
+| `admin_notification_sends` | Idempotency and audit records for admin-created notification sends |
+| `admin_notification_rate_limits` | Per-admin cooldown records for notification sending |
 | `medical_documents` | Uploaded file metadata and storage references |
 | `doctor_patient_access` | Doctor-to-patient access grants for scoped medical document visibility |
 | `admin_audit_logs` | Immutable governance audit trail for Super Admin actions |
@@ -391,7 +409,7 @@ Server-side functions handle privileged operations that require Firebase Admin S
 | Function | Description | Access |
 |:---|:---|:---|
 | **Appointment Lifecycle** | | |
-| `createAppointment` | Validates slot availability, acquires transactional slot lock, creates appointment + patient notification | 🔒 Authenticated |
+| `createAppointment` | Validates doctor active/available status, slot availability, acquires transactional slot lock, creates appointment + patient notification | 🔒 Authenticated |
 | `rescheduleAppointment` | Releases old slot lock, acquires new slot lock, updates appointment date/time atomically | 🔒 Authenticated |
 | `cancelAppointment` | Cancels appointment and releases the slot lock | 🔒 Authenticated |
 | `updateAppointmentStatus` | Updates status (confirmed, completed, noShow) with role-based access checks | 🔒 Doctor / Admin |
@@ -403,15 +421,34 @@ Server-side functions handle privileged operations that require Firebase Admin S
 | `updateDoctorEmail` | Updates a doctor's email in both Auth and Firestore | 🔒 Admin |
 | `deleteDoctorAccount` | Removes a doctor from Auth and Firestore completely | 🔒 Admin |
 | `resetDoctorPassword` | Resets a doctor's password without requiring the old one | 🔒 Admin |
+| `completeInitialPasswordChange` | Forces doctor/student/staff users to replace an admin-created initial password | 🔒 Authenticated |
+| `updateDoctorProfile` | Updates admin-safe doctor profile fields | 🔒 Admin |
+| `setDoctorActiveStatus` | Activates/deactivates doctor records | 🔒 Admin |
+| `updateDoctorSchedule` | Updates a doctor's weekly schedule | 🔒 Admin |
+| `requestDoctorUnavailable` | Doctor submits an unavailable request with a note for admin review | 🔒 Doctor |
+| `setDoctorAvailability` | Doctor returns to available immediately; unavailable requires admin approval | 🔒 Doctor |
+| `setDoctorAvailabilityByAdmin` | Admin directly marks a doctor available/unavailable from Doctor Management | 🔒 Admin |
+| `reviewDoctorAvailabilityRequest` | Admin approves/rejects a doctor unavailable request, cancels affected appointments, and notifies the doctor/patients | 🔒 Admin |
+| **Department Management** | | |
+| `createDepartment` | Creates a department with metadata and working hours | 🔒 Admin |
+| `updateDepartment` | Updates department details and working hours | 🔒 Admin |
+| `setDepartmentActiveStatus` | Activates/deactivates departments | 🔒 Admin |
+| `deleteDepartment` | Deletes a department record | 🔒 Admin |
 | **User Management** | | |
 | `createUserAccount` | Creates student/staff accounts in Auth + Firestore | 🔒 Admin |
 | `bootstrapSelfUserDocument` | Creates self-registration user profile document securely (`student` role) | 🔒 Authenticated |
 | `setUserActiveStatus` | Activates/deactivates non-admin users | 🔒 Admin |
+| `changeUserRoleByAdmin` | Changes non-admin user roles within allowed patient roles | 🔒 Admin |
+| `unlinkGoogleProviderByAdmin` | Unlinks Google provider for managed users | 🔒 Admin |
 | `updateUserProfileByAdmin` | Admin-safe profile updates without direct privilege writes | 🔒 Admin |
+| `deleteUserAccount` | Deletes non-admin user accounts through server-side validation | 🔒 Admin |
 | **Notifications** | | |
 | `onNotificationCreated` | Firestore trigger — sends immediate FCM push and defers future scheduled notifications | 🔄 Auto |
 | `deliverScheduledNotifications` | Scheduled function — delivers due notification documents every 5 minutes | 🔄 Auto |
-| `sendTopicNotification` | Sends broadcast push notifications to FCM topics (e.g. announcements) | 🔒 Admin |
+| `searchAdminNotificationRecipients` | Searches valid notification recipients without broad client-side user listing | 🔒 Admin |
+| `previewAdminNotificationRecipients` | Counts recipients before sending an admin notification | 🔒 Admin |
+| `sendAdminNotification` | Creates audited in-app notifications for selected patient/doctor audiences | 🔒 Admin |
+| `sendTopicNotification` | Disabled legacy topic sender; directs admins to audited in-app notifications | 🔒 Admin |
 | **Super Admin Governance** | | |
 | `createAdminAccount` | Creates admin account with default permission map | 🛡️ Super Admin |
 | `changeAdminRole` | Promotes/demotes admin role (excluding superAdmin assignment) | 🛡️ Super Admin |
@@ -494,6 +531,31 @@ flutter build web --release
 <details open>
 <summary><b>v2.4.0</b> — May 15, 2026</summary>
 
+#### 🎨 Premium Onboarding Redesign (May 27, 2026)
+- **Full onboarding rewrite** — Replaced the legacy onboarding screen with a modern, immersive design featuring per-slide gradient backgrounds, custom `CustomPainter` vector illustrations, smooth animated transitions, and a clean bottom content area.
+- **Custom vector illustrations** — Three programmatic illustrations (calendar with clock, notification bell with pulse rings, clipboard with heartbeat line) built entirely with `CustomPainter` — no external image assets required.
+- **Per-slide gradient themes** — Each slide uses the app's own color palette: primary blue gradient (Appointments), secondary teal gradient (Reminders), warm amber-to-brown gradient (Health Records).
+- **Smooth page transitions** — Proper `PageView` with swipe navigation, `AnimatedSwitcher` for title/description cross-fades, and `AnimatedContainer` pill indicators.
+- **Richer onboarding copy** — Expanded all three onboarding descriptions from brief one-liners to detailed, 2-sentence explanations in English, Arabic, and Kurdish.
+- **Simplified visual effects** — Removed heavy visual effects (frosted glass `BackdropFilter`, liquid `CustomPainter` indicators, floating bokeh particles) in favor of a clean, comfortable design that matches the app's overall style.
+- **Zero new dependencies** — Uses only existing project packages: `google_fonts`, `flutter_animate`, and built-in Flutter painting APIs.
+
+#### 🩺 Doctor Availability Approval & Booking Locks (May 27, 2026)
+- **Admin-approved unavailable workflow** — Doctors now request unavailable status with a short note; only admins with `doctors.manage` can approve or reject the request.
+- **Monthly unavailable limit** — Approved doctor unavailable requests are capped at 2 per calendar month using server-owned `doctor_availability_usage` counters.
+- **High-priority admin notifications** — Doctor availability requests render as special notification cards with Approve/Reject actions, clear pending/approved/rejected status, and permission-gated controls.
+- **Real-time doctor dashboard sync** — Doctor dashboard availability state listens to the doctor document, so admin approvals or manual admin availability changes update the switch without app refresh.
+- **Admin Doctor Management controls** — Doctor cards now show both account status and availability badges, hide inactive doctors by default, expose an Inactive filter, and include `Make Available` / `Make Unavailable` in the three-dot menu.
+- **Patient booking protection** — Patients cannot open/book unavailable doctors from the doctor browser, schedule page, or booking flow; `createAppointment` also rejects unavailable doctors server-side.
+- **Appointment cancellation on approval** — When an unavailable request is approved, active future appointments for that doctor are cancelled, slot locks are released, and patients are notified to book another available time.
+- **Firestore rule hardening** — `doctor_availability_requests` are readable only by the requesting doctor or doctor-managing admins, and client-side writes to sensitive doctor availability fields are blocked.
+
+#### 🔔 Admin Notifications & Account Operations (May 27, 2026)
+- **Audited admin notifications** — Added recipient search, preview, idempotency, cooldown, and audited send records for targeted patient/doctor notifications.
+- **Legacy topic send disabled** — `sendTopicNotification` now blocks topic broadcast sends and points admins to audited in-app notification delivery.
+- **Initial password change flow** — Admin-created doctor/student/staff accounts can be forced through `completeInitialPasswordChange` before normal use.
+- **Server-owned profile photo operations** — Storage rules and helper functions now support permission-gated doctor/user profile photo uploads and cleanup.
+
 #### 🩺 Stability Follow-Up (May 24, 2026)
 - **Scheduled reminder delivery** — Added `deliverScheduledNotifications` so future notification documents are delivered when due instead of being skipped by the create trigger.
 - **Cursor-paginated appointment reads** — Patient, doctor, admin, slot-availability, and doctor/patient history queries now page through bounded Firestore batches with server-side filters instead of applying hard `.limit(500/1000)` before in-memory filtering.
@@ -559,6 +621,10 @@ flutter build web --release
 | `storage.rules` | [NEW] Firebase Storage security rules |
 | `lib/core/widgets/role_english_ltr_scope.dart` | [NEW] LTR text scope widget for role/status labels in RTL layouts |
 | `pubspec.yaml` | Dependency updates |
+| `lib/screens/onboarding/onboarding_screen.dart` | Full rewrite: premium gradient backgrounds, `CustomPainter` illustrations, `PageView` navigation, animated indicators |
+| `lib/l10n/app_en.arb` | Expanded onboarding descriptions to detailed 2-sentence copy |
+| `lib/l10n/app_ar.arb` | Expanded onboarding descriptions (Arabic) |
+| `lib/l10n/app_ku.arb` | Expanded onboarding descriptions (Kurdish) |
 
 </details>
 

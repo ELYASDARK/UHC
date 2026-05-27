@@ -16,6 +16,7 @@ class AdminGovernanceService {
     String? phoneNumber,
     DateTime? dateOfBirth,
     String? photoUrl,
+    Map<String, dynamic>? photoUpload,
   }) async {
     return _call('createAdminAccount', {
       'email': email,
@@ -24,6 +25,7 @@ class AdminGovernanceService {
       'phoneNumber': phoneNumber,
       'dateOfBirth': dateOfBirth?.toIso8601String(),
       'photoUrl': photoUrl,
+      'photoUpload': photoUpload,
     });
   }
 

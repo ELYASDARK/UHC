@@ -1,7 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,29 @@ import '../../../data/models/user_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/admin_governance_service.dart';
 import '../../../services/user_functions_service.dart';
+
+const int _userPhotoMaxSizeBytes = 5 * 1024 * 1024;
+
+String _contentTypeForImageName(String fileName) {
+  final extension = fileName.split('.').last.toLowerCase();
+  switch (extension) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return 'image/jpeg';
+  }
+}
+
+String _storageExtensionForImageName(String fileName) {
+  final extension = fileName.split('.').last.toLowerCase();
+  return switch (extension) {
+    'png' => 'png',
+    'webp' => 'webp',
+    _ => 'jpg',
+  };
+}
 
 class UserFormDialog extends StatefulWidget {
   final String? id;
@@ -27,9 +51,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
   final _picker = ImagePicker();
   final _userFunctionsService = UserFunctionsService();
   final _governanceService = AdminGovernanceService();
-  bool _isUploading = false;
   bool _isSubmitting = false;
   Uint8List? _imageBytes;
+  String? _imageFileName;
 
   // Controllers
   late TextEditingController _nameController;
@@ -185,6 +209,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   Navigator.pop(context);
                   setState(() {
                     _imageBytes = null;
+                    _imageFileName = null;
                     _photoUrlController.text = '';
                   });
                 },
@@ -208,9 +233,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
       if (image != null) {
         final bytes = await image.readAsBytes();
 
-        // Enforce 25 MB file size limit
-        const maxSizeBytes = 25 * 1024 * 1024; // 25 MB
-        if (bytes.lengthInBytes > maxSizeBytes) {
+        if (bytes.lengthInBytes > _userPhotoMaxSizeBytes) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -221,7 +244,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 25 MB.',
+                        'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 5 MB.',
                       ),
                     ),
                   ],
@@ -239,6 +262,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
         setState(() {
           _imageBytes = bytes;
+          _imageFileName = image.name;
         });
       }
     } catch (e) {
@@ -253,36 +277,15 @@ class _UserFormDialogState extends State<UserFormDialog> {
     }
   }
 
-  Future<String?> _uploadImage(String userId) async {
-    if (_imageBytes == null) {
-      return _photoUrlController.text.isNotEmpty
-          ? _photoUrlController.text
-          : null;
-    }
+  Map<String, dynamic>? _selectedPhotoUploadPayload() {
+    if (_imageBytes == null) return null;
 
-    setState(() => _isUploading = true);
-
-    try {
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child('user_photos')
-          .child('$userId.jpg');
-
-      await ref.putData(
-        _imageBytes!,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-
-      final url = await ref.getDownloadURL();
-      return url;
-    } catch (e) {
-      debugPrint('Error uploading image: $e');
-      return null;
-    } finally {
-      if (mounted) {
-        setState(() => _isUploading = false);
-      }
-    }
+    final fileName = _imageFileName ?? 'profile.jpg';
+    return {
+      'base64': base64Encode(_imageBytes!),
+      'contentType': _contentTypeForImageName(fileName),
+      'extension': _storageExtensionForImageName(fileName),
+    };
   }
 
   Future<void> _selectDateOfBirth() async {
@@ -317,6 +320,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final dialogContext = context;
     setState(() => _isSubmitting = true);
 
     try {
@@ -331,10 +335,10 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
       if (isEditing) {
         // Update existing user
-        String? photoUrl = _photoUrlController.text;
-        if (_imageBytes != null) {
-          photoUrl = await _uploadImage(widget.id!);
-        }
+        final photoUrl = _photoUrlController.text.trim().isNotEmpty
+            ? _photoUrlController.text.trim()
+            : null;
+        final photoUpload = _selectedPhotoUploadPayload();
         final roleStudentId =
             _selectedRole == UserRole.student ? widget.id : null;
         final roleStaffId = _selectedRole == UserRole.staff ? widget.id : null;
@@ -345,7 +349,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
           phoneNumber: _phoneController.text.trim().isNotEmpty
               ? _phoneController.text.trim()
               : null,
-          photoUrl: photoUrl,
+          photoUrl: photoUpload == null ? photoUrl : null,
+          photoUpload: photoUpload,
           studentId: roleStudentId,
           staffId: roleStaffId,
           dateOfBirth: _selectedDateOfBirth,
@@ -385,47 +390,47 @@ class _UserFormDialogState extends State<UserFormDialog> {
           );
         }
       } else {
+        final createdEmail = _emailController.text.trim();
+        final createdPassword = _passwordController.text;
+
         if (_selectedRole == UserRole.admin) {
           if (!actorIsSuperAdmin) {
             throw Exception('Only Super Admin can create admin accounts.');
           }
           // ADMIN creation must use governance function (server-enforced).
           await _governanceService.createAdminAccount(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
+            email: createdEmail,
+            password: createdPassword,
             fullName: _nameController.text.trim(),
             phoneNumber: _phoneController.text.trim().isNotEmpty
                 ? _phoneController.text.trim()
                 : null,
             dateOfBirth: _selectedDateOfBirth,
+            photoUpload: _selectedPhotoUploadPayload(),
           );
         } else {
           // Non-admin creation via standard user function.
           await _userFunctionsService.createUserAccount(
-            email: _emailController.text.trim(),
-            password: _passwordController.text,
+            email: createdEmail,
+            password: createdPassword,
             fullName: _nameController.text.trim(),
             role: _selectedRole.name,
             phoneNumber: _phoneController.text.trim().isNotEmpty
                 ? _phoneController.text.trim()
                 : null,
             dateOfBirth: _selectedDateOfBirth,
+            photoUpload: _selectedPhotoUploadPayload(),
           );
         }
 
-        // Upload image if selected
-        if (_imageBytes != null) {
-          // Note: We can't upload image immediately as we don't have userId
-          // The user would need to edit their profile to add photo
-        }
-
-        if (mounted) {
-          Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('User created successfully'),
-              backgroundColor: AppColors.success,
-            ),
+        if (dialogContext.mounted) {
+          final successDialogContext =
+              Navigator.of(dialogContext, rootNavigator: true).context;
+          Navigator.pop(dialogContext, true);
+          await _showUserCreatedDialog(
+            context: successDialogContext,
+            email: createdEmail,
+            password: createdPassword,
           );
         }
       }
@@ -443,6 +448,120 @@ class _UserFormDialogState extends State<UserFormDialog> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _showUserCreatedDialog({
+    required BuildContext context,
+    required String email,
+    required String password,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        final dialogSurface = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+        final credentialBackground =
+            isDark ? const Color(0xFF262626) : const Color(0xFFF4F4F5);
+        final credentialBorder =
+            isDark ? const Color(0xFF3A3A3A) : const Color(0xFFE5E7EB);
+        final secondaryText =
+            isDark ? AppColors.textSecondaryDark : Colors.grey[600];
+
+        return AlertDialog(
+          backgroundColor: dialogSurface,
+          surfaceTintColor: Colors.transparent,
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: AppColors.success),
+              SizedBox(width: 8),
+              Text('User Added'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'User account created successfully!',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Please share these credentials with the user:',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: credentialBackground,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: credentialBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.email, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SelectableText(
+                            email,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(
+                      height: 1,
+                      color: credentialBorder,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.lock, size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SelectableText(
+                            password,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'monospace',
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'The user should change their password after first login.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: secondaryText,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -475,9 +594,15 @@ class _UserFormDialogState extends State<UserFormDialog> {
         .toList();
     final selectedRoleInOptions =
         roleOptions.contains(_selectedRole) ? _selectedRole : null;
+    final dialogSurface = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final contentSurface =
+        isDark ? const Color(0xFF121212) : AppColors.backgroundLight;
 
     return Dialog(
       insetPadding: const EdgeInsets.all(16),
+      backgroundColor: dialogSurface,
+      surfaceTintColor: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
       child: AdaptiveDialogConstraints(
         width: UhcResponsive.dialogWidth(
           context,
@@ -493,7 +618,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.white,
+                color: dialogSurface,
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(28)),
               ),
@@ -507,7 +632,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                     ),
                   ),
                   const Spacer(),
-                  if (_isSubmitting || _isUploading)
+                  if (_isSubmitting)
                     const SizedBox(
                       width: 24,
                       height: 24,
@@ -523,291 +648,296 @@ class _UserFormDialogState extends State<UserFormDialog> {
             ),
             // Content
             Flexible(
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  shrinkWrap: true,
-                  children: [
-                    // Profile Photo Section
-                    _buildSectionCard(
-                      title: 'Profile Photo',
-                      isDark: isDark,
-                      children: [
-                        Center(
-                          child: Stack(
-                            children: [
-                              CircleAvatar(
-                                radius: 50,
-                                backgroundColor: isDark
-                                    ? AppColors.surfaceDark
-                                    : Colors.grey[200],
-                                backgroundImage: _imageBytes != null
-                                    ? MemoryImage(_imageBytes!)
-                                    : (_photoUrlController.text.isNotEmpty
-                                        ? NetworkImage(_photoUrlController.text)
-                                        : null) as ImageProvider?,
-                                child: (_imageBytes == null &&
-                                        _photoUrlController.text.isEmpty)
-                                    ? Icon(
-                                        Icons.person,
-                                        size: 50,
-                                        color: isDark
-                                            ? Colors.white70
-                                            : Colors.grey,
-                                      )
-                                    : null,
-                              ),
-                              Positioned(
-                                right: 0,
-                                bottom: 0,
-                                child: GestureDetector(
-                                  onTap: _showPhotoOptions,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isDark
-                                            ? AppColors.surfaceDark
-                                            : Colors.white,
-                                        width: 2,
+              child: ColoredBox(
+                color: contentSurface,
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    shrinkWrap: true,
+                    children: [
+                      // Profile Photo Section
+                      _buildSectionCard(
+                        title: 'Profile Photo',
+                        isDark: isDark,
+                        children: [
+                          Center(
+                            child: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: isDark
+                                      ? const Color(0xFF2A2A2A)
+                                      : Colors.grey[200],
+                                  backgroundImage: _imageBytes != null
+                                      ? MemoryImage(_imageBytes!)
+                                      : (_photoUrlController.text.isNotEmpty
+                                          ? NetworkImage(
+                                              _photoUrlController.text)
+                                          : null) as ImageProvider?,
+                                  child: (_imageBytes == null &&
+                                          _photoUrlController.text.isEmpty)
+                                      ? Icon(
+                                          Icons.person,
+                                          size: 50,
+                                          color: isDark
+                                              ? Colors.white70
+                                              : Colors.grey,
+                                        )
+                                      : null,
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: GestureDetector(
+                                    onTap: _showPhotoOptions,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isDark
+                                              ? const Color(0xFF2A2A2A)
+                                              : Colors.white,
+                                          width: 2,
+                                        ),
                                       ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.camera_alt,
-                                      size: 20,
-                                      color: Colors.white,
+                                      child: const Icon(
+                                        Icons.camera_alt,
+                                        size: 20,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
 
-                    // Account Information Section
-                    _buildSectionCard(
-                      title: 'Account Information',
-                      isDark: isDark,
-                      children: [
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            labelText: 'Full Name *',
-                            prefixIcon: const Icon(Icons.person_outline),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter full name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _emailController,
-                          enabled:
-                              !isEditing, // Email cannot be changed after creation
-                          decoration: InputDecoration(
-                            labelText: 'Email *',
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            helperText:
-                                isEditing ? 'Email cannot be changed' : null,
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Please enter email';
-                            }
-                            if (!value.contains('@')) {
-                              return 'Please enter a valid email';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        if (!isEditing) ...[
+                      // Account Information Section
+                      _buildSectionCard(
+                        title: 'Account Information',
+                        isDark: isDark,
+                        children: [
                           TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
+                            controller: _nameController,
                             decoration: InputDecoration(
-                              labelText: 'Password *',
-                              prefixIcon: const Icon(Icons.lock_outline),
+                              labelText: 'Full Name *',
+                              prefixIcon: const Icon(Icons.person_outline),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                ),
-                                onPressed: () {
-                                  setState(() =>
-                                      _obscurePassword = !_obscurePassword);
-                                },
-                              ),
                             ),
                             validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter password';
-                              }
-                              if (value.length < 12) {
-                                return 'Password must be at least 12 characters';
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter full name';
                               }
                               return null;
                             },
                           ),
                           const SizedBox(height: 16),
-                        ],
-                        TextFormField(
-                          controller: _phoneController,
-                          decoration: InputDecoration(
-                            labelText: 'Phone Number',
-                            prefixIcon: const Icon(Icons.phone_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Role & Details Section
-                    _buildSectionCard(
-                      title: 'Role & Details',
-                      isDark: isDark,
-                      children: [
-                        if (!isEditingSuperAdmin) ...[
-                          // Role Dropdown (exclude doctor/superAdmin, and admin on create)
-                          DropdownButtonFormField<UserRole>(
-                            key: ValueKey('${_selectedRole.name}-$canEditRole'),
-                            initialValue: selectedRoleInOptions,
-                            hint: Text(
-                              isEditing && _selectedRole == UserRole.admin
-                                  ? 'Select new role'
-                                  : 'Select role',
-                            ),
-                            onChanged: canEditRole
-                                ? (value) {
-                                    if (value != null) {
-                                      setState(() => _selectedRole = value);
-                                    }
-                                  }
-                                : null,
+                          TextFormField(
+                            controller: _emailController,
+                            enabled:
+                                !isEditing, // Email cannot be changed after creation
                             decoration: InputDecoration(
-                              labelText: 'Role *',
-                              prefixIcon: const Icon(
-                                  Icons.admin_panel_settings_outlined),
+                              labelText: 'Email *',
+                              prefixIcon: const Icon(Icons.email_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              helperText: isEditing
-                                  ? (actorIsSuperAdmin
-                                      ? 'Only Super Admin can assign ADMIN role.'
-                                      : 'Admin can change STUDENT/STAFF only.')
-                                  : (actorIsSuperAdmin
-                                      ? 'Only Super Admin can assign ADMIN role.'
-                                      : null),
+                              helperText:
+                                  isEditing ? 'Email cannot be changed' : null,
                             ),
-                            items: roleOptions.map((role) {
-                              return DropdownMenuItem(
-                                value: role,
-                                child: Text(role.name.toUpperCase()),
-                              );
-                            }).toList(),
+                            keyboardType: TextInputType.emailAddress,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter email';
+                              }
+                              if (!value.contains('@')) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 16),
+                          if (!isEditing) ...[
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
+                                labelText: 'Password *',
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(() =>
+                                        _obscurePassword = !_obscurePassword);
+                                  },
+                                ),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter password';
+                                }
+                                if (value.length < 8) {
+                                  return 'Password must be at least 8 characters';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          TextFormField(
+                            controller: _phoneController,
+                            decoration: InputDecoration(
+                              labelText: 'Phone Number',
+                              prefixIcon: const Icon(Icons.phone_outlined),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            keyboardType: TextInputType.phone,
+                          ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
 
-                        // Date of Birth
-                        InkWell(
-                          onTap: _selectDateOfBirth,
-                          borderRadius: BorderRadius.circular(12),
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'Date of Birth',
-                              prefixIcon:
-                                  const Icon(Icons.calendar_today_outlined),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                      // Role & Details Section
+                      _buildSectionCard(
+                        title: 'Role & Details',
+                        isDark: isDark,
+                        children: [
+                          if (!isEditingSuperAdmin) ...[
+                            // Role Dropdown (exclude doctor/superAdmin, and admin on create)
+                            DropdownButtonFormField<UserRole>(
+                              key: ValueKey(
+                                  '${_selectedRole.name}-$canEditRole'),
+                              initialValue: selectedRoleInOptions,
+                              hint: Text(
+                                isEditing && _selectedRole == UserRole.admin
+                                    ? 'Select new role'
+                                    : 'Select role',
                               ),
-                              suffixIcon: _selectedDateOfBirth != null
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear),
-                                      onPressed: () {
-                                        setState(
-                                            () => _selectedDateOfBirth = null);
-                                      },
-                                    )
-                                  : const Icon(Icons.arrow_drop_down),
-                            ),
-                            child: Text(
-                              _selectedDateOfBirth != null
-                                  ? DateFormat('dd/MM/yyyy')
-                                      .format(_selectedDateOfBirth!)
-                                  : 'Select date',
-                              style: TextStyle(
-                                color: _selectedDateOfBirth != null
-                                    ? null
-                                    : (isDark
-                                        ? Colors.white70
-                                        : Colors.grey[600]),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        if (isEditing)
-                          TextFormField(
-                            initialValue: widget.id ?? '',
-                            readOnly: true,
-                            decoration: InputDecoration(
-                              labelText: 'User UID',
-                              prefixIcon:
-                                  const Icon(Icons.perm_identity_outlined),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              suffixIcon: actorIsSuperAdmin
-                                  ? IconButton(
-                                      tooltip: 'Copy UID',
-                                      icon: const Icon(Icons.copy_rounded),
-                                      onPressed: () =>
-                                          _copyUid(widget.id ?? ''),
-                                    )
+                              onChanged: canEditRole
+                                  ? (value) {
+                                      if (value != null) {
+                                        setState(() => _selectedRole = value);
+                                      }
+                                    }
                                   : null,
+                              decoration: InputDecoration(
+                                labelText: 'Role *',
+                                prefixIcon: const Icon(
+                                    Icons.admin_panel_settings_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                helperText: isEditing
+                                    ? (actorIsSuperAdmin
+                                        ? 'Only Super Admin can assign ADMIN role.'
+                                        : 'Admin can change STUDENT/STAFF only.')
+                                    : (actorIsSuperAdmin
+                                        ? 'Only Super Admin can assign ADMIN role.'
+                                        : null),
+                              ),
+                              items: roleOptions.map((role) {
+                                return DropdownMenuItem(
+                                  value: role,
+                                  child: Text(role.name.toUpperCase()),
+                                );
+                              }).toList(),
                             ),
-                          )
-                        else
-                          TextFormField(
-                            initialValue: 'Auto-generated after create',
-                            readOnly: true,
-                            decoration: InputDecoration(
-                              labelText: 'User UID',
-                              prefixIcon:
-                                  const Icon(Icons.perm_identity_outlined),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Date of Birth
+                          InkWell(
+                            onTap: _selectDateOfBirth,
+                            borderRadius: BorderRadius.circular(12),
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: 'Date of Birth',
+                                prefixIcon:
+                                    const Icon(Icons.calendar_today_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                suffixIcon: _selectedDateOfBirth != null
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear),
+                                        onPressed: () {
+                                          setState(() =>
+                                              _selectedDateOfBirth = null);
+                                        },
+                                      )
+                                    : const Icon(Icons.arrow_drop_down),
+                              ),
+                              child: Text(
+                                _selectedDateOfBirth != null
+                                    ? DateFormat('dd/MM/yyyy')
+                                        .format(_selectedDateOfBirth!)
+                                    : 'Select date',
+                                style: TextStyle(
+                                  color: _selectedDateOfBirth != null
+                                      ? null
+                                      : (isDark
+                                          ? Colors.white70
+                                          : Colors.grey[600]),
+                                ),
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                  ],
+                          const SizedBox(height: 16),
+                          if (isEditing)
+                            TextFormField(
+                              initialValue: widget.id ?? '',
+                              readOnly: true,
+                              decoration: InputDecoration(
+                                labelText: 'User UID',
+                                prefixIcon:
+                                    const Icon(Icons.perm_identity_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                suffixIcon: actorIsSuperAdmin
+                                    ? IconButton(
+                                        tooltip: 'Copy UID',
+                                        icon: const Icon(Icons.copy_rounded),
+                                        onPressed: () =>
+                                            _copyUid(widget.id ?? ''),
+                                      )
+                                    : null,
+                              ),
+                            )
+                          else
+                            TextFormField(
+                              initialValue: 'Auto-generated after create',
+                              readOnly: true,
+                              decoration: InputDecoration(
+                                labelText: 'User UID',
+                                prefixIcon:
+                                    const Icon(Icons.perm_identity_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -815,7 +945,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.white,
+                color: dialogSurface,
                 borderRadius:
                     const BorderRadius.vertical(bottom: Radius.circular(28)),
               ),
@@ -832,8 +962,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed:
-                          (_isUploading || _isSubmitting) ? null : _submitForm,
+                      onPressed: _isSubmitting ? null : _submitForm,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -880,16 +1009,23 @@ class _UserFormDialogState extends State<UserFormDialog> {
     required bool isDark,
     required List<Widget> children,
   }) {
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF303030) : const Color(0xFFE5E7EB);
+
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-          ),
-        ],
+        border: Border.all(color: borderColor),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                ),
+              ],
       ),
       padding: const EdgeInsets.all(16),
       child: Column(

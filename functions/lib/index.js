@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.deliverScheduledNotifications = exports.onNotificationCreated = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = exports.deleteAppointment = exports.incrementQrScanFailures = exports.updateMedicalNotes = exports.updateAppointmentStatus = exports.cancelAppointment = exports.rescheduleAppointment = exports.createAppointment = void 0;
+exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.sendAdminNotification = exports.previewAdminNotificationRecipients = exports.searchAdminNotificationRecipients = exports.reviewDoctorAvailabilityRequest = exports.setDoctorAvailabilityByAdmin = exports.setDoctorAvailability = exports.requestDoctorUnavailable = exports.deliverScheduledNotifications = exports.onNotificationCreated = exports.deleteUserAccount = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.completeInitialPasswordChange = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = exports.deleteAppointment = exports.incrementQrScanFailures = exports.updateMedicalNotes = exports.updateAppointmentStatus = exports.cancelAppointment = exports.rescheduleAppointment = exports.createAppointment = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
+const crypto_1 = require("crypto");
 admin.initializeApp();
 const db = admin.firestore();
 const auth = admin.auth();
@@ -50,7 +51,7 @@ function requirePermission(callerDoc, permissionKey) {
     if (!perms) {
         throw new functions.https.HttpsError('permission-denied', `Missing permission: ${permissionKey}`);
     }
-    if (!perms[permissionKey]) {
+    if (perms[permissionKey] !== true) {
         throw new functions.https.HttpsError('permission-denied', `Missing permission: ${permissionKey}`);
     }
 }
@@ -83,7 +84,7 @@ function toHttpsError(error, fallbackMessage) {
         return new functions.https.HttpsError('not-found', 'Target auth user not found.');
     }
     if (code === 'auth/invalid-password' || code === 'auth/weak-password') {
-        return new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters.');
+        return new functions.https.HttpsError('invalid-argument', MIN_PASSWORD_ERROR);
     }
     const message = (maybe === null || maybe === void 0 ? void 0 : maybe.message) || fallbackMessage;
     return new functions.https.HttpsError('internal', message);
@@ -100,9 +101,83 @@ const READ_ONLY_ADMIN_PERMISSIONS = {
     'reports.export': false,
     'notifications.send': false,
 };
+const ADMIN_PERMISSION_KEYS = Object.keys(READ_ONLY_ADMIN_PERMISSIONS);
+function sanitizeAdminPermissions(permissions) {
+    if (!permissions || typeof permissions !== 'object' || Array.isArray(permissions)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid permissions.');
+    }
+    const raw = permissions;
+    const unknownKeys = Object.keys(raw).filter((key) => !ADMIN_PERMISSION_KEYS.includes(key));
+    if (unknownKeys.length > 0) {
+        throw new functions.https.HttpsError('invalid-argument', `Unknown permission key: ${unknownKeys[0]}`);
+    }
+    const sanitized = {};
+    for (const key of ADMIN_PERMISSION_KEYS) {
+        const value = raw[key];
+        if (typeof value !== 'boolean') {
+            throw new functions.https.HttpsError('invalid-argument', `Permission ${key} must be true or false.`);
+        }
+        sanitized[key] = value;
+    }
+    return sanitized;
+}
 const APPOINTMENT_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'noShow'];
 const APPOINTMENT_TYPES = ['regularCheckup', 'followUp', 'consultation', 'emergency'];
 const ACTIVE_APPOINTMENT_STATUSES = ['pending', 'confirmed'];
+const MIN_PASSWORD_LENGTH = 8;
+const MIN_PASSWORD_ERROR = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+const MIN_PASSWORD_ERROR_LONG = `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`;
+const PROFILE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const PROFILE_IMAGE_EXTENSIONS = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+};
+async function uploadProfilePhoto(uid, upload, folder = 'user_photos') {
+    if (!upload)
+        return undefined;
+    if (typeof upload.base64 !== 'string' || typeof upload.contentType !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid profile photo upload.');
+    }
+    const expectedExtension = PROFILE_IMAGE_EXTENSIONS[upload.contentType];
+    if (!expectedExtension) {
+        throw new functions.https.HttpsError('invalid-argument', 'Profile photo must be a JPEG, PNG, or WebP image.');
+    }
+    const buffer = Buffer.from(upload.base64, 'base64');
+    if (buffer.length === 0 || buffer.length > PROFILE_IMAGE_MAX_BYTES) {
+        throw new functions.https.HttpsError('invalid-argument', 'Profile photo must be less than 5 MB.');
+    }
+    const requestedExtension = (upload.extension || expectedExtension)
+        .toLowerCase()
+        .replace(/^\./, '');
+    const extension = requestedExtension === expectedExtension ||
+        (expectedExtension === 'jpg' && requestedExtension === 'jpeg')
+        ? expectedExtension
+        : expectedExtension;
+    const bucket = admin.storage().bucket();
+    const token = (0, crypto_1.randomUUID)();
+    const file = bucket.file(`${folder}/${uid}.${extension}`);
+    await file.save(buffer, {
+        resumable: false,
+        metadata: {
+            contentType: upload.contentType,
+            cacheControl: 'public, max-age=31536000',
+            metadata: {
+                firebaseStorageDownloadTokens: token,
+            },
+        },
+    });
+    return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(file.name)}?alt=media&token=${token}`;
+}
+async function deleteProfilePhotos(uid, folder = 'user_photos') {
+    const bucket = admin.storage().bucket();
+    await Promise.all(['jpg', 'jpeg', 'png', 'webp'].map((extension) => bucket
+        .file(`${folder}/${uid}.${extension}`)
+        .delete({ ignoreNotFound: true })
+        .catch((error) => {
+        console.warn(`Failed to delete profile photo ${uid}.${extension}:`, error);
+    })));
+}
 function appointmentDateKey(appointmentDate) {
     const year = appointmentDate.getFullYear();
     const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
@@ -198,8 +273,12 @@ async function canMutateAppointment(callerUid, callerDoc, appointmentData, optio
 }
 async function createTrustedNotification(params) {
     const ref = db.collection('notifications').doc();
-    await ref.set({
-        id: ref.id,
+    await ref.set(trustedNotificationPayload(ref.id, params));
+    return ref.id;
+}
+function trustedNotificationPayload(id, params) {
+    return {
+        id,
         userId: params.userId,
         title: params.title,
         body: params.body,
@@ -212,8 +291,10 @@ async function createTrustedNotification(params) {
         reminderType: params.reminderType || null,
         isDelivered: params.isDelivered || false,
         createdByBackend: true,
-    });
-    return ref.id;
+    };
+}
+function trustedNotificationPayloadWithId(id, params) {
+    return trustedNotificationPayload(id, params);
 }
 async function deleteAppointmentNotifications(appointmentId) {
     const snap = await db.collection('notifications')
@@ -330,7 +411,7 @@ exports.createAppointment = functions.https.onCall(async (request) => {
             const doctorRef = db.collection('doctors').doc(data.doctorId);
             const doctorDoc = await transaction.get(doctorRef);
             const doctorData = doctorDoc.data();
-            if (!doctorDoc.exists || (doctorData === null || doctorData === void 0 ? void 0 : doctorData.isActive) !== true) {
+            if (!doctorDoc.exists || (doctorData === null || doctorData === void 0 ? void 0 : doctorData.isActive) !== true || (doctorData === null || doctorData === void 0 ? void 0 : doctorData.isAvailable) !== true) {
                 throw new functions.https.HttpsError('failed-precondition', 'Selected doctor is unavailable.');
             }
             doctorUserId = doctorData.userId;
@@ -656,8 +737,8 @@ exports.createDoctorAccount = functions.https.onCall(async (request) => {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: email, password, name, specialization');
     }
     // Validate password strength
-    if (data.password.length < 12) {
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters long');
+    if (data.password.length < MIN_PASSWORD_LENGTH) {
+        throw new functions.https.HttpsError('invalid-argument', MIN_PASSWORD_ERROR_LONG);
     }
     try {
         // Create Firebase Auth user
@@ -689,6 +770,8 @@ exports.createDoctorAccount = functions.https.onCall(async (request) => {
                 sms: false,
             },
             language: 'en',
+            requiresInitialPasswordChange: true,
+            initialPasswordChangedAt: null,
         });
         // Use provided schedule or default to empty arrays
         const defaultSchedule = {
@@ -825,8 +908,8 @@ exports.resetDoctorPassword = functions.https.onCall(async (request) => {
     const callerUid = requireAuth(request);
     const callerDoc = await getCallerUserDoc(callerUid);
     requirePermission(callerDoc, 'doctors.manage');
-    if (!data.newPassword || data.newPassword.length < 12) {
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters long.');
+    if (!data.newPassword || data.newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new functions.https.HttpsError('invalid-argument', MIN_PASSWORD_ERROR_LONG);
     }
     try {
         // Get doctor document to find userId
@@ -839,14 +922,53 @@ exports.resetDoctorPassword = functions.https.onCall(async (request) => {
         if (!userId || userId.startsWith('sample_')) {
             throw new functions.https.HttpsError('failed-precondition', 'This doctor does not have an associated auth account.');
         }
-        // Update password
+        // Update password and require the doctor to replace it on next login.
         await auth.updateUser(userId, { password: data.newPassword });
+        await db.collection('users').doc(userId).update({
+            requiresInitialPasswordChange: true,
+            initialPasswordChangedAt: admin.firestore.FieldValue.delete(),
+            updatedAt: admin.firestore.Timestamp.now(),
+        });
         return { success: true, message: 'Password reset successfully' };
     }
     catch (error) {
         console.error('Error resetting doctor password:', error);
         throw new functions.https.HttpsError('internal', 'Failed to reset doctor password.');
     }
+});
+/**
+ * Clear the one-time first-login password change gate after the signed-in
+ * client successfully replaces their admin-issued temporary password.
+ */
+exports.completeInitialPasswordChange = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const data = request.data;
+    if (!data.newPassword || data.newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new functions.https.HttpsError('invalid-argument', MIN_PASSWORD_ERROR_LONG);
+    }
+    const userRef = db.collection('users').doc(callerUid);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'User profile not found.');
+    }
+    const userData = userDoc.data();
+    if (userData.isActive !== true) {
+        throw new functions.https.HttpsError('permission-denied', 'Your account is inactive.');
+    }
+    const role = userData.role;
+    if (!['doctor', 'student', 'staff'].includes(role !== null && role !== void 0 ? role : '')) {
+        throw new functions.https.HttpsError('failed-precondition', 'Initial password change is only available for doctor and patient accounts.');
+    }
+    if (userData.requiresInitialPasswordChange !== true) {
+        return { success: true, message: 'No initial password change required.' };
+    }
+    const now = admin.firestore.Timestamp.now();
+    await userRef.update({
+        requiresInitialPasswordChange: false,
+        initialPasswordChangedAt: now,
+        updatedAt: now,
+    });
+    return { success: true, message: 'Initial password change completed.' };
 });
 /**
  * Cloud Function to create a user account (student or staff only).
@@ -867,9 +989,10 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
         throw new functions.https.HttpsError('invalid-argument', 'Invalid role. Must be student or staff. Use createAdminAccount for admin accounts.');
     }
     // Validate password strength
-    if (data.password.length < 12) {
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters long');
+    if (data.password.length < MIN_PASSWORD_LENGTH) {
+        throw new functions.https.HttpsError('invalid-argument', MIN_PASSWORD_ERROR_LONG);
     }
+    let createdUid = null;
     try {
         // Create Firebase Auth user
         const userRecord = await auth.createUser({
@@ -878,14 +1001,16 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
             displayName: data.fullName,
             emailVerified: false,
         });
+        createdUid = userRecord.uid;
         const now = admin.firestore.Timestamp.now();
+        const uploadedPhotoUrl = await uploadProfilePhoto(userRecord.uid, data.photoUpload);
         // Create user document
         await db.collection('users').doc(userRecord.uid).set({
             email: data.email,
             fullName: data.fullName,
             role: data.role,
             phoneNumber: data.phoneNumber || null,
-            photoUrl: data.photoUrl || null,
+            photoUrl: uploadedPhotoUrl || data.photoUrl || null,
             dateOfBirth: data.dateOfBirth ? admin.firestore.Timestamp.fromDate(new Date(data.dateOfBirth)) : null,
             studentId: data.studentId || null,
             staffId: data.staffId || null,
@@ -896,6 +1021,8 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
                 sms: false,
             },
             language: 'en',
+            requiresInitialPasswordChange: true,
+            initialPasswordChangedAt: null,
             createdAt: now,
             updatedAt: now,
         });
@@ -907,6 +1034,17 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
     }
     catch (error) {
         console.error('Error creating user account:', error);
+        if (createdUid) {
+            await auth.deleteUser(createdUid).catch((cleanupError) => {
+                console.error('Failed to clean up created auth user:', cleanupError);
+            });
+            await deleteProfilePhotos(createdUid).catch((cleanupError) => {
+                console.error('Failed to clean up uploaded profile photo:', cleanupError);
+            });
+        }
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         // Handle specific Firebase Auth errors
         if (error && typeof error === 'object' && 'code' in error) {
             const firebaseError = error;
@@ -1378,8 +1516,12 @@ exports.updateUserProfileByAdmin = functions.https.onCall(async (request) => {
     }
     if (data.phoneNumber !== undefined)
         updates.phoneNumber = data.phoneNumber;
-    if (data.photoUrl !== undefined)
+    if (data.photoUpload !== undefined && data.photoUpload !== null) {
+        updates.photoUrl = await uploadProfilePhoto(data.targetUid, data.photoUpload);
+    }
+    else if (data.photoUrl !== undefined) {
         updates.photoUrl = data.photoUrl;
+    }
     if (data.studentId !== undefined)
         updates.studentId = data.studentId;
     if (data.staffId !== undefined)
@@ -1395,10 +1537,65 @@ exports.updateUserProfileByAdmin = functions.https.onCall(async (request) => {
         message: 'User profile updated successfully.',
     };
 });
+/**
+ * Delete a student or staff account from User Management.
+ * Admin accounts use deleteAdminAccount, doctors use deleteDoctorAccount.
+ */
+exports.deleteUserAccount = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'users.manageNonAdmin');
+    const data = request.data;
+    if (!(data === null || data === void 0 ? void 0 : data.targetUid)) {
+        throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+    }
+    if (data.targetUid === callerUid) {
+        throw new functions.https.HttpsError('failed-precondition', 'You cannot delete your own account from User Management.');
+    }
+    const callerRole = callerDoc.data().role;
+    const targetRef = db.collection('users').doc(data.targetUid);
+    const targetDoc = await targetRef.get();
+    if (!targetDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Target user not found.');
+    }
+    const targetData = targetDoc.data();
+    const targetRole = targetData.role;
+    if (targetRole === 'superAdmin') {
+        throw new functions.https.HttpsError('permission-denied', 'Super Admin accounts cannot be deleted from User Management.');
+    }
+    if (targetRole === 'admin') {
+        throw new functions.https.HttpsError('failed-precondition', 'Admin accounts must be deleted from Super Admin controls.');
+    }
+    if (targetRole === 'doctor') {
+        throw new functions.https.HttpsError('failed-precondition', 'Doctor accounts must be deleted from Doctor Management.');
+    }
+    if (callerRole !== 'superAdmin' && targetRole !== 'student' && targetRole !== 'staff') {
+        throw new functions.https.HttpsError('permission-denied', 'Admins can delete student and staff accounts only.');
+    }
+    try {
+        await revokeSessionsAndClearFcm(data.targetUid);
+        await auth.deleteUser(data.targetUid).catch((error) => {
+            if ((error === null || error === void 0 ? void 0 : error.code) !== 'auth/user-not-found') {
+                throw error;
+            }
+        });
+        await deleteProfilePhotos(data.targetUid);
+        await targetRef.delete();
+        return {
+            success: true,
+            message: 'User account deleted successfully.',
+        };
+    }
+    catch (error) {
+        console.error('Error deleting user account:', error);
+        throw toHttpsError(error, 'Failed to delete user account.');
+    }
+});
 // ─────────────────────────────────────────────────────────
 // FCM Push Notification Functions
 // ─────────────────────────────────────────────────────────
 const messaging = admin.messaging();
+const MAX_PUSH_DELIVERY_ATTEMPTS = 3;
 function scheduledForDate(notification) {
     const scheduledFor = notification.scheduledFor;
     if (!scheduledFor)
@@ -1408,6 +1605,29 @@ function scheduledForDate(notification) {
     }
     const parsed = new Date(scheduledFor);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+function fcmErrorCode(error) {
+    if (!error || typeof error !== 'object' || !('code' in error))
+        return null;
+    const code = error.code;
+    return typeof code === 'string' ? code : null;
+}
+function isTerminalFcmError(error) {
+    const code = fcmErrorCode(error);
+    return code === 'messaging/invalid-registration-token' ||
+        code === 'messaging/registration-token-not-registered' ||
+        code === 'messaging/invalid-argument' ||
+        code === 'messaging/mismatched-credential';
+}
+function errorMessage(error) {
+    if (error instanceof Error)
+        return error.message;
+    if (error && typeof error === 'object' && 'message' in error) {
+        const message = error.message;
+        if (typeof message === 'string')
+            return message;
+    }
+    return String(error);
 }
 async function deliverNotificationPush(snap, notificationId) {
     const notification = snap.data();
@@ -1436,6 +1656,9 @@ async function deliverNotificationPush(snap, notificationId) {
             await snap.ref.update({
                 isDelivered: true,
                 deliveredAt: admin.firestore.Timestamp.now(),
+                pushStatus: 'skipped_no_token',
+                pushAttemptedAt: admin.firestore.Timestamp.now(),
+                pushSkippedReason: 'no_active_fcm_token',
             });
             return;
         }
@@ -1473,21 +1696,42 @@ async function deliverNotificationPush(snap, notificationId) {
         await snap.ref.update({
             isDelivered: true,
             deliveredAt: admin.firestore.Timestamp.now(),
+            pushStatus: 'sent',
+            pushAttemptedAt: admin.firestore.Timestamp.now(),
+            pushErrorCode: null,
+            pushErrorMessage: null,
         });
     }
     catch (error) {
         console.error(`Error sending FCM for notification ${notificationId}:`, error);
-        if (error && typeof error === 'object' && 'code' in error) {
-            const fcmError = error;
-            if (fcmError.code === 'messaging/invalid-registration-token' ||
-                fcmError.code === 'messaging/registration-token-not-registered') {
-                console.log(`Removing stale FCM token for user ${userId}`);
-                await db.collection('user_tokens').doc(userId).delete().catch(() => { });
-            }
+        const code = fcmErrorCode(error);
+        const attempts = Number(notification.deliveryAttempts || 0) + 1;
+        const terminal = isTerminalFcmError(error);
+        if (code === 'messaging/invalid-registration-token' ||
+            code === 'messaging/registration-token-not-registered') {
+            console.log(`Removing stale FCM token for user ${userId}`);
+            await db.collection('user_tokens').doc(userId).delete().catch(() => { });
+        }
+        if (!terminal && attempts < MAX_PUSH_DELIVERY_ATTEMPTS) {
+            await snap.ref.update({
+                isDelivered: false,
+                scheduledFor: admin.firestore.Timestamp.now(),
+                deliveryAttempts: attempts,
+                pushStatus: 'retryable_error',
+                pushAttemptedAt: admin.firestore.Timestamp.now(),
+                pushErrorCode: code || 'unknown',
+                pushErrorMessage: errorMessage(error).slice(0, 240),
+            });
+            return;
         }
         await snap.ref.update({
             isDelivered: true,
             deliveredAt: admin.firestore.Timestamp.now(),
+            deliveryAttempts: attempts,
+            pushStatus: terminal ? 'failed_terminal' : 'failed_retry_exhausted',
+            pushAttemptedAt: admin.firestore.Timestamp.now(),
+            pushErrorCode: code || 'unknown',
+            pushErrorMessage: errorMessage(error).slice(0, 240),
         });
     }
 }
@@ -1542,56 +1786,1095 @@ exports.deliverScheduledNotifications = (0, scheduler_1.onSchedule)({
     console.log(`Delivering ${snap.docs.length} scheduled notification(s).`);
     await Promise.all(snap.docs.map((doc) => deliverNotificationPush(doc, doc.id)));
 });
+const DOCTOR_AVAILABILITY_MONTHLY_LIMIT = 2;
+const DOCTOR_AVAILABILITY_ADMIN_NOTIFICATION_LIMIT = 450;
+const DOCTOR_AVAILABILITY_APPOINTMENT_BATCH_SIZE = 200;
+const DOCTOR_AVAILABILITY_TIME_ZONE = 'Asia/Baghdad';
+const ADMIN_NOTIFICATION_TARGET_TYPES = [
+    'singlePatient',
+    'singleDoctor',
+    'allPatients',
+    'allDoctors',
+    'patientsAndDoctors',
+];
+const ADMIN_NOTIFICATION_MAX_RECIPIENTS = 500;
+const ADMIN_NOTIFICATION_COOLDOWN_MS = 60 * 1000;
+const ADMIN_NOTIFICATION_BATCH_SIZE = 450;
+const ADMIN_NOTIFICATION_SEARCH_SCAN_LIMIT = 2000;
+function isAdminNotificationTargetType(value) {
+    return typeof value === 'string' &&
+        ADMIN_NOTIFICATION_TARGET_TYPES.includes(value);
+}
+function adminNotificationTargetLabel(targetType) {
+    switch (targetType) {
+        case 'singlePatient':
+            return 'Single patient';
+        case 'singleDoctor':
+            return 'Single doctor';
+        case 'allPatients':
+            return 'All active patients';
+        case 'allDoctors':
+            return 'All active doctors';
+        case 'patientsAndDoctors':
+            return 'All active patients and doctors';
+    }
+}
+function normalizeSearchText(value) {
+    return String(value || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f\u064b-\u065f\u0670\u0640]/g, '')
+        .replace(/[أإآٱ]/g, 'ا')
+        .replace(/[ىئ]/g, 'ي')
+        .replace(/ی/g, 'ي')
+        .replace(/ك/g, 'ک')
+        .replace(/ة/g, 'ه')
+        .replace(/ؤ/g, 'و')
+        .trim()
+        .toLocaleLowerCase();
+}
+function requireTargetUserId(value, label) {
+    if (typeof value !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', `${label} must be a string.`);
+    }
+    const trimmed = value.trim();
+    if (trimmed.length < 1 || trimmed.length > 128 || trimmed.includes('/')) {
+        throw new functions.https.HttpsError('invalid-argument', `${label} is invalid.`);
+    }
+    return trimmed;
+}
+function sanitizeAdminNotificationRequestId(value) {
+    if (value === undefined || value === null || value === '') {
+        return (0, crypto_1.randomUUID)();
+    }
+    if (typeof value !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'requestId must be a string.');
+    }
+    const trimmed = value.trim();
+    if (!/^[A-Za-z0-9_-]{8,80}$/.test(trimmed)) {
+        throw new functions.https.HttpsError('invalid-argument', 'requestId is invalid.');
+    }
+    return trimmed;
+}
+function requireTrimmedText(value, field, maxLength) {
+    if (typeof value !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', `${field} must be a string.`);
+    }
+    const trimmed = value.trim();
+    if (trimmed.length < 1 || trimmed.length > maxLength) {
+        throw new functions.https.HttpsError('invalid-argument', `${field} must be between 1 and ${maxLength} characters.`);
+    }
+    return trimmed;
+}
+function recipientFromUserDoc(doc) {
+    const data = doc.data();
+    if (!data || data.isActive !== true)
+        return null;
+    const role = data.role;
+    if (role !== 'student' && role !== 'staff' && role !== 'doctor')
+        return null;
+    return {
+        uid: doc.id,
+        name: data.fullName || data.email || doc.id,
+        role,
+        email: data.email,
+        subtitle: role === 'student'
+            ? data.studentId
+            : role === 'staff'
+                ? data.staffId
+                : data.email,
+    };
+}
+function doctorRecipientFromDocs(doctorDoc, userDoc) {
+    const doctor = doctorDoc.data();
+    const user = userDoc === null || userDoc === void 0 ? void 0 : userDoc.data();
+    const userId = doctor.userId;
+    if (!userId || doctor.isActive !== true || !user || user.isActive !== true) {
+        return null;
+    }
+    if (user.role !== 'doctor') {
+        return null;
+    }
+    return {
+        uid: userId,
+        name: doctor.name ||
+            user.fullName ||
+            doctor.email ||
+            user.email ||
+            userId,
+        role: 'doctor',
+        email: doctor.email || user.email,
+        subtitle: doctor.specialization ||
+            doctor.department ||
+            user.email,
+    };
+}
+async function requireActivePatientRecipient(targetUserId) {
+    const uid = requireTargetUserId(targetUserId, 'targetUserId');
+    const doc = await db.collection('users').doc(uid).get();
+    const recipient = recipientFromUserDoc(doc);
+    if (!recipient || (recipient.role !== 'student' && recipient.role !== 'staff')) {
+        throw new functions.https.HttpsError('failed-precondition', 'Target user must be an active student or staff patient.');
+    }
+    return recipient;
+}
+async function hasActiveDoctorRecord(userId) {
+    const doctorSnap = await db.collection('doctors')
+        .where('userId', '==', userId)
+        .limit(10)
+        .get();
+    return doctorSnap.docs.some((doc) => doc.data().isActive === true);
+}
+async function requireActiveDoctorRecipient(targetUserId) {
+    const uid = requireTargetUserId(targetUserId, 'targetUserId');
+    const doc = await db.collection('users').doc(uid).get();
+    const recipient = recipientFromUserDoc(doc);
+    if (!recipient || recipient.role !== 'doctor') {
+        throw new functions.https.HttpsError('failed-precondition', 'Target user must be an active doctor.');
+    }
+    if (!(await hasActiveDoctorRecord(uid))) {
+        throw new functions.https.HttpsError('failed-precondition', 'Target doctor record must be active.');
+    }
+    return recipient;
+}
+function enforceAdminNotificationCap(count) {
+    if (count > ADMIN_NOTIFICATION_MAX_RECIPIENTS) {
+        throw new functions.https.HttpsError('resource-exhausted', `Admin notifications are capped at ${ADMIN_NOTIFICATION_MAX_RECIPIENTS} recipients in v1.`);
+    }
+}
+async function getActivePatientRecipients() {
+    const snap = await db.collection('users')
+        .where('isActive', '==', true)
+        .limit(ADMIN_NOTIFICATION_SEARCH_SCAN_LIMIT)
+        .get();
+    const recipients = snap.docs
+        .map((doc) => recipientFromUserDoc(doc))
+        .filter((recipient) => recipient !== null && (recipient.role === 'student' || recipient.role === 'staff'));
+    enforceAdminNotificationCap(recipients.length);
+    return recipients;
+}
+async function getActiveDoctorRecipients() {
+    const doctorSnap = await db.collection('doctors')
+        .where('isActive', '==', true)
+        .limit(ADMIN_NOTIFICATION_MAX_RECIPIENTS + 1)
+        .get();
+    enforceAdminNotificationCap(doctorSnap.docs.length);
+    const userIds = Array.from(new Set(doctorSnap.docs
+        .map((doc) => doc.data().userId)
+        .filter((userId) => !!userId)));
+    enforceAdminNotificationCap(userIds.length);
+    if (userIds.length === 0)
+        return [];
+    const userDocs = await db.getAll(...userIds.map((userId) => db.collection('users').doc(userId)));
+    const usersById = new Map(userDocs.map((doc) => [doc.id, doc]));
+    const recipients = doctorSnap.docs
+        .map((doc) => {
+        const userId = doc.data().userId;
+        return userId ? doctorRecipientFromDocs(doc, usersById.get(userId)) : null;
+    })
+        .filter((recipient) => recipient !== null && recipient.role === 'doctor');
+    enforceAdminNotificationCap(recipients.length);
+    return recipients;
+}
+async function getAdminNotificationRecipients(targetType, targetUserId) {
+    switch (targetType) {
+        case 'singlePatient':
+            return [await requireActivePatientRecipient(targetUserId)];
+        case 'singleDoctor':
+            return [await requireActiveDoctorRecipient(targetUserId)];
+        case 'allPatients':
+            return getActivePatientRecipients();
+        case 'allDoctors':
+            return getActiveDoctorRecipients();
+        case 'patientsAndDoctors': {
+            const [patients, doctors] = await Promise.all([
+                getActivePatientRecipients(),
+                getActiveDoctorRecipients(),
+            ]);
+            const byUid = new Map();
+            [...patients, ...doctors].forEach((recipient) => byUid.set(recipient.uid, recipient));
+            enforceAdminNotificationCap(byUid.size);
+            return Array.from(byUid.values());
+        }
+    }
+}
+function assertAdminNotificationTarget(data) {
+    if (!isAdminNotificationTargetType(data.targetType)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid targetType.');
+    }
+    if (data.targetType === 'singlePatient' || data.targetType === 'singleDoctor') {
+        requireTargetUserId(data.targetUserId, 'targetUserId');
+    }
+    return data.targetType;
+}
+function matchesRecipientQuery(recipient, query) {
+    const haystack = [
+        recipient.name,
+        recipient.email,
+        recipient.subtitle,
+        recipient.role,
+        recipient.role === 'doctor' ? 'doctor dr دكتور دکتۆر پزیشک' : null,
+        recipient.role === 'student' ? 'patient student طالب قوتابی خوێندکار' : null,
+        recipient.role === 'staff' ? 'patient staff موظف ستاف کارمەند' : null,
+    ].map((value) => normalizeSearchText(value)).join(' ');
+    return haystack.includes(query);
+}
+async function reserveAdminNotificationSend(callerUid, requestId) {
+    const sendId = `${callerUid}_${requestId}`;
+    const sendRef = db.collection('admin_notification_sends').doc(sendId);
+    const rateRef = db.collection('admin_notification_rate_limits').doc(callerUid);
+    await db.runTransaction(async (transaction) => {
+        var _a, _b;
+        const [sendDoc, rateDoc] = await Promise.all([
+            transaction.get(sendRef),
+            transaction.get(rateRef),
+        ]);
+        if (sendDoc.exists) {
+            const status = (_a = sendDoc.data()) === null || _a === void 0 ? void 0 : _a.status;
+            throw new functions.https.HttpsError('already-exists', `This notification request was already ${status || 'submitted'}.`);
+        }
+        const lastSentAt = (_b = rateDoc.data()) === null || _b === void 0 ? void 0 : _b.lastSentAt;
+        if (lastSentAt) {
+            const elapsedMs = Date.now() - lastSentAt.toDate().getTime();
+            if (elapsedMs < ADMIN_NOTIFICATION_COOLDOWN_MS) {
+                throw new functions.https.HttpsError('resource-exhausted', 'Please wait before sending another notification.');
+            }
+        }
+        const now = admin.firestore.Timestamp.now();
+        transaction.create(sendRef, {
+            id: sendId,
+            callerUid,
+            requestId,
+            status: 'reserved',
+            createdAt: now,
+            updatedAt: now,
+        });
+        transaction.set(rateRef, {
+            lastSentAt: now,
+            updatedAt: now,
+        }, { merge: true });
+    });
+    return sendId;
+}
+async function markAdminNotificationSend(sendId, status, metadata) {
+    await db.collection('admin_notification_sends').doc(sendId).set(Object.assign(Object.assign({ status }, metadata), { updatedAt: admin.firestore.Timestamp.now() }), { merge: true });
+}
+async function createAdminNotificationDocs(params) {
+    for (let i = 0; i < params.recipients.length; i += ADMIN_NOTIFICATION_BATCH_SIZE) {
+        const batch = db.batch();
+        const chunk = params.recipients.slice(i, i + ADMIN_NOTIFICATION_BATCH_SIZE);
+        const chunkIds = [];
+        for (const recipient of chunk) {
+            const notificationId = `admin_${params.sendId}_${encodeURIComponent(recipient.uid)}`;
+            const ref = db.collection('notifications').doc(notificationId);
+            chunkIds.push(notificationId);
+            batch.set(ref, trustedNotificationPayloadWithId(notificationId, {
+                userId: recipient.uid,
+                title: params.title,
+                body: params.body,
+                type: 'adminAnnouncement',
+                data: {
+                    targetType: params.targetType,
+                    sentBy: params.callerUid,
+                    sendId: params.sendId,
+                },
+                reminderType: 'immediate',
+            }));
+        }
+        await batch.commit();
+        params.notificationIds.push(...chunkIds);
+    }
+    return params.notificationIds;
+}
+function availabilityDateParts(date) {
+    const formatted = new Intl.DateTimeFormat('en-CA', {
+        timeZone: DOCTOR_AVAILABILITY_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(date);
+    const match = formatted.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+        return {
+            year: Number(match[1]),
+            month: Number(match[2]),
+            day: Number(match[3]),
+        };
+    }
+    const fallback = new Date(date.getTime() + 3 * 60 * 60 * 1000);
+    return {
+        year: fallback.getUTCFullYear(),
+        month: fallback.getUTCMonth() + 1,
+        day: fallback.getUTCDate(),
+    };
+}
+function availabilityMonthKey(date = new Date()) {
+    const parts = availabilityDateParts(date);
+    return `${parts.year}-${String(parts.month).padStart(2, '0')}`;
+}
+function baghdadStartOfToday(date = new Date()) {
+    const parts = availabilityDateParts(date);
+    return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, -3, 0, 0, 0));
+}
+function doctorAvailabilityUsageRef(doctorId, monthKey) {
+    return db.collection('doctor_availability_usage').doc(`${doctorId}_${monthKey}`);
+}
+function sanitizeAvailabilityReason(value) {
+    if (typeof value !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'Please add a short note for the admin.');
+    }
+    const trimmed = value.trim();
+    if (trimmed.length < 3 || trimmed.length > 280) {
+        throw new functions.https.HttpsError('invalid-argument', 'The note must be between 3 and 280 characters.');
+    }
+    return trimmed;
+}
+function requireAvailabilityRequestId(value) {
+    return requireTargetUserId(value, 'requestId');
+}
+function parseAvailabilityDecision(value) {
+    if (value === 'approved' || value === 'rejected')
+        return value;
+    throw new functions.https.HttpsError('invalid-argument', 'decision must be approved or rejected.');
+}
+function clearPendingAvailabilityFields() {
+    return {
+        availabilityRequestStatus: admin.firestore.FieldValue.delete(),
+        pendingAvailabilityRequestId: admin.firestore.FieldValue.delete(),
+        availabilityRequestReason: admin.firestore.FieldValue.delete(),
+        availabilityRequestedAt: admin.firestore.FieldValue.delete(),
+    };
+}
+async function getDoctorManagingAdminRecipients() {
+    const snap = await db.collection('users')
+        .where('isActive', '==', true)
+        .limit(ADMIN_NOTIFICATION_SEARCH_SCAN_LIMIT)
+        .get();
+    return snap.docs
+        .map((doc) => {
+        const data = doc.data();
+        const role = data.role;
+        const permissions = data.adminPermissions;
+        const canManageDoctors = role === 'superAdmin' ||
+            (role === 'admin' && (permissions === null || permissions === void 0 ? void 0 : permissions['doctors.manage']) === true);
+        if (!canManageDoctors)
+            return null;
+        const recipientRole = role === 'superAdmin' ? 'superAdmin' : 'admin';
+        return {
+            uid: doc.id,
+            name: data.fullName ||
+                data.email ||
+                doc.id,
+            role: recipientRole,
+            email: data.email,
+            subtitle: role === 'superAdmin' ? 'Super Admin' : 'Doctor management',
+        };
+    })
+        .filter((recipient) => recipient !== null);
+}
+function setDoctorAvailabilityAdminNotifications(transaction, params) {
+    if (params.recipients.length > DOCTOR_AVAILABILITY_ADMIN_NOTIFICATION_LIMIT) {
+        throw new functions.https.HttpsError('resource-exhausted', 'Too many doctor-managing admins to notify.');
+    }
+    const notificationIds = [];
+    for (const recipient of params.recipients) {
+        const notificationId = `doctor_availability_${params.requestId}_${encodeURIComponent(recipient.uid)}`;
+        notificationIds.push(notificationId);
+        transaction.set(db.collection('notifications').doc(notificationId), trustedNotificationPayloadWithId(notificationId, {
+            userId: recipient.uid,
+            title: 'Action required: doctor availability',
+            body: `Dr. ${params.doctorName} requested to become unavailable. Note: ${params.reason}`,
+            type: 'doctorAvailabilityRequest',
+            data: {
+                category: 'doctorAvailabilityRequest',
+                priority: 'high',
+                availabilityRequestId: params.requestId,
+                doctorId: params.doctorId,
+                doctorUserId: params.doctorUserId,
+                doctorName: params.doctorName,
+                specialization: params.specialization || '',
+                reason: params.reason,
+                status: 'pending',
+                monthKey: params.monthKey,
+                monthlyLimit: DOCTOR_AVAILABILITY_MONTHLY_LIMIT,
+            },
+            reminderType: 'immediate',
+        }));
+    }
+    return notificationIds;
+}
+async function updateDoctorAvailabilityAdminNotifications(params) {
+    const title = params.status === 'approved'
+        ? 'Doctor availability approved'
+        : 'Doctor availability rejected';
+    const body = params.status === 'approved'
+        ? `Dr. ${params.doctorName} is now unavailable.`
+        : `Dr. ${params.doctorName}'s unavailable request was rejected.`;
+    for (const notificationId of params.notificationIds) {
+        await db.collection('notifications').doc(notificationId).update({
+            title,
+            body,
+            'data.status': params.status,
+            'data.reviewedBy': params.reviewerUid,
+            'data.reviewedByName': params.reviewerName || null,
+            'data.reviewedAt': admin.firestore.Timestamp.now(),
+        }).catch((error) => {
+            console.warn(`Failed to update admin notification ${notificationId}:`, error);
+        });
+    }
+}
+async function cancelActiveAppointmentsForUnavailableDoctor(params) {
+    const start = admin.firestore.Timestamp.fromDate(baghdadStartOfToday());
+    const appointmentIds = [];
+    let cancelledCount = 0;
+    while (true) {
+        const snap = await db.collection('appointments')
+            .where('doctorId', '==', params.doctorId)
+            .where('status', 'in', ACTIVE_APPOINTMENT_STATUSES)
+            .where('appointmentDate', '>=', start)
+            .orderBy('appointmentDate', 'asc')
+            .limit(DOCTOR_AVAILABILITY_APPOINTMENT_BATCH_SIZE)
+            .get();
+        if (snap.empty)
+            break;
+        const batch = db.batch();
+        const notifications = [];
+        for (const doc of snap.docs) {
+            const appointment = doc.data();
+            const appointmentDate = firestoreDateToDate(appointment.appointmentDate);
+            const timeSlot = appointment.timeSlot || '';
+            batch.update(doc.ref, {
+                status: 'cancelled',
+                cancelReason: 'Doctor unavailable. Please cancel or reschedule with another available time.',
+                statusUpdatedBy: params.reviewedByUid,
+                cancellationSource: 'doctorAvailabilityApproved',
+                availabilityRequestId: params.requestId,
+                updatedAt: admin.firestore.Timestamp.now(),
+            });
+            if (appointmentDate && timeSlot) {
+                batch.delete(appointmentSlotLockRef(params.doctorId, appointmentDate, timeSlot));
+            }
+            notifications.push({
+                appointmentId: doc.id,
+                patientId: appointment.patientId,
+                doctorName: appointment.doctorName ||
+                    params.doctorName ||
+                    'your doctor',
+                appointmentDate,
+                timeSlot,
+            });
+            appointmentIds.push(doc.id);
+        }
+        await batch.commit();
+        for (const notification of notifications) {
+            if (!notification.patientId)
+                continue;
+            await deleteAppointmentNotifications(notification.appointmentId);
+            await createTrustedNotification({
+                userId: notification.patientId,
+                title: 'Appointment Cancelled',
+                body: `Your appointment with Dr. ${notification.doctorName}${notification.appointmentDate ? ` on ${formatDateForNotification(notification.appointmentDate)}` : ''}${notification.timeSlot ? ` at ${notification.timeSlot}` : ''} has been cancelled because the doctor is unavailable. Please book another available time.`,
+                type: 'appointmentCancellation',
+                data: {
+                    appointmentId: notification.appointmentId,
+                    availabilityRequestId: params.requestId,
+                    cancellationSource: 'doctorAvailabilityApproved',
+                },
+                appointmentId: notification.appointmentId,
+                reminderType: 'immediate',
+            });
+        }
+        cancelledCount += snap.size;
+        if (snap.size < DOCTOR_AVAILABILITY_APPOINTMENT_BATCH_SIZE)
+            break;
+    }
+    return { cancelledCount, appointmentIds };
+}
+/**
+ * Doctor requests admin approval before becoming unavailable.
+ */
+exports.requestDoctorUnavailable = functions.https.onCall(async (request) => {
+    var _a;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const callerData = callerDoc.data();
+    if (callerData.role !== 'doctor') {
+        throw new functions.https.HttpsError('permission-denied', 'Only doctors can request unavailable status.');
+    }
+    const reason = sanitizeAvailabilityReason((_a = request.data) === null || _a === void 0 ? void 0 : _a.reason);
+    const doctorDoc = await getDoctorForUser(callerUid);
+    if (!doctorDoc) {
+        throw new functions.https.HttpsError('not-found', 'Doctor profile not found.');
+    }
+    const recipients = await getDoctorManagingAdminRecipients();
+    if (recipients.length === 0) {
+        throw new functions.https.HttpsError('failed-precondition', 'No doctor-managing admin is available to review this request.');
+    }
+    const requestRef = db.collection('doctor_availability_requests').doc();
+    const monthKey = availabilityMonthKey();
+    let approvedCount = 0;
+    let notificationIds = [];
+    await db.runTransaction(async (transaction) => {
+        var _a;
+        const [doctorSnap, usageSnap] = await Promise.all([
+            transaction.get(doctorDoc.ref),
+            transaction.get(doctorAvailabilityUsageRef(doctorDoc.id, monthKey)),
+        ]);
+        if (!doctorSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Doctor profile not found.');
+        }
+        const doctorData = doctorSnap.data();
+        if (doctorData.isActive !== true) {
+            throw new functions.https.HttpsError('failed-precondition', 'Doctor account is inactive.');
+        }
+        if (doctorData.isAvailable === false) {
+            throw new functions.https.HttpsError('failed-precondition', 'You are already unavailable.');
+        }
+        if (doctorData.availabilityRequestStatus === 'pending') {
+            throw new functions.https.HttpsError('already-exists', 'You already have an unavailable request waiting for admin review.');
+        }
+        approvedCount = Number(((_a = usageSnap.data()) === null || _a === void 0 ? void 0 : _a.approvedCount) || 0);
+        if (approvedCount >= DOCTOR_AVAILABILITY_MONTHLY_LIMIT) {
+            throw new functions.https.HttpsError('resource-exhausted', `You can become unavailable only ${DOCTOR_AVAILABILITY_MONTHLY_LIMIT} times per month.`);
+        }
+        const now = admin.firestore.Timestamp.now();
+        const doctorName = doctorData.name ||
+            callerData.fullName ||
+            'Doctor';
+        notificationIds = setDoctorAvailabilityAdminNotifications(transaction, {
+            requestId: requestRef.id,
+            recipients,
+            doctorId: doctorDoc.id,
+            doctorUserId: callerUid,
+            doctorName,
+            specialization: doctorData.specialization,
+            reason,
+            monthKey,
+        });
+        transaction.set(requestRef, {
+            id: requestRef.id,
+            doctorId: doctorDoc.id,
+            doctorUserId: callerUid,
+            doctorName,
+            specialization: doctorData.specialization || '',
+            reason,
+            status: 'pending',
+            monthKey,
+            monthlyLimit: DOCTOR_AVAILABILITY_MONTHLY_LIMIT,
+            approvedCountAtRequest: approvedCount,
+            adminNotificationIds: notificationIds,
+            createdAt: now,
+            updatedAt: now,
+        });
+        transaction.update(doctorDoc.ref, {
+            availabilityRequestStatus: 'pending',
+            pendingAvailabilityRequestId: requestRef.id,
+            availabilityRequestReason: reason,
+            availabilityRequestedAt: now,
+            updatedAt: now,
+        });
+    });
+    return {
+        success: true,
+        requestId: requestRef.id,
+        status: 'pending',
+        monthlyLimit: DOCTOR_AVAILABILITY_MONTHLY_LIMIT,
+        usedThisMonth: approvedCount,
+        remainingThisMonth: DOCTOR_AVAILABILITY_MONTHLY_LIMIT - approvedCount,
+        adminNotificationIds: notificationIds,
+    };
+});
+/**
+ * Doctor can return to available immediately. Becoming unavailable requires approval.
+ */
+exports.setDoctorAvailability = functions.https.onCall(async (request) => {
+    var _a, _b;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    if (((_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role) !== 'doctor') {
+        throw new functions.https.HttpsError('permission-denied', 'Only doctors can update their own availability.');
+    }
+    if (((_b = request.data) === null || _b === void 0 ? void 0 : _b.isAvailable) !== true) {
+        throw new functions.https.HttpsError('failed-precondition', 'Submit an unavailable request for admin approval.');
+    }
+    const doctorDoc = await getDoctorForUser(callerUid);
+    if (!doctorDoc) {
+        throw new functions.https.HttpsError('not-found', 'Doctor profile not found.');
+    }
+    const doctorData = doctorDoc.data();
+    if (doctorData.availabilityRequestStatus === 'pending') {
+        throw new functions.https.HttpsError('failed-precondition', 'Your unavailable request is still waiting for admin review.');
+    }
+    await doctorDoc.ref.update(Object.assign(Object.assign({ isAvailable: true }, clearPendingAvailabilityFields()), { updatedAt: admin.firestore.Timestamp.now() }));
+    return { success: true, isAvailable: true };
+});
+/**
+ * Admins with doctor management permission can set a doctor's live availability.
+ */
+exports.setDoctorAvailabilityByAdmin = functions.https.onCall(async (request) => {
+    var _a, _b;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'doctors.manage');
+    const callerData = callerDoc.data();
+    const doctorId = requireTargetUserId((_a = request.data) === null || _a === void 0 ? void 0 : _a.doctorId, 'doctorId');
+    if (typeof ((_b = request.data) === null || _b === void 0 ? void 0 : _b.isAvailable) !== 'boolean') {
+        throw new functions.https.HttpsError('invalid-argument', 'doctorId and isAvailable are required.');
+    }
+    const isAvailable = request.data.isAvailable;
+    const doctorRef = db.collection('doctors').doc(doctorId);
+    const context = await db.runTransaction(async (transaction) => {
+        var _a, _b;
+        const doctorSnap = await transaction.get(doctorRef);
+        if (!doctorSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Doctor not found.');
+        }
+        const doctorData = doctorSnap.data();
+        const doctorUserId = doctorData.userId;
+        if (!doctorUserId) {
+            throw new functions.https.HttpsError('failed-precondition', 'Doctor is not linked to a login account.');
+        }
+        const doctorName = doctorData.name || 'Doctor';
+        const now = admin.firestore.Timestamp.now();
+        const pendingRequestId = typeof doctorData.pendingAvailabilityRequestId === 'string'
+            ? doctorData.pendingAvailabilityRequestId
+            : undefined;
+        let pendingDecision;
+        let pendingNotificationIds = [];
+        let monthKey;
+        if (pendingRequestId) {
+            const requestRef = db.collection('doctor_availability_requests').doc(pendingRequestId);
+            const requestSnap = await transaction.get(requestRef);
+            if (requestSnap.exists && ((_a = requestSnap.data()) === null || _a === void 0 ? void 0 : _a.status) === 'pending') {
+                const requestData = requestSnap.data();
+                pendingDecision = isAvailable ? 'rejected' : 'approved';
+                monthKey = String(requestData.monthKey || availabilityMonthKey());
+                pendingNotificationIds = Array.isArray(requestData.adminNotificationIds)
+                    ? requestData.adminNotificationIds.map((id) => String(id))
+                    : [];
+                if (pendingDecision === 'approved') {
+                    const usageRef = doctorAvailabilityUsageRef(doctorId, monthKey);
+                    const usageSnap = await transaction.get(usageRef);
+                    const approvedCount = Number(((_b = usageSnap.data()) === null || _b === void 0 ? void 0 : _b.approvedCount) || 0);
+                    if (approvedCount >= DOCTOR_AVAILABILITY_MONTHLY_LIMIT) {
+                        throw new functions.https.HttpsError('resource-exhausted', `This doctor has already used ${DOCTOR_AVAILABILITY_MONTHLY_LIMIT} unavailable approvals this month.`);
+                    }
+                    transaction.set(usageRef, {
+                        doctorId,
+                        doctorUserId,
+                        monthKey,
+                        approvedCount: approvedCount + 1,
+                        updatedAt: now,
+                    }, { merge: true });
+                }
+                transaction.update(requestRef, {
+                    status: pendingDecision,
+                    reviewedAt: now,
+                    reviewedBy: callerUid,
+                    reviewedByName: callerData.fullName || null,
+                    updatedAt: now,
+                });
+            }
+        }
+        const updates = Object.assign(Object.assign({ isAvailable }, clearPendingAvailabilityFields()), { availabilityUpdatedByAdminAt: now, availabilityUpdatedByAdminUid: callerUid, updatedAt: now });
+        if (!isAvailable) {
+            updates.lastUnavailableApprovedAt = now;
+            updates.lastAvailabilityRequestId = pendingRequestId || null;
+            updates.lastAvailabilityRequestReason = pendingRequestId
+                ? (doctorData.availabilityRequestReason || 'Admin marked unavailable')
+                : 'Admin marked unavailable';
+            if (monthKey)
+                updates.availabilityUsageMonth = monthKey;
+        }
+        transaction.update(doctorRef, updates);
+        return {
+            doctorUserId,
+            doctorName,
+            pendingRequestId,
+            pendingDecision,
+            pendingNotificationIds,
+            monthKey,
+        };
+    });
+    let cancelledAppointments = 0;
+    let cancellationError = null;
+    if (!isAvailable) {
+        try {
+            const cancellation = await cancelActiveAppointmentsForUnavailableDoctor({
+                doctorId,
+                reviewedByUid: callerUid,
+                doctorName: context.doctorName,
+                requestId: context.pendingRequestId || `admin_manual_${doctorId}_${Date.now()}`,
+            });
+            cancelledAppointments = cancellation.cancelledCount;
+        }
+        catch (error) {
+            cancellationError = errorMessage(error).slice(0, 240);
+            console.error('Failed to cancel appointments for admin availability change:', error);
+        }
+    }
+    if (context.pendingDecision) {
+        await updateDoctorAvailabilityAdminNotifications({
+            notificationIds: context.pendingNotificationIds,
+            status: context.pendingDecision,
+            doctorName: context.doctorName,
+            reviewerUid: callerUid,
+            reviewerName: callerData.fullName,
+        });
+    }
+    await createTrustedNotification({
+        userId: context.doctorUserId,
+        title: 'Availability updated by admin',
+        body: isAvailable
+            ? 'Admin marked you available.'
+            : 'Admin marked you unavailable.',
+        type: 'doctorAvailabilityDecision',
+        data: {
+            status: isAvailable ? 'available' : 'unavailable',
+            source: 'adminDoctorManagement',
+            doctorId,
+            availabilityRequestId: context.pendingRequestId || '',
+            cancelledAppointments,
+        },
+        reminderType: 'immediate',
+    });
+    await writeAdminAuditLog({
+        actorUid: callerUid,
+        actorRole: callerData.role,
+        actorName: callerData.fullName,
+        targetUid: context.doctorUserId,
+        targetName: context.doctorName,
+        targetRoleBefore: 'doctor',
+        targetRoleAfter: 'doctor',
+        action: isAvailable
+            ? 'doctorAvailability.adminSetAvailable'
+            : 'doctorAvailability.adminSetUnavailable',
+        metadata: {
+            doctorId,
+            pendingRequestId: context.pendingRequestId || null,
+            pendingDecision: context.pendingDecision || null,
+            cancelledAppointments,
+            cancellationError,
+        },
+    });
+    return {
+        success: true,
+        isAvailable,
+        cancelledAppointments,
+        cancellationError,
+    };
+});
+/**
+ * Admin approval or rejection for doctor unavailable requests.
+ */
+exports.reviewDoctorAvailabilityRequest = functions.https.onCall(async (request) => {
+    var _a, _b;
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'doctors.manage');
+    const callerData = callerDoc.data();
+    const requestId = requireAvailabilityRequestId((_a = request.data) === null || _a === void 0 ? void 0 : _a.requestId);
+    const decision = parseAvailabilityDecision((_b = request.data) === null || _b === void 0 ? void 0 : _b.decision);
+    const requestRef = db.collection('doctor_availability_requests').doc(requestId);
+    const reviewContext = await db.runTransaction(async (transaction) => {
+        var _a;
+        const requestSnap = await transaction.get(requestRef);
+        if (!requestSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Availability request not found.');
+        }
+        const requestData = requestSnap.data();
+        if (requestData.status !== 'pending') {
+            throw new functions.https.HttpsError('failed-precondition', 'This availability request has already been reviewed.');
+        }
+        const doctorId = requireTargetUserId(requestData.doctorId, 'doctorId');
+        const doctorUserId = requireTargetUserId(requestData.doctorUserId, 'doctorUserId');
+        const monthKey = String(requestData.monthKey || availabilityMonthKey());
+        const doctorRef = db.collection('doctors').doc(doctorId);
+        const usageRef = doctorAvailabilityUsageRef(doctorId, monthKey);
+        const [doctorSnap, usageSnap] = await Promise.all([
+            transaction.get(doctorRef),
+            decision === 'approved' ? transaction.get(usageRef) : Promise.resolve(null),
+        ]);
+        if (!doctorSnap.exists) {
+            throw new functions.https.HttpsError('not-found', 'Doctor profile not found.');
+        }
+        const doctorData = doctorSnap.data();
+        if (doctorData.userId !== doctorUserId || doctorData.isActive !== true) {
+            throw new functions.https.HttpsError('failed-precondition', 'Doctor profile is no longer active.');
+        }
+        const approvedCount = usageSnap
+            ? Number(((_a = usageSnap.data()) === null || _a === void 0 ? void 0 : _a.approvedCount) || 0)
+            : 0;
+        if (decision === 'approved' && approvedCount >= DOCTOR_AVAILABILITY_MONTHLY_LIMIT) {
+            throw new functions.https.HttpsError('resource-exhausted', `This doctor has already used ${DOCTOR_AVAILABILITY_MONTHLY_LIMIT} unavailable approvals this month.`);
+        }
+        const now = admin.firestore.Timestamp.now();
+        const doctorName = requestData.doctorName ||
+            doctorData.name ||
+            'Doctor';
+        const reason = String(requestData.reason || '');
+        const notificationIds = Array.isArray(requestData.adminNotificationIds)
+            ? requestData.adminNotificationIds.map((id) => String(id))
+            : [];
+        if (decision === 'approved') {
+            transaction.update(doctorRef, Object.assign(Object.assign({ isAvailable: false, lastUnavailableApprovedAt: now, lastAvailabilityRequestId: requestId, lastAvailabilityRequestReason: reason, availabilityUsageMonth: monthKey }, clearPendingAvailabilityFields()), { updatedAt: now }));
+            transaction.set(usageRef, {
+                doctorId,
+                doctorUserId,
+                monthKey,
+                approvedCount: approvedCount + 1,
+                updatedAt: now,
+            }, { merge: true });
+        }
+        else {
+            transaction.update(doctorRef, Object.assign(Object.assign({}, clearPendingAvailabilityFields()), { updatedAt: now }));
+        }
+        transaction.update(requestRef, {
+            status: decision,
+            reviewedAt: now,
+            reviewedBy: callerUid,
+            reviewedByName: callerData.fullName || null,
+            updatedAt: now,
+        });
+        return {
+            doctorId,
+            doctorUserId,
+            doctorName,
+            reason,
+            monthKey,
+            notificationIds,
+        };
+    });
+    let cancelledAppointments = 0;
+    let cancellationError = null;
+    if (decision === 'approved') {
+        try {
+            const cancellation = await cancelActiveAppointmentsForUnavailableDoctor({
+                doctorId: reviewContext.doctorId,
+                reviewedByUid: callerUid,
+                doctorName: reviewContext.doctorName,
+                requestId,
+            });
+            cancelledAppointments = cancellation.cancelledCount;
+            await requestRef.update({
+                cancelledAppointmentIds: cancellation.appointmentIds,
+                cancelledAppointments,
+                cancellationProcessedAt: admin.firestore.Timestamp.now(),
+            });
+        }
+        catch (error) {
+            cancellationError = errorMessage(error).slice(0, 240);
+            console.error('Failed to cancel appointments for availability approval:', error);
+            await requestRef.update({
+                cancellationError,
+                cancellationProcessedAt: admin.firestore.Timestamp.now(),
+            }).catch(() => { });
+        }
+    }
+    await updateDoctorAvailabilityAdminNotifications({
+        notificationIds: reviewContext.notificationIds,
+        status: decision,
+        doctorName: reviewContext.doctorName,
+        reviewerUid: callerUid,
+        reviewerName: callerData.fullName,
+    });
+    await createTrustedNotification({
+        userId: reviewContext.doctorUserId,
+        title: decision === 'approved'
+            ? 'Availability request approved'
+            : 'Availability request rejected',
+        body: decision === 'approved'
+            ? 'Your request was approved. You are now unavailable.'
+            : 'Your request was rejected',
+        type: 'doctorAvailabilityDecision',
+        data: {
+            availabilityRequestId: requestId,
+            status: decision,
+            cancelledAppointments,
+        },
+        reminderType: 'immediate',
+    });
+    await writeAdminAuditLog({
+        actorUid: callerUid,
+        actorRole: callerData.role,
+        actorName: callerData.fullName,
+        targetUid: reviewContext.doctorUserId,
+        targetName: reviewContext.doctorName,
+        targetRoleBefore: 'doctor',
+        targetRoleAfter: 'doctor',
+        action: `doctorAvailability.${decision}`,
+        metadata: {
+            requestId,
+            doctorId: reviewContext.doctorId,
+            monthKey: reviewContext.monthKey,
+            cancelledAppointments,
+            cancellationError,
+        },
+    });
+    return {
+        success: true,
+        status: decision,
+        cancelledAppointments,
+        cancellationError,
+    };
+});
+/**
+ * Search valid single-send recipients without granting broad user-list access.
+ */
+exports.searchAdminNotificationRecipients = functions.https.onCall(async (request) => {
+    try {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requirePermission(callerDoc, 'notifications.send');
+        const data = request.data || {};
+        const targetType = data.targetType;
+        if (targetType !== 'singlePatient' && targetType !== 'singleDoctor') {
+            throw new functions.https.HttpsError('invalid-argument', 'Recipient search is only available for singlePatient and singleDoctor.');
+        }
+        const query = normalizeSearchText(data.query);
+        const limit = Math.min(Math.max(Number(data.limit) || 10, 1), 20);
+        if (query.length < 2) {
+            return { success: true, recipients: [] };
+        }
+        if (targetType === 'singlePatient') {
+            const recipients = (await getActivePatientRecipients())
+                .filter((recipient) => matchesRecipientQuery(recipient, query))
+                .slice(0, limit);
+            return { success: true, recipients };
+        }
+        const recipients = (await getActiveDoctorRecipients())
+            .filter((recipient) => matchesRecipientQuery(recipient, query))
+            .slice(0, limit);
+        return { success: true, recipients };
+    }
+    catch (error) {
+        console.error('searchAdminNotificationRecipients failed:', error);
+        throw toHttpsError(error, 'Failed to search notification recipients.');
+    }
+});
+/**
+ * Preview trusted recipient count before confirmation.
+ */
+exports.previewAdminNotificationRecipients = functions.https.onCall(async (request) => {
+    try {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        requirePermission(callerDoc, 'notifications.send');
+        const data = request.data || {};
+        const targetType = assertAdminNotificationTarget(data);
+        const recipients = await getAdminNotificationRecipients(targetType, data.targetUserId);
+        return {
+            success: true,
+            targetLabel: adminNotificationTargetLabel(targetType),
+            recipientCount: recipients.length,
+        };
+    }
+    catch (error) {
+        console.error('previewAdminNotificationRecipients failed:', error);
+        throw toHttpsError(error, 'Failed to count notification recipients.');
+    }
+});
+/**
+ * Callable Cloud Function for admins to send trusted in-app and push notifications.
+ */
+exports.sendAdminNotification = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    requirePermission(callerDoc, 'notifications.send');
+    const data = request.data;
+    const targetType = assertAdminNotificationTarget(data);
+    const title = requireTrimmedText(data.title, 'title', 80);
+    const body = requireTrimmedText(data.body, 'body', 500);
+    const requestId = sanitizeAdminNotificationRequestId(data.requestId);
+    const recipients = await getAdminNotificationRecipients(targetType, data.targetUserId);
+    if (recipients.length === 0) {
+        throw new functions.https.HttpsError('failed-precondition', 'No active recipients matched this target.');
+    }
+    enforceAdminNotificationCap(recipients.length);
+    const callerData = callerDoc.data();
+    const sendId = await reserveAdminNotificationSend(callerUid, requestId);
+    const baseAudit = {
+        actorUid: callerUid,
+        actorRole: callerData.role,
+        actorName: callerData.fullName,
+        targetUid: data.targetUserId || targetType,
+        targetName: adminNotificationTargetLabel(targetType),
+    };
+    await writeAdminAuditLog(Object.assign(Object.assign({}, baseAudit), { action: 'notifications.send.attempt', metadata: {
+            sendId,
+            targetType,
+            recipientCount: recipients.length,
+            titlePreview: title.slice(0, 80),
+            bodyLength: body.length,
+        } }));
+    let notificationIds = [];
+    try {
+        notificationIds = await createAdminNotificationDocs({
+            sendId,
+            callerUid,
+            recipients,
+            targetType,
+            title,
+            body,
+            notificationIds,
+        });
+    }
+    catch (error) {
+        await markAdminNotificationSend(sendId, 'failed', {
+            targetType,
+            recipientCount: recipients.length,
+            createdCount: notificationIds.length,
+            errorMessage: errorMessage(error).slice(0, 240),
+        }).catch(() => { });
+        await writeAdminAuditLog(Object.assign(Object.assign({}, baseAudit), { action: 'notifications.send.failed', metadata: {
+                sendId,
+                targetType,
+                recipientCount: recipients.length,
+                createdCount: notificationIds.length,
+                errorMessage: errorMessage(error).slice(0, 240),
+            } })).catch(() => { });
+        throw toHttpsError(error, 'Failed to create notification records.');
+    }
+    await markAdminNotificationSend(sendId, 'completed', {
+        targetType,
+        recipientCount: recipients.length,
+        createdCount: notificationIds.length,
+    });
+    await writeAdminAuditLog(Object.assign(Object.assign({}, baseAudit), { action: 'notifications.send', metadata: {
+            sendId,
+            targetType,
+            recipientCount: recipients.length,
+            createdCount: notificationIds.length,
+            titlePreview: title.slice(0, 80),
+            bodyLength: body.length,
+        } }));
+    return {
+        success: true,
+        targetLabel: adminNotificationTargetLabel(targetType),
+        recipientCount: recipients.length,
+        notificationIds,
+        message: 'Notification queued for delivery.',
+    };
+});
 /**
  * Callable Cloud Function for admins to send notifications to FCM topics
  * (e.g. "announcements", "department_cardiology").
  */
 exports.sendTopicNotification = functions.https.onCall(async (request) => {
-    const data = request.data;
     const callerUid = requireAuth(request);
     const callerDoc = await getCallerUserDoc(callerUid);
     requirePermission(callerDoc, 'notifications.send');
-    if (!data.topic || !data.title || !data.body) {
-        throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: topic, title, body');
-    }
-    if (!['announcements', 'health_tips', 'system_updates'].includes(data.topic)) {
-        throw new functions.https.HttpsError('permission-denied', 'Only approved non-sensitive broadcast topics are allowed.');
-    }
-    try {
-        const message = {
-            topic: data.topic,
-            notification: {
-                title: data.title,
-                body: data.body,
-            },
-            data: data.data || {},
-            android: {
-                priority: 'high',
-                notification: {
-                    channelId: 'uhc_notifications',
-                    sound: 'default',
-                },
-            },
-            apns: {
-                payload: {
-                    aps: {
-                        sound: 'default',
-                    },
-                },
-            },
-        };
-        const messageId = await messaging.send(message);
-        console.log(`Topic notification sent to "${data.topic}", messageId: ${messageId}`);
-        return {
-            success: true,
-            messageId,
-            message: `Notification sent to topic "${data.topic}" successfully`,
-        };
-    }
-    catch (error) {
-        console.error('Error sending topic notification:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to send topic notification.');
-    }
+    await writeAdminAuditLog({
+        actorUid: callerUid,
+        actorRole: callerDoc.data().role,
+        actorName: callerDoc.data().fullName,
+        targetUid: 'topic',
+        targetName: 'Legacy topic notification',
+        action: 'notifications.topicSend.blocked',
+        metadata: {
+            reason: 'deprecated_unaudited_topic_send',
+        },
+    }).catch(() => { });
+    throw new functions.https.HttpsError('failed-precondition', 'Topic notifications are disabled. Use sendAdminNotification so notifications are audited and visible in-app.');
 });
 // ─────────────────────────────────────────────────────────
 // Super Admin Governance Functions
@@ -1607,18 +2890,21 @@ exports.createAdminAccount = functions.https.onCall(async (request) => {
     if (!data.email || !data.password || !data.fullName) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields.');
     }
-    if (data.password.length < 12) {
-        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters.');
+    if (data.password.length < MIN_PASSWORD_LENGTH) {
+        throw new functions.https.HttpsError('invalid-argument', MIN_PASSWORD_ERROR);
     }
+    let createdUid = null;
     try {
         const userRecord = await auth.createUser({
             email: data.email, password: data.password,
             displayName: data.fullName, emailVerified: false,
         });
+        createdUid = userRecord.uid;
         const now = admin.firestore.Timestamp.now();
+        const uploadedPhotoUrl = await uploadProfilePhoto(userRecord.uid, data.photoUpload);
         await db.collection('users').doc(userRecord.uid).set({
             email: data.email, fullName: data.fullName, role: 'admin',
-            phoneNumber: data.phoneNumber || null, photoUrl: data.photoUrl || null,
+            phoneNumber: data.phoneNumber || null, photoUrl: uploadedPhotoUrl || data.photoUrl || null,
             dateOfBirth: data.dateOfBirth ? admin.firestore.Timestamp.fromDate(new Date(data.dateOfBirth)) : null,
             isActive: true,
             adminPermissions: READ_ONLY_ADMIN_PERMISSIONS,
@@ -1635,6 +2921,17 @@ exports.createAdminAccount = functions.https.onCall(async (request) => {
         return { success: true, userId: userRecord.uid, message: 'Admin account created successfully' };
     }
     catch (error) {
+        if (createdUid) {
+            await auth.deleteUser(createdUid).catch((cleanupError) => {
+                console.error('Failed to clean up created admin auth user:', cleanupError);
+            });
+            await deleteProfilePhotos(createdUid).catch((cleanupError) => {
+                console.error('Failed to clean up uploaded admin profile photo:', cleanupError);
+            });
+        }
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
         if (error && typeof error === 'object' && 'code' in error) {
             const e = error;
             if (e.code === 'auth/email-already-exists')
@@ -1714,8 +3011,8 @@ exports.resetAdminPassword = functions.https.onCall(async (request) => {
         const callerDoc = await getCallerUserDoc(callerUid);
         requireSuperAdmin(callerDoc);
         const { targetUid, newPassword } = request.data;
-        if (!targetUid || !newPassword || newPassword.length < 12)
-            throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 12 characters.');
+        if (!targetUid || !newPassword || newPassword.length < MIN_PASSWORD_LENGTH)
+            throw new functions.https.HttpsError('invalid-argument', MIN_PASSWORD_ERROR);
         const targetDoc = await db.collection('users').doc(targetUid).get();
         if (!targetDoc.exists)
             throw new functions.https.HttpsError('not-found', 'Target user not found.');
@@ -1754,6 +3051,7 @@ exports.deleteAdminAccount = functions.https.onCall(async (request) => {
     catch (e) {
         console.log('Auth user may not exist:', e);
     }
+    await deleteProfilePhotos(targetUid);
     await db.collection('users').doc(targetUid).delete();
     await writeAdminAuditLog({
         actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data().fullName,
@@ -1818,10 +3116,13 @@ exports.setAdminPermissions = functions.https.onCall(async (request) => {
         const callerUid = requireAuth(request);
         const callerDoc = await getCallerUserDoc(callerUid);
         requireSuperAdmin(callerDoc);
-        const { targetUid, permissions } = request.data;
+        const data = request.data || {};
+        const { permissions } = data;
+        const targetUid = requireTargetUserId(data.targetUid, 'targetUid');
         if (!targetUid || !permissions || typeof permissions !== 'object') {
             throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid targetUid/permissions.');
         }
+        const sanitizedPermissions = sanitizeAdminPermissions(permissions);
         const targetDoc = await db.collection('users').doc(targetUid).get();
         if (!targetDoc.exists)
             throw new functions.https.HttpsError('not-found', 'Target user not found.');
@@ -1829,7 +3130,7 @@ exports.setAdminPermissions = functions.https.onCall(async (request) => {
             throw new functions.https.HttpsError('failed-precondition', 'Permissions can only be set on admin accounts.');
         const oldPerms = targetDoc.data().adminPermissions || {};
         await db.collection('users').doc(targetUid).update({
-            adminPermissions: permissions,
+            adminPermissions: sanitizedPermissions,
             updatedAt: admin.firestore.Timestamp.now(),
         });
         await writeAdminAuditLog({
@@ -1837,7 +3138,7 @@ exports.setAdminPermissions = functions.https.onCall(async (request) => {
             targetUid, targetName: targetDoc.data().fullName,
             action: 'admin.permissionsUpdate',
             before: oldPerms,
-            after: permissions,
+            after: sanitizedPermissions,
         });
         return { success: true, message: 'Permissions updated' };
     }

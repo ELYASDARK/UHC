@@ -18,12 +18,15 @@ class DoctorManagementScreen extends StatefulWidget {
   State<DoctorManagementScreen> createState() => _DoctorManagementScreenState();
 }
 
+enum _DoctorStatusFilter { active, inactive, available, unavailable }
+
 class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _searchController = TextEditingController();
   final _doctorFunctionsService = DoctorFunctionsService();
   String _searchQuery = '';
   Set<Department> _selectedDepartments = {};
+  Set<_DoctorStatusFilter> _selectedStatusFilters = {};
 
   /// Whether the current admin can perform doctor management mutations
   bool get _canManage =>
@@ -103,7 +106,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
             ),
 
             // Filter Chips
-            if (_selectedDepartments.isNotEmpty)
+            if (_selectedDepartments.isNotEmpty ||
+                _selectedStatusFilters.isNotEmpty)
               ResponsiveContent(
                 maxWidth: 1320,
                 child: Padding(
@@ -111,30 +115,58 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                       UhcResponsive.pagePadding(context, top: 0, bottom: 8),
                   child: Wrap(
                     spacing: 8,
-                    children: _selectedDepartments.map((dept) {
-                      return Chip(
-                        label: Text(
-                          dept.name.toUpperCase(),
-                          style: TextStyle(
-                            color: isDark ? Colors.white : AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                    runSpacing: 8,
+                    children: [
+                      ..._selectedDepartments.map((dept) {
+                        return Chip(
+                          label: Text(
+                            dept.name.toUpperCase(),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                        backgroundColor: isDark
-                            ? AppColors.primary.withValues(alpha: 0.2)
-                            : AppColors.primary.withValues(alpha: 0.1),
-                        side: BorderSide(
-                          color: isDark
-                              ? AppColors.primary.withValues(alpha: 0.5)
-                              : AppColors.primary.withValues(alpha: 0.2),
-                        ),
-                        onDeleted: () =>
-                            setState(() => _selectedDepartments.remove(dept)),
-                        deleteIconColor:
-                            isDark ? Colors.white70 : AppColors.primary,
-                      );
-                    }).toList(),
+                          backgroundColor: isDark
+                              ? AppColors.primary.withValues(alpha: 0.2)
+                              : AppColors.primary.withValues(alpha: 0.1),
+                          side: BorderSide(
+                            color: isDark
+                                ? AppColors.primary.withValues(alpha: 0.5)
+                                : AppColors.primary.withValues(alpha: 0.2),
+                          ),
+                          onDeleted: () =>
+                              setState(() => _selectedDepartments.remove(dept)),
+                          deleteIconColor:
+                              isDark ? Colors.white70 : AppColors.primary,
+                        );
+                      }),
+                      ..._selectedStatusFilters.map((status) {
+                        return Chip(
+                          label: Text(
+                            _statusFilterLabel(status),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          backgroundColor: isDark
+                              ? AppColors.primary.withValues(alpha: 0.2)
+                              : AppColors.primary.withValues(alpha: 0.1),
+                          side: BorderSide(
+                            color: isDark
+                                ? AppColors.primary.withValues(alpha: 0.5)
+                                : AppColors.primary.withValues(alpha: 0.2),
+                          ),
+                          onDeleted: () => setState(
+                            () => _selectedStatusFilters.remove(status),
+                          ),
+                          deleteIconColor:
+                              isDark ? Colors.white70 : AppColors.primary,
+                        );
+                      }),
+                    ],
                   ),
                 ),
               ),
@@ -192,8 +224,10 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                     final matchesSearch = name.contains(
                       _searchQuery.toLowerCase(),
                     );
+                    final matchesStatus = _matchesStatusFilters(data);
+                    if (!matchesSearch || !matchesStatus) return false;
 
-                    if (_selectedDepartments.isEmpty) return matchesSearch;
+                    if (_selectedDepartments.isEmpty) return true;
 
                     final deptName = data['department'] as String?;
                     final dept = Department.values.firstWhere(
@@ -201,7 +235,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                       orElse: () => Department.generalMedicine,
                     );
 
-                    return matchesSearch && _selectedDepartments.contains(dept);
+                    return _selectedDepartments.contains(dept);
                   }).toList();
 
                   return ResponsiveListView(
@@ -236,12 +270,75 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
     return _firestore.collection('doctors').orderBy('name').snapshots();
   }
 
+  String _statusFilterLabel(_DoctorStatusFilter status) {
+    switch (status) {
+      case _DoctorStatusFilter.active:
+        return 'Active';
+      case _DoctorStatusFilter.inactive:
+        return 'Inactive';
+      case _DoctorStatusFilter.available:
+        return 'Available';
+      case _DoctorStatusFilter.unavailable:
+        return 'Unavailable';
+    }
+  }
+
+  bool _matchesStatusFilters(Map<String, dynamic> data) {
+    final isActive = data['isActive'] ?? true;
+    final isAvailable = data['isAvailable'] ?? true;
+
+    if (_selectedStatusFilters.isEmpty) {
+      return isActive;
+    }
+
+    final accountStatusSelected =
+        _selectedStatusFilters.contains(_DoctorStatusFilter.active) ||
+            _selectedStatusFilters.contains(_DoctorStatusFilter.inactive);
+    final availabilitySelected =
+        _selectedStatusFilters.contains(_DoctorStatusFilter.available) ||
+            _selectedStatusFilters.contains(_DoctorStatusFilter.unavailable);
+
+    final matchesAccount = !accountStatusSelected ||
+        (_selectedStatusFilters.contains(_DoctorStatusFilter.active) &&
+            isActive) ||
+        (_selectedStatusFilters.contains(_DoctorStatusFilter.inactive) &&
+            !isActive);
+    final matchesAvailability = !availabilitySelected ||
+        (_selectedStatusFilters.contains(_DoctorStatusFilter.available) &&
+            isAvailable) ||
+        (_selectedStatusFilters.contains(_DoctorStatusFilter.unavailable) &&
+            !isAvailable);
+
+    return matchesAccount && matchesAvailability;
+  }
+
+  Widget _buildStatusBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
   Widget _buildDoctorCard(
     BuildContext context,
     String id,
     Map<String, dynamic> data,
     bool isDark,
   ) {
+    final isActive = data['isActive'] ?? true;
+    final isAvailable = data['isAvailable'] ?? true;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -318,6 +415,21 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _buildStatusBadge(
+                          isActive ? 'Active' : 'Inactive',
+                          isActive ? AppColors.success : Colors.grey,
+                        ),
+                        _buildStatusBadge(
+                          isAvailable ? 'Available' : 'Unavailable',
+                          isAvailable ? AppColors.success : AppColors.error,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -338,7 +450,10 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                       _confirmDelete(id, data['name'] ?? 'this doctor', data);
                       break;
                     case 'toggle':
-                      _toggleDoctorStatus(id, data['isActive'] ?? true);
+                      _toggleDoctorStatus(id, isActive);
+                      break;
+                    case 'availability':
+                      _toggleDoctorAvailability(id, isAvailable);
                       break;
                   }
                 },
@@ -391,6 +506,28 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                     ),
                   ),
                   PopupMenuItem(
+                    value: 'availability',
+                    enabled: _canManage,
+                    child: Row(
+                      children: [
+                        Icon(
+                          isAvailable
+                              ? Icons.event_busy
+                              : Icons.event_available,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(isAvailable
+                            ? 'Make Unavailable'
+                            : 'Make Available'),
+                        if (!_canManage) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
                     value: 'delete',
                     enabled: _canManage,
                     child: Row(
@@ -421,35 +558,70 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
       context: context,
       builder: (context) {
         final tempSelected = Set<Department>.from(_selectedDepartments);
+        final tempStatusSelected =
+            Set<_DoctorStatusFilter>.from(_selectedStatusFilters);
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Filter by Department'),
+              title: const Text('Filter Doctors'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: Department.values.map((dept) {
-                    return CheckboxListTile(
-                      title: Text(dept.name),
-                      value: tempSelected.contains(dept),
-                      activeColor: AppColors.primary,
-                      onChanged: (bool? selected) {
-                        setState(() {
-                          if (selected == true) {
-                            tempSelected.add(dept);
-                          } else {
-                            tempSelected.remove(dept);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Status',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._DoctorStatusFilter.values.map((status) {
+                      return CheckboxListTile(
+                        title: Text(_statusFilterLabel(status)),
+                        value: tempStatusSelected.contains(status),
+                        activeColor: AppColors.primary,
+                        onChanged: (bool? selected) {
+                          setState(() {
+                            if (selected == true) {
+                              tempStatusSelected.add(status);
+                            } else {
+                              tempStatusSelected.remove(status);
+                            }
+                          });
+                        },
+                      );
+                    }),
+                    const Divider(height: 24),
+                    const Text(
+                      'Department',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ...Department.values.map((dept) {
+                      return CheckboxListTile(
+                        title: Text(dept.name),
+                        value: tempSelected.contains(dept),
+                        activeColor: AppColors.primary,
+                        onChanged: (bool? selected) {
+                          setState(() {
+                            if (selected == true) {
+                              tempSelected.add(dept);
+                            } else {
+                              tempSelected.remove(dept);
+                            }
+                          });
+                        },
+                      );
+                    }),
+                  ],
                 ),
               ),
               actions: [
                 TextButton(
                   onPressed: () {
-                    this.setState(() => _selectedDepartments.clear());
+                    this.setState(() {
+                      _selectedDepartments.clear();
+                      _selectedStatusFilters.clear();
+                    });
                     Navigator.pop(context);
                   },
                   child: const Text('Clear All'),
@@ -462,6 +634,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                   onPressed: () {
                     this.setState(() {
                       _selectedDepartments = tempSelected;
+                      _selectedStatusFilters = tempStatusSelected;
                     });
                     Navigator.pop(context);
                   },
@@ -608,6 +781,48 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
     }
   }
 
+  Future<void> _toggleDoctorAvailability(
+    String id,
+    bool currentAvailability,
+  ) async {
+    try {
+      await _doctorFunctionsService.setDoctorAvailabilityByAdmin(
+        doctorId: id,
+        isAvailable: !currentAvailability,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              currentAvailability
+                  ? 'Doctor marked unavailable'
+                  : 'Doctor marked available',
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } on DoctorFunctionException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.userMessage),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update doctor availability: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   /// Show doctor details in a bottom sheet
   Future<void> _showDoctorDetails(
     BuildContext context,
@@ -628,6 +843,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
     final qualifications =
         (data['qualifications'] as List<dynamic>?)?.cast<String>() ?? [];
     final isActive = data['isActive'] ?? true;
+    final isAvailable = data['isAvailable'] ?? true;
     final photoUrl = data['photoUrl'] as String?;
     final userId = data['userId'] as String?;
 
@@ -782,6 +998,15 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                               isDark,
                               valueColor:
                                   isActive ? AppColors.success : Colors.grey,
+                            ),
+                            _buildDivider(isDark),
+                            _buildDetailRow(
+                              'Availability',
+                              isAvailable ? 'Available' : 'Unavailable',
+                              isDark,
+                              valueColor: isAvailable
+                                  ? AppColors.success
+                                  : AppColors.error,
                             ),
                           ],
                         ),

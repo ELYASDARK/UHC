@@ -132,12 +132,34 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /doctor_availability_requests/{requestId} {
+      allow read: if isActiveUser() &&
+        (
+          resource.data.doctorUserId == request.auth.uid ||
+          hasRolePermission('doctors.manage')
+        );
+      allow create, update, delete: if false;
+    }
+
     match /doctors/{doctorId} {
       allow read: if isActiveUser();
       allow update: if isActiveUser() &&
         resource.data.userId == request.auth.uid &&
         !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['userId', 'email', 'isActive']);
+          .hasAny([
+            'userId',
+            'email',
+            'isActive',
+            'isAvailable',
+            'availabilityRequestStatus',
+            'pendingAvailabilityRequestId',
+            'availabilityRequestReason',
+            'availabilityRequestedAt',
+            'lastUnavailableApprovedAt',
+            'lastAvailabilityRequestId',
+            'lastAvailabilityRequestReason',
+            'availabilityUsageMonth'
+          ]);
       allow create, delete: if false;
     }
 

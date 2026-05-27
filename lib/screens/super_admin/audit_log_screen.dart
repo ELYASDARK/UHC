@@ -43,6 +43,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     'admin.delete',
     'admin.forceSignOut',
     'admin.permissionsUpdate',
+    'notifications.send',
     'superAdmin.slotAssign',
     'superAdmin.slotRotate',
   ];
@@ -58,6 +59,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     'admin.delete': 'Delete Admin',
     'admin.forceSignOut': 'Force Sign-Out',
     'admin.permissionsUpdate': 'Permissions Update',
+    'notifications.send': 'Send Notification',
     'superAdmin.slotAssign': 'Slot Assign',
     'superAdmin.slotRotate': 'Slot Rotate',
   };
@@ -722,6 +724,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         return Icons.logout;
       case 'admin.permissionsUpdate':
         return Icons.security;
+      case 'notifications.send':
+        return Icons.campaign;
       case 'superAdmin.slotAssign':
         return Icons.star;
       case 'superAdmin.slotRotate':
@@ -741,6 +745,8 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         return AppColors.warning;
       case 'admin.activate':
       case 'admin.deactivate':
+        return AppColors.info;
+      case 'notifications.send':
         return AppColors.info;
       default:
         return const Color(0xFFD32F2F);

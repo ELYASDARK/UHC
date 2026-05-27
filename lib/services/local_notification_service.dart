@@ -26,6 +26,7 @@ class LocalNotificationService {
 
   // Callback for notification taps
   Function(String? payload)? onNotificationTap;
+  bool _isInitialized = false;
 
   /// Initialize the notification service
   Future<void> initialize({Function(String? payload)? onTap}) async {
@@ -58,6 +59,7 @@ class LocalNotificationService {
 
     // Create notification channels for Android
     await _createNotificationChannels();
+    _isInitialized = true;
   }
 
   /// Create Android notification channels
@@ -365,6 +367,7 @@ class LocalNotificationService {
 
   /// Cancel a scheduled notification
   Future<void> cancelNotification(int id) async {
+    if (kIsWeb || !_isInitialized) return;
     await _notifications.cancel(id: id);
   }
 
@@ -377,11 +380,13 @@ class LocalNotificationService {
 
   /// Cancel all notifications
   Future<void> cancelAllNotifications() async {
+    if (kIsWeb || !_isInitialized) return;
     await _notifications.cancelAll();
   }
 
   /// Get pending notifications
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    if (kIsWeb || !_isInitialized) return const [];
     return await _notifications.pendingNotificationRequests();
   }
 

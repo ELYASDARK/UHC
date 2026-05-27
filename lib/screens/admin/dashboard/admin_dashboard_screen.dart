@@ -8,6 +8,7 @@ import '../../../providers/auth_provider.dart';
 import '../departments/department_management_screen.dart';
 import '../doctors/doctor_management_screen.dart';
 import '../users/user_management_screen.dart';
+import '../notifications/admin_notification_sender_screen.dart';
 import '../analytics/appointment_analytics_screen.dart';
 import '../reports/reports_screen.dart';
 import '../../../core/widgets/loading_skeleton.dart';
@@ -322,6 +323,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildQuickActions(bool isDark) {
     final user = context.read<AuthProvider>().currentUser;
+    final canSendNotifications =
+        user?.hasPermission('notifications.send') ?? false;
 
     final actions = <Widget>[
       _buildActionCard(
@@ -372,9 +375,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       _buildActionCard(
         isDark: isDark,
+        title: 'Send Notification',
+        icon: Icons.campaign,
+        color: Colors.deepOrange,
+        isEnabled: canSendNotifications,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AdminNotificationSenderScreen(),
+          ),
+        ),
+      ),
+      _buildActionCard(
+        isDark: isDark,
         title: 'Departments',
         icon: Icons.business,
-        color: Colors.teal,
+        color: Colors.indigo,
         isEnabled: user?.hasPermission('departments.view') ?? false,
         onTap: () => Navigator.push(
           context,

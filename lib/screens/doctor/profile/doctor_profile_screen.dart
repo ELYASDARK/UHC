@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -543,20 +541,12 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             onPressed: () async {
               Navigator.of(dialogContext).pop();
 
-              final userId = auth.currentUser?.id;
               final notificationProvider = ctx.read<NotificationProvider>();
 
-              // Run cleanup in background so web logout is never blocked.
-              if (userId != null) {
-                unawaited(
-                  notificationProvider.onLogout(userId).catchError((e) {
-                    debugPrint('Notification cleanup on logout failed: $e');
-                  }),
-                );
-              }
-
               try {
-                await auth.signOut();
+                await auth.signOut(
+                  beforeSignOut: notificationProvider.onLogout,
+                );
               } catch (_) {
                 if (!ctx.mounted) return;
                 ScaffoldMessenger.of(ctx).showSnackBar(

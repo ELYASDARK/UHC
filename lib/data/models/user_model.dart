@@ -27,6 +27,7 @@ class UserModel {
   final String language;
   final String themeMode;
   final String? googleEmail;
+  final bool requiresInitialPasswordChange;
 
   /// Only set when role == superAdmin
   final SuperAdminType? superAdminType;
@@ -53,6 +54,7 @@ class UserModel {
     this.language = 'en',
     this.themeMode = 'system',
     this.googleEmail,
+    this.requiresInitialPasswordChange = false,
     this.superAdminType,
     this.adminPermissions,
   });
@@ -83,6 +85,8 @@ class UserModel {
       language: data['language'] ?? 'en',
       themeMode: data['themeMode'] ?? 'system',
       googleEmail: data['googleEmail'],
+      requiresInitialPasswordChange:
+          data['requiresInitialPasswordChange'] ?? false,
       superAdminType: data['superAdminType'] != null
           ? SuperAdminType.values.firstWhere(
               (t) => t.name == data['superAdminType'],
@@ -116,6 +120,7 @@ class UserModel {
       'language': language,
       'themeMode': themeMode,
       'googleEmail': googleEmail,
+      'requiresInitialPasswordChange': requiresInitialPasswordChange,
       'superAdminType': superAdminType?.name,
       'adminPermissions': adminPermissions?.toMap(),
     };
@@ -140,6 +145,7 @@ class UserModel {
     String? language,
     String? themeMode,
     String? googleEmail,
+    bool? requiresInitialPasswordChange,
     SuperAdminType? superAdminType,
     AdminPermissions? adminPermissions,
   }) {
@@ -162,6 +168,8 @@ class UserModel {
       language: language ?? this.language,
       themeMode: themeMode ?? this.themeMode,
       googleEmail: googleEmail ?? this.googleEmail,
+      requiresInitialPasswordChange:
+          requiresInitialPasswordChange ?? this.requiresInitialPasswordChange,
       superAdminType: superAdminType ?? this.superAdminType,
       adminPermissions: adminPermissions ?? this.adminPermissions,
     );

@@ -25,6 +25,7 @@ class AuthService {
       'This account cannot access UHC. Please contact your administrator.';
   static const String _deactivatedAccountMessage =
       'Your account has been deactivated. Please contact support.';
+  static const int _minimumPasswordLength = 8;
 
   /// Current Firebase user
   User? get currentUser => _auth.currentUser;
@@ -391,6 +392,37 @@ class AuthService {
     }
   }
 
+  /// Change the admin-issued temporary password and clear the one-time gate.
+  Future<void> completeInitialPasswordChange(String newPassword) async {
+    final user = currentUser;
+    if (user == null) {
+      throw Exception('No user logged in');
+    }
+    if (!isPasswordLinked) {
+      throw Exception(
+        'This account is not using email/password sign-in. Password cannot be changed here.',
+      );
+    }
+    if (newPassword.length < _minimumPasswordLength) {
+      throw Exception(
+        'Password must be at least $_minimumPasswordLength characters',
+      );
+    }
+
+    try {
+      await user.updatePassword(newPassword);
+
+      final callable = _functions.httpsCallable(
+        'completeInitialPasswordChange',
+      );
+      await callable.call<Map<String, dynamic>>({
+        'newPassword': newPassword,
+      });
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
   /// Sign out
   Future<void> signOut() async {
     if (!kIsWeb) {
@@ -614,6 +646,8 @@ class AuthService {
         return 'This email is already registered.';
       case 'weak-password':
         return 'Password is too weak.';
+      case 'requires-recent-login':
+        return 'Please sign in again, then choose your new password.';
       case 'invalid-email':
         return 'Invalid email address.';
       case 'user-disabled':

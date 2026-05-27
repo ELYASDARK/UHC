@@ -145,6 +145,18 @@ class DoctorRepository {
     });
   }
 
+  /// Stream one doctor for real-time updates.
+  Stream<DoctorModel?> streamDoctorById(String doctorId) {
+    if (doctorId.trim().isEmpty) {
+      return const Stream<DoctorModel?>.empty();
+    }
+
+    return _doctorsRef.doc(doctorId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return DoctorModel.fromFirestore(doc);
+    });
+  }
+
   /// Stream doctors by department
   Stream<List<DoctorModel>> streamDoctorsByDepartment(Department department) {
     return _doctorsRef

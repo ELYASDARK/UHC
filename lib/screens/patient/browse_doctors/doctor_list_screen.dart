@@ -340,9 +340,24 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   }
 
   void _navigateToDetail(DoctorModel doctor) {
+    if (!doctor.isAvailable) {
+      _showDoctorUnavailableMessage();
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => DoctorDetailScreen(doctor: doctor)),
+    );
+  }
+
+  void _showDoctorUnavailableMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This doctor is not available for booking right now.'),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 }
@@ -361,6 +376,8 @@ class _DoctorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canOpen = doctor.isAvailable;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -368,6 +385,9 @@ class _DoctorCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(16),
+          border: !canOpen
+              ? Border.all(color: AppColors.error.withValues(alpha: 0.35))
+              : null,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -468,6 +488,16 @@ class DoctorDetailScreen extends StatelessWidget {
   final DoctorModel doctor;
 
   const DoctorDetailScreen({super.key, required this.doctor});
+
+  void _showUnavailableDoctorMessage(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This doctor is not available for booking right now.'),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -710,6 +740,10 @@ class DoctorDetailScreen extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
+                    if (!doctor.isAvailable) {
+                      _showUnavailableDoctorMessage(context);
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -718,13 +752,17 @@ class DoctorDetailScreen extends StatelessWidget {
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
+                    foregroundColor:
+                        doctor.isAvailable ? AppColors.primary : Colors.grey,
                     minimumSize: const Size(0, 56),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    side:
-                        const BorderSide(color: AppColors.primary, width: 1.5),
+                    side: BorderSide(
+                      color:
+                          doctor.isAvailable ? AppColors.primary : Colors.grey,
+                      width: 1.5,
+                    ),
                   ),
                   icon: const Icon(Icons.schedule_rounded),
                   label: Text(
@@ -741,6 +779,10 @@ class DoctorDetailScreen extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
+                    if (!doctor.isAvailable) {
+                      _showUnavailableDoctorMessage(context);
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -749,7 +791,8 @@ class DoctorDetailScreen extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor:
+                        doctor.isAvailable ? AppColors.primary : Colors.grey,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(0, 56),
                     shape: RoundedRectangleBorder(
@@ -1002,10 +1045,15 @@ class DoctorDetailScreen extends StatelessWidget {
   }
 
   Widget _buildDoctorActions(BuildContext context, {bool vertical = false}) {
+    final canBook = doctor.isAvailable;
     final scheduleButton = SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: () {
+          if (!canBook) {
+            _showUnavailableDoctorMessage(context);
+            return;
+          }
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -1014,12 +1062,15 @@ class DoctorDetailScreen extends StatelessWidget {
           );
         },
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: canBook ? AppColors.primary : Colors.grey,
           minimumSize: const Size(0, 56),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          side: const BorderSide(color: AppColors.primary, width: 1.5),
+          side: BorderSide(
+            color: canBook ? AppColors.primary : Colors.grey,
+            width: 1.5,
+          ),
         ),
         icon: const Icon(Icons.schedule_rounded),
         label: Text(
@@ -1032,13 +1083,17 @@ class DoctorDetailScreen extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () {
+          if (!canBook) {
+            _showUnavailableDoctorMessage(context);
+            return;
+          }
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => BookingScreen(doctor: doctor)),
           );
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: canBook ? AppColors.primary : Colors.grey,
           foregroundColor: Colors.white,
           minimumSize: const Size(0, 56),
           shape: RoundedRectangleBorder(

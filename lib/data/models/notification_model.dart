@@ -12,6 +12,9 @@ enum NotificationType {
   systemUpdate,
   healthTip,
   dailySummary,
+  adminAnnouncement,
+  doctorAvailabilityRequest,
+  doctorAvailabilityDecision,
 }
 
 /// Reminder type for appointment notifications

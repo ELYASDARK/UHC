@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -21,6 +24,8 @@ class DoctorScheduleScreen extends StatefulWidget {
 class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   final AppointmentRepository _appointmentRepo = AppointmentRepository();
 
+  late DoctorModel _doctor;
+  StreamSubscription<DocumentSnapshot>? _doctorSubscription;
   CalendarFormat _calendarFormat = CalendarFormat.week;
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
@@ -30,7 +35,28 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   @override
   void initState() {
     super.initState();
+    _doctor = widget.doctor;
+    _subscribeToDoctor();
     _loadBookedSlots(_selectedDay);
+  }
+
+  void _subscribeToDoctor() {
+    _doctorSubscription = FirebaseFirestore.instance
+        .collection('doctors')
+        .doc(widget.doctor.id)
+        .snapshots()
+        .listen((snapshot) {
+      if (!snapshot.exists || !mounted) return;
+      setState(() {
+        _doctor = DoctorModel.fromFirestore(snapshot);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _doctorSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadBookedSlots(DateTime date) async {
@@ -39,7 +65,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
 
     try {
       final appointments = await _appointmentRepo.getDoctorAppointments(
-        widget.doctor.id,
+        _doctor.id,
         date,
       );
       if (!mounted) return;
@@ -79,8 +105,12 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   }
 
   List<TimeSlot> _getAvailableSlots(DateTime date) {
+    if (!_doctor.isAvailable || !_doctor.isActive) {
+      return [];
+    }
+
     final dayName = _getDayName(date);
-    final doctorSlots = widget.doctor.weeklySchedule[dayName];
+    final doctorSlots = _doctor.weeklySchedule[dayName];
 
     // If doctor has specific slots for this day, use them
     if (doctorSlots != null && doctorSlots.isNotEmpty) {
@@ -88,7 +118,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
     }
 
     // Check if doctor has ANY schedule set
-    final hasAnySchedule = widget.doctor.weeklySchedule.values.any(
+    final hasAnySchedule = _doctor.weeklySchedule.values.any(
       (slots) => slots.isNotEmpty,
     );
 
@@ -124,7 +154,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          '${l10n.doctorScheduleTitle} ${widget.doctor.name}',
+          '${l10n.doctorScheduleTitle} ${_doctor.name}',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
@@ -136,7 +166,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) =>
-                        EmergencyRequestScreen(doctor: widget.doctor),
+                        EmergencyRequestScreen(doctor: _doctor),
                   ),
                 );
               }
@@ -460,6 +490,17 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   }
 
   void _onSlotTap(TimeSlot slot) {
+    if (!_doctor.isAvailable || !_doctor.isActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This doctor is not available for booking right now.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     // Capture the outer navigator before opening the bottom sheet
     final navigator = Navigator.of(context);
 
@@ -474,7 +515,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
           maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
         child: _BookingConfirmationSheet(
-          doctor: widget.doctor,
+          doctor: _doctor,
           date: _selectedDay,
           timeSlot: slot,
           parentNavigator: navigator,

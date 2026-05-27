@@ -1166,8 +1166,8 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                             if (value == null || value.isEmpty) {
                               return 'Please enter password';
                             }
-                            if (value.length < 12) {
-                              return 'Password must be at least 12 characters';
+                            if (value.length < 8) {
+                              return 'Password must be at least 8 characters';
                             }
                             return null;
                           },
@@ -1322,8 +1322,8 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                             if (value == null || value.isEmpty) {
                               return 'Please enter password';
                             }
-                            if (value.length < 12) {
-                              return 'Password must be at least 12 characters';
+                            if (value.length < 8) {
+                              return 'Password must be at least 8 characters';
                             }
                             return null;
                           },

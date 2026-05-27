@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -30,6 +32,7 @@ class _DoctorShellState extends State<DoctorShell> {
   late Set<int> _visitedScreens;
   late DoctorModel _doctor;
   final DoctorRepository _doctorRepo = DoctorRepository();
+  StreamSubscription<DoctorModel?>? _doctorSubscription;
 
   @override
   void initState() {
@@ -37,9 +40,38 @@ class _DoctorShellState extends State<DoctorShell> {
     _doctor = widget.doctor;
     _currentIndex = widget.initialIndex;
     _visitedScreens = {widget.initialIndex};
+    _startDoctorStream();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initNotifications();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant DoctorShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.doctor.id != oldWidget.doctor.id) {
+      _doctor = widget.doctor;
+      _startDoctorStream();
+    }
+  }
+
+  void _startDoctorStream() {
+    _doctorSubscription?.cancel();
+    _doctorSubscription = _doctorRepo.streamDoctorById(_doctor.id).listen(
+      (updated) {
+        if (updated == null || !mounted) return;
+        setState(() => _doctor = updated);
+      },
+      onError: (error) {
+        debugPrint('Doctor live refresh failed: $error');
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _doctorSubscription?.cancel();
+    super.dispose();
   }
 
   /// Re-fetch doctor data from Firestore and rebuild all tabs.

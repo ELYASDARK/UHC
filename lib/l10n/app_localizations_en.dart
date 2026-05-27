@@ -70,21 +70,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingDesc1 =>
-      'Schedule appointments with university doctors easily and quickly';
+      'Browse available doctors across all departments, pick a date and time that works for you, and book your appointment in just a few taps — no phone calls or waiting in line needed.';
 
   @override
   String get onboardingTitle2 => 'Get Reminders';
 
   @override
   String get onboardingDesc2 =>
-      'Never miss an appointment with smart notifications and reminders';
+      'Receive smart push notifications before every appointment so you never miss a visit. Get reminders 24 hours and 1 hour ahead, along with daily schedule summaries to stay on top of your health.';
 
   @override
   String get onboardingTitle3 => 'Track Your Health';
 
   @override
   String get onboardingDesc3 =>
-      'Keep all your medical records and appointment history in one place';
+      'Keep all your medical records, prescriptions, lab results, and appointment history organized in one secure place. Access everything anytime, anywhere — right from your phone.';
 
   @override
   String get skip => 'Skip';

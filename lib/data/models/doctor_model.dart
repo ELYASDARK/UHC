@@ -18,6 +18,10 @@ class DoctorModel {
   final List<String> qualifications;
   final bool isAvailable;
   final bool isActive; // Admin-controlled activation status
+  final String? availabilityRequestStatus;
+  final String? pendingAvailabilityRequestId;
+  final String? availabilityRequestReason;
+  final DateTime? availabilityRequestedAt;
   final Map<String, List<TimeSlot>> weeklySchedule;
   final String dailyNotificationTime; // HH:mm format
   final DateTime createdAt;
@@ -36,6 +40,10 @@ class DoctorModel {
     this.qualifications = const [],
     this.isAvailable = true,
     this.isActive = true,
+    this.availabilityRequestStatus,
+    this.pendingAvailabilityRequestId,
+    this.availabilityRequestReason,
+    this.availabilityRequestedAt,
     this.weeklySchedule = const {},
     this.dailyNotificationTime = '21:00',
     required this.createdAt,
@@ -86,6 +94,11 @@ class DoctorModel {
       qualifications: List<String>.from(data['qualifications'] ?? []),
       isAvailable: data['isAvailable'] ?? true,
       isActive: data['isActive'] ?? true,
+      availabilityRequestStatus: data['availabilityRequestStatus'],
+      pendingAvailabilityRequestId: data['pendingAvailabilityRequestId'],
+      availabilityRequestReason: data['availabilityRequestReason'],
+      availabilityRequestedAt:
+          (data['availabilityRequestedAt'] as Timestamp?)?.toDate(),
       weeklySchedule: schedule,
       dailyNotificationTime: data['dailyNotificationTime'] ?? '21:00',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -111,6 +124,12 @@ class DoctorModel {
       'qualifications': qualifications,
       'isAvailable': isAvailable,
       'isActive': isActive,
+      'availabilityRequestStatus': availabilityRequestStatus,
+      'pendingAvailabilityRequestId': pendingAvailabilityRequestId,
+      'availabilityRequestReason': availabilityRequestReason,
+      'availabilityRequestedAt': availabilityRequestedAt != null
+          ? Timestamp.fromDate(availabilityRequestedAt!)
+          : null,
       'weeklySchedule': scheduleMap,
       'dailyNotificationTime': dailyNotificationTime,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -131,6 +150,10 @@ class DoctorModel {
     List<String>? qualifications,
     bool? isAvailable,
     bool? isActive,
+    String? availabilityRequestStatus,
+    String? pendingAvailabilityRequestId,
+    String? availabilityRequestReason,
+    DateTime? availabilityRequestedAt,
     Map<String, List<TimeSlot>>? weeklySchedule,
     String? dailyNotificationTime,
     DateTime? createdAt,
@@ -149,6 +172,14 @@ class DoctorModel {
       qualifications: qualifications ?? this.qualifications,
       isAvailable: isAvailable ?? this.isAvailable,
       isActive: isActive ?? this.isActive,
+      availabilityRequestStatus:
+          availabilityRequestStatus ?? this.availabilityRequestStatus,
+      pendingAvailabilityRequestId:
+          pendingAvailabilityRequestId ?? this.pendingAvailabilityRequestId,
+      availabilityRequestReason:
+          availabilityRequestReason ?? this.availabilityRequestReason,
+      availabilityRequestedAt:
+          availabilityRequestedAt ?? this.availabilityRequestedAt,
       weeklySchedule: weeklySchedule ?? this.weeklySchedule,
       dailyNotificationTime:
           dailyNotificationTime ?? this.dailyNotificationTime,
@@ -169,6 +200,11 @@ class DoctorModel {
 
   String get experienceDisplay =>
       '$experienceYears ${experienceYears == 1 ? 'year' : 'years'}';
+
+  bool get hasPendingAvailabilityRequest =>
+      availabilityRequestStatus == 'pending' &&
+      pendingAvailabilityRequestId != null &&
+      pendingAvailabilityRequestId!.isNotEmpty;
 }
 
 /// Time slot model for doctor schedules

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../services/fcm_service.dart';
+import '../services/local_notification_service.dart';
 import '../data/repositories/notification_repository.dart';
 import '../data/models/notification_model.dart';
 import '../main.dart' show navigatorKey;
@@ -208,27 +209,35 @@ class NotificationProvider extends ChangeNotifier {
   /// Clean up on logout
   Future<void> onLogout(String userId) async {
     // Cancel real-time streams
-    _notificationsSubscription?.cancel();
-    _unreadCountSubscription?.cancel();
-    _messageTapSubscription?.cancel();
+    await _notificationsSubscription?.cancel();
+    await _unreadCountSubscription?.cancel();
+    await _messageTapSubscription?.cancel();
     _notificationsSubscription = null;
     _unreadCountSubscription = null;
     _messageTapSubscription = null;
 
-    // FCM cleanup — wrapped in try-catch so local state cleanup always runs.
-    // On web, FCM operations (getToken, topic subscribe/unsubscribe) may fail.
+    _notifications.clear();
+    _unreadCount = 0;
+    _isLoading = false;
+    _error = null;
+    notifyListeners();
+
     try {
-      await _fcmService.removeTokenFromDatabase(userId);
       await _fcmService.unsubscribeUserFromTopics(userId,
           role: _currentRole, department: _currentDepartment);
+      await _fcmService.removeTokenFromDatabase(userId);
     } catch (e) {
       debugPrint('FCM cleanup on logout failed (safe to ignore on web): $e');
     }
 
+    try {
+      await LocalNotificationService().cancelAllNotifications();
+    } catch (e) {
+      debugPrint('Local notification cleanup on logout failed: $e');
+    }
+
     _currentRole = null;
     _currentDepartment = null;
-    _notifications.clear();
-    _unreadCount = 0;
     notifyListeners();
   }
 

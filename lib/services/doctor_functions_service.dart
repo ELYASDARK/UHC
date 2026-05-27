@@ -210,6 +210,99 @@ class DoctorFunctionsService {
       );
     }
   }
+
+  /// Request admin approval before the signed-in doctor becomes unavailable.
+  Future<Map<String, dynamic>> requestDoctorUnavailable({
+    required String reason,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('requestDoctorUnavailable');
+      final result = await callable.call<Map<String, dynamic>>({
+        'reason': reason,
+      });
+
+      return Map<String, dynamic>.from(result.data);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint(
+        'Error requesting doctor unavailable: ${e.code} - ${e.message}',
+      );
+      throw DoctorFunctionException(
+        code: e.code,
+        message: e.message ?? 'Failed to submit availability request',
+      );
+    }
+  }
+
+  /// Doctors can return to available immediately.
+  Future<Map<String, dynamic>> setDoctorAvailability({
+    required bool isAvailable,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('setDoctorAvailability');
+      final result = await callable.call<Map<String, dynamic>>({
+        'isAvailable': isAvailable,
+      });
+
+      return Map<String, dynamic>.from(result.data);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint(
+        'Error setting doctor availability: ${e.code} - ${e.message}',
+      );
+      throw DoctorFunctionException(
+        code: e.code,
+        message: e.message ?? 'Failed to update availability',
+      );
+    }
+  }
+
+  /// Admin action to set a doctor's availability from Doctor Management.
+  Future<Map<String, dynamic>> setDoctorAvailabilityByAdmin({
+    required String doctorId,
+    required bool isAvailable,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('setDoctorAvailabilityByAdmin');
+      final result = await callable.call<Map<String, dynamic>>({
+        'doctorId': doctorId,
+        'isAvailable': isAvailable,
+      });
+
+      return Map<String, dynamic>.from(result.data);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint(
+        'Error admin setting doctor availability: ${e.code} - ${e.message}',
+      );
+      throw DoctorFunctionException(
+        code: e.code,
+        message: e.message ?? 'Failed to update availability',
+      );
+    }
+  }
+
+  /// Admin review action for doctor unavailable requests.
+  Future<Map<String, dynamic>> reviewDoctorAvailabilityRequest({
+    required String requestId,
+    required bool approved,
+  }) async {
+    try {
+      final callable =
+          _functions.httpsCallable('reviewDoctorAvailabilityRequest');
+      final result = await callable.call<Map<String, dynamic>>({
+        'requestId': requestId,
+        'decision': approved ? 'approved' : 'rejected',
+      });
+
+      return Map<String, dynamic>.from(result.data);
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint(
+        'Error reviewing doctor availability: ${e.code} - ${e.message}',
+      );
+      throw DoctorFunctionException(
+        code: e.code,
+        message: e.message ?? 'Failed to review availability request',
+      );
+    }
+  }
 }
 
 /// Exception for doctor function errors
@@ -236,6 +329,8 @@ class DoctorFunctionException implements Exception {
       case 'not-found':
         return 'Doctor not found.';
       case 'failed-precondition':
+        return message;
+      case 'resource-exhausted':
         return message;
       default:
         return 'An error occurred. Please try again.';

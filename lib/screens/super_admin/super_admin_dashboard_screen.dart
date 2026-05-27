@@ -5,6 +5,7 @@ import 'package:uhc/l10n/app_localizations.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/responsive_layout.dart';
 import '../../core/widgets/role_english_ltr_scope.dart';
+import '../admin/dashboard/admin_dashboard_screen.dart';
 
 /// Super Admin Dashboard with governance-focused KPIs:
 /// admin count, active admins, slot health, recent audit activity.
@@ -154,6 +155,8 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               children: [
                 _buildSlotHealthBanner(isDark, l10n),
                 const SizedBox(height: 14),
+                _buildAdminDashboardEntry(isDark),
+                const SizedBox(height: 14),
                 metrics,
                 if (riskVisible) ...[
                   const SizedBox(height: 18),
@@ -176,6 +179,8 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       children: [
         _buildSlotHealthBanner(isDark, l10n),
         const SizedBox(height: 14),
+        _buildAdminDashboardEntry(isDark),
+        const SizedBox(height: 14),
         metrics,
         const SizedBox(height: 18),
         if (riskVisible) ...[
@@ -183,6 +188,31 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
         ],
         _buildRecentAuditSection(isDark, l10n),
       ],
+    );
+  }
+
+  Widget _buildAdminDashboardEntry(bool isDark) {
+    return Card(
+      color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppColors.info.withValues(alpha: 0.12),
+          child: const Icon(Icons.dashboard_customize, color: AppColors.info),
+        ),
+        title: Text(
+          'Admin tools dashboard',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          'Open the shared Admin Dashboard for operational quick actions.',
+          style: GoogleFonts.poppins(fontSize: 11),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+        ),
+      ),
     );
   }
 

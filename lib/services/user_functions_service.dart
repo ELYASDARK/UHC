@@ -16,6 +16,7 @@ class UserFunctionsService {
     String? studentId,
     String? staffId,
     String? photoUrl,
+    Map<String, dynamic>? photoUpload,
   }) async {
     return _call('createUserAccount', {
       'email': email,
@@ -27,6 +28,7 @@ class UserFunctionsService {
       'studentId': studentId,
       'staffId': staffId,
       'photoUrl': photoUrl,
+      'photoUpload': photoUpload,
     });
   }
 
@@ -61,6 +63,7 @@ class UserFunctionsService {
     DateTime? dateOfBirth,
     String? studentId,
     String? staffId,
+    Map<String, dynamic>? photoUpload,
   }) async {
     return _call('updateUserProfileByAdmin', {
       'targetUid': targetUid,
@@ -70,6 +73,16 @@ class UserFunctionsService {
       'dateOfBirth': dateOfBirth?.toIso8601String(),
       'studentId': studentId,
       'staffId': staffId,
+      'photoUpload': photoUpload,
+    });
+  }
+
+  /// Delete a student or staff account.
+  Future<Map<String, dynamic>> deleteUserAccount({
+    required String targetUid,
+  }) async {
+    return _call('deleteUserAccount', {
+      'targetUid': targetUid,
     });
   }
 

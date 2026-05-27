@@ -11,6 +11,21 @@ import '../../../services/doctor_functions_service.dart';
 import '../../../services/user_functions_service.dart';
 import 'doctor_schedule_dialog.dart';
 
+const int _minimumPasswordLength = 8;
+const int _doctorPhotoMaxSizeBytes = 5 * 1024 * 1024;
+
+String _contentTypeForImageName(String fileName) {
+  final extension = fileName.split('.').last.toLowerCase();
+  switch (extension) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return 'image/jpeg';
+  }
+}
+
 class DoctorFormDialog extends StatefulWidget {
   final String? id;
   final Map<String, dynamic>? data;
@@ -365,9 +380,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
       // Read as bytes for Web compatibility
       final bytes = await image.readAsBytes();
 
-      // Enforce 25 MB file size limit
-      const maxSizeBytes = 25 * 1024 * 1024; // 25 MB
-      if (bytes.lengthInBytes > maxSizeBytes) {
+      if (bytes.lengthInBytes > _doctorPhotoMaxSizeBytes) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -377,7 +390,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 25 MB.',
+                      'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 5 MB.',
                     ),
                   ),
                 ],
@@ -399,13 +412,18 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
       });
 
       // Create a reference to Firebase Storage
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('doctor_photos')
-          .child('${DateTime.now().millisecondsSinceEpoch}_${image.name}');
+      final safeImageName = image.name.replaceAll(
+        RegExp(r'[^A-Za-z0-9._-]'),
+        '_',
+      );
+      final storageRef = FirebaseStorage.instance.ref().child(
+            'doctor_photos/${DateTime.now().millisecondsSinceEpoch}_$safeImageName',
+          );
 
       // Upload data (works on both Mobile and Web)
-      final metadata = SettableMetadata(contentType: 'image/jpeg');
+      final metadata = SettableMetadata(
+        contentType: _contentTypeForImageName(image.name),
+      );
       await storageRef.putData(bytes, metadata);
 
       // Get download URL
@@ -607,8 +625,8 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter a password';
                             }
-                            if (value.length < 12) {
-                              return 'Password must be at least 12 characters';
+                            if (value.length < _minimumPasswordLength) {
+                              return 'Password must be at least $_minimumPasswordLength characters';
                             }
                             return null;
                           },
@@ -1017,90 +1035,109 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           // Show success dialog with credentials
           showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: AppColors.success),
-                  SizedBox(width: 8),
-                  Text('Doctor Added'),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Doctor account created successfully!',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Please share these credentials with the doctor:',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.email, size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: SelectableText(
-                                _emailController.text.trim(),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        const Divider(height: 1),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            const Icon(Icons.lock, size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: SelectableText(
-                                _passwordController.text,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'The doctor should change their password after first login.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Done'),
+            builder: (context) {
+              final theme = Theme.of(context);
+              final isDark = theme.brightness == Brightness.dark;
+              final credentialBackground =
+                  isDark ? const Color(0xFF262626) : Colors.grey[100];
+              final credentialBorder =
+                  isDark ? const Color(0xFF3A3A3A) : Colors.transparent;
+              final secondaryText =
+                  isDark ? AppColors.textSecondaryDark : Colors.grey[600];
+
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: AppColors.success),
+                    SizedBox(width: 8),
+                    Text('Doctor Added'),
+                  ],
                 ),
-              ],
-            ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Doctor account created successfully!',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Please share these credentials with the doctor:',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: credentialBackground,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: credentialBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.email, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: SelectableText(
+                                  _emailController.text.trim(),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Divider(
+                            height: 1,
+                            color: isDark
+                                ? const Color(0xFF3A3A3A)
+                                : Colors.grey[300],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Icon(Icons.lock, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: SelectableText(
+                                  _passwordController.text,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    fontFamily: 'monospace',
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'The doctor should change their password after first login.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: secondaryText,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Done'),
+                  ),
+                ],
+              );
+            },
           );
         }
       } else {

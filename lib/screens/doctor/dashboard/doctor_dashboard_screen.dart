@@ -8,10 +8,10 @@ import '../../../core/widgets/glassmorphic_card.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/models/doctor_model.dart';
-import '../../../data/repositories/doctor_repository.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/doctor_appointment_provider.dart';
 import '../../../providers/notification_provider.dart';
+import '../../../services/doctor_functions_service.dart';
 import '../../../core/utils/locale_utils.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../appointments/doctor_appointment_detail_screen.dart';
@@ -41,7 +41,7 @@ class DoctorDashboardScreen extends StatefulWidget {
 
 class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   late DoctorModel _doctor;
-  final DoctorRepository _doctorRepo = DoctorRepository();
+  final DoctorFunctionsService _doctorFunctions = DoctorFunctionsService();
   bool _togglingAvailability = false;
 
   @override
@@ -157,6 +157,18 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         : hour < 17
             ? l10n.goodAfternoon
             : l10n.goodEvening;
+    final hasPendingAvailabilityRequest =
+        _doctor.hasPendingAvailabilityRequest;
+    final availabilityDotColor = hasPendingAvailabilityRequest
+        ? AppColors.warning
+        : _doctor.isAvailable
+            ? AppColors.success
+            : Colors.grey.shade400;
+    final availabilityLabel = hasPendingAvailabilityRequest
+        ? 'Pending approval'
+        : _doctor.isAvailable
+            ? l10n.available
+            : l10n.unavailable;
 
     return GradientCard(
       colors: AppColors.primaryGradient,
@@ -325,13 +337,14 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                       height: 10,
                       decoration: BoxDecoration(
                         color: _doctor.isAvailable
-                            ? AppColors.success
+                            ? availabilityDotColor
                             : Colors.grey.shade400,
                         shape: BoxShape.circle,
                         boxShadow: [
                           if (_doctor.isAvailable)
                             BoxShadow(
-                              color: AppColors.success.withValues(alpha: 0.4),
+                              color:
+                                  availabilityDotColor.withValues(alpha: 0.4),
                               blurRadius: 6,
                               spreadRadius: 1,
                             )
@@ -340,7 +353,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _doctor.isAvailable ? l10n.available : l10n.unavailable,
+                      availabilityLabel,
                       style: GoogleFonts.roboto(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -360,9 +373,11 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : Switch(
+                   : Switch(
                       value: _doctor.isAvailable,
-                      onChanged: _toggleAvailability,
+                      onChanged: hasPendingAvailabilityRequest
+                          ? null
+                          : _toggleAvailability,
                       activeThumbColor: Colors.white,
                       activeTrackColor:
                           AppColors.success.withValues(alpha: 0.8),
@@ -371,6 +386,42 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ),
             ],
           ),
+          if (hasPendingAvailabilityRequest) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.hourglass_top_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You remain available while admin reviews your request.',
+                      style: GoogleFonts.roboto(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     ).animate(delay: 300.ms).fadeIn(duration: 500.ms).slideY(begin: -0.05);
@@ -890,15 +941,30 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
   // ---- handlers ----
   Future<void> _toggleAvailability(bool value) async {
+    if (!value) {
+      await _showUnavailableRequestDialog();
+      return;
+    }
+
     setState(() => _togglingAvailability = true);
     try {
-      await _doctorRepo.toggleAvailability(_doctor.id, value);
+      await _doctorFunctions.setDoctorAvailability(isAvailable: true);
       if (mounted) {
         setState(() {
-          _doctor = _doctor.copyWith(isAvailable: value);
+          _doctor = _doctor.copyWith(isAvailable: true);
           _togglingAvailability = false;
         });
         widget.onDoctorUpdated?.call();
+      }
+    } on DoctorFunctionException catch (e) {
+      if (mounted) {
+        setState(() => _togglingAvailability = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.userMessage),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -911,6 +977,142 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _showUnavailableRequestDialog() async {
+    final controller = TextEditingController();
+    String? errorText;
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.pending_actions_rounded,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('Request unavailable status'),
+                  ),
+                ],
+              ),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Admin approval is required. You will stay available until the request is approved.',
+                      style: GoogleFonts.roboto(height: 1.35),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      minLines: 3,
+                      maxLines: 5,
+                      maxLength: 280,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        labelText: 'Note for admin',
+                        hintText: 'Example: clinic duty, emergency, sick leave',
+                        errorText: errorText,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    final trimmed = controller.text.trim();
+                    if (trimmed.length < 3) {
+                      setDialogState(() {
+                        errorText = 'Please write a short note.';
+                      });
+                      return;
+                    }
+                    Navigator.pop(context, trimmed);
+                  },
+                  icon: const Icon(Icons.send_rounded),
+                  label: const Text('Send request'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+
+    if (reason == null || !mounted) return;
+    await _submitUnavailableRequest(reason);
+  }
+
+  Future<void> _submitUnavailableRequest(String reason) async {
+    setState(() => _togglingAvailability = true);
+    try {
+      final result = await _doctorFunctions.requestDoctorUnavailable(
+        reason: reason,
+      );
+      if (!mounted) return;
+      final requestId = result['requestId']?.toString() ?? '';
+      setState(() {
+        _doctor = _doctor.copyWith(
+          isAvailable: true,
+          availabilityRequestStatus: 'pending',
+          pendingAvailabilityRequestId: requestId,
+          availabilityRequestReason: reason,
+          availabilityRequestedAt: DateTime.now(),
+        );
+        _togglingAvailability = false;
+      });
+      widget.onDoctorUpdated?.call();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Request sent. You remain available until admin approval.',
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } on DoctorFunctionException catch (e) {
+      if (!mounted) return;
+      setState(() => _togglingAvailability = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.userMessage),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _togglingAvailability = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to submit availability request: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 

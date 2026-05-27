@@ -31,6 +31,8 @@ class FCMService {
   /// Whether [initialize] has already completed successfully
   bool _initialized = false;
   StreamSubscription<String>? _tokenRefreshSubscription;
+  String? _tokenOwnerUserId;
+  int _tokenSessionVersion = 0;
 
   // Stream controller for notification taps
   final StreamController<RemoteMessage> _messageStreamController =
@@ -133,8 +135,18 @@ class FCMService {
 
   /// Save FCM token to Firestore for user
   Future<void> saveTokenToDatabase(String userId) async {
+    final sessionVersion = ++_tokenSessionVersion;
+    await _tokenRefreshSubscription?.cancel();
+    _tokenRefreshSubscription = null;
+    _tokenOwnerUserId = userId;
+
     try {
       final token = await getToken();
+      if (_tokenOwnerUserId != userId ||
+          sessionVersion != _tokenSessionVersion) {
+        return;
+      }
+
       if (token != null) {
         final platform = kIsWeb ? 'web' : _getNativePlatform();
         await _firestore.collection('user_tokens').doc(userId).set({
@@ -144,10 +156,18 @@ class FCMService {
         }, SetOptions(merge: true));
       }
 
-      // Listen for token refresh (cancel previous to prevent duplicates)
-      _tokenRefreshSubscription?.cancel();
+      if (_tokenOwnerUserId != userId ||
+          sessionVersion != _tokenSessionVersion) {
+        return;
+      }
+
       _tokenRefreshSubscription =
           _messaging.onTokenRefresh.listen((newToken) async {
+        if (_tokenOwnerUserId != userId ||
+            sessionVersion != _tokenSessionVersion) {
+          return;
+        }
+
         final refreshPlatform = kIsWeb ? 'web' : _getNativePlatform();
         await _firestore.collection('user_tokens').doc(userId).set({
           'token': newToken,
@@ -176,23 +196,32 @@ class FCMService {
 
   /// Remove FCM token when user logs out
   Future<void> removeTokenFromDatabase(String userId) async {
-    // Cancel token refresh listener to prevent stale writes
-    _tokenRefreshSubscription?.cancel();
-    _tokenRefreshSubscription = null;
+    final shouldInvalidateDeviceToken =
+        _tokenOwnerUserId == null || _tokenOwnerUserId == userId;
+
+    if (shouldInvalidateDeviceToken) {
+      _tokenSessionVersion++;
+      await _tokenRefreshSubscription?.cancel();
+      _tokenRefreshSubscription = null;
+      _tokenOwnerUserId = null;
+    }
 
     try {
-      final token = await getToken();
-      if (token != null) {
-        await _firestore
-            .collection('user_tokens')
-            .doc(userId)
-            .delete()
-            .catchError((_) {});
-      }
+      await _firestore.collection('user_tokens').doc(userId).delete();
     } catch (e) {
-      // getToken() can throw on web (requires VAPID key) — don't let that
-      // block the rest of the logout flow.
-      debugPrint('removeTokenFromDatabase failed (safe to ignore on web): $e');
+      // Deleting from Firestore can fail if auth is already gone or the app is
+      // offline. We still invalidate the local token below when it belongs to
+      // this session so stale server-side tokens stop working.
+      debugPrint('Failed to delete FCM token document for $userId: $e');
+    }
+
+    if (!shouldInvalidateDeviceToken) return;
+
+    try {
+      await _messaging.deleteToken();
+    } catch (e) {
+      // deleteToken() can throw on web or when messaging is unavailable.
+      debugPrint('Failed to delete local FCM token for $userId: $e');
     }
   }
 

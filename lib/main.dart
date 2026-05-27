@@ -26,6 +26,7 @@ import 'services/fcm_service.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/initial_password_change_screen.dart';
 import 'screens/auth/link_google_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/patient/main_shell.dart';
@@ -253,6 +254,7 @@ class _AppNavigatorState extends State<AppNavigator> {
 
   bool _bootReady = false;
   bool _onboardingComplete = false;
+  bool _fadingToLogin = false;
 
   // Auth flow: 0 = login, 1 = forgot password
   int _authScreen = 0;
@@ -336,11 +338,16 @@ class _AppNavigatorState extends State<AppNavigator> {
   Future<void> _completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onboardingKey, true);
-    if (mounted) {
-      setState(() {
-        _onboardingComplete = true;
-      });
-    }
+    if (!mounted) return;
+
+    // Fade out the onboarding screen before switching to login
+    setState(() => _fadingToLogin = true);
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+    setState(() {
+      _onboardingComplete = true;
+      _fadingToLogin = false;
+    });
   }
 
   String _normalizeLanguageCode(String? languageCode) {
@@ -435,10 +442,24 @@ class _AppNavigatorState extends State<AppNavigator> {
       screen = const SplashScreen();
     } else if (!_onboardingComplete) {
       // Show onboarding if not complete.
-      screen = OnboardingScreen(onComplete: _completeOnboarding);
+      screen = AnimatedOpacity(
+        opacity: _fadingToLogin ? 0.0 : 1.0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+        child: OnboardingScreen(onComplete: _completeOnboarding),
+      );
     } else if (authProvider.isAuthenticated) {
-      // Check auth state
-      if (!authProvider.isGoogleLinked) {
+      final currentUser = authProvider.currentUser;
+      if (currentUser != null) {
+        _syncThemeForAuthenticatedUser(currentUser, themeProvider);
+        _syncLocaleForAuthenticatedUser(currentUser, localeProvider);
+      }
+
+      // Admin-created doctors and patients must replace the temporary password
+      // once before any normal app access.
+      if (currentUser?.requiresInitialPasswordChange == true) {
+        screen = const InitialPasswordChangeScreen();
+      } else if (!authProvider.isGoogleLinked) {
         // Check if Google is linked — show link screen if not
         screen = LinkGoogleScreen(
           onLinked: () {
@@ -446,11 +467,6 @@ class _AppNavigatorState extends State<AppNavigator> {
           },
         );
       } else {
-        final currentUser = authProvider.currentUser;
-        if (currentUser != null) {
-          _syncThemeForAuthenticatedUser(currentUser, themeProvider);
-          _syncLocaleForAuthenticatedUser(currentUser, localeProvider);
-        }
         if (currentUser?.role == UserRole.superAdmin) {
           // Route superAdmin to dedicated governance shell
           screen = const SuperAdminShell();
@@ -505,8 +521,12 @@ class _AppNavigatorState extends State<AppNavigator> {
                       const SizedBox(height: 12),
                       TextButton(
                         onPressed: () async {
+                          final notificationProvider =
+                              context.read<NotificationProvider>();
                           try {
-                            await authProvider.signOut();
+                            await authProvider.signOut(
+                              beforeSignOut: notificationProvider.onLogout,
+                            );
                           } catch (_) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
