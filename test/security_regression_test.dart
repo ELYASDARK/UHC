@@ -154,7 +154,7 @@ void main() {
 
       expect(
         profileSource,
-        contains('bottomPadding: UhcResponsive.isWide(context) ? 32 : 120'),
+        contains('bottomPadding: UhcResponsive.isWide(context)\n            ? 32\n            : (isSuperAdmin ? 32 : 120)'),
       );
       expect(profileSource, contains('logout,'));
     });

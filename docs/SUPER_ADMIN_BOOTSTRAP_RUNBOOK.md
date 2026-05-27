@@ -276,20 +276,20 @@ Before considering the deployment production-ready, verify:
 
 ```
 ┌─────────────────────────────────────────────┐
-│                  Flutter App                 │
+│                  Flutter App                │
 │                                             │
-│  ┌─────────┐  ┌──────────┐  ┌────────────┐ │
-│  │ Patient  │  │  Admin   │  │Super Admin │ │
-│  │  Shell   │  │  Shell   │  │   Shell    │ │
-│  └─────────┘  └──────────┘  └────────────┘ │
+│  ┌─────────┐  ┌──────────┐  ┌────────────┐  │
+│  │ Patient │  │  Admin   │  │Super Admin │  │
+│  │  Shell  │  │  Shell   │  │   Shell    │  │
+│  └─────────┘  └──────────┘  └────────────┘  │
 │       │            │              │         │
-│       │     ┌──────┴──────┐       │         │
-│       │     │ AuthProvider │       │         │
-│       │     │ hasPermission│       │         │
-│       │     └──────┬──────┘       │         │
+│       │     ┌──────┴───────┐      │         │
+│       │     │ AuthProvider │      │         │
+│       │     │ hasPermission│      │         │
+│       │     └──────┬───────┘      │         │
 │       │            │              │         │
 │       └────────────┴──────────────┘         │
-│                    │                         │
+│                    │                        │
 │     ┌──────────────┴──────────────┐         │
 │     │  AdminGovernanceService     │         │
 │     │  (Cloud Function callables) │         │
@@ -297,22 +297,22 @@ Before considering the deployment production-ready, verify:
 └────────────────────┼────────────────────────┘
                      │ HTTPS
 ┌────────────────────┼────────────────────────┐
-│           Cloud Functions (Gen2)             │
-│                    │                         │
-│  ┌─────────────────┴──────────────────────┐ │
-│  │  Guards: requireAuth, requireSuperAdmin │ │
-│  │  requirePermission, writeAuditLog       │ │
-│  └─────────────────┬──────────────────────┘ │
-│                    │ Admin SDK               │
-│           ┌────────┴────────┐                │
-│           │   Firestore     │                │
-│           │  ┌───────────┐  │                │
-│           │  │   users   │  │                │
-│           │  │  doctors  │  │                │
-│           │  │audit_logs │  │                │
-│           │  └───────────┘  │                │
-│           └─────────────────┘                │
-└──────────────────────────────────────────────┘
+│           Cloud Functions (Gen2)            │
+│                    │                        │
+│  ┌─────────────────┴───────────────────────┐│
+│  │  Guards: requireAuth, requireSuperAdmin ││
+│  │  requirePermission, writeAuditLog       ││
+│  └─────────────────┬───────────────────────┘│
+│                    │ Admin SDK              │
+│           ┌────────┴────────┐               │
+│           │   Firestore     │               │
+│           │  ┌───────────┐  │               │
+│           │  │   users   │  │               │
+│           │  │  doctors  │  │               │
+│           │  │audit_logs │  │               │
+│           │  └───────────┘  │               │
+│           └─────────────────┘               │
+└─────────────────────────────────────────────┘
 ```
 
 ---

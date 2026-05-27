@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
-
 import '../../core/widgets/responsive_layout.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -15,15 +14,15 @@ import '../../l10n/app_localizations.dart';
 class _SlideData {
   final String title;
   final String description;
-  final Color gradientStart;
-  final Color gradientEnd;
+  final Color accentColor;
+  final Color accentColorLight;
   final int illustrationIndex;
 
   const _SlideData({
     required this.title,
     required this.description,
-    required this.gradientStart,
-    required this.gradientEnd,
+    required this.accentColor,
+    required this.accentColorLight,
     required this.illustrationIndex,
   });
 }
@@ -32,7 +31,6 @@ class _SlideData {
 //  ONBOARDING SCREEN
 // ──────────────────────────────────────────────────────────────────────────────
 
-/// Premium onboarding screen with 3 immersive slides.
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
 
@@ -52,22 +50,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _SlideData(
         title: l10n.onboardingTitle1,
         description: l10n.onboardingDesc1,
-        gradientStart: AppColors.primaryGradient[0],
-        gradientEnd: AppColors.primaryGradient[1],
+        accentColor: AppColors.primary,
+        accentColorLight: AppColors.primaryLight.withValues(alpha: 0.15),
         illustrationIndex: 0,
       ),
       _SlideData(
         title: l10n.onboardingTitle2,
         description: l10n.onboardingDesc2,
-        gradientStart: AppColors.secondaryGradient[0],
-        gradientEnd: AppColors.secondaryGradient[1],
+        accentColor: AppColors.secondary,
+        accentColorLight: AppColors.secondaryLight.withValues(alpha: 0.15),
         illustrationIndex: 1,
       ),
       _SlideData(
         title: l10n.onboardingTitle3,
         description: l10n.onboardingDesc3,
-        gradientStart: const Color(0xFFF0A830),
-        gradientEnd: const Color(0xFF6D4524),
+        accentColor: AppColors.tertiary,
+        accentColorLight: AppColors.tertiary.withValues(alpha: 0.12),
         illustrationIndex: 2,
       ),
     ];
@@ -96,13 +94,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final slides = _getSlides(context);
     final l10n = AppLocalizations.of(context);
     final currentSlide = slides[_currentPage];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor =
+        isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final textPrimary = isDark ? Colors.white : const Color(0xFF1A1A2E);
+    final textSecondary =
+        isDark ? Colors.white60 : const Color(0xFF6B7280);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarIconBrightness: Brightness.light,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: bgColor,
+        systemNavigationBarIconBrightness:
+            isDark ? Brightness.light : Brightness.dark,
       ),
       child: PopScope(
         canPop: _currentPage == 0,
@@ -116,266 +121,247 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           }
         },
         child: Scaffold(
-          body: AnimatedContainer(
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [currentSlide.gradientStart, currentSlide.gradientEnd],
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  // ── Skip button ─────────────────────────────────────
-                  Align(
-                    alignment: AlignmentDirectional.topEnd,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 8, right: 8),
-                      child: TextButton(
-                        onPressed: widget.onComplete,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white70,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
+          backgroundColor: bgColor,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // ── Skip button ─────────────────────────────────
+                Align(
+                  alignment: AlignmentDirectional.topEnd,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, right: 8),
+                    child: TextButton(
+                      onPressed: widget.onComplete,
+                      style: TextButton.styleFrom(
+                        foregroundColor: textSecondary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                        child: Text(
-                          l10n.skip,
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
+                      ),
+                      child: Text(
+                        l10n.skip,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                   ),
+                ),
 
-                  // ── Illustration (PageView for swiping) ─────────────
-                  Expanded(
-                    child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: slides.length,
-                      onPageChanged: (index) {
-                        setState(() => _currentPage = index);
-                      },
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: Center(
-                            child: SizedBox(
-                              width: 240,
-                              height: 240,
-                              child: CustomPaint(
-                                painter: _IllustrationPainter(
-                                  slideIndex: index,
-                                ),
-                                size: const Size(240, 240),
-                              ),
-                            ),
-                          )
-                              .animate()
-                              .scale(
-                                begin: const Offset(0.88, 0.88),
-                                end: const Offset(1.0, 1.0),
-                                duration: 500.ms,
-                                curve: Curves.easeOutBack,
-                              )
-                              .fadeIn(duration: 400.ms),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // ── Bottom content area ─────────────────────────────
-                  ResponsiveContent(
-                    maxWidth: 520,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        28,
-                        0,
-                        28,
-                        MediaQuery.paddingOf(context).bottom > 0 ? 16 : 28,
-                      ),
-                      child: Column(
-                        children: [
-                          // Title
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (child, animation) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0, 0.12),
-                                    end: Offset.zero,
-                                  ).animate(CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOut,
-                                  )),
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: Text(
-                              currentSlide.title,
-                              key: ValueKey<int>(_currentPage),
-                              style: GoogleFonts.poppins(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                height: 1.2,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          // Description
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (child, animation) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              );
-                            },
-                            child: Text(
-                              currentSlide.description,
-                              key: ValueKey<String>(currentSlide.description),
-                              style: GoogleFonts.roboto(
-                                fontSize: 15,
-                                height: 1.6,
-                                color: Colors.white.withValues(alpha: 0.75),
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 5,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-
-                          const SizedBox(height: 36),
-
-                          // Page indicators (simple animated pills)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(slides.length, (index) {
-                              final isActive = _currentPage == index;
-                              return AnimatedContainer(
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeInOut,
-                                margin:
-                                    const EdgeInsets.symmetric(horizontal: 4),
-                                width: isActive ? 28 : 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4),
-                                  color: isActive
-                                      ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.3),
-                                ),
-                              );
-                            }),
-                          ),
-
-                          const SizedBox(height: 32),
-
-                          // Next / Get Started button
-                          _GradientPillButton(
-                            text: _currentPage == slides.length - 1
-                                ? l10n.getStarted
-                                : l10n.next,
-                            gradientStart: currentSlide.gradientStart,
-                            gradientEnd: currentSlide.gradientEnd,
-                            onTap: _nextPage,
-                            showArrow: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-//  GRADIENT PILL BUTTON
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _GradientPillButton extends StatelessWidget {
-  final String text;
-  final Color gradientStart;
-  final Color gradientEnd;
-  final VoidCallback onTap;
-  final bool showArrow;
-
-  const _GradientPillButton({
-    required this.text,
-    required this.gradientStart,
-    required this.gradientEnd,
-    required this.onTap,
-    this.showArrow = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(28),
-          child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              color: Colors.white.withValues(alpha: 0.2),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    transitionBuilder: (child, animation) {
-                      return FadeTransition(opacity: animation, child: child);
+                // ── Illustration (PageView for swiping) ─────────
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: slides.length,
+                    onPageChanged: (index) {
+                      setState(() => _currentPage = index);
                     },
-                    child: Text(
-                      text,
-                      key: ValueKey<String>(text),
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                    itemBuilder: (context, index) {
+                      final slide = slides[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Center(
+                          child: Container(
+                            width: 220,
+                            height: 220,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isDark
+                                  ? slide.accentColor.withValues(alpha: 0.12)
+                                  : slide.accentColorLight,
+                            ),
+                            child: Center(
+                              child: SizedBox(
+                                width: 160,
+                                height: 160,
+                                child: CustomPaint(
+                                  painter: _IllustrationPainter(
+                                    slideIndex: index,
+                                    accentColor: slide.accentColor,
+                                    isDark: isDark,
+                                  ),
+                                  size: const Size(160, 160),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                            .animate()
+                            .scale(
+                              begin: const Offset(0.88, 0.88),
+                              end: const Offset(1.0, 1.0),
+                              duration: 500.ms,
+                              curve: Curves.easeOutBack,
+                            )
+                            .fadeIn(duration: 400.ms),
+                      );
+                    },
+                  ),
+                ),
+
+                // ── Bottom content area ─────────────────────────
+                ResponsiveContent(
+                  maxWidth: 520,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      28,
+                      0,
+                      28,
+                      MediaQuery.paddingOf(context).bottom > 0 ? 16 : 28,
+                    ),
+                    child: Column(
+                      children: [
+                        // Title
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 0.12),
+                                  end: Offset.zero,
+                                ).animate(CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOut,
+                                )),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: Text(
+                            currentSlide.title,
+                            key: ValueKey<int>(_currentPage),
+                            style: GoogleFonts.poppins(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: textPrimary,
+                              height: 1.2,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Description
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                          child: Text(
+                            currentSlide.description,
+                            key: ValueKey<String>(currentSlide.description),
+                            style: GoogleFonts.roboto(
+                              fontSize: 15,
+                              height: 1.6,
+                              color: textSecondary,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 5,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+
+                        const SizedBox(height: 36),
+
+                        // Page indicators
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(slides.length, (index) {
+                            final isActive = _currentPage == index;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 350),
+                              curve: Curves.easeInOut,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                              width: isActive ? 28 : 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(4),
+                                color: isActive
+                                    ? currentSlide.accentColor
+                                    : (isDark
+                                        ? Colors.white24
+                                        : Colors.grey.shade300),
+                              ),
+                            );
+                          }),
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              color: currentSlide.accentColor
+                                  .withValues(alpha: isDark ? 0.25 : 0.12),
+                              border: Border.all(
+                                color: currentSlide.accentColor
+                                    .withValues(alpha: isDark ? 0.4 : 0.25),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _nextPage,
+                                borderRadius: BorderRadius.circular(16),
+                                splashColor: currentSlide.accentColor
+                                    .withValues(alpha: 0.15),
+                                child: Center(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AnimatedSwitcher(
+                                        duration:
+                                            const Duration(milliseconds: 250),
+                                        transitionBuilder: (child, animation) {
+                                          return FadeTransition(
+                                            opacity: animation,
+                                            child: child,
+                                          );
+                                        },
+                                        child: Text(
+                                          _currentPage == slides.length - 1
+                                              ? l10n.getStarted
+                                              : l10n.next,
+                                          key: ValueKey<int>(_currentPage),
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: currentSlide.accentColor,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        Icons.arrow_forward_rounded,
+                                        size: 20,
+                                        color: currentSlide.accentColor,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (showArrow) ...[
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.arrow_forward_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -390,8 +376,14 @@ class _GradientPillButton extends StatelessWidget {
 
 class _IllustrationPainter extends CustomPainter {
   final int slideIndex;
+  final Color accentColor;
+  final bool isDark;
 
-  _IllustrationPainter({required this.slideIndex});
+  _IllustrationPainter({
+    required this.slideIndex,
+    required this.accentColor,
+    required this.isDark,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -413,15 +405,7 @@ class _IllustrationPainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
     final unit = size.width / 10;
-
-    // Outer glow circle
-    canvas.drawCircle(
-      Offset(cx, cy),
-      unit * 4.5,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.06)
-        ..style = PaintingStyle.fill,
-    );
+    final color = accentColor;
 
     // Calendar body
     final calendarRect = RRect.fromRectAndRadius(
@@ -435,13 +419,13 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawRRect(
       calendarRect,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.15)
+        ..color = color.withValues(alpha: 0.12)
         ..style = PaintingStyle.fill,
     );
     canvas.drawRRect(
       calendarRect,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.3)
+        ..color = color.withValues(alpha: 0.4)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
@@ -454,13 +438,13 @@ class _IllustrationPainter extends CustomPainter {
         topRight: Radius.circular(unit * 0.7),
       ),
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.2)
+        ..color = color.withValues(alpha: 0.2)
         ..style = PaintingStyle.fill,
     );
 
     // Calendar binding rings
     final ringPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.45)
+      ..color = color.withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
@@ -483,8 +467,7 @@ class _IllustrationPainter extends CustomPainter {
           Offset(dx, dy),
           isHighlighted ? unit * 0.35 : unit * 0.2,
           Paint()
-            ..color = Colors.white
-                .withValues(alpha: isHighlighted ? 0.85 : 0.35)
+            ..color = color.withValues(alpha: isHighlighted ? 0.85 : 0.35)
             ..style = PaintingStyle.fill,
         );
       }
@@ -496,19 +479,19 @@ class _IllustrationPainter extends CustomPainter {
       clockCenter,
       unit * 1.2,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.15)
+        ..color = color.withValues(alpha: 0.1)
         ..style = PaintingStyle.fill,
     );
     canvas.drawCircle(
       clockCenter,
       unit * 1.2,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.4)
+        ..color = color.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
     final handPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.7)
+      ..color = color.withValues(alpha: 0.7)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
@@ -520,7 +503,7 @@ class _IllustrationPainter extends CustomPainter {
 
     // Plus sign accent (top-right)
     final plusPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.4)
+      ..color = color.withValues(alpha: 0.45)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
@@ -536,6 +519,7 @@ class _IllustrationPainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
     final unit = size.width / 10;
+    final color = accentColor;
 
     // Pulse rings
     for (var i = 3; i >= 1; i--) {
@@ -543,8 +527,7 @@ class _IllustrationPainter extends CustomPainter {
         Offset(cx, cy - unit * 0.5),
         unit * (2.5 + i * 0.9),
         Paint()
-          ..color =
-              Colors.white.withValues(alpha: 0.03 * (4 - i).toDouble())
+          ..color = color.withValues(alpha: 0.03 * (4 - i).toDouble())
           ..style = PaintingStyle.fill,
       );
     }
@@ -565,13 +548,13 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawPath(
       bellPath,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.15)
+        ..color = color.withValues(alpha: 0.15)
         ..style = PaintingStyle.fill,
     );
     canvas.drawPath(
       bellPath,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.4)
+        ..color = color.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
         ..strokeJoin = StrokeJoin.round,
@@ -582,7 +565,7 @@ class _IllustrationPainter extends CustomPainter {
       Offset(cx, cy + unit * 2.0),
       unit * 0.4,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.45)
+        ..color = color.withValues(alpha: 0.5)
         ..style = PaintingStyle.fill,
     );
 
@@ -591,7 +574,7 @@ class _IllustrationPainter extends CustomPainter {
       Offset(cx, cy - unit * 3),
       unit * 0.3,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.5)
+        ..color = color.withValues(alpha: 0.6)
         ..style = PaintingStyle.fill,
     );
 
@@ -601,12 +584,12 @@ class _IllustrationPainter extends CustomPainter {
       badgeCenter,
       unit * 0.65,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.8)
+        ..color = color
         ..style = PaintingStyle.fill,
     );
     // Mini clock in badge
     final miniPaint = Paint()
-      ..color = const Color(0xFF26A69A)
+      ..color = Colors.white
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round;
@@ -616,7 +599,7 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawLine(badgeCenter,
         Offset(badgeCenter.dx + unit * 0.15, badgeCenter.dy), miniPaint);
 
-    // Sound waves (simple arcs on each side)
+    // Sound waves
     for (var side = -1; side <= 1; side += 2) {
       for (var i = 1; i <= 2; i++) {
         canvas.drawArc(
@@ -629,7 +612,7 @@ class _IllustrationPainter extends CustomPainter {
           3.14 * 2 / 3,
           false,
           Paint()
-            ..color = Colors.white.withValues(alpha: 0.2 / i)
+            ..color = color.withValues(alpha: 0.25 / i)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.5
             ..strokeCap = StrokeCap.round,
@@ -643,15 +626,7 @@ class _IllustrationPainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
     final unit = size.width / 10;
-
-    // Outer glow
-    canvas.drawCircle(
-      Offset(cx, cy),
-      unit * 4.5,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.05)
-        ..style = PaintingStyle.fill,
-    );
+    final color = accentColor;
 
     // Clipboard body
     final clipRect = RRect.fromRectAndRadius(
@@ -665,13 +640,13 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawRRect(
       clipRect,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.15)
+        ..color = color.withValues(alpha: 0.12)
         ..style = PaintingStyle.fill,
     );
     canvas.drawRRect(
       clipRect,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.3)
+        ..color = color.withValues(alpha: 0.4)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
@@ -688,13 +663,13 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawRRect(
       clipTopRect,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.25)
+        ..color = color.withValues(alpha: 0.2)
         ..style = PaintingStyle.fill,
     );
     canvas.drawRRect(
       clipTopRect,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.4)
+        ..color = color.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
@@ -713,7 +688,7 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawPath(
       pulsePath,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.6)
+        ..color = color.withValues(alpha: 0.7)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2
         ..strokeCap = StrokeCap.round
@@ -722,7 +697,7 @@ class _IllustrationPainter extends CustomPainter {
 
     // Text placeholder lines
     final linePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.2)
+      ..color = color.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
@@ -752,13 +727,13 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawPath(
       shieldPath,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.15)
+        ..color = color.withValues(alpha: 0.15)
         ..style = PaintingStyle.fill,
     );
     canvas.drawPath(
       shieldPath,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.4)
+        ..color = color.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
@@ -771,7 +746,7 @@ class _IllustrationPainter extends CustomPainter {
     canvas.drawPath(
       checkPath,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.65)
+        ..color = color.withValues(alpha: 0.7)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
         ..strokeCap = StrokeCap.round
@@ -781,6 +756,8 @@ class _IllustrationPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _IllustrationPainter oldDelegate) {
-    return oldDelegate.slideIndex != slideIndex;
+    return oldDelegate.slideIndex != slideIndex ||
+        oldDelegate.accentColor != accentColor ||
+        oldDelegate.isDark != isDark;
   }
 }

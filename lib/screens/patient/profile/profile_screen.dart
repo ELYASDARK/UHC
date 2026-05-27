@@ -272,7 +272,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: ResponsivePage(
         maxWidth: UhcResponsive.isWide(context) ? 1080 : 980,
-        bottomPadding: UhcResponsive.isWide(context) ? 32 : 120,
+        bottomPadding:
+            UhcResponsive.isWide(context) ? 32 : (isSuperAdmin ? 32 : 100),
         alignment: UhcResponsive.isWide(context)
             ? AlignmentDirectional.topStart
             : Alignment.topCenter,
@@ -505,8 +506,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: GoogleFonts.poppins(color: AppColors.error),
         ),
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(48),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           side: const BorderSide(color: AppColors.error),
         ),
       ),

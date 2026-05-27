@@ -11,10 +11,10 @@
 [![Dart](https://img.shields.io/badge/Dart-3.5+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-[![Platform](https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white)]()
-[![Platform](https://img.shields.io/badge/iOS-000000?style=flat-square&logo=apple&logoColor=white)]()
-[![Platform](https://img.shields.io/badge/Web-4285F4?style=flat-square&logo=googlechrome&logoColor=white)]()
-[![i18n](https://img.shields.io/badge/i18n-EN%20%7C%20AR%20%7C%20KU-blueviolet?style=flat-square)]()
+[![Platform](https://img.shields.io/badge/Android-3DDC84?style=flat-square&logo=android&logoColor=white)](android)
+[![Platform](https://img.shields.io/badge/iOS-000000?style=flat-square&logo=apple&logoColor=white)](ios)
+[![Platform](https://img.shields.io/badge/Web-4285F4?style=flat-square&logo=googlechrome&logoColor=white)](web)
+[![i18n](https://img.shields.io/badge/i18n-EN%20%7C%20AR%20%7C%20KU-blueviolet?style=flat-square)](lib/l10n)
 
 </div>
 
@@ -196,10 +196,6 @@ uhc/
 │   ├── providers/                  # ChangeNotifier providers (auth, appointments, doctor, theme, locale, notifications)
 │   ├── screens/
 │   │   ├── auth/                   # Login, forgot password, Google linking, initial password change
-│   │   │   ├── login_screen.dart
-│   │   │   ├── forgot_password_screen.dart
-│   │   │   ├── link_google_screen.dart
-│   │   │   └── initial_password_change_screen.dart
 │   │   ├── splash/                 # Animated splash screen
 │   │   ├── onboarding/             # First-launch walkthrough
 │   │   ├── shared/                 # Screens used by ALL roles
@@ -224,26 +220,19 @@ uhc/
 │   │   │   ├── profile/            # Doctor profile & edit profile
 │   │   │   └── qr/                 # QR code scanner for appointment check-in
 │   │   ├── admin/                  # Admin management console
-│   │       ├── dashboard/          # Admin KPI dashboard
-│   │       ├── departments/        # Department CRUD with form dialog
-│   │       ├── doctors/            # Doctor CRUD with schedule dialog
-│   │       ├── users/              # User management with form dialog
-│   │       ├── notifications/      # Admin notification sender and recipient targeting
-│   │       ├── analytics/          # Appointment analytics & charts
-│   │       └── reports/            # Professional XLSX report generation & export
+│   │   │   ├── dashboard/          # Admin KPI dashboard
+│   │   │   ├── departments/        # Department CRUD with form dialog
+│   │   │   ├── doctors/            # Doctor CRUD with schedule dialog
+│   │   │   ├── users/              # User management with form dialog
+│   │   │   ├── notifications/      # Admin notification sender and recipient targeting
+│   │   │   ├── analytics/          # Appointment analytics & charts
+│   │   │   └── reports/            # Professional XLSX report generation & export
 │   │   └── super_admin/            # Super Admin governance shell & screens
 │   │       ├── super_admin_shell.dart
 │   │       ├── super_admin_dashboard_screen.dart
 │   │       ├── admin_control_screen.dart
 │   │       └── audit_log_screen.dart
 │   ├── services/                   # Auth, FCM, local notifications, admin notifications, Cloud Function wrappers
-│   │   ├── admin_notification_service.dart
-│   │   ├── doctor_functions_service.dart
-│   │   ├── user_functions_service.dart
-│   │   ├── admin_governance_service.dart
-│   │   ├── auth_service.dart
-│   │   ├── fcm_service.dart
-│   │   └── local_notification_service.dart
 │   ├── utils/                      # Helper functions & cross-platform file utilities
 │   │   ├── save_file.dart          # Conditional export: routes to web or IO implementation
 │   │   ├── save_file_web.dart      # Web: Blob download via dart:js_interop
