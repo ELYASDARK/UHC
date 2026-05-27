@@ -618,6 +618,7 @@
   "addedByPatient": "أضافه المريض",
   "readOnlyMode": "للقراءة فقط",
   "appointmentCompletedReadOnly": "هذا الموعد مكتمل. المستندات للقراءة فقط.",
+  "documentsAccessLocked": "تم قفل الوصول إلى المستندات بعد اكتمال الموعد",
   "noEditPermission": "يمكنك فقط تعديل المستندات التي أضفتها",
   "documentsCount": "{count} مستند",
   "doctorDocument": "مستند الطبيب",

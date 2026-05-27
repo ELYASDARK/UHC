@@ -226,7 +226,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         bottom: false,
         child: ResponsivePage(
           maxWidth: isWide ? 1080 : 980,
-          bottomPadding: 32,
+          bottomPadding: isWide ? 32 : 100,
           alignment: isWide
               ? AlignmentDirectional.topStart
               : AlignmentDirectional.topCenter,

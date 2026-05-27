@@ -59,7 +59,7 @@ dependencies:
   # Charts for Admin
   fl_chart: ^1.2.0
   timezone: ^0.11.0
-  firebase_storage: 13.3.0
+  firebase_storage: ^13.4.1
   file_picker: ^11.0.2
   package_info_plus: ^9.0.1
   firebase_crashlytics: ^5.2.0

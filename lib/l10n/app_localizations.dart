@@ -3802,6 +3802,12 @@ abstract class AppLocalizations {
   /// **'This appointment is completed. Documents are read-only.'**
   String get appointmentCompletedReadOnly;
 
+  /// No description provided for @documentsAccessLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents access is locked after appointment completion'**
+  String get documentsAccessLocked;
+
   /// No description provided for @noEditPermission.
   ///
   /// In en, this message translates to:

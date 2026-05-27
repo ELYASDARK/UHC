@@ -272,8 +272,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: ResponsivePage(
         maxWidth: UhcResponsive.isWide(context) ? 1080 : 980,
-        bottomPadding:
-            UhcResponsive.isWide(context) ? 32 : (isSuperAdmin ? 32 : 100),
+        bottomPadding: UhcResponsive.isWide(context)
+            ? 32
+            : (isSuperAdmin ? 32 : 100),
         alignment: UhcResponsive.isWide(context)
             ? AlignmentDirectional.topStart
             : Alignment.topCenter,

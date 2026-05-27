@@ -1947,6 +1947,10 @@ class AppLocalizationsKu extends AppLocalizations {
       'ئەم چاوپێکەوتنە تەواو بووە. بەڵگەنامەکان تەنها خوێندنەوەن.';
 
   @override
+  String get documentsAccessLocked =>
+      'دەستگەیشتن بە بەڵگەنامەکان قوفڵ کراوە لەدوای تەواوبوونی چاوپێکەوتنەکە';
+
+  @override
   String get noEditPermission =>
       'تەنها دەتوانیت ئەو بەڵگەنامانە دەستکاری بکەیت کە خۆت زیادت کردووە';
 

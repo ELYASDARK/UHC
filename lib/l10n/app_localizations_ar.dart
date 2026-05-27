@@ -1927,6 +1927,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'هذا الموعد مكتمل. المستندات للقراءة فقط.';
 
   @override
+  String get documentsAccessLocked =>
+      'تم قفل الوصول إلى المستندات بعد اكتمال الموعد';
+
+  @override
   String get noEditPermission => 'يمكنك فقط تعديل المستندات التي أضفتها';
 
   @override

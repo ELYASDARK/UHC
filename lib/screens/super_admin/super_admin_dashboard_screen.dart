@@ -220,7 +220,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     final l10n = AppLocalizations.of(context);
     final breakpoint = UhcResponsive.breakpointOf(context);
     final ratio = switch (breakpoint) {
-      UhcBreakpoint.phone => 1.95,
+      UhcBreakpoint.phone => 1.55,
       UhcBreakpoint.tablet => 2.0,
       UhcBreakpoint.laptop || UhcBreakpoint.desktop => compact ? 3.15 : 2.2,
     };
@@ -389,7 +389,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     return Card(
       color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth > 260;
@@ -432,7 +432,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 iconBox,
-                SizedBox(height: dense ? 4 : 6),
+                SizedBox(height: dense ? 2 : 4),
                 _buildKpiText(
                   label,
                   value,

@@ -712,6 +712,7 @@
   "addedByPatient": "Added by patient",
   "readOnlyMode": "Read-only",
   "appointmentCompletedReadOnly": "This appointment is completed. Documents are read-only.",
+  "documentsAccessLocked": "Documents access is locked after appointment completion",
   "noEditPermission": "You can only edit documents you added",
   "documentsCount": "{count} documents",
   "@documentsCount": {

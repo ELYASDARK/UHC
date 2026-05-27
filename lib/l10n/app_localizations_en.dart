@@ -1939,6 +1939,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This appointment is completed. Documents are read-only.';
 
   @override
+  String get documentsAccessLocked =>
+      'Documents access is locked after appointment completion';
+
+  @override
   String get noEditPermission => 'You can only edit documents you added';
 
   @override

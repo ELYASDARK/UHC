@@ -470,69 +470,108 @@ class _DoctorAppointmentDetailScreenState
                 if (_appointment.status == AppointmentStatus.confirmed ||
                     _appointment.status == AppointmentStatus.completed) ...[
                   const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => DoctorPatientDocumentsScreen(
-                          patientId: _appointment.patientId,
-                          patientName: _appointment.patientName,
-                          appointmentId: _appointment.id,
-                          doctorId: widget.doctor.userId,
-                          doctorName: widget.doctor.name,
-                          isReadOnly: _appointment.status ==
-                              AppointmentStatus.completed,
+                  Builder(builder: (context) {
+                    final isLocked = _appointment.status ==
+                        AppointmentStatus.completed;
+                    final effectiveColor = isLocked
+                        ? Color.lerp(
+                            AppColors.primary, Colors.grey, 0.35)!
+                        : AppColors.primary;
+
+                    return GestureDetector(
+                      onTap: isLocked
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      l10n.documentsAccessLocked),
+                                  backgroundColor: AppColors.warning,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      DoctorPatientDocumentsScreen(
+                                    patientId:
+                                        _appointment.patientId,
+                                    patientName:
+                                        _appointment.patientName,
+                                    appointmentId: _appointment.id,
+                                    doctorId: widget.doctor.userId,
+                                    doctorName: widget.doctor.name,
+                                  ),
+                                ),
+                              ),
+                      child: _sectionCard(
+                        isDark: isDark,
+                        child: Opacity(
+                          opacity: isLocked ? 0.6 : 1.0,
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: effectiveColor
+                                      .withValues(alpha: 0.1),
+                                  borderRadius:
+                                      BorderRadius.circular(12),
+                                ),
+                                child: Icon(Icons.folder_shared,
+                                    color: effectiveColor),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      l10n.patientDocuments,
+                                      style: GoogleFonts.roboto(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      isLocked
+                                          ? l10n
+                                              .documentsAccessLocked
+                                          : l10n
+                                              .viewPatientDocuments,
+                                      style: GoogleFonts.roboto(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? AppColors
+                                                .textSecondaryDark
+                                            : AppColors
+                                                .textSecondaryLight,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                isLocked
+                                    ? Icons.lock_outline
+                                    : Icons.chevron_right,
+                                color: isLocked
+                                    ? Colors.grey
+                                    : (isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors
+                                            .textSecondaryLight),
+                                size: isLocked ? 20 : 24,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    child: _sectionCard(
-                      isDark: isDark,
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.folder_shared,
-                                color: AppColors.primary),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  l10n.patientDocuments,
-                                  style: GoogleFonts.roboto(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  l10n.viewPatientDocuments,
-                                  style: GoogleFonts.roboto(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondaryLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.chevron_right,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ).animate(delay: 550.ms).fadeIn(duration: 400.ms),
+                    );
+                  }).animate(delay: 550.ms).fadeIn(duration: 400.ms),
                 ],
               ],
             ),
