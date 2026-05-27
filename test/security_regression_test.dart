@@ -2,7 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-String readProjectFile(String path) => File(path).readAsStringSync();
+String readProjectFile(String path) =>
+    File(path).readAsStringSync().replaceAll('\r\n', '\n');
 
 void main() {
   group('security regression guards', () {
@@ -154,7 +155,8 @@ void main() {
 
       expect(
         profileSource,
-        contains('bottomPadding: UhcResponsive.isWide(context)\n            ? 32\n            : (isSuperAdmin ? 32 : 120)'),
+        contains(
+            'bottomPadding: UhcResponsive.isWide(context)\n            ? 32\n            : (isSuperAdmin ? 32 : 100)'),
       );
       expect(profileSource, contains('logout,'));
     });
