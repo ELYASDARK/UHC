@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../core/notifications/notification_preferences.dart';
 import '../data/models/appointment_model.dart';
 import '../data/models/doctor_model.dart';
-import '../data/models/notification_model.dart';
 import '../data/repositories/appointment_repository.dart';
-import '../data/repositories/notification_repository.dart';
 import '../data/repositories/user_repository.dart';
 import '../services/local_notification_service.dart';
 
 /// Provider for managing doctor-side appointment state
 class DoctorAppointmentProvider extends ChangeNotifier {
   final AppointmentRepository _appointmentRepo = AppointmentRepository();
-  final NotificationRepository _notificationRepo = NotificationRepository();
   final UserRepository _userRepo = UserRepository();
 
   List<AppointmentModel> _appointments = [];
@@ -196,20 +196,7 @@ class DoctorAppointmentProvider extends ChangeNotifier {
         statusUpdatedBy: statusUpdatedBy,
       );
 
-      // Notify the patient about the cancellation (best-effort)
-      if (appointment != null && doctorName != null) {
-        try {
-          await _notificationRepo.sendAppointmentCancellation(
-            userId: appointment.patientId,
-            appointmentId: appointmentId,
-            doctorName: doctorName,
-            appointmentTime: appointment.appointmentDate,
-            reason: reason,
-          );
-        } catch (e) {
-          debugPrint('Failed to send cancellation notification: $e');
-        }
-      }
+
 
       await loadAppointments(doctorId);
       return true;
@@ -346,111 +333,85 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   }
 
   Future<void> _scheduleDailyNotificationsInternal() async {
+    if (kIsWeb) return;
+    if (_dailyNotifDoctorUserId == null || _dailyNotifSchedule == null) return;
+    
     final notifService = LocalNotificationService();
-
-    final prefs = await SharedPreferences.getInstance();
-    final dailySummaryEnabled = prefs.getBool('notif_daily_summary') ?? true;
-    if (!dailySummaryEnabled) {
-      return;
-    }
-
-    final timeString = prefs.getString('notif_daily_summary_time') ?? '21:00';
-
-    // Parse configured time
-    int targetHour = 21;
-    int targetMin = 0;
-    try {
-      final parts = timeString.split(':');
-      if (parts.length == 2) {
-        targetHour = int.parse(parts[0]);
-        targetMin = int.parse(parts[1]);
-      }
-    } catch (_) {}
 
     try {
       // Cancel existing daily summary local notifications
       await notifService.cancelDoctorDailySummaries();
-
-      // Delete existing future daily summary Firestore docs
-      await _notificationRepo
-          .deleteFutureDailySummaries(_dailyNotifDoctorUserId!);
     } catch (e) {
-      debugPrint('Failed to clean old daily summaries: $e');
+      debugPrint('Failed to cancel old daily summaries: $e');
     }
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    try {
+      final userSnap = await FirebaseFirestore.instance.collection('users').doc(_dailyNotifDoctorUserId).get();
+      final userData = userSnap.data();
+      if (userData == null) return;
+      final isDoctor = userData['role'] == 'doctor';
+      final prefsMap = userData['notificationSettings'] as Map<String, dynamic>?;
+      final settings = NotificationPreferences.fromMap(prefsMap, isDoctor: isDoctor, isWeb: kIsWeb);
 
-    for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
-      final notificationDate = today.add(Duration(days: dayOffset));
-      // Configured time on notificationDate
-      final scheduledTime =
-          notificationDate.add(Duration(hours: targetHour, minutes: targetMin));
-
-      // Skip if time has already passed
-      if (scheduledTime.isBefore(now)) continue;
-
-      // Target date is tomorrow relative to notificationDate
-      final targetDate = notificationDate.add(const Duration(days: 1));
-      final targetDayName = _dayNames[targetDate.weekday - 1];
-
-      // Skip if it's not a working day tomorrow
-      final daySlots = _dailyNotifSchedule![targetDayName];
-      if (daySlots == null || daySlots.isEmpty) continue;
-
-      // Count pending appointments for target date
-      final startOfTarget =
-          DateTime(targetDate.year, targetDate.month, targetDate.day);
-      final endOfTarget = startOfTarget.add(const Duration(days: 1));
-
-      final pendingCount = _appointments.where((apt) {
-        final isTargetDay = apt.appointmentDate.isAfter(
-              startOfTarget.subtract(const Duration(seconds: 1)),
-            ) &&
-            apt.appointmentDate.isBefore(endOfTarget);
-        return isTargetDay && apt.status == AppointmentStatus.pending;
-      }).length;
-
-      const title = "Tomorrow's Appointments";
-      final body = pendingCount == 0
-          ? 'You have no booked appointments tomorrow'
-          : pendingCount == 1
-              ? 'You have 1 booked appointment tomorrow'
-              : 'You have $pendingCount booked appointments tomorrow';
-
-      // Schedule local push notification
-      try {
-        await notifService.scheduleDoctorDailySummary(
-          dayOffset: dayOffset,
-          title: title,
-          body: body,
-          scheduledTime: scheduledTime,
-        );
-      } catch (e) {
-        debugPrint('Failed to schedule daily summary local notif: $e');
+      if (!settings.doctorDailySummaryEnabled) {
+        return;
       }
 
-      // Create Firestore notification doc (for in-app notification list)
+      // Only schedule local daily summaries if in local delivery mode!
+      if (settings.doctorDailySummaryDelivery != NotificationDeliveryMode.local) {
+        return;
+      }
+
+      final timeString = settings.doctorDailySummaryTime;
+
+      // Parse configured time
+      int targetHour = 21;
+      int targetMin = 0;
       try {
-        await _notificationRepo.createNotification(
-          NotificationModel(
-            id: '',
-            userId: _dailyNotifDoctorUserId!,
+        final parts = timeString.split(':');
+        if (parts.length == 2) {
+          targetHour = int.parse(parts[0]);
+          targetMin = int.parse(parts[1]);
+        }
+      } catch (_) {}
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
+        final notificationDate = today.add(Duration(days: dayOffset));
+        // Configured time on notificationDate
+        final scheduledTime =
+            notificationDate.add(Duration(hours: targetHour, minutes: targetMin));
+
+        // Skip if time has already passed
+        if (scheduledTime.isBefore(now)) continue;
+
+        // Target date is tomorrow relative to notificationDate
+        final targetDate = notificationDate.add(const Duration(days: 1));
+        final targetDayName = _dayNames[targetDate.weekday - 1];
+
+        // Skip if it's not a working day tomorrow
+        final daySlots = _dailyNotifSchedule![targetDayName];
+        if (daySlots == null || daySlots.isEmpty) continue;
+
+        const title = "Tomorrow's UHC Schedule";
+        const body = "Open UHC to review tomorrow's schedule.";
+
+        // Schedule local push notification
+        try {
+          await notifService.scheduleDoctorDailySummary(
+            dayOffset: dayOffset,
             title: title,
             body: body,
-            type: NotificationType.dailySummary,
-            data: {
-              'targetDate': targetDate.toIso8601String(),
-              'pendingCount': pendingCount,
-            },
-            createdAt: DateTime.now(),
-            scheduledFor: scheduledTime,
-            isDelivered: false,
-          ),
-        );
-      } catch (e) {
-        debugPrint('Failed to create daily summary Firestore doc: $e');
+            scheduledTime: scheduledTime,
+          );
+        } catch (e) {
+          debugPrint('Failed to schedule daily summary local notif: $e');
+        }
       }
+    } catch (e) {
+      debugPrint('Error inside _scheduleDailyNotificationsInternal: $e');
     }
   }
 

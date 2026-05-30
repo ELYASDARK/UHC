@@ -125,6 +125,10 @@ service cloud.firestore {
 
     match /user_tokens/{userId} {
       allow read, write: if isOwner(userId);
+
+      match /tokens/{tokenId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     match /appointments/{appointmentId} {

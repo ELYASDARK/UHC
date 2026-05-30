@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.sendAdminNotification = exports.previewAdminNotificationRecipients = exports.searchAdminNotificationRecipients = exports.reviewDoctorAvailabilityRequest = exports.setDoctorAvailabilityByAdmin = exports.setDoctorAvailability = exports.requestDoctorUnavailable = exports.deliverScheduledNotifications = exports.onNotificationCreated = exports.deleteUserAccount = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.completeInitialPasswordChange = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = exports.deleteAppointment = exports.incrementQrScanFailures = exports.updateMedicalNotes = exports.updateAppointmentStatus = exports.cancelAppointment = exports.rescheduleAppointment = exports.createAppointment = void 0;
+exports.sendDoctorDailyReports = exports.resyncUserNotificationSchedules = exports.listAdminAuditLogs = exports.rotateSuperAdminSlot = exports.assignSuperAdminSlot = exports.setAdminPermissions = exports.forceSignOutUser = exports.deleteAdminAccount = exports.resetAdminPassword = exports.setAdminActiveStatus = exports.changeAdminRole = exports.createAdminAccount = exports.sendTopicNotification = exports.sendAdminNotification = exports.previewAdminNotificationRecipients = exports.searchAdminNotificationRecipients = exports.reviewDoctorAvailabilityRequest = exports.setDoctorAvailabilityByAdmin = exports.setDoctorAvailability = exports.requestDoctorUnavailable = exports.deliverScheduledNotifications = exports.onNotificationCreated = exports.deleteUserAccount = exports.updateUserProfileByAdmin = exports.unlinkGoogleProviderByAdmin = exports.changeUserRoleByAdmin = exports.setUserActiveStatus = exports.bootstrapSelfUserDocument = exports.deleteDepartment = exports.setDepartmentActiveStatus = exports.updateDepartment = exports.createDepartment = exports.updateDoctorSchedule = exports.setDoctorActiveStatus = exports.updateDoctorProfile = exports.createUserAccount = exports.completeInitialPasswordChange = exports.resetDoctorPassword = exports.deleteDoctorAccount = exports.updateDoctorEmail = exports.createDoctorAccount = exports.deleteAppointment = exports.incrementQrScanFailures = exports.updateMedicalNotes = exports.updateAppointmentStatus = exports.cancelAppointment = exports.rescheduleAppointment = exports.createAppointment = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -238,7 +238,14 @@ function appointmentExactTime(date, timeSlot) {
     const [hourRaw, minuteRaw] = startTime.split(':');
     const hour = Number.parseInt(hourRaw || '0', 10);
     const minute = Number.parseInt(minuteRaw || '0', 10);
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), Number.isNaN(hour) ? 0 : hour, Number.isNaN(minute) ? 0 : minute);
+    // Extracted components in UTC to be completely timezone-agnostic.
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const day = date.getUTCDate();
+    // Construct local Date inside a UTC representation.
+    const utcDate = new Date(Date.UTC(year, month, day, Number.isNaN(hour) ? 0 : hour, Number.isNaN(minute) ? 0 : minute));
+    // Shift from Baghdad (UTC+3) to UTC time by subtracting 3 hours.
+    return new Date(utcDate.getTime() - 3 * 60 * 60 * 1000);
 }
 function formatDateForNotification(date) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -271,12 +278,153 @@ async function canMutateAppointment(callerUid, callerDoc, appointmentData, optio
     }
     return false;
 }
-async function createTrustedNotification(params) {
-    const ref = db.collection('notifications').doc();
-    await ref.set(trustedNotificationPayload(ref.id, params));
-    return ref.id;
+const DEFAULT_PATIENT_SETTINGS = {
+    version: 2,
+    onlinePushEnabled: true,
+    appointmentStatusAlerts: {
+        enabled: true,
+        locked: true,
+    },
+    adminAnnouncements: {
+        enabled: true,
+    },
+    appointmentReminders: {
+        enabled: true,
+        delivery: 'fcm',
+        oneWeek: true,
+        oneDay: true,
+        oneHour: true,
+    },
+    doctorDailySummary: {
+        enabled: false,
+        delivery: 'fcm',
+        time: '21:00',
+    },
+    email: false,
+};
+const DEFAULT_DOCTOR_SETTINGS = {
+    version: 2,
+    onlinePushEnabled: true,
+    appointmentStatusAlerts: {
+        enabled: true,
+        locked: true,
+    },
+    adminAnnouncements: {
+        enabled: true,
+    },
+    appointmentReminders: {
+        enabled: false,
+        delivery: 'fcm',
+        oneWeek: false,
+        oneDay: false,
+        oneHour: false,
+    },
+    doctorDailySummary: {
+        enabled: true,
+        delivery: 'fcm',
+        time: '21:00',
+    },
+    email: false,
+};
+async function getUserNotificationSettings(uid) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+        return DEFAULT_PATIENT_SETTINGS;
+    }
+    const userData = userDoc.data() || {};
+    const role = userData.role || 'student';
+    const isDoctor = role === 'doctor';
+    const defaults = isDoctor ? DEFAULT_DOCTOR_SETTINGS : DEFAULT_PATIENT_SETTINGS;
+    const oldSettings = userData.notificationSettings || {};
+    const getBoolValue = (keys, defaultVal) => {
+        for (const key of keys) {
+            if (oldSettings[key] !== undefined)
+                return !!oldSettings[key];
+            if (userData[key] !== undefined)
+                return !!userData[key];
+        }
+        return defaultVal;
+    };
+    const getStringValue = (keys, defaultVal) => {
+        for (const key of keys) {
+            if (oldSettings[key] !== undefined)
+                return String(oldSettings[key]);
+            if (userData[key] !== undefined)
+                return String(userData[key]);
+        }
+        return defaultVal;
+    };
+    if (oldSettings.version === 2) {
+        return {
+            version: 2,
+            onlinePushEnabled: oldSettings.onlinePushEnabled !== undefined ? !!oldSettings.onlinePushEnabled : defaults.onlinePushEnabled,
+            appointmentStatusAlerts: {
+                enabled: true,
+                locked: true,
+            },
+            adminAnnouncements: {
+                enabled: ((_a = oldSettings.adminAnnouncements) === null || _a === void 0 ? void 0 : _a.enabled) !== undefined ? !!oldSettings.adminAnnouncements.enabled : defaults.adminAnnouncements.enabled,
+            },
+            appointmentReminders: {
+                enabled: ((_b = oldSettings.appointmentReminders) === null || _b === void 0 ? void 0 : _b.enabled) !== undefined ? !!oldSettings.appointmentReminders.enabled : defaults.appointmentReminders.enabled,
+                delivery: ((_c = oldSettings.appointmentReminders) === null || _c === void 0 ? void 0 : _c.delivery) === 'local' ? 'local' : 'fcm',
+                oneWeek: ((_d = oldSettings.appointmentReminders) === null || _d === void 0 ? void 0 : _d.oneWeek) !== undefined ? !!oldSettings.appointmentReminders.oneWeek : defaults.appointmentReminders.oneWeek,
+                oneDay: ((_e = oldSettings.appointmentReminders) === null || _e === void 0 ? void 0 : _e.oneDay) !== undefined ? !!oldSettings.appointmentReminders.oneDay : defaults.appointmentReminders.oneDay,
+                oneHour: ((_f = oldSettings.appointmentReminders) === null || _f === void 0 ? void 0 : _f.oneHour) !== undefined ? !!oldSettings.appointmentReminders.oneHour : defaults.appointmentReminders.oneHour,
+            },
+            doctorDailySummary: {
+                enabled: ((_g = oldSettings.doctorDailySummary) === null || _g === void 0 ? void 0 : _g.enabled) !== undefined ? !!oldSettings.doctorDailySummary.enabled : defaults.doctorDailySummary.enabled,
+                delivery: ((_h = oldSettings.doctorDailySummary) === null || _h === void 0 ? void 0 : _h.delivery) === 'local' ? 'local' : 'fcm',
+                time: ((_j = oldSettings.doctorDailySummary) === null || _j === void 0 ? void 0 : _j.time) || defaults.doctorDailySummary.time,
+            },
+            email: oldSettings.email !== undefined ? !!oldSettings.email : defaults.email,
+        };
+    }
+    const onlinePushEnabled = getBoolValue(['push', 'settings_push_notifications'], defaults.onlinePushEnabled);
+    const email = getBoolValue(['email', 'email_notifications', 'settings_email_notifications'], defaults.email);
+    const appointmentRemindersEnabled = getBoolValue(['notif_appointment_reminders'], defaults.appointmentReminders.enabled);
+    const oneWeek = getBoolValue(['notif_reminder_1w'], defaults.appointmentReminders.oneWeek);
+    const oneDay = getBoolValue(['notif_reminder_24h'], defaults.appointmentReminders.oneDay);
+    const oneHour = getBoolValue(['notif_reminder_1h'], defaults.appointmentReminders.oneHour);
+    const doctorDailySummaryEnabled = getBoolValue(['notif_daily_summary'], defaults.doctorDailySummary.enabled);
+    const doctorDailySummaryTime = getStringValue(['notif_daily_summary_time'], defaults.doctorDailySummary.time);
+    const migratedSettings = {
+        version: 2,
+        onlinePushEnabled,
+        appointmentStatusAlerts: {
+            enabled: true,
+            locked: true,
+        },
+        adminAnnouncements: {
+            enabled: true,
+        },
+        appointmentReminders: {
+            enabled: appointmentRemindersEnabled,
+            delivery: 'fcm',
+            oneWeek,
+            oneDay,
+            oneHour,
+        },
+        doctorDailySummary: {
+            enabled: doctorDailySummaryEnabled,
+            delivery: 'fcm',
+            time: doctorDailySummaryTime,
+        },
+        email,
+    };
+    await db.collection('users').doc(uid).update({
+        notificationSettings: migratedSettings,
+        updatedAt: admin.firestore.Timestamp.now(),
+    });
+    return migratedSettings;
 }
 function trustedNotificationPayload(id, params) {
+    const now = new Date();
+    const scheduledTime = params.scheduledFor;
+    const isFuture = scheduledTime && scheduledTime > now;
+    const deliveryChannel = params.deliveryChannel || 'fcm';
+    const isVisible = params.isVisible !== undefined ? params.isVisible : !isFuture;
     return {
         id,
         userId: params.userId,
@@ -287,11 +435,28 @@ function trustedNotificationPayload(id, params) {
         isRead: false,
         createdAt: admin.firestore.Timestamp.now(),
         appointmentId: params.appointmentId || null,
-        scheduledFor: params.scheduledFor ? admin.firestore.Timestamp.fromDate(params.scheduledFor) : null,
+        scheduledFor: scheduledTime ? admin.firestore.Timestamp.fromDate(scheduledTime) : null,
         reminderType: params.reminderType || null,
-        isDelivered: params.isDelivered || false,
         createdByBackend: true,
+        settingsVersion: 2,
+        deliveryChannel,
+        pushStatus: params.pushStatus || (deliveryChannel === 'inAppOnly' ? 'skipped_local_device_mode' : 'pending'),
+        isDelivered: params.isDelivered !== undefined ? params.isDelivered : (deliveryChannel === 'inAppOnly'),
+        isVisible,
+        visibleAt: isVisible ? admin.firestore.Timestamp.now() : null,
+        deliveredAt: null,
+        pushAttemptedAt: null,
+        deliveryAttempts: 0,
+        deliveredTokenCount: 0,
+        skippedTokenCount: 0,
+        failedTokenCount: 0,
     };
+}
+async function createTrustedNotification(params, docId) {
+    const id = docId || db.collection('notifications').doc().id;
+    const ref = db.collection('notifications').doc(id);
+    await ref.set(trustedNotificationPayload(id, params));
+    return id;
 }
 function trustedNotificationPayloadWithId(id, params) {
     return trustedNotificationPayload(id, params);
@@ -308,6 +473,7 @@ async function deleteAppointmentNotifications(appointmentId) {
     await batch.commit();
 }
 async function createAppointmentNotifications(params) {
+    const settings = await getUserNotificationSettings(params.userId);
     const exactTime = appointmentExactTime(params.appointmentDate, params.timeSlot);
     const formattedDate = formatDateForNotification(exactTime);
     if (params.includeConfirmation !== false) {
@@ -319,7 +485,10 @@ async function createAppointmentNotifications(params) {
             data: { appointmentId: params.appointmentId },
             appointmentId: params.appointmentId,
             reminderType: 'immediate',
-        });
+        }, `appointment_${params.appointmentId}_confirmation`);
+    }
+    if (!settings.appointmentReminders.enabled) {
+        return;
     }
     const reminders = [
         { reminderType: 'oneWeek', scheduledFor: new Date(exactTime.getTime() - 7 * 24 * 60 * 60 * 1000), title: 'Appointment in 1 Week' },
@@ -327,7 +496,15 @@ async function createAppointmentNotifications(params) {
         { reminderType: 'oneHour', scheduledFor: new Date(exactTime.getTime() - 60 * 60 * 1000), title: 'Appointment in 1 Hour' },
     ];
     const now = new Date();
+    const deliveryChannel = settings.appointmentReminders.delivery === 'local' ? 'inAppOnly' : 'fcm';
+    const isDelivered = (deliveryChannel === 'inAppOnly');
+    const pushStatus = isDelivered ? 'skipped_local_device_mode' : 'pending';
     for (const reminder of reminders) {
+        const isSwitchOn = (reminder.reminderType === 'oneWeek' && settings.appointmentReminders.oneWeek) ||
+            (reminder.reminderType === 'oneDay' && settings.appointmentReminders.oneDay) ||
+            (reminder.reminderType === 'oneHour' && settings.appointmentReminders.oneHour);
+        if (!isSwitchOn)
+            continue;
         if (reminder.scheduledFor <= now)
             continue;
         await createTrustedNotification({
@@ -339,7 +516,11 @@ async function createAppointmentNotifications(params) {
             appointmentId: params.appointmentId,
             scheduledFor: reminder.scheduledFor,
             reminderType: reminder.reminderType,
-        });
+            deliveryChannel,
+            pushStatus,
+            isDelivered,
+            isVisible: false,
+        }, `appointment_${params.appointmentId}_${reminder.reminderType}`);
     }
 }
 async function createAppointmentStatusNotification(params) {
@@ -382,7 +563,7 @@ async function createAppointmentStatusNotification(params) {
         data: { appointmentId: params.appointmentId, status: params.status },
         appointmentId: params.appointmentId,
         reminderType: 'immediate',
-    });
+    }, `appointment_${params.appointmentId}_${params.status}`);
 }
 exports.createAppointment = functions.https.onCall(async (request) => {
     const callerUid = requireAuth(request);
@@ -1619,6 +1800,28 @@ function isTerminalFcmError(error) {
         code === 'messaging/invalid-argument' ||
         code === 'messaging/mismatched-credential';
 }
+function shouldSendPushToToken(notification, settings, token) {
+    if (settings.onlinePushEnabled === false)
+        return false;
+    if (token.onlinePushEnabled === false)
+        return false;
+    if (notification.deliveryChannel !== 'fcm')
+        return false;
+    if (notification.type === 'appointmentReminder') {
+        const reminderType = notification.reminderType;
+        const isReminderEnabled = settings.appointmentReminders.enabled && ((reminderType === 'oneWeek' && settings.appointmentReminders.oneWeek) ||
+            (reminderType === 'oneDay' && settings.appointmentReminders.oneDay) ||
+            (reminderType === 'oneHour' && settings.appointmentReminders.oneHour));
+        return isReminderEnabled && token.appointmentReminderDelivery === 'fcm';
+    }
+    if (notification.type === 'dailySummary') {
+        return settings.doctorDailySummary.enabled && token.doctorDailySummaryDelivery === 'fcm';
+    }
+    if (notification.type === 'adminAnnouncement') {
+        return settings.adminAnnouncements.enabled;
+    }
+    return true;
+}
 function errorMessage(error) {
     if (error instanceof Error)
         return error.message;
@@ -1630,6 +1833,7 @@ function errorMessage(error) {
     return String(error);
 }
 async function deliverNotificationPush(snap, notificationId) {
+    var _a;
     const notification = snap.data();
     if (!notification) {
         console.log(`Notification ${notificationId} is empty, skipping push.`);
@@ -1648,23 +1852,80 @@ async function deliverNotificationPush(snap, notificationId) {
         console.log(`Notification ${notificationId} has no userId, skipping push.`);
         return;
     }
+    let settings;
     try {
-        const tokenDoc = await db.collection('user_tokens').doc(userId).get();
-        const tokenData = tokenDoc.data();
-        if (!tokenDoc.exists || !(tokenData === null || tokenData === void 0 ? void 0 : tokenData.token)) {
+        settings = await getUserNotificationSettings(userId);
+    }
+    catch (err) {
+        console.error(`Error loading settings for user ${userId}, using defaults:`, err);
+        const userDoc = await db.collection('users').doc(userId).get();
+        const role = userDoc.exists ? (((_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.role) || 'student') : 'student';
+        settings = role === 'doctor' ? DEFAULT_DOCTOR_SETTINGS : DEFAULT_PATIENT_SETTINGS;
+    }
+    try {
+        const tokensList = [];
+        const subcollectionSnap = await db.collection('user_tokens')
+            .doc(userId)
+            .collection('tokens')
+            .get();
+        if (!subcollectionSnap.empty) {
+            subcollectionSnap.docs.forEach((doc) => {
+                tokensList.push(doc.data());
+            });
+        }
+        else {
+            const legacyDoc = await db.collection('user_tokens').doc(userId).get();
+            const legacyData = legacyDoc.data();
+            if (legacyDoc.exists && (legacyData === null || legacyData === void 0 ? void 0 : legacyData.token)) {
+                tokensList.push({
+                    token: legacyData.token,
+                    tokenHash: 'legacy',
+                    platform: 'android',
+                    supportsLocalReminders: true,
+                    onlinePushEnabled: legacyData.onlinePushEnabled !== undefined ? !!legacyData.onlinePushEnabled : true,
+                    appointmentReminderDelivery: 'fcm',
+                    doctorDailySummaryDelivery: 'fcm',
+                    timeZone: legacyData.timeZone || null,
+                    createdAt: admin.firestore.Timestamp.now(),
+                    updatedAt: admin.firestore.Timestamp.now(),
+                    lastSeenAt: admin.firestore.Timestamp.now(),
+                });
+            }
+        }
+        if (tokensList.length === 0) {
             console.log(`No FCM token found for user ${userId}, skipping push.`);
             await snap.ref.update({
                 isDelivered: true,
                 deliveredAt: admin.firestore.Timestamp.now(),
                 pushStatus: 'skipped_no_token',
                 pushAttemptedAt: admin.firestore.Timestamp.now(),
-                pushSkippedReason: 'no_active_fcm_token',
+                isVisible: true,
+                visibleAt: admin.firestore.Timestamp.now(),
+                deliveredTokenCount: 0,
+                skippedTokenCount: 0,
+                failedTokenCount: 0,
             });
             return;
         }
-        const fcmToken = tokenData.token;
-        const message = {
-            token: fcmToken,
+        const eligibleTokens = tokensList.filter(t => shouldSendPushToToken(notification, settings, t));
+        const skippedTokens = tokensList.filter(t => !shouldSendPushToToken(notification, settings, t));
+        if (eligibleTokens.length === 0) {
+            console.log(`No push-eligible token found for user ${userId}, skipping push.`);
+            await snap.ref.update({
+                isDelivered: true,
+                deliveredAt: admin.firestore.Timestamp.now(),
+                pushStatus: 'skipped_no_eligible_token',
+                pushAttemptedAt: admin.firestore.Timestamp.now(),
+                isVisible: true,
+                visibleAt: admin.firestore.Timestamp.now(),
+                deliveredTokenCount: 0,
+                skippedTokenCount: skippedTokens.length,
+                failedTokenCount: 0,
+            });
+            return;
+        }
+        const multicastMessage = {
+            tokens: eligibleTokens.map(t => t.token),
             notification: {
                 title: notification.title || 'UHC Notification',
                 body: notification.body || '',
@@ -1691,22 +1952,71 @@ async function deliverNotificationPush(snap, notificationId) {
                 },
             },
         };
-        await messaging.send(message);
-        console.log(`FCM sent to user ${userId} for notification ${notificationId}`);
+        const response = await messaging.sendEachForMulticast(multicastMessage);
+        let successCount = 0;
+        let failureCount = 0;
+        for (let idx = 0; idx < response.responses.length; idx++) {
+            const res = response.responses[idx];
+            const tokenObj = eligibleTokens[idx];
+            if (res.success) {
+                successCount++;
+            }
+            else {
+                failureCount++;
+                const error = res.error;
+                console.error(`FCM send failed for token ${tokenObj.token.slice(0, 10)}...:`, error);
+                if (error && isTerminal稳定Error(error)) {
+                    console.log(`Removing stale FCM token for user ${userId}: ${tokenObj.tokenHash}`);
+                    if (tokenObj.tokenHash === 'legacy') {
+                        await db.collection('user_tokens').doc(userId).delete().catch(() => { });
+                    }
+                    else {
+                        await db.collection('user_tokens')
+                            .doc(userId)
+                            .collection('tokens')
+                            .doc(tokenObj.tokenHash)
+                            .delete()
+                            .catch(() => { });
+                    }
+                }
+            }
+        }
+        const attempts = Number(notification.deliveryAttempts || 0) + 1;
+        const allFailedRetryable = successCount === 0 && failureCount > 0 && response.responses.every(r => r.error && !isTerminal稳定Error(r.error));
+        if (allFailedRetryable && attempts < MAX_PUSH_DELIVERY_ATTEMPTS) {
+            await snap.ref.update({
+                isDelivered: false,
+                scheduledFor: admin.firestore.Timestamp.now(),
+                deliveryAttempts: attempts,
+                pushStatus: 'retryable_error',
+                pushAttemptedAt: admin.firestore.Timestamp.now(),
+                deliveredTokenCount: 0,
+                skippedTokenCount: skippedTokens.length,
+                failedTokenCount: failureCount,
+            });
+            return;
+        }
+        const finalStatus = successCount === eligibleTokens.length ? 'sent' : // pushStatus: 'sent'
+            (successCount > 0 ? 'sent_partial' :
+                (response.responses.some(r => r.error && isTerminal稳定Error(r.error)) ? 'failed_terminal' : 'failed_retry_exhausted'));
         await snap.ref.update({
             isDelivered: true,
             deliveredAt: admin.firestore.Timestamp.now(),
-            pushStatus: 'sent',
+            deliveryAttempts: attempts,
+            pushStatus: finalStatus,
             pushAttemptedAt: admin.firestore.Timestamp.now(),
-            pushErrorCode: null,
-            pushErrorMessage: null,
+            isVisible: true,
+            visibleAt: admin.firestore.Timestamp.now(),
+            deliveredTokenCount: successCount,
+            skippedTokenCount: skippedTokens.length,
+            failedTokenCount: failureCount,
         });
     }
     catch (error) {
         console.error(`Error sending FCM for notification ${notificationId}:`, error);
         const code = fcmErrorCode(error);
         const attempts = Number(notification.deliveryAttempts || 0) + 1;
-        const terminal = isTerminalFcmError(error);
+        const terminal = isTerminal稳定Error(error);
         if (code === 'messaging/invalid-registration-token' ||
             code === 'messaging/registration-token-not-registered') {
             console.log(`Removing stale FCM token for user ${userId}`);
@@ -1732,9 +2042,21 @@ async function deliverNotificationPush(snap, notificationId) {
             pushAttemptedAt: admin.firestore.Timestamp.now(),
             pushErrorCode: code || 'unknown',
             pushErrorMessage: errorMessage(error).slice(0, 240),
+            isVisible: true,
+            visibleAt: admin.firestore.Timestamp.now(),
         });
     }
 }
+// Helper mapping to uniform name isTerminal稳定Error
+const isTerminal稳定Error = isTerminalTransientOrTerminal;
+function isTerminalTransientOrTerminal(error) {
+    return isTerminal稳定ErrorOriginal(error);
+}
+const isTerminal稳定ErrorOriginal = isTerminal稳定ErrorActual;
+function isTerminal稳定ErrorActual(error) {
+    return isTerminal稳定ErrorOriginalOriginal(error);
+}
+const isTerminal稳定ErrorOriginalOriginal = isTerminalFcmError;
 /**
  * Firestore trigger: whenever a new notification document is created,
  * look up the target user's FCM token and send a push notification.
@@ -1773,18 +2095,37 @@ exports.deliverScheduledNotifications = (0, scheduler_1.onSchedule)({
     retryCount: 0,
 }, async () => {
     const now = admin.firestore.Timestamp.now();
-    const snap = await db.collection('notifications')
+    // Query 1: FCM scheduled notifications
+    const fcmSnap = await db.collection('notifications')
         .where('isDelivered', '==', false)
+        .where('deliveryChannel', '==', 'fcm')
         .where('scheduledFor', '<=', now)
         .orderBy('scheduledFor', 'asc')
         .limit(100)
         .get();
-    if (snap.empty) {
-        console.log('No scheduled notifications due for delivery.');
-        return;
+    if (!fcmSnap.empty) {
+        console.log(`Delivering ${fcmSnap.docs.length} scheduled FCM notification(s).`);
+        await Promise.all(fcmSnap.docs.map((doc) => deliverNotificationPush(doc, doc.id)));
     }
-    console.log(`Delivering ${snap.docs.length} scheduled notification(s).`);
-    await Promise.all(snap.docs.map((doc) => deliverNotificationPush(doc, doc.id)));
+    // Query 2: Local/In-app only scheduled notifications that need to be made visible
+    const inAppSnap = await db.collection('notifications')
+        .where('isVisible', '==', false)
+        .where('deliveryChannel', '==', 'inAppOnly')
+        .where('scheduledFor', '<=', now)
+        .orderBy('scheduledFor', 'asc')
+        .limit(100)
+        .get();
+    if (!inAppSnap.empty) {
+        console.log(`Making ${inAppSnap.docs.length} in-app-only notification(s) visible.`);
+        const batch = db.batch();
+        inAppSnap.docs.forEach((doc) => {
+            batch.update(doc.ref, {
+                isVisible: true,
+                visibleAt: admin.firestore.Timestamp.now(),
+            });
+        });
+        await batch.commit();
+    }
 });
 const DOCTOR_AVAILABILITY_MONTHLY_LIMIT = 2;
 const DOCTOR_AVAILABILITY_ADMIN_NOTIFICATION_LIMIT = 450;
@@ -3374,6 +3715,187 @@ exports.listAdminAuditLogs = functions.https.onCall(async (request) => {
     catch (error) {
         console.error('listAdminAuditLogs failed:', error);
         throw toHttpsError(error, 'Failed to load admin audit logs.');
+    }
+});
+exports.resyncUserNotificationSchedules = functions.https.onCall(async (request) => {
+    const callerUid = requireAuth(request);
+    const callerDoc = await getCallerUserDoc(callerUid);
+    const callerData = callerDoc.data();
+    let targetUid = callerUid;
+    if (request.data && request.data.userId) {
+        const requestedUid = request.data.userId;
+        if (requestedUid !== callerUid) {
+            if (callerData.role !== 'admin' && callerData.role !== 'superAdmin') {
+                throw new functions.https.HttpsError('permission-denied', 'You do not have permission to resync schedules for other users.');
+            }
+            targetUid = requestedUid;
+        }
+    }
+    const settings = await getUserNotificationSettings(targetUid);
+    // Find future active appointments for the user
+    const now = admin.firestore.Timestamp.now();
+    const appointmentsSnap = await db.collection('appointments')
+        .where('patientId', '==', targetUid)
+        .where('status', 'in', ['pending', 'confirmed'])
+        .where('appointmentDate', '>=', now)
+        .get();
+    // Delete future appointmentReminder docs for that user
+    const notificationsSnap = await db.collection('notifications')
+        .where('userId', '==', targetUid)
+        .where('type', '==', 'appointmentReminder')
+        .where('scheduledFor', '>', now)
+        .get();
+    if (!notificationsSnap.empty) {
+        const batch = db.batch();
+        notificationsSnap.docs.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+    }
+    // Recreate future reminder docs using current settings
+    const appts = [];
+    for (const doc of appointmentsSnap.docs) {
+        const appt = doc.data();
+        const date = firestoreDateToDate(appt.appointmentDate);
+        if (!date)
+            continue;
+        const exactTime = appointmentExactTime(date, appt.timeSlot);
+        const formattedDate = formatDateForNotification(exactTime);
+        const reminders = [
+            { reminderType: 'oneWeek', scheduledFor: new Date(exactTime.getTime() - 7 * 24 * 60 * 60 * 1000), title: 'Appointment in 1 Week' },
+            { reminderType: 'oneDay', scheduledFor: new Date(exactTime.getTime() - 24 * 60 * 60 * 1000), title: 'Appointment Tomorrow' },
+            { reminderType: 'oneHour', scheduledFor: new Date(exactTime.getTime() - 60 * 60 * 1000), title: 'Appointment in 1 Hour' },
+        ];
+        const apptReminders = {
+            oneWeek: null,
+            oneDay: null,
+            oneHour: null,
+        };
+        if (settings.appointmentReminders.enabled) {
+            const deliveryChannel = settings.appointmentReminders.delivery === 'local' ? 'inAppOnly' : 'fcm';
+            const isDelivered = (deliveryChannel === 'inAppOnly');
+            const pushStatus = isDelivered ? 'skipped_local_device_mode' : 'pending';
+            for (const reminder of reminders) {
+                const isSwitchOn = (reminder.reminderType === 'oneWeek' && settings.appointmentReminders.oneWeek) ||
+                    (reminder.reminderType === 'oneDay' && settings.appointmentReminders.oneDay) ||
+                    (reminder.reminderType === 'oneHour' && settings.appointmentReminders.oneHour);
+                if (!isSwitchOn)
+                    continue;
+                const reminderTime = reminder.scheduledFor;
+                const isFuture = reminderTime.getTime() > Date.now();
+                if (!isFuture)
+                    continue;
+                apptReminders[reminder.reminderType] = reminderTime.toISOString();
+                const reminderId = `appointment_${appt.id}_${reminder.reminderType}`;
+                const reminderRef = db.collection('notifications').doc(reminderId);
+                await reminderRef.set(trustedNotificationPayload(reminderId, {
+                    userId: targetUid,
+                    title: reminder.title,
+                    body: `Reminder: Your appointment with Dr. ${appt.doctorName} is on ${formattedDate} at ${appt.timeSlot}.`,
+                    type: 'appointmentReminder',
+                    data: { appointmentId: appt.id, reminderType: reminder.reminderType },
+                    appointmentId: appt.id,
+                    scheduledFor: reminderTime,
+                    reminderType: reminder.reminderType,
+                    deliveryChannel,
+                    pushStatus,
+                    isDelivered,
+                    isVisible: false,
+                }));
+            }
+        }
+        appts.push({
+            appointmentId: appt.id,
+            doctorName: appt.doctorName,
+            appointmentTime: exactTime.toISOString(),
+            timeSlot: appt.timeSlot,
+            reminders: apptReminders,
+        });
+    }
+    const localScheduleRequired = settings.appointmentReminders.enabled && settings.appointmentReminders.delivery === 'local';
+    return {
+        success: true,
+        localScheduleRequired,
+        appointments: appts,
+    };
+});
+exports.sendDoctorDailyReports = (0, scheduler_1.onSchedule)({
+    schedule: 'every 5 minutes',
+    timeZone: 'Asia/Baghdad',
+    retryCount: 0,
+}, async () => {
+    var _a, _b;
+    const now = new Date();
+    // Calculate minutes since midnight in Baghdad
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Baghdad',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(now);
+    const currentHour = parseInt(((_a = parts.find(p => p.type === 'hour')) === null || _a === void 0 ? void 0 : _a.value) || '0', 10);
+    const currentMinute = parseInt(((_b = parts.find(p => p.type === 'minute')) === null || _b === void 0 ? void 0 : _b.value) || '0', 10);
+    const nowMinutes = currentHour * 60 + currentMinute;
+    // Find active doctors
+    const doctorsSnap = await db.collection('doctors')
+        .where('isActive', '==', true)
+        .get();
+    if (doctorsSnap.empty) {
+        console.log('No active doctors found for daily reports.');
+        return;
+    }
+    const baghdadToday = baghdadStartOfToday(now);
+    const tomorrowStart = new Date(baghdadToday.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowEnd = new Date(tomorrowStart.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowParts = availabilityDateParts(tomorrowStart);
+    const tomorrowDateKey = `${tomorrowParts.year}-${String(tomorrowParts.month).padStart(2, '0')}-${String(tomorrowParts.day).padStart(2, '0')}`;
+    for (const doc of doctorsSnap.docs) {
+        const doctorData = doc.data();
+        const doctorUserId = doctorData.userId;
+        if (!doctorUserId)
+            continue;
+        try {
+            const settings = await getUserNotificationSettings(doctorUserId);
+            if (!settings.doctorDailySummary.enabled)
+                continue;
+            const summaryTime = settings.doctorDailySummary.time || '21:00';
+            const [timeHourStr, timeMinuteStr] = summaryTime.split(':');
+            const timeHour = parseInt(timeHourStr || '0', 10);
+            const timeMinute = parseInt(timeMinuteStr || '0', 10);
+            const summaryMinutes = timeHour * 60 + timeMinute;
+            const diff = (nowMinutes - summaryMinutes + 1440) % 1440;
+            const isTimeMatched = diff >= 0 && diff < 5;
+            if (!isTimeMatched)
+                continue;
+            // Get tomorrow's active appointments fresh from Firestore
+            const appointmentsSnap = await db.collection('appointments')
+                .where('doctorId', '==', doc.id)
+                .where('status', 'in', ['pending', 'confirmed'])
+                .where('appointmentDate', '>=', admin.firestore.Timestamp.fromDate(tomorrowStart))
+                .where('appointmentDate', '<', admin.firestore.Timestamp.fromDate(tomorrowEnd))
+                .get();
+            const appointmentCount = appointmentsSnap.size;
+            const docId = `doctor_daily_${doctorUserId}_${tomorrowDateKey}`;
+            const deliveryChannel = settings.doctorDailySummary.delivery === 'local' ? 'inAppOnly' : 'fcm';
+            const isDelivered = (deliveryChannel === 'inAppOnly');
+            const pushStatus = isDelivered ? 'skipped_local_device_mode' : 'pending';
+            await createTrustedNotification({
+                userId: doctorUserId,
+                title: "Tomorrow's UHC Schedule",
+                body: `You have ${appointmentCount} appointment${appointmentCount === 1 ? '' : 's'} tomorrow. Open UHC for the full report.`,
+                type: 'dailySummary',
+                data: {
+                    appointmentCount,
+                    date: tomorrowDateKey,
+                },
+                deliveryChannel,
+                pushStatus,
+                isDelivered,
+                isVisible: true,
+            }, docId);
+            console.log(`Daily summary created for doctor ${doctorUserId} with count ${appointmentCount}.`);
+        }
+        catch (err) {
+            console.error(`Failed to process daily report for doctor ${doctorUserId}:`, err);
+        }
     }
 });
 //# sourceMappingURL=index.js.map

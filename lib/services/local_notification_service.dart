@@ -5,6 +5,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 /// Local notifications service for scheduling and displaying notifications
 class LocalNotificationService {
@@ -28,12 +29,60 @@ class LocalNotificationService {
   Function(String? payload)? onNotificationTap;
   bool _isInitialized = false;
 
+  /// Generate deterministic stable notification IDs instead of using hashCode.
+  int stableReminderId(String appointmentId, String reminderType) {
+    final input = '$appointmentId:$reminderType';
+    var hash = 0;
+    for (final codeUnit in input.codeUnits) {
+      hash = 0x1fffffff & (hash + codeUnit);
+      hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+      hash ^= (hash >> 6);
+    }
+    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
+    hash ^= (hash >> 11);
+    hash = 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
+    return hash;
+  }
+
+  /// Initialize timezone helper
+  Future<void> _configureLocalTimeZone() async {
+    if (kIsWeb) return;
+
+    tz_data.initializeTimeZones();
+
+    try {
+      final tzInfo = await FlutterTimezone.getLocalTimezone();
+      final timeZoneName = tzInfo.identifier;
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+    } catch (_) {
+      try {
+        tz.setLocalLocation(tz.getLocation('Asia/Baghdad'));
+      } catch (e) {
+        debugPrint('Fallback timezone setting failed: $e');
+      }
+    }
+  }
+
+  /// Check if exact alarm scheduling is allowed on Android
+  Future<bool> canScheduleExactAlarms() async {
+    if (kIsWeb) return false;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        return await androidPlugin.canScheduleExactNotifications() ?? false;
+      }
+    }
+    return true;
+  }
+
   /// Initialize the notification service
   Future<void> initialize({Function(String? payload)? onTap}) async {
+    if (kIsWeb) return;
     onNotificationTap = onTap;
 
     // Initialize timezone
-    tz_data.initializeTimeZones();
+    await _configureLocalTimeZone();
 
     // Android settings
     const androidSettings = AndroidInitializationSettings(
@@ -64,6 +113,7 @@ class LocalNotificationService {
 
   /// Create Android notification channels
   Future<void> _createNotificationChannels() async {
+    if (kIsWeb) return;
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
@@ -109,8 +159,9 @@ class LocalNotificationService {
     onNotificationTap?.call(response.payload);
   }
 
-  /// Request notification permissions (iOS)
+  /// Request notification permissions (iOS / Android)
   Future<bool> requestPermissions() async {
+    if (kIsWeb) return false;
     final iosPlugin = _notifications.resolvePlatformSpecificImplementation<
         IOSFlutterLocalNotificationsPlugin>();
 
@@ -135,7 +186,6 @@ class LocalNotificationService {
       try {
         await androidPlugin.requestExactAlarmsPermission();
       } catch (e) {
-        // Exact alarm permission not available or denied, will use inexact scheduling
         debugPrint('Exact alarm permission not granted: $e');
       }
 
@@ -153,6 +203,7 @@ class LocalNotificationService {
     String? payload,
     bool isAppointment = false,
   }) async {
+    if (kIsWeb) return;
     final prefs = await SharedPreferences.getInstance();
     final soundEnabled = prefs.getBool('notif_sound') ?? true;
     final vibrationEnabled = prefs.getBool('notif_vibration') ?? true;
@@ -192,6 +243,7 @@ class LocalNotificationService {
     String? payload,
     bool isAppointment = true,
   }) async {
+    if (kIsWeb) return;
     final prefs = await SharedPreferences.getInstance();
     final soundEnabled = prefs.getBool('notif_sound') ?? true;
     final vibrationEnabled = prefs.getBool('notif_vibration') ?? true;
@@ -219,22 +271,30 @@ class LocalNotificationService {
         'Scheduling notification for: $scheduledTz (in ${scheduledTime.difference(DateTime.now()).inSeconds} seconds)',
       );
 
-      await _notifications.zonedSchedule(
-        id: id,
-        title: title,
-        body: body,
-        scheduledDate: scheduledTz,
-        notificationDetails: details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: payload,
-      );
+      try {
+        await _notifications.zonedSchedule(
+          id: id,
+          title: title,
+          body: body,
+          scheduledDate: scheduledTz,
+          notificationDetails: details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          payload: payload,
+        );
+      } catch (_) {
+        await _notifications.zonedSchedule(
+          id: id,
+          title: title,
+          body: body,
+          scheduledDate: scheduledTz,
+          notificationDetails: details,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          payload: payload,
+        );
+      }
 
       debugPrint('Notification scheduled successfully with ID: $id');
     } catch (e, stack) {
-      // If scheduling fails, log and continue gracefully.
-      // Do NOT rethrow – the appointment is already created, and crashing here
-      // would cause the user to see an error and potentially retry, creating
-      // duplicate appointments.
       debugPrint('Failed to schedule notification: $e');
       _recordError(e, stack, reason: 'Scheduling Notification Failed');
     }
@@ -247,9 +307,12 @@ class LocalNotificationService {
     required DateTime appointmentTime,
     required String timeSlot,
   }) async {
+    if (kIsWeb) return;
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('notif_appointment_reminders') == false) return;
-    if (prefs.getBool('notif_reminder_1w') == false) return;
+    // Support version 2 check if available, otherwise fallback
+    final apptRemindersEnabled = prefs.getBool('notif_appointment_reminders') ?? true;
+    final oneWeekEnabled = prefs.getBool('notif_reminder_1w') ?? true;
+    if (!apptRemindersEnabled || !oneWeekEnabled) return;
 
     final reminderTime = appointmentTime.subtract(const Duration(days: 7));
 
@@ -261,7 +324,7 @@ class LocalNotificationService {
       });
 
       await scheduleNotification(
-        id: appointmentId.hashCode,
+        id: stableReminderId(appointmentId, 'oneWeek'),
         title: 'Appointment in 1 Week',
         body:
             'Reminder: Your appointment with Dr. $doctorName is in 1 week at $timeSlot',
@@ -278,9 +341,11 @@ class LocalNotificationService {
     required DateTime appointmentTime,
     required String timeSlot,
   }) async {
+    if (kIsWeb) return;
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('notif_appointment_reminders') == false) return;
-    if (prefs.getBool('notif_reminder_24h') == false) return;
+    final apptRemindersEnabled = prefs.getBool('notif_appointment_reminders') ?? true;
+    final oneDayEnabled = prefs.getBool('notif_reminder_24h') ?? true;
+    if (!apptRemindersEnabled || !oneDayEnabled) return;
 
     final reminderTime = appointmentTime.subtract(const Duration(hours: 24));
 
@@ -292,7 +357,7 @@ class LocalNotificationService {
       });
 
       await scheduleNotification(
-        id: appointmentId.hashCode + 1, // Different ID for 1 day reminder
+        id: stableReminderId(appointmentId, 'oneDay'),
         title: 'Appointment Tomorrow',
         body:
             'Your appointment with Dr. $doctorName is tomorrow at $timeSlot. Please arrive 10 minutes early.',
@@ -309,9 +374,11 @@ class LocalNotificationService {
     required DateTime appointmentTime,
     required String timeSlot,
   }) async {
+    if (kIsWeb) return;
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('notif_appointment_reminders') == false) return;
-    if (prefs.getBool('notif_reminder_1h') == false) return;
+    final apptRemindersEnabled = prefs.getBool('notif_appointment_reminders') ?? true;
+    final oneHourEnabled = prefs.getBool('notif_reminder_1h') ?? true;
+    if (!apptRemindersEnabled || !oneHourEnabled) return;
 
     final reminderTime = appointmentTime.subtract(const Duration(hours: 1));
 
@@ -323,7 +390,7 @@ class LocalNotificationService {
       });
 
       await scheduleNotification(
-        id: appointmentId.hashCode + 2, // Different ID for 1 hour reminder
+        id: stableReminderId(appointmentId, 'oneHour'),
         title: 'Appointment in 1 Hour',
         body:
             'Your appointment with Dr. $doctorName is in 1 hour at $timeSlot. Time to get ready!',
@@ -340,6 +407,14 @@ class LocalNotificationService {
     required DateTime appointmentTime,
     required String timeSlot,
   }) async {
+    if (kIsWeb) return;
+    final prefs = await SharedPreferences.getInstance();
+    final localEnabled = prefs.getBool('notif_local_reminders') ?? true;
+    if (!localEnabled) {
+      debugPrint('Local reminders are disabled by user settings. Skipping local scheduling.');
+      return;
+    }
+
     // Schedule 1 week before reminder
     await scheduleAppointmentReminder1Week(
       appointmentId: appointmentId,
@@ -373,9 +448,10 @@ class LocalNotificationService {
 
   /// Cancel all appointment reminders (all 3: 1 week, 1 day, 1 hour)
   Future<void> cancelAppointmentReminders(String appointmentId) async {
-    await cancelNotification(appointmentId.hashCode); // 1 week reminder
-    await cancelNotification(appointmentId.hashCode + 1); // 1 day reminder
-    await cancelNotification(appointmentId.hashCode + 2); // 1 hour reminder
+    if (kIsWeb) return;
+    await cancelNotification(stableReminderId(appointmentId, 'oneWeek')); // 1 week reminder
+    await cancelNotification(stableReminderId(appointmentId, 'oneDay')); // 1 day reminder
+    await cancelNotification(stableReminderId(appointmentId, 'oneHour')); // 1 hour reminder
   }
 
   /// Cancel all notifications
@@ -402,6 +478,7 @@ class LocalNotificationService {
     required String body,
     required DateTime scheduledTime,
   }) async {
+    if (kIsWeb) return;
     await scheduleNotification(
       id: _doctorDailySummaryBaseId + dayOffset,
       title: title,
@@ -414,6 +491,7 @@ class LocalNotificationService {
 
   /// Cancel all 7 doctor daily summary notifications.
   Future<void> cancelDoctorDailySummaries() async {
+    if (kIsWeb) return;
     for (int i = 0; i < 7; i++) {
       await cancelNotification(_doctorDailySummaryBaseId + i);
     }
@@ -428,7 +506,7 @@ class LocalNotificationService {
     try {
       FirebaseCrashlytics.instance.recordError(error, stack, reason: reason);
     } catch (_) {
-      // Ignore Crashlytics secondary failures.
+      // Ignore Crashlytics failures.
     }
   }
 }

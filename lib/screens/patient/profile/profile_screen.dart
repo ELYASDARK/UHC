@@ -351,7 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       isDark,
     );
 
-    final notifications = !isAdminLike
+    final notifications = !isSuperAdmin
         ? _buildSection(
             l10n.notificationSettings,
             [

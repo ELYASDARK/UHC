@@ -14,22 +14,16 @@ class NotificationRepository {
     String userId, {
     int limit = 50,
   }) async {
-    final now = DateTime.now();
     final snapshot = await _notificationsRef
         .where('userId', isEqualTo: userId)
+        .where('isVisible', isEqualTo: true)
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .get();
 
-    // Filter to show only delivered notifications or those scheduled for now/past
     return snapshot.docs
         .map((doc) => NotificationModel.fromFirestore(doc))
-        .where((notification) {
-      // Show immediate notifications or scheduled ones that are due
-      if (notification.scheduledFor == null) return true;
-      return notification.scheduledFor!.isBefore(now) ||
-          notification.scheduledFor!.isAtSameMomentAs(now);
-    }).toList();
+        .toList();
   }
 
   /// Get unread notifications count (only for delivered notifications)
@@ -38,6 +32,7 @@ class NotificationRepository {
     final countQuery = _notificationsRef
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
+        .where('isVisible', isEqualTo: true)
         .count();
     final snapshot = await countQuery.get();
     return snapshot.count ?? 0;
@@ -119,17 +114,14 @@ class NotificationRepository {
   Stream<List<NotificationModel>> streamNotifications(String userId) {
     return _notificationsRef
         .where('userId', isEqualTo: userId)
+        .where('isVisible', isEqualTo: true)
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
         .map((snapshot) {
-      final now = DateTime.now();
       return snapshot.docs
           .map((doc) => NotificationModel.fromFirestore(doc))
-          .where((notification) {
-        if (notification.scheduledFor == null) return true;
-        return notification.scheduledFor!.isBefore(now);
-      }).toList();
+          .toList();
     });
   }
 
@@ -138,17 +130,9 @@ class NotificationRepository {
     return _notificationsRef
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
-        .limit(200)
+        .where('isVisible', isEqualTo: true)
         .snapshots()
-        .map((snapshot) {
-      final now = DateTime.now();
-      return snapshot.docs
-          .map((doc) => NotificationModel.fromFirestore(doc))
-          .where((notification) {
-        if (notification.scheduledFor == null) return true;
-        return notification.scheduledFor!.isBefore(now);
-      }).length;
-    });
+        .map((snapshot) => snapshot.docs.length);
   }
 
   /// Schedule 3 appointment reminder notifications (1 week, 1 day, 1 hour before)

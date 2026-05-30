@@ -3,16 +3,12 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import '../data/models/appointment_model.dart';
 import '../data/repositories/appointment_repository.dart';
-import '../data/repositories/notification_repository.dart';
-import '../services/local_notification_service.dart';
+import '../services/notification_scheduling_coordinator.dart';
 import '../data/repositories/doctor_repository.dart';
 
 /// Provider for managing appointments state
 class AppointmentProvider extends ChangeNotifier {
   final AppointmentRepository _appointmentRepo = AppointmentRepository();
-  final LocalNotificationService _notificationService =
-      LocalNotificationService();
-  final NotificationRepository _notificationRepo = NotificationRepository();
   final DoctorRepository _doctorRepo = DoctorRepository();
 
   List<AppointmentModel> _upcomingAppointments = [];
@@ -130,33 +126,12 @@ class AppointmentProvider extends ChangeNotifier {
     String appointmentId,
   ) async {
     try {
-      await _notificationService.scheduleAppointmentReminders(
-        appointmentId: appointmentId,
-        doctorName: appointment.doctorName,
-        appointmentTime: appointment.exactAppointmentTime,
-        timeSlot: appointment.timeSlot,
+      final coordinator = NotificationSchedulingCoordinator();
+      await coordinator.scheduleLocalAppointmentReminders(
+        appointment.copyWith(id: appointmentId),
       );
     } catch (e) {
       debugPrint('Failed to schedule local reminders: $e');
-    }
-
-    try {
-      await _notificationRepo.sendAppointmentConfirmation(
-        userId: appointment.patientId,
-        appointmentId: appointmentId,
-        doctorName: appointment.doctorName,
-        appointmentTime: appointment.exactAppointmentTime,
-        timeSlot: appointment.timeSlot,
-      );
-      await _notificationRepo.scheduleAppointmentReminders(
-        userId: appointment.patientId,
-        appointmentId: appointmentId,
-        doctorName: appointment.doctorName,
-        appointmentTime: appointment.exactAppointmentTime,
-        timeSlot: appointment.timeSlot,
-      );
-    } catch (e) {
-      debugPrint('Failed to send Firebase notifications: $e');
     }
 
     try {
@@ -183,26 +158,12 @@ class AppointmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Get appointment details if not provided
-      AppointmentModel? appointment;
-      if (doctorName == null || appointmentTime == null) {
-        appointment = await _appointmentRepo.getAppointmentById(appointmentId);
-      }
+      final coordinator = NotificationSchedulingCoordinator();
+      await coordinator.cancelLocalAppointmentReminders(appointmentId);
 
       await _appointmentRepo.cancelAppointment(appointmentId, reason);
 
-      // Cancel scheduled local reminders
-      await _notificationService.cancelAppointmentReminders(appointmentId);
-
-      // Send cancellation notification to Firebase (also deletes pending reminders)
-      await _notificationRepo.sendAppointmentCancellation(
-        userId: userId,
-        appointmentId: appointmentId,
-        doctorName: doctorName ?? appointment?.doctorName ?? 'Unknown',
-        appointmentTime:
-            appointmentTime ?? appointment?.appointmentDate ?? DateTime.now(),
-        reason: reason,
-      );
+      await coordinator.resyncAfterSettingsChange(userId);
 
       // Refresh appointments
       await loadAppointments(userId);
@@ -225,10 +186,12 @@ class AppointmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final coordinator = NotificationSchedulingCoordinator();
+      await coordinator.cancelLocalAppointmentReminders(appointmentId);
+
       await _appointmentRepo.deleteAppointment(appointmentId);
 
-      // Cancel scheduled reminders
-      await _notificationService.cancelAppointmentReminders(appointmentId);
+      await coordinator.resyncAfterSettingsChange(userId);
 
       // Refresh appointments
       await loadAppointments(userId);
@@ -253,8 +216,9 @@ class AppointmentProvider extends ChangeNotifier {
     try {
       await _appointmentRepo.deleteAllUserAppointments(userId);
 
-      // Cancel all notifications
-      await _notificationService.cancelAllNotifications();
+      // Cancel all local notifications on this device
+      final coordinator = NotificationSchedulingCoordinator();
+      await coordinator.cancelAllLocalReminders();
 
       _upcomingAppointments = [];
       _pastAppointments = [];
@@ -286,17 +250,6 @@ class AppointmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Get old appointment time if not provided
-      DateTime oldTime = oldAppointmentTime ?? DateTime.now();
-      if (oldAppointmentTime == null) {
-        final oldAppointment = await _appointmentRepo.getAppointmentById(
-          appointmentId,
-        );
-        if (oldAppointment != null) {
-          oldTime = oldAppointment.appointmentDate;
-        }
-      }
-
       // Check if new time slot is available
       final isAvailable = await _appointmentRepo.isTimeSlotAvailable(
         doctorId,
@@ -311,6 +264,9 @@ class AppointmentProvider extends ChangeNotifier {
         return false;
       }
 
+      final coordinator = NotificationSchedulingCoordinator();
+      await coordinator.cancelLocalAppointmentReminders(appointmentId);
+
       await _appointmentRepo.rescheduleAppointment(
         appointmentId,
         newDate,
@@ -318,28 +274,7 @@ class AppointmentProvider extends ChangeNotifier {
         reason,
       );
 
-      // Build exact DateTime from newDate + newTimeSlot so reminders fire
-      // relative to the real appointment hour, not midnight.
-      final newExactTime = _buildExactTime(newDate, newTimeSlot);
-
-      // Cancel old local reminders and schedule new ones
-      await _notificationService.cancelAppointmentReminders(appointmentId);
-      await _notificationService.scheduleAppointmentReminders(
-        appointmentId: appointmentId,
-        doctorName: doctorName,
-        appointmentTime: newExactTime,
-        timeSlot: newTimeSlot,
-      );
-
-      // Update Firebase notifications (delete old, create rescheduled notification + new reminders)
-      await _notificationRepo.sendAppointmentRescheduled(
-        userId: userId,
-        appointmentId: appointmentId,
-        doctorName: doctorName,
-        oldAppointmentTime: oldTime,
-        newAppointmentTime: newExactTime,
-        newTimeSlot: newTimeSlot,
-      );
+      await coordinator.resyncAfterSettingsChange(userId);
 
       // Refresh appointments
       await loadAppointments(userId);
@@ -394,20 +329,6 @@ class AppointmentProvider extends ChangeNotifier {
     _doctorPhotos = {};
     _error = null;
     notifyListeners();
-  }
-
-  /// Build exact DateTime from a date-only [date] and a timeSlot string
-  /// like "09:00 - 09:30". Extracts the start time and combines with [date].
-  DateTime _buildExactTime(DateTime date, String timeSlot) {
-    final startTimeStr = timeSlot.split(' - ').first;
-    final parts = startTimeStr.split(':');
-    int hour = 0;
-    int minute = 0;
-    if (parts.length == 2) {
-      hour = int.tryParse(parts[0]) ?? 0;
-      minute = int.tryParse(parts[1]) ?? 0;
-    }
-    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
   /// Batch-fetch profile photos for all unique doctors across appointments.

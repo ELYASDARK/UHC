@@ -518,7 +518,18 @@ flutter build web --release
 ## 📝 Changelog
 
 <details open>
-<summary><b>v2.4.0</b> — May 15, 2026</summary>
+<summary><b>v2.4.0</b> — May 30, 2026</summary>
+
+#### 🔔 UHC Notification System V2 Rebuilt & Hardened (May 30, 2026)
+- **Clear Architectural Rules** — Implemented a clean separation of concern: Firestore Alerts are the in-app source of truth; FCM handles real-time push notifications; Local reminders handle mobile-only offline schedules. Web never schedules local notifications.
+- **Multi-Device Token Support** — Replaced single-token per user limits with subcollection-based hashed multi-device tracking (`user_tokens/{userId}/tokens/{tokenHash}`) with device and timezone metadata.
+- **No Duplicate Reminders** — Prevented duplicate delivery of local alarms and FCM scheduled pushes for identical appointments by routing scheduling and cancellation flows through a new scheduling coordinator.
+- **Scheduling Coordinator Integration** — Created `NotificationSchedulingCoordinator` which manages offline local scheduling state, clears old alarms, and synchronizes future reminders after login, logout, app reboots, settings change, cancellations, and reschedules.
+- **Settings UI Redesign** — Redesigned the settings screen with 6 card-based sections mapping platforms, push switches, appointment timing reminders, delivery preferences, doctor summary timing, and announcements. Hides local-mode reminder widgets entirely on Web.
+- **Doctor Daily Summaries** — Refactored summaries to compute fresh appointment counts server-side at the configured time (delivered via FCM). Mobile local modes schedule a generic open-app reminder instead of using stale local data.
+- **Alerts Count Visibility Guard** — Future scheduled alerts are hidden (`isVisible: false`) from the in-app Alerts count until they are actually due and processed by the delivery worker.
+- **Robust Logout Cleanup** — Guaranteed unregistration of current device FCM tokens, topic subscriptions, and complete local alarm wipe on user sign-out.
+- **Upgrade Package Compatibility** — Upgraded `flutter_timezone` to `5.1.0` and `crypto` to `3.0.7` and resolved all compile errors/warnings across the codebase.
 
 #### 🎨 Premium Onboarding Redesign (May 27, 2026)
 - **Full onboarding rewrite** — Replaced the legacy onboarding screen with a modern, immersive design featuring per-slide gradient backgrounds, custom `CustomPainter` vector illustrations, smooth animated transitions, and a clean bottom content area.
@@ -594,22 +605,21 @@ flutter build web --release
 
 | File | Key Changes |
 |:---|:---|
-| `functions/src/index.ts` | Appointment callables, slot-lock release on hard delete, scheduled notification delivery, inactive-account gateway, explicit permission enforcement, 12-char password policy, session + FCM revocation |
-| `lib/data/repositories/appointment_repository.dart` | All mutations routed through `FirebaseFunctions.httpsCallable()`; appointment reads use cursor-paginated bounded batches |
-| `lib/data/repositories/document_repository.dart` | Scoped storage paths, `contentType` metadata on uploads |
-| `lib/data/repositories/notification_repository.dart` | Client-side notification creation stubbed out (now server-owned) |
+| `functions/src/index.ts` | Added settings normalization, `resyncUserNotificationSchedules` callable, `sendDoctorDailyReports` scheduled summary, and multi-device multicast delivery |
+| `firestore.indexes.json` | Added composite indexes for notification queries and scheduled scans |
+| `firestore.rules` | Configured user device tokens subcollection security rules |
+| `lib/core/notifications/` | [NEW] Added device and user notification preferences models |
+| `lib/services/notification_scheduling_coordinator.dart` | [NEW] Added notification scheduling coordinator to orchestrate local/FCM reminder sync |
+| `lib/services/local_notification_service.dart` | Upgraded with timezone compatibility, web guards, stable reminder IDs, and fallback exact-alarm modes |
+| `lib/services/fcm_service.dart` | Modified to register tokens under `user_tokens` subcollections and fixed timezone info extraction |
+| `lib/screens/shared/notification_settings_screen.dart` | Complete settings screen redesign with status card, timing preferences, radio card delivery selectors, and web overrides |
+| `lib/providers/appointment_provider.dart` | Integrated scheduling coordinator, removing direct/duplicate local alarms |
+| `lib/providers/doctor_appointment_provider.dart` | Modified doctor daily summary local scheduling to align with coordinator and use generic fallback reminders |
+| `lib/data/repositories/notification_repository.dart` | Updated notifications and unread streams to filter for visibility status |
+| `pubspec.yaml` | Upgraded `flutter_timezone` to `5.1.0` and `crypto` to `3.0.7` |
+| `lib/main.dart` | Integrated coordinator resync on user login or session restoration |
 | `lib/data/models/user_model.dart` | Added `themeMode` field, explicit `hasPermission` now returns false for null permissions |
-| `lib/providers/auth_provider.dart` | `updateLanguage()`, `updateThemeMode()`, pre-signout state clearing with rollback |
 | `lib/services/auth_service.dart` | `updateUserLanguage()`, `updateUserThemeMode()` Firestore helpers |
-| `lib/services/fcm_service.dart` | Removed dual `users` collection token writes, removed per-user/role/department topic subscriptions |
-| `lib/services/local_notification_service.dart` | Android channel registration aligned with backend FCM channel ID |
-| `lib/screens/admin/dashboard/admin_dashboard_screen.dart` | Permission-gated KPI queries, `_countSafely()` wrapper |
-| `lib/screens/admin/reports/reports_screen.dart` | Updated to work with server-side appointment lifecycle |
-| `lib/screens/super_admin/*` | UI refinements, Load More governance lists, and audit-log pagination handling |
-| `firestore.indexes.json` | Composite indexes for appointment pagination, slot availability checks, audit queries, and scheduled notification scans |
-| `storage.rules` | [NEW] Firebase Storage security rules |
-| `lib/core/widgets/role_english_ltr_scope.dart` | [NEW] LTR text scope widget for role/status labels in RTL layouts |
-| `pubspec.yaml` | Dependency updates |
 | `lib/screens/onboarding/onboarding_screen.dart` | Full rewrite: premium gradient backgrounds, `CustomPainter` illustrations, `PageView` navigation, animated indicators |
 | `lib/l10n/app_en.arb` | Expanded onboarding descriptions to detailed 2-sentence copy |
 | `lib/l10n/app_ar.arb` | Expanded onboarding descriptions (Arabic) |

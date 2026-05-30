@@ -7,6 +7,11 @@ import 'package:flutter/foundation.dart'
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import '../core/notifications/notification_preferences.dart';
 import 'local_notification_service.dart';
 
 /// Background message handler - must be top-level function
@@ -148,12 +153,7 @@ class FCMService {
       }
 
       if (token != null) {
-        final platform = kIsWeb ? 'web' : _getNativePlatform();
-        await _firestore.collection('user_tokens').doc(userId).set({
-          'token': token,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'platform': platform,
-        }, SetOptions(merge: true));
+        await _saveToken(userId, token);
       }
 
       if (_tokenOwnerUserId != userId ||
@@ -168,29 +168,72 @@ class FCMService {
           return;
         }
 
-        final refreshPlatform = kIsWeb ? 'web' : _getNativePlatform();
-        await _firestore.collection('user_tokens').doc(userId).set({
-          'token': newToken,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'platform': refreshPlatform,
-        }, SetOptions(merge: true));
+        await _saveToken(userId, newToken);
       });
     } catch (e) {
-      // getToken() can throw on web (requires VAPID key) — don't let that
-      // block the rest of the initialization flow.
       debugPrint('saveTokenToDatabase failed (safe to ignore on web): $e');
     }
   }
 
-  /// Determine native platform name (only called when NOT on web).
-  /// Separated into its own method so dart:io is only imported conditionally.
-  String _getNativePlatform() {
-    // On web, this should never be called, but default to 'unknown' as safety.
+  Future<void> _saveToken(String userId, String token) async {
     try {
-      // ignore: avoid_slow_async_io
-      return defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
-    } catch (_) {
-      return 'unknown';
+      final userSnap = await _firestore.collection('users').doc(userId).get();
+      final userData = userSnap.data();
+      final isDoctor = userData?['role'] == 'doctor';
+      final prefsMap = userData?['notificationSettings'] as Map<String, dynamic>?;
+      final settings = NotificationPreferences.fromMap(prefsMap, isDoctor: isDoctor, isWeb: kIsWeb);
+
+      final prefs = await SharedPreferences.getInstance();
+      var deviceId = prefs.getString('uhc_device_id');
+      if (deviceId == null) {
+        deviceId = const Uuid().v4();
+        await prefs.setString('uhc_device_id', deviceId);
+      }
+
+      final bytes = utf8.encode(token);
+      final tokenHash = sha256.convert(bytes).toString();
+
+      final platform = kIsWeb ? 'web' : _getNativePlatform();
+      final supportsLocalReminders = !kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+           defaultTargetPlatform == TargetPlatform.iOS);
+
+      final effectiveAppointmentReminderDelivery = kIsWeb
+          ? NotificationDeliveryMode.fcm
+          : settings.appointmentReminderDelivery;
+
+      final effectiveDoctorDailySummaryDelivery = kIsWeb
+          ? NotificationDeliveryMode.fcm
+          : settings.doctorDailySummaryDelivery;
+
+      String? timeZone;
+      if (!kIsWeb) {
+        try {
+          final tzInfo = await FlutterTimezone.getLocalTimezone();
+          timeZone = tzInfo.identifier;
+        } catch (_) {}
+      }
+
+      await _firestore
+          .collection('user_tokens')
+          .doc(userId)
+          .collection('tokens')
+          .doc(tokenHash)
+          .set({
+        'token': token,
+        'tokenHash': tokenHash,
+        'deviceId': deviceId,
+        'platform': platform,
+        'supportsLocalReminders': supportsLocalReminders,
+        'onlinePushEnabled': settings.onlinePushEnabled,
+        'appointmentReminderDelivery': effectiveAppointmentReminderDelivery.name,
+        'doctorDailySummaryDelivery': effectiveDoctorDailySummaryDelivery.name,
+        'timeZone': timeZone,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'lastSeenAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error inside _saveToken helper: $e');
     }
   }
 
@@ -207,11 +250,18 @@ class FCMService {
     }
 
     try {
-      await _firestore.collection('user_tokens').doc(userId).delete();
+      final token = await getToken();
+      if (token != null) {
+        final bytes = utf8.encode(token);
+        final tokenHash = sha256.convert(bytes).toString();
+        await _firestore
+            .collection('user_tokens')
+            .doc(userId)
+            .collection('tokens')
+            .doc(tokenHash)
+            .delete();
+      }
     } catch (e) {
-      // Deleting from Firestore can fail if auth is already gone or the app is
-      // offline. We still invalidate the local token below when it belongs to
-      // this session so stale server-side tokens stop working.
       debugPrint('Failed to delete FCM token document for $userId: $e');
     }
 
@@ -220,7 +270,6 @@ class FCMService {
     try {
       await _messaging.deleteToken();
     } catch (e) {
-      // deleteToken() can throw on web or when messaging is unavailable.
       debugPrint('Failed to delete local FCM token for $userId: $e');
     }
   }
@@ -249,6 +298,23 @@ class FCMService {
   void dispose() {
     _tokenRefreshSubscription?.cancel();
     _messageStreamController.close();
+  }
+
+  String _getNativePlatform() {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'android';
+      case TargetPlatform.iOS:
+        return 'ios';
+      case TargetPlatform.macOS:
+        return 'macos';
+      case TargetPlatform.windows:
+        return 'windows';
+      case TargetPlatform.linux:
+        return 'linux';
+      default:
+        return 'unknown';
+    }
   }
 
   void _recordError(

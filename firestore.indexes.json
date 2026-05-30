@@ -23,6 +23,24 @@
             "queryScope": "COLLECTION",
             "fields": [
                 {
+                    "fieldPath": "patientId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "appointmentDate",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "appointments",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
                     "fieldPath": "patientEmail",
                     "order": "ASCENDING"
                 },
@@ -147,7 +165,79 @@
             "queryScope": "COLLECTION",
             "fields": [
                 {
+                    "fieldPath": "userId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "isVisible",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "notifications",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "userId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "isRead",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "isVisible",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "notifications",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
                     "fieldPath": "isDelivered",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "scheduledFor",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "notifications",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "isDelivered",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "deliveryChannel",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "scheduledFor",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "notifications",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "isVisible",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "deliveryChannel",
                     "order": "ASCENDING"
                 },
                 {
