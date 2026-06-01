@@ -1501,9 +1501,9 @@ exports.bootstrapSelfUserDocument = functions.https.onCall(async (request) => {
     return { success: true, message: 'User profile initialized successfully.' };
 });
 /**
- * Activate/deactivate a non-admin user.
+ * Activate/deactivate a student or staff user.
  * Admin requires users.manageNonAdmin permission.
- * Super Admin bypasses permission checks.
+ * Doctor accounts must be managed through Doctor Management.
  */
 exports.setUserActiveStatus = functions.https.onCall(async (request) => {
     const callerUid = requireAuth(request);
@@ -1524,6 +1524,9 @@ exports.setUserActiveStatus = functions.https.onCall(async (request) => {
     }
     if (targetRole === 'admin') {
         throw new functions.https.HttpsError('failed-precondition', 'Use setAdminActiveStatus for admin accounts.');
+    }
+    if (targetRole === 'doctor') {
+        throw new functions.https.HttpsError('failed-precondition', 'Doctor accounts must be managed from Doctor Management.');
     }
     if (callerRole === 'admin' && targetRole === 'admin') {
         throw new functions.https.HttpsError('permission-denied', 'Admins cannot modify admin accounts.');
@@ -1661,8 +1664,8 @@ exports.unlinkGoogleProviderByAdmin = functions.https.onCall(async (request) => 
 });
 /**
  * Update profile-safe fields for a target user via server-side enforcement.
- * Admins can manage non-admin users only.
- * Super Admins can manage all users, including super admins.
+ * Admins can manage student and staff users only.
+ * Doctor profiles must be managed through Doctor Management.
  */
 exports.updateUserProfileByAdmin = functions.https.onCall(async (request) => {
     const callerUid = requireAuth(request);
@@ -1684,6 +1687,9 @@ exports.updateUserProfileByAdmin = functions.https.onCall(async (request) => {
     }
     if (callerRole === 'admin' && targetRole === 'admin') {
         throw new functions.https.HttpsError('permission-denied', 'Admins cannot edit admin accounts.');
+    }
+    if (targetRole === 'doctor') {
+        throw new functions.https.HttpsError('failed-precondition', 'Doctor profiles must be managed from Doctor Management.');
     }
     const updates = {
         updatedAt: admin.firestore.Timestamp.now(),

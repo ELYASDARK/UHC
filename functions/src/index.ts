@@ -2085,9 +2085,9 @@ interface SetUserActiveStatusData {
 }
 
 /**
- * Activate/deactivate a non-admin user.
+ * Activate/deactivate a student or staff user.
  * Admin requires users.manageNonAdmin permission.
- * Super Admin bypasses permission checks.
+ * Doctor accounts must be managed through Doctor Management.
  */
 export const setUserActiveStatus = functions.https.onCall(
     async (request: functions.https.CallableRequest<SetUserActiveStatusData>) => {
@@ -2120,6 +2120,12 @@ export const setUserActiveStatus = functions.https.onCall(
             throw new functions.https.HttpsError(
                 'failed-precondition',
                 'Use setAdminActiveStatus for admin accounts.'
+            );
+        }
+        if (targetRole === 'doctor') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Doctor accounts must be managed from Doctor Management.'
             );
         }
         if (callerRole === 'admin' && targetRole === 'admin') {
@@ -2336,8 +2342,8 @@ interface UpdateUserProfileByAdminData {
 
 /**
  * Update profile-safe fields for a target user via server-side enforcement.
- * Admins can manage non-admin users only.
- * Super Admins can manage all users, including super admins.
+ * Admins can manage student and staff users only.
+ * Doctor profiles must be managed through Doctor Management.
  */
 export const updateUserProfileByAdmin = functions.https.onCall(
     async (request: functions.https.CallableRequest<UpdateUserProfileByAdminData>) => {
@@ -2368,6 +2374,12 @@ export const updateUserProfileByAdmin = functions.https.onCall(
             throw new functions.https.HttpsError(
                 'permission-denied',
                 'Admins cannot edit admin accounts.'
+            );
+        }
+        if (targetRole === 'doctor') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Doctor profiles must be managed from Doctor Management.'
             );
         }
 
