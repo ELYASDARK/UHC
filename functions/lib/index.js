@@ -3725,7 +3725,7 @@ exports.resyncUserNotificationSchedules = functions.https.onCall(async (request)
     if (request.data && request.data.userId) {
         const requestedUid = request.data.userId;
         if (requestedUid !== callerUid) {
-            if (callerData.role !== 'admin' && callerData.role !== 'superAdmin') {
+            if (!isAdminWithAppointmentAccess(callerData)) {
                 throw new functions.https.HttpsError('permission-denied', 'You do not have permission to resync schedules for other users.');
             }
             targetUid = requestedUid;
