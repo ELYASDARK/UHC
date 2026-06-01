@@ -133,6 +133,8 @@ const READ_ONLY_ADMIN_PERMISSIONS: Record<string, boolean> = {
     'doctors.manage': false,
     'departments.view': true,
     'departments.manage': false,
+    'appointments.view': true,
+    'appointments.manage': false,
     'analytics.view': true,
     'reports.view': true,
     'reports.export': false,
@@ -411,11 +413,11 @@ function formatDateForNotification(date: Date): string {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function isAdminWithAppointmentAccess(data: FirebaseFirestore.DocumentData): boolean {
+function isAdminWithAppointmentMutationAccess(data: FirebaseFirestore.DocumentData): boolean {
     if (data.role === 'superAdmin') return true;
     if (data.role !== 'admin') return false;
     const perms = data.adminPermissions as Record<string, boolean> | undefined;
-    return !!(perms?.['appointments.view'] || perms?.['analytics.view'] || perms?.['reports.view']);
+    return perms?.['appointments.manage'] === true;
 }
 
 async function getDoctorForUser(uid: string): Promise<FirebaseFirestore.DocumentSnapshot | null> {
@@ -435,7 +437,7 @@ async function canMutateAppointment(
 ): Promise<boolean> {
     const callerData = callerDoc.data()!;
     if (options.allowPatient && appointmentData.patientId === callerUid) return true;
-    if (options.allowAdmin && isAdminWithAppointmentAccess(callerData)) return true;
+    if (options.allowAdmin && isAdminWithAppointmentMutationAccess(callerData)) return true;
     if (options.allowDoctor && callerData.role === 'doctor') {
         const doctorDoc = await getDoctorForUser(callerUid);
         return doctorDoc?.id === appointmentData.doctorId;

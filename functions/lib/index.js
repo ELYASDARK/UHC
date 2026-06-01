@@ -96,6 +96,8 @@ const READ_ONLY_ADMIN_PERMISSIONS = {
     'doctors.manage': false,
     'departments.view': true,
     'departments.manage': false,
+    'appointments.view': true,
+    'appointments.manage': false,
     'analytics.view': true,
     'reports.view': true,
     'reports.export': false,
@@ -250,13 +252,13 @@ function appointmentExactTime(date, timeSlot) {
 function formatDateForNotification(date) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function isAdminWithAppointmentAccess(data) {
+function isAdminWithAppointmentMutationAccess(data) {
     if (data.role === 'superAdmin')
         return true;
     if (data.role !== 'admin')
         return false;
     const perms = data.adminPermissions;
-    return !!((perms === null || perms === void 0 ? void 0 : perms['appointments.view']) || (perms === null || perms === void 0 ? void 0 : perms['analytics.view']) || (perms === null || perms === void 0 ? void 0 : perms['reports.view']));
+    return (perms === null || perms === void 0 ? void 0 : perms['appointments.manage']) === true;
 }
 async function getDoctorForUser(uid) {
     const snap = await db.collection('doctors')
@@ -270,7 +272,7 @@ async function canMutateAppointment(callerUid, callerDoc, appointmentData, optio
     const callerData = callerDoc.data();
     if (options.allowPatient && appointmentData.patientId === callerUid)
         return true;
-    if (options.allowAdmin && isAdminWithAppointmentAccess(callerData))
+    if (options.allowAdmin && isAdminWithAppointmentMutationAccess(callerData))
         return true;
     if (options.allowDoctor && callerData.role === 'doctor') {
         const doctorDoc = await getDoctorForUser(callerUid);

@@ -85,6 +85,22 @@ void main() {
       );
     });
 
+    test('admin appointment mutations require manage permission', () {
+      final functionsSource = readProjectFile('functions/src/index.ts');
+
+      expect(functionsSource, contains('isAdminWithAppointmentMutationAccess'));
+      expect(
+        functionsSource,
+        contains("perms?.['appointments.manage'] === true"),
+      );
+      expect(
+        functionsSource,
+        isNot(contains(
+          "perms?.['appointments.view'] || perms?.['analytics.view'] || perms?.['reports.view']",
+        )),
+      );
+    });
+
     test('push delivery records push status separately from in-app delivery',
         () {
       final functionsSource = readProjectFile('functions/src/index.ts');
