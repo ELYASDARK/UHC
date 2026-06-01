@@ -63,7 +63,7 @@
 - **Appointment Booking** — Browse by department or doctor, pick available time slots, and confirm instantly; unavailable or inactive doctors are locked in the UI and rejected by the backend
 - **Appointment Management** — View upcoming/past appointments, reschedule, or cancel with reason tracking
 - **Medical Documents** — Upload and organize lab results, prescriptions, and imaging reports
-- **Push Notifications** — Appointment reminders and in-app notification center
+- **Push Notifications** — FCM push, local mobile reminders, and in-app notification center with visibility-safe scheduled alerts
 - **Profile Management** — Edit personal info, change password, upload profile photo
 - **QR Code** — Generate QR codes for appointments
 - **Dark Mode** — System-aware or manual theme toggle
@@ -81,7 +81,7 @@
 - **Patient Profiles** — View patient details, profile photos, medical info, and appointment history from within appointment context
 - **Doctor Profile & Settings** — Edit specialization, bio, qualifications; configure notifications, language, and theme
 - **Availability Requests** — Request unavailable status with a note for admin approval, stay available while pending, and sync the dashboard switch in real time when admin changes availability
-- **Push Notifications** — Real-time alerts for new bookings, cancellations, and status changes
+- **Push Notifications** — Real-time alerts for new bookings, cancellations, status changes, and configurable daily schedule summaries
 - **Consistent Design Language** — Matches patient/staff UI with shared widgets, staggered animations, skeleton loaders, and theme-aware styling
 
 </details>
@@ -239,6 +239,17 @@ uhc/
 │   │   ├── save_file_io.dart       # Mobile/Desktop: save to temp + share via share_plus
 │   │   └── save_file_stub.dart     # Stub for unsupported platforms
 ├── functions/                      # Firebase Cloud Functions (TypeScript)
+│   ├── src/
+│   │   ├── index.ts                # Public Firebase export surface only
+│   │   ├── firebase.ts             # Firebase Admin initialization and shared SDK handles
+│   │   ├── appointments.ts         # Appointment lifecycle callables
+│   │   ├── doctors.ts              # Doctor account/profile/schedule callables
+│   │   ├── users.ts                # Student/staff account and profile callables
+│   │   ├── departments.ts          # Department CRUD callables
+│   │   ├── doctorAvailability.ts   # Availability request/review workflow
+│   │   ├── admin.ts                # Super Admin governance callables
+│   │   ├── notifications/          # Notification core, delivery, admin send, scheduled jobs
+│   │   └── shared/                 # Auth guards, audit logs, errors, validation, shared helpers
 ├── test/                           # Security, notification theme, and integration tests
 ├── assets/
 │   ├── images/                     # Static images
@@ -290,13 +301,20 @@ flutter run
 ### Cloud Functions Setup
 
 ```bash
-# Navigate to functions directory
+# Navigate to functions directory and install dependencies
 cd functions
-
-# Install Node.js dependencies
 npm install
 
-# Deploy functions to Firebase
+# Build TypeScript locally
+npm run build
+
+# Return to project root for Firebase CLI commands
+cd ..
+
+# Validate rules, indexes, storage rules, and functions packaging without deploying
+firebase deploy --only 'firestore:rules,firestore:indexes,storage,functions' --dry-run
+
+# Deploy functions to Firebase after validation
 firebase deploy --only functions
 ```
 
@@ -313,7 +331,7 @@ Enable the following in your [Firebase Console](https://console.firebase.google.
 - ✅ **Firebase Storage** — Enable for file uploads
 - ✅ **Cloud Messaging** — Enable for push notifications
 - ✅ **Cloud Functions** — Upgrade project to Blaze plan (required for Node.js functions)
-- ✅ **Cloud Scheduler** — Required by scheduled notification delivery (`deliverScheduledNotifications`)
+- ✅ **Cloud Scheduler** — Required by scheduled notification delivery (`deliverScheduledNotifications`, `sendDoctorDailyReports`)
 
 ### Platform Configuration
 
@@ -370,6 +388,8 @@ Add these keys to `ios/Runner/Info.plist` for permissions:
 </array>
 ```
 
+The Android and iOS runners also expose the `uhc/notification_settings` method channel so the shared notification settings screen can open the app's native notification settings page.
+
 ### Firestore Collections
 
 | Collection | Description |
@@ -394,6 +414,8 @@ Add these keys to `ios/Runner/Info.plist` for permissions:
 ## ⚙️ Cloud Functions
 
 Server-side functions handle privileged operations that require Firebase Admin SDK access:
+
+The Functions source is split by domain. `functions/src/index.ts` keeps the stable public Firebase export names, while implementation lives in appointment, doctor, user, department, notification, availability, admin, and shared helper modules.
 
 | Function | Description | Access |
 |:---|:---|:---|
@@ -433,7 +455,9 @@ Server-side functions handle privileged operations that require Firebase Admin S
 | `deleteUserAccount` | Deletes non-admin user accounts through server-side validation | 🔒 Admin |
 | **Notifications** | | |
 | `onNotificationCreated` | Firestore trigger — sends immediate FCM push and defers future scheduled notifications | 🔄 Auto |
-| `deliverScheduledNotifications` | Scheduled function — delivers due notification documents every 5 minutes | 🔄 Auto |
+| `deliverScheduledNotifications` | Scheduled function — delivers due FCM notifications and makes local/in-app scheduled notifications visible every 5 minutes | 🔄 Auto |
+| `resyncUserNotificationSchedules` | Rebuilds future reminder notification documents and returns local scheduling instructions for the active device | 🔒 Authenticated |
+| `sendDoctorDailyReports` | Scheduled function — creates doctor daily summary notifications at each doctor's configured time | 🔄 Auto |
 | `searchAdminNotificationRecipients` | Searches valid notification recipients without broad client-side user listing | 🔒 Admin |
 | `previewAdminNotificationRecipients` | Counts recipients before sending an admin notification | 🔒 Admin |
 | `sendAdminNotification` | Creates audited in-app notifications for selected patient/doctor audiences | 🔒 Admin |
@@ -518,6 +542,42 @@ flutter build web --release
 ## 📝 Changelog
 
 <details open>
+<summary><b>Unreleased</b> — June 1, 2026</summary>
+
+#### 🧩 Firebase Functions Modularization
+- **Domain Split** — Refactored the large Firebase Functions entrypoint into focused modules for appointments, doctors, users, departments, doctor availability, notifications, admin governance, and shared helpers.
+- **Stable Public Surface** — Kept `functions/src/index.ts` as the public Firebase export surface only; all 48 callable/trigger/scheduled function names remain unchanged for Flutter clients and Firebase deployment.
+- **Central Firebase Admin Initialization** — Added a shared Firebase Admin module so `admin.initializeApp()`, Firestore, Auth, and Messaging handles are initialized once and reused safely.
+- **Validation Completed** — Verified with `npm --prefix functions run build`, Firebase emulator boot for `functions`, `firestore`, and `storage`, and `firebase deploy --only 'firestore:rules,firestore:indexes,storage,functions' --dry-run`.
+
+#### 🔔 Notification Settings & Local Scheduling Follow-Up
+- **Native Settings Bridge** — Added Android/iOS method-channel support for opening the app's notification settings page from the shared settings screen.
+- **Permission Refresh on Resume** — Notification settings now refresh permission/device state when returning from system settings and resync token/schedule state.
+- **Local Reminder Cleanup** — Local appointment reminder resync now cancels only appointment-reminder notifications instead of wiping unrelated local notifications.
+- **Doctor Local Daily Summary Resync** — Mobile doctor daily summaries can be rescheduled from current doctor settings and weekly schedule.
+- **Visibility-Safe Reads** — Notification list, unread count, mark-read, and delete flows filter scheduled/future notifications client-side when Firestore queries cannot rely solely on `isVisible`.
+- **Index Support** — Added a composite notification index for user/type/scheduled reminder cleanup queries.
+
+#### 📁 Files Changed
+
+| File | Key Changes |
+|:---|:---|
+| `functions/src/index.ts` | Reduced to public re-exports only |
+| `functions/src/firebase.ts` | Centralized Firebase Admin initialization and shared SDK handles |
+| `functions/src/*.ts` | Added domain modules for appointments, doctors, users, departments, availability, and admin governance |
+| `functions/src/notifications/` | Added notification core, delivery, admin send, and scheduled modules |
+| `functions/src/shared/` | Added reusable auth, audit, error, validation, profile photo, and appointment helper modules |
+| `lib/screens/shared/notification_settings_screen.dart` | Added lifecycle refresh, native settings open flow, and settings rollback on save failure |
+| `lib/services/notification_scheduling_coordinator.dart` | Added targeted local reminder cleanup and doctor daily summary local resync |
+| `lib/services/local_notification_service.dart` | Added native notification settings bridge and idempotent initialization |
+| `android/app/src/main/kotlin/com/example/uhc/MainActivity.kt` | Added Android notification settings method channel |
+| `ios/Runner/AppDelegate.swift` | Added iOS notification settings method channel |
+| `lib/data/repositories/notification_repository.dart` | Added visibility-safe notification filtering |
+| `firestore.indexes.json` | Added notification cleanup composite index |
+
+</details>
+
+<details>
 <summary><b>v2.4.0</b> — May 30, 2026</summary>
 
 #### 🔔 UHC Notification System V2 Rebuilt & Hardened (May 30, 2026)

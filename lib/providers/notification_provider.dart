@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../services/fcm_service.dart';
 import '../services/local_notification_service.dart';
+import '../services/notification_scheduling_coordinator.dart';
 import '../data/repositories/notification_repository.dart';
 import '../data/models/notification_model.dart';
 import '../main.dart' show navigatorKey;
@@ -47,6 +48,7 @@ class NotificationProvider extends ChangeNotifier {
 
       // Save token to database
       await _fcmService.saveTokenToDatabase(userId);
+      await NotificationSchedulingCoordinator().resyncAfterLogin(userId);
 
       // Subscribe to topics (including role-based topic)
       await _fcmService.subscribeUserToTopics(userId,
@@ -246,6 +248,7 @@ class NotificationProvider extends ChangeNotifier {
     try {
       await _fcmService.initialize();
       await _fcmService.saveTokenToDatabase(userId);
+      await NotificationSchedulingCoordinator().resyncAfterLogin(userId);
       await _fcmService.subscribeUserToTopics(userId,
           role: _currentRole, department: _currentDepartment);
     } catch (e, stack) {

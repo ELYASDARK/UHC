@@ -9,6 +9,26 @@ class NotificationRepository {
   CollectionReference<Map<String, dynamic>> get _notificationsRef =>
       _firestore.collection(_collection);
 
+  DateTime? _dateFromFirestoreValue(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  bool _isVisibleForClient(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    if (data == null) return false;
+
+    final isVisible = data['isVisible'];
+    if (isVisible is bool) return isVisible;
+
+    final scheduledFor = _dateFromFirestoreValue(data['scheduledFor']);
+    if (scheduledFor == null) return true;
+    if (!scheduledFor.isAfter(DateTime.now())) return true;
+
+    return data['isDelivered'] == true;
+  }
+
   /// Get user's notifications (only delivered ones)
   Future<List<NotificationModel>> getUserNotifications(
     String userId, {
@@ -16,26 +36,24 @@ class NotificationRepository {
   }) async {
     final snapshot = await _notificationsRef
         .where('userId', isEqualTo: userId)
-        .where('isVisible', isEqualTo: true)
         .orderBy('createdAt', descending: true)
-        .limit(limit)
+        .limit(limit * 3)
         .get();
 
     return snapshot.docs
+        .where(_isVisibleForClient)
         .map((doc) => NotificationModel.fromFirestore(doc))
+        .take(limit)
         .toList();
   }
 
   /// Get unread notifications count (only for delivered notifications)
   Future<int> getUnreadCount(String userId) async {
-    // Use Firestore count() aggregation to avoid downloading all unread docs
-    final countQuery = _notificationsRef
+    final snapshot = await _notificationsRef
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
-        .where('isVisible', isEqualTo: true)
-        .count();
-    final snapshot = await countQuery.get();
-    return snapshot.count ?? 0;
+        .get();
+    return snapshot.docs.where(_isVisibleForClient).length;
   }
 
   /// Create notification
@@ -59,7 +77,7 @@ class NotificationRepository {
         .get();
 
     // Chunk into batches of 500 (Firestore batch limit)
-    final docs = snapshot.docs;
+    final docs = snapshot.docs.where(_isVisibleForClient).toList();
     for (var i = 0; i < docs.length; i += 500) {
       final batch = _firestore.batch();
       final end = (i + 500 < docs.length) ? i + 500 : docs.length;
@@ -81,7 +99,7 @@ class NotificationRepository {
         await _notificationsRef.where('userId', isEqualTo: userId).get();
 
     // Chunk into batches of 500 (Firestore batch limit)
-    final docs = snapshot.docs;
+    final docs = snapshot.docs.where(_isVisibleForClient).toList();
     for (var i = 0; i < docs.length; i += 500) {
       final batch = _firestore.batch();
       final end = (i + 500 < docs.length) ? i + 500 : docs.length;
@@ -93,13 +111,17 @@ class NotificationRepository {
   }
 
   /// Delete all notifications for a specific appointment
-  Future<void> deleteAppointmentNotifications(String appointmentId) async {
+  Future<void> deleteAppointmentNotifications({
+    required String userId,
+    required String appointmentId,
+  }) async {
     final snapshot = await _notificationsRef
+        .where('userId', isEqualTo: userId)
         .where('appointmentId', isEqualTo: appointmentId)
         .get();
 
     // Chunk into batches of 500 (Firestore batch limit)
-    final docs = snapshot.docs;
+    final docs = snapshot.docs.where(_isVisibleForClient).toList();
     for (var i = 0; i < docs.length; i += 500) {
       final batch = _firestore.batch();
       final end = (i + 500 < docs.length) ? i + 500 : docs.length;
@@ -114,13 +136,14 @@ class NotificationRepository {
   Stream<List<NotificationModel>> streamNotifications(String userId) {
     return _notificationsRef
         .where('userId', isEqualTo: userId)
-        .where('isVisible', isEqualTo: true)
         .orderBy('createdAt', descending: true)
-        .limit(50)
+        .limit(150)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
+          .where(_isVisibleForClient)
           .map((doc) => NotificationModel.fromFirestore(doc))
+          .take(50)
           .toList();
     });
   }
@@ -130,9 +153,8 @@ class NotificationRepository {
     return _notificationsRef
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
-        .where('isVisible', isEqualTo: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .map((snapshot) => snapshot.docs.where(_isVisibleForClient).length);
   }
 
   /// Schedule 3 appointment reminder notifications (1 week, 1 day, 1 hour before)

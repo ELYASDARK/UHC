@@ -61,7 +61,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
       );
 
       if (provider.appointments.isEmpty && !provider.isLoading) {
-        provider.loadAppointments(_doctor.id);
+        provider.loadDashboardAppointments(_doctor.id);
       }
     });
   }
@@ -89,7 +89,8 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
             child: provider.isLoading
                 ? _buildSkeleton(isDark)
                 : RefreshIndicator(
-                    onRefresh: () => provider.loadAppointments(_doctor.id),
+                    onRefresh: () =>
+                        provider.loadDashboardAppointments(_doctor.id),
                     child: ResponsivePage(
                       physics: const AlwaysScrollableScrollPhysics(),
                       maxWidth: 1560,
@@ -157,8 +158,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         : hour < 17
             ? l10n.goodAfternoon
             : l10n.goodEvening;
-    final hasPendingAvailabilityRequest =
-        _doctor.hasPendingAvailabilityRequest;
+    final hasPendingAvailabilityRequest = _doctor.hasPendingAvailabilityRequest;
     final availabilityDotColor = hasPendingAvailabilityRequest
         ? AppColors.warning
         : _doctor.isAvailable
@@ -373,7 +373,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         color: Colors.white,
                       ),
                     )
-                   : Switch(
+                  : Switch(
                       value: _doctor.isAvailable,
                       onChanged: hasPendingAvailabilityRequest
                           ? null

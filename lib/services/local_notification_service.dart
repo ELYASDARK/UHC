@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Local notifications service for scheduling and displaying notifications
 class LocalNotificationService {
@@ -16,6 +18,8 @@ class LocalNotificationService {
 
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+  static const MethodChannel _settingsChannel =
+      MethodChannel('uhc/notification_settings');
 
   // Notification channels
   static const String _appointmentChannelId = 'appointment_reminders';
@@ -67,8 +71,9 @@ class LocalNotificationService {
   Future<bool> canScheduleExactAlarms() async {
     if (kIsWeb) return false;
     if (defaultTargetPlatform == TargetPlatform.android) {
-      final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin =
+          _notifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
       if (androidPlugin != null) {
         return await androidPlugin.canScheduleExactNotifications() ?? false;
       }
@@ -76,10 +81,36 @@ class LocalNotificationService {
     return true;
   }
 
+  Future<void> openNotificationSettings() async {
+    if (kIsWeb) return;
+
+    try {
+      await _settingsChannel.invokeMethod<void>('openNotificationSettings');
+      return;
+    } on MissingPluginException {
+      await _openSettingsFallback();
+    } on PlatformException catch (e) {
+      debugPrint('Failed to open notification settings: ${e.message}');
+      await _openSettingsFallback();
+    }
+  }
+
+  Future<void> _openSettingsFallback() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+
+    final settingsUri = Uri.parse('app-settings:');
+    if (await canLaunchUrl(settingsUri)) {
+      await launchUrl(settingsUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   /// Initialize the notification service
   Future<void> initialize({Function(String? payload)? onTap}) async {
     if (kIsWeb) return;
-    onNotificationTap = onTap;
+    if (onTap != null) {
+      onNotificationTap = onTap;
+    }
+    if (_isInitialized) return;
 
     // Initialize timezone
     await _configureLocalTimeZone();
@@ -308,11 +339,6 @@ class LocalNotificationService {
     required String timeSlot,
   }) async {
     if (kIsWeb) return;
-    final prefs = await SharedPreferences.getInstance();
-    // Support version 2 check if available, otherwise fallback
-    final apptRemindersEnabled = prefs.getBool('notif_appointment_reminders') ?? true;
-    final oneWeekEnabled = prefs.getBool('notif_reminder_1w') ?? true;
-    if (!apptRemindersEnabled || !oneWeekEnabled) return;
 
     final reminderTime = appointmentTime.subtract(const Duration(days: 7));
 
@@ -342,10 +368,6 @@ class LocalNotificationService {
     required String timeSlot,
   }) async {
     if (kIsWeb) return;
-    final prefs = await SharedPreferences.getInstance();
-    final apptRemindersEnabled = prefs.getBool('notif_appointment_reminders') ?? true;
-    final oneDayEnabled = prefs.getBool('notif_reminder_24h') ?? true;
-    if (!apptRemindersEnabled || !oneDayEnabled) return;
 
     final reminderTime = appointmentTime.subtract(const Duration(hours: 24));
 
@@ -375,10 +397,6 @@ class LocalNotificationService {
     required String timeSlot,
   }) async {
     if (kIsWeb) return;
-    final prefs = await SharedPreferences.getInstance();
-    final apptRemindersEnabled = prefs.getBool('notif_appointment_reminders') ?? true;
-    final oneHourEnabled = prefs.getBool('notif_reminder_1h') ?? true;
-    if (!apptRemindersEnabled || !oneHourEnabled) return;
 
     final reminderTime = appointmentTime.subtract(const Duration(hours: 1));
 
@@ -408,12 +426,6 @@ class LocalNotificationService {
     required String timeSlot,
   }) async {
     if (kIsWeb) return;
-    final prefs = await SharedPreferences.getInstance();
-    final localEnabled = prefs.getBool('notif_local_reminders') ?? true;
-    if (!localEnabled) {
-      debugPrint('Local reminders are disabled by user settings. Skipping local scheduling.');
-      return;
-    }
 
     // Schedule 1 week before reminder
     await scheduleAppointmentReminder1Week(
@@ -449,9 +461,12 @@ class LocalNotificationService {
   /// Cancel all appointment reminders (all 3: 1 week, 1 day, 1 hour)
   Future<void> cancelAppointmentReminders(String appointmentId) async {
     if (kIsWeb) return;
-    await cancelNotification(stableReminderId(appointmentId, 'oneWeek')); // 1 week reminder
-    await cancelNotification(stableReminderId(appointmentId, 'oneDay')); // 1 day reminder
-    await cancelNotification(stableReminderId(appointmentId, 'oneHour')); // 1 hour reminder
+    await cancelNotification(
+        stableReminderId(appointmentId, 'oneWeek')); // 1 week reminder
+    await cancelNotification(
+        stableReminderId(appointmentId, 'oneDay')); // 1 day reminder
+    await cancelNotification(
+        stableReminderId(appointmentId, 'oneHour')); // 1 hour reminder
   }
 
   /// Cancel all notifications

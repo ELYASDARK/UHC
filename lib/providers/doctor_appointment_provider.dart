@@ -139,6 +139,27 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     scheduleDailyNotifications();
   }
 
+  /// Load only the appointments needed by the dashboard first paint.
+  Future<void> loadDashboardAppointments(String doctorId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _appointments =
+          await _appointmentRepo.getDoctorDashboardAppointments(doctorId);
+      _error = null;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+
+    _runDashboardPostLoadWork(doctorId);
+    scheduleDailyNotifications();
+  }
+
   /// Update appointment status (confirm, complete, no-show, cancel)
   ///
   /// [appointment] is needed to send a notification to the patient.
@@ -195,8 +216,6 @@ class DoctorAppointmentProvider extends ChangeNotifier {
         reason,
         statusUpdatedBy: statusUpdatedBy,
       );
-
-
 
       await loadAppointments(doctorId);
       return true;
@@ -335,7 +354,7 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   Future<void> _scheduleDailyNotificationsInternal() async {
     if (kIsWeb) return;
     if (_dailyNotifDoctorUserId == null || _dailyNotifSchedule == null) return;
-    
+
     final notifService = LocalNotificationService();
 
     try {
@@ -346,19 +365,25 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     }
 
     try {
-      final userSnap = await FirebaseFirestore.instance.collection('users').doc(_dailyNotifDoctorUserId).get();
+      final userSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_dailyNotifDoctorUserId)
+          .get();
       final userData = userSnap.data();
       if (userData == null) return;
       final isDoctor = userData['role'] == 'doctor';
-      final prefsMap = userData['notificationSettings'] as Map<String, dynamic>?;
-      final settings = NotificationPreferences.fromMap(prefsMap, isDoctor: isDoctor, isWeb: kIsWeb);
+      final prefsMap =
+          userData['notificationSettings'] as Map<String, dynamic>?;
+      final settings = NotificationPreferences.fromMap(prefsMap,
+          isDoctor: isDoctor, isWeb: kIsWeb);
 
       if (!settings.doctorDailySummaryEnabled) {
         return;
       }
 
       // Only schedule local daily summaries if in local delivery mode!
-      if (settings.doctorDailySummaryDelivery != NotificationDeliveryMode.local) {
+      if (settings.doctorDailySummaryDelivery !=
+          NotificationDeliveryMode.local) {
         return;
       }
 
@@ -381,8 +406,8 @@ class DoctorAppointmentProvider extends ChangeNotifier {
       for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
         final notificationDate = today.add(Duration(days: dayOffset));
         // Configured time on notificationDate
-        final scheduledTime =
-            notificationDate.add(Duration(hours: targetHour, minutes: targetMin));
+        final scheduledTime = notificationDate
+            .add(Duration(hours: targetHour, minutes: targetMin));
 
         // Skip if time has already passed
         if (scheduledTime.isBefore(now)) continue;
@@ -423,7 +448,10 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   ///
   /// Only `pending` appointments are affected — `confirmed` means
   /// the patient checked in (QR scan), so that stays for the doctor to close.
-  Future<void> _autoMarkNoShow(String doctorId) async {
+  Future<void> _autoMarkNoShow(
+    String doctorId, {
+    bool refetchAll = true,
+  }) async {
     final now = DateTime.now();
     // 30 min appointment duration + 30 min grace = 60 min after slot start
     const autoNoShowMinutes = 60;
@@ -453,12 +481,23 @@ class DoctorAppointmentProvider extends ChangeNotifier {
       }
     }
 
-    // Re-fetch so the local list reflects the updated statuses
-    try {
-      _appointments = await _appointmentRepo.getAllDoctorAppointments(doctorId);
-    } catch (e) {
-      debugPrint('Re-fetch after auto no-show failed: $e');
+    if (refetchAll) {
+      try {
+        _appointments =
+            await _appointmentRepo.getAllDoctorAppointments(doctorId);
+      } catch (e) {
+        debugPrint('Re-fetch after auto no-show failed: $e');
+      }
+      return;
     }
+
+    final overdueIds = overdue.map((apt) => apt.id).toSet();
+    _appointments = _appointments
+        .map((apt) => overdueIds.contains(apt.id)
+            ? apt.copyWith(status: AppointmentStatus.noShow)
+            : apt)
+        .toList();
+    notifyListeners();
   }
 
   /// Batch-fetch profile photos for all unique patients in the appointment list.
@@ -477,5 +516,15 @@ class DoctorAppointmentProvider extends ChangeNotifier {
         _patientPhotos[id] = null;
       }
     }));
+  }
+
+  Future<void> _runDashboardPostLoadWork(String doctorId) async {
+    try {
+      await _autoMarkNoShow(doctorId, refetchAll: false);
+      await _fetchPatientPhotos();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Dashboard post-load work failed: $e');
+    }
   }
 }

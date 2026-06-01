@@ -17,24 +17,115 @@ class NotificationSchedulingCoordinator {
   final LocalNotificationService _localNotificationService =
       LocalNotificationService();
 
-  /// Resync reminders after login
+  static const _dayNames = [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ];
+
   Future<void> resyncAfterLogin(String userId) async {
     if (kIsWeb) return;
     await _resync(userId);
   }
 
-  /// Resync reminders after settings change
   Future<void> resyncAfterSettingsChange(String userId) async {
     if (kIsWeb) return;
     await _resync(userId);
   }
 
-  /// Helper to trigger the resync cloud function and schedule local alarms
+  Future<void> resyncDoctorDailySummaryAfterSettingsChange(
+      String doctorUserId) async {
+    if (kIsWeb) return;
+
+    try {
+      await _ensureLocalNotificationsInitialized();
+      await _localNotificationService.cancelDoctorDailySummaries();
+
+      final userSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(doctorUserId)
+          .get();
+      final userData = userSnap.data();
+      if (userData == null || userData['role'] != 'doctor') return;
+
+      final prefsMap =
+          userData['notificationSettings'] as Map<String, dynamic>?;
+      final settings = NotificationPreferences.fromMap(
+        prefsMap,
+        isDoctor: true,
+        isWeb: kIsWeb,
+      );
+
+      if (!settings.doctorDailySummaryEnabled ||
+          settings.doctorDailySummaryDelivery !=
+              NotificationDeliveryMode.local) {
+        return;
+      }
+
+      final doctorSnap = await FirebaseFirestore.instance
+          .collection('doctors')
+          .where('userId', isEqualTo: doctorUserId)
+          .where('isActive', isEqualTo: true)
+          .limit(1)
+          .get();
+      if (doctorSnap.docs.isEmpty) return;
+
+      final schedule = doctorSnap.docs.first.data()['weeklySchedule']
+              as Map<String, dynamic>? ??
+          const <String, dynamic>{};
+
+      final timeParts = settings.doctorDailySummaryTime.split(':');
+      var targetHour = 21;
+      var targetMinute = 0;
+      if (timeParts.length == 2) {
+        targetHour = int.tryParse(timeParts[0]) ?? targetHour;
+        targetMinute = int.tryParse(timeParts[1]) ?? targetMinute;
+      }
+      targetHour = targetHour.clamp(0, 23).toInt();
+      targetMinute = targetMinute.clamp(0, 59).toInt();
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      for (var dayOffset = 0; dayOffset < 7; dayOffset++) {
+        final notificationDate = today.add(Duration(days: dayOffset));
+        final scheduledTime = notificationDate.add(
+          Duration(hours: targetHour, minutes: targetMinute),
+        );
+        if (!scheduledTime.isAfter(now)) continue;
+
+        final targetDate = notificationDate.add(const Duration(days: 1));
+        final daySlots = schedule[_dayNames[targetDate.weekday - 1]];
+        final hasSlots = daySlots is Iterable && daySlots.isNotEmpty;
+        if (!hasSlots) continue;
+
+        await _localNotificationService.scheduleDoctorDailySummary(
+          dayOffset: dayOffset,
+          title: "Tomorrow's UHC Schedule",
+          body: "Open UHC to review tomorrow's schedule.",
+          scheduledTime: scheduledTime,
+        );
+      }
+    } catch (e, stack) {
+      debugPrint(
+          '[NotificationSchedulingCoordinator] Error resyncing doctor daily summary: $e');
+      try {
+        FirebaseCrashlytics.instance.recordError(e, stack,
+            reason: 'Doctor Daily Summary Local Resync Failed');
+      } catch (_) {}
+    }
+  }
+
   Future<void> _resync(String userId) async {
     if (kIsWeb) return;
     try {
-      debugPrint('[NotificationSchedulingCoordinator] Calling resyncUserNotificationSchedules for $userId');
-      final callable = _functions.httpsCallable('resyncUserNotificationSchedules');
+      debugPrint(
+          '[NotificationSchedulingCoordinator] Calling resyncUserNotificationSchedules for $userId');
+      final callable =
+          _functions.httpsCallable('resyncUserNotificationSchedules');
       final response = await callable.call<Map<String, dynamic>>({
         'userId': userId,
       });
@@ -43,19 +134,18 @@ class NotificationSchedulingCoordinator {
       final bool localScheduleRequired = data['localScheduleRequired'] ?? false;
       final appointments = data['appointments'] as List<dynamic>? ?? [];
 
-      // First cancel all local notifications
-      await _localNotificationService.cancelAllNotifications();
+      await _ensureLocalNotificationsInitialized();
+      await _cancelPendingAppointmentReminders();
 
-      // If user wants local notifications, schedule them
       if (localScheduleRequired) {
-        debugPrint('[NotificationSchedulingCoordinator] Local scheduling required. Scheduling ${appointments.length} appointments.');
+        debugPrint(
+            '[NotificationSchedulingCoordinator] Local scheduling required. Scheduling ${appointments.length} appointments.');
         for (final appt in appointments) {
           final appointmentId = appt['appointmentId'] as String;
           final doctorName = appt['doctorName'] as String;
           final timeSlot = appt['timeSlot'] as String;
           final reminders = appt['reminders'] as Map<dynamic, dynamic>? ?? {};
 
-          // Schedule each active reminder
           if (reminders['oneWeek'] != null) {
             final time = DateTime.parse(reminders['oneWeek']);
             if (time.isAfter(DateTime.now())) {
@@ -65,9 +155,11 @@ class NotificationSchedulingCoordinator {
                 'reminderType': 'oneWeek',
               });
               await _localNotificationService.scheduleNotification(
-                id: _localNotificationService.stableReminderId(appointmentId, 'oneWeek'),
+                id: _localNotificationService.stableReminderId(
+                    appointmentId, 'oneWeek'),
                 title: 'Appointment in 1 Week',
-                body: 'Reminder: Your appointment with Dr. $doctorName is in 1 week at $timeSlot',
+                body:
+                    'Reminder: Your appointment with Dr. $doctorName is in 1 week at $timeSlot',
                 scheduledTime: time,
                 payload: payload,
               );
@@ -83,9 +175,11 @@ class NotificationSchedulingCoordinator {
                 'reminderType': 'oneDay',
               });
               await _localNotificationService.scheduleNotification(
-                id: _localNotificationService.stableReminderId(appointmentId, 'oneDay'),
+                id: _localNotificationService.stableReminderId(
+                    appointmentId, 'oneDay'),
                 title: 'Appointment Tomorrow',
-                body: 'Your appointment with Dr. $doctorName is tomorrow at $timeSlot. Please arrive 10 minutes early.',
+                body:
+                    'Your appointment with Dr. $doctorName is tomorrow at $timeSlot. Please arrive 10 minutes early.',
                 scheduledTime: time,
                 payload: payload,
               );
@@ -101,9 +195,11 @@ class NotificationSchedulingCoordinator {
                 'reminderType': 'oneHour',
               });
               await _localNotificationService.scheduleNotification(
-                id: _localNotificationService.stableReminderId(appointmentId, 'oneHour'),
+                id: _localNotificationService.stableReminderId(
+                    appointmentId, 'oneHour'),
                 title: 'Appointment in 1 Hour',
-                body: 'Your appointment with Dr. $doctorName is in 1 hour at $timeSlot. Time to get ready!',
+                body:
+                    'Your appointment with Dr. $doctorName is in 1 hour at $timeSlot. Time to get ready!',
                 scheduledTime: time,
                 payload: payload,
               );
@@ -111,36 +207,46 @@ class NotificationSchedulingCoordinator {
           }
         }
       } else {
-        debugPrint('[NotificationSchedulingCoordinator] Local scheduling NOT required.');
+        debugPrint(
+            '[NotificationSchedulingCoordinator] Local scheduling NOT required.');
       }
     } catch (e, stack) {
       debugPrint('[NotificationSchedulingCoordinator] Error during resync: $e');
       try {
-        FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Notification Scheduling Resync Failed');
+        FirebaseCrashlytics.instance.recordError(e, stack,
+            reason: 'Notification Scheduling Resync Failed');
       } catch (_) {}
     }
   }
 
-  /// Schedule local reminders for a single appointment if user has local mode active.
-  Future<void> scheduleLocalAppointmentReminders(AppointmentModel appointment) async {
+  Future<void> scheduleLocalAppointmentReminders(
+      AppointmentModel appointment) async {
     if (kIsWeb) return;
 
     try {
-      final userSnap = await FirebaseFirestore.instance.collection('users').doc(appointment.patientId).get();
+      final userSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(appointment.patientId)
+          .get();
       final userData = userSnap.data();
       final isDoctor = userData?['role'] == 'doctor';
-      final prefsMap = userData?['notificationSettings'] as Map<String, dynamic>?;
-      final settings = NotificationPreferences.fromMap(prefsMap, isDoctor: isDoctor, isWeb: kIsWeb);
+      final prefsMap =
+          userData?['notificationSettings'] as Map<String, dynamic>?;
+      final settings = NotificationPreferences.fromMap(prefsMap,
+          isDoctor: isDoctor, isWeb: kIsWeb);
 
       if (!settings.appointmentRemindersEnabled) return;
-      if (settings.appointmentReminderDelivery != NotificationDeliveryMode.local) return;
+      if (settings.appointmentReminderDelivery !=
+          NotificationDeliveryMode.local) {
+        return;
+      }
 
+      await _ensureLocalNotificationsInitialized();
       final appointmentTime = appointment.exactAppointmentTime;
       final appointmentId = appointment.id;
       final doctorName = appointment.doctorName;
       final timeSlot = appointment.timeSlot;
 
-      // 1 Week
       if (settings.reminderOneWeek) {
         final time = appointmentTime.subtract(const Duration(days: 7));
         if (time.isAfter(DateTime.now())) {
@@ -150,16 +256,17 @@ class NotificationSchedulingCoordinator {
             'reminderType': 'oneWeek',
           });
           await _localNotificationService.scheduleNotification(
-            id: _localNotificationService.stableReminderId(appointmentId, 'oneWeek'),
+            id: _localNotificationService.stableReminderId(
+                appointmentId, 'oneWeek'),
             title: 'Appointment in 1 Week',
-            body: 'Reminder: Your appointment with Dr. $doctorName is in 1 week at $timeSlot',
+            body:
+                'Reminder: Your appointment with Dr. $doctorName is in 1 week at $timeSlot',
             scheduledTime: time,
             payload: payload,
           );
         }
       }
 
-      // 1 Day
       if (settings.reminderOneDay) {
         final time = appointmentTime.subtract(const Duration(hours: 24));
         if (time.isAfter(DateTime.now())) {
@@ -169,16 +276,17 @@ class NotificationSchedulingCoordinator {
             'reminderType': 'oneDay',
           });
           await _localNotificationService.scheduleNotification(
-            id: _localNotificationService.stableReminderId(appointmentId, 'oneDay'),
+            id: _localNotificationService.stableReminderId(
+                appointmentId, 'oneDay'),
             title: 'Appointment Tomorrow',
-            body: 'Your appointment with Dr. $doctorName is tomorrow at $timeSlot. Please arrive 10 minutes early.',
+            body:
+                'Your appointment with Dr. $doctorName is tomorrow at $timeSlot. Please arrive 10 minutes early.',
             scheduledTime: time,
             payload: payload,
           );
         }
       }
 
-      // 1 Hour
       if (settings.reminderOneHour) {
         final time = appointmentTime.subtract(const Duration(hours: 1));
         if (time.isAfter(DateTime.now())) {
@@ -188,31 +296,59 @@ class NotificationSchedulingCoordinator {
             'reminderType': 'oneHour',
           });
           await _localNotificationService.scheduleNotification(
-            id: _localNotificationService.stableReminderId(appointmentId, 'oneHour'),
+            id: _localNotificationService.stableReminderId(
+                appointmentId, 'oneHour'),
             title: 'Appointment in 1 Hour',
-            body: 'Your appointment with Dr. $doctorName is in 1 hour at $timeSlot. Time to get ready!',
+            body:
+                'Your appointment with Dr. $doctorName is in 1 hour at $timeSlot. Time to get ready!',
             scheduledTime: time,
             payload: payload,
           );
         }
       }
     } catch (e, stack) {
-      debugPrint('[NotificationSchedulingCoordinator] Error scheduling single appt reminders: $e');
+      debugPrint(
+          '[NotificationSchedulingCoordinator] Error scheduling single appt reminders: $e');
       try {
-        FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Single Appointment Local Scheduling Failed');
+        FirebaseCrashlytics.instance.recordError(e, stack,
+            reason: 'Single Appointment Local Scheduling Failed');
       } catch (_) {}
     }
   }
 
-  /// Cancel local reminders for a single appointment.
   Future<void> cancelLocalAppointmentReminders(String appointmentId) async {
     if (kIsWeb) return;
+    await _ensureLocalNotificationsInitialized();
     await _localNotificationService.cancelAppointmentReminders(appointmentId);
   }
 
-  /// Cancel all local notifications on this device.
   Future<void> cancelAllLocalReminders() async {
     if (kIsWeb) return;
+    await _ensureLocalNotificationsInitialized();
     await _localNotificationService.cancelAllNotifications();
+  }
+
+  Future<void> _cancelPendingAppointmentReminders() async {
+    await _ensureLocalNotificationsInitialized();
+    final pending = await _localNotificationService.getPendingNotifications();
+
+    for (final request in pending) {
+      final payload = request.payload;
+      if (payload == null || payload.isEmpty) continue;
+
+      try {
+        final data = jsonDecode(payload);
+        if (data is Map && data['type'] == 'appointment_reminder') {
+          await _localNotificationService.cancelNotification(request.id);
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+  }
+
+  Future<void> _ensureLocalNotificationsInitialized() async {
+    if (kIsWeb) return;
+    await _localNotificationService.initialize();
   }
 }

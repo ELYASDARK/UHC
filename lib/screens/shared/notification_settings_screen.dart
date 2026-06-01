@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/notifications/notification_preferences.dart';
@@ -9,7 +10,8 @@ import '../../services/local_notification_service.dart';
 import '../../services/fcm_service.dart';
 import '../../services/notification_scheduling_coordinator.dart';
 import '../../core/widgets/responsive_layout.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -19,8 +21,8 @@ class NotificationSettingsScreen extends StatefulWidget {
       _NotificationSettingsScreenState();
 }
 
-class _NotificationSettingsScreenState
-    extends State<NotificationSettingsScreen> {
+class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
+    with WidgetsBindingObserver {
   late NotificationPreferences _prefs;
   bool _isLoading = true;
   bool _areNotificationsEnabled = true;
@@ -31,10 +33,24 @@ class _NotificationSettingsScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadSettings();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPermissions();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshAfterResume();
+    }
   }
 
   Future<void> _checkPermissions() async {
@@ -42,17 +58,32 @@ class _NotificationSettingsScreenState
     bool exactAllowed = true;
     final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-    if (!kIsWeb) {
+    if (kIsWeb) {
+      try {
+        final settings =
+            await FirebaseMessaging.instance.getNotificationSettings();
+        enabled =
+            settings.authorizationStatus == AuthorizationStatus.authorized ||
+                settings.authorizationStatus == AuthorizationStatus.provisional;
+      } catch (_) {
+        enabled = false;
+      }
+    } else {
       if (defaultTargetPlatform == TargetPlatform.android) {
-        final androidImplementation =
-            flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+        final androidImplementation = flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
         if (androidImplementation != null) {
-          enabled = await androidImplementation.areNotificationsEnabled() ?? false;
+          enabled =
+              await androidImplementation.areNotificationsEnabled() ?? false;
         }
         exactAllowed = await _notificationService.canScheduleExactAlarms();
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-        enabled = await _notificationService.requestPermissions();
+        final settings =
+            await FirebaseMessaging.instance.getNotificationSettings();
+        enabled =
+            settings.authorizationStatus == AuthorizationStatus.authorized ||
+                settings.authorizationStatus == AuthorizationStatus.provisional;
       }
     }
 
@@ -64,6 +95,28 @@ class _NotificationSettingsScreenState
     }
   }
 
+  Future<void> _refreshAfterResume() async {
+    try {
+      await _checkPermissions();
+      if (!mounted) return;
+
+      final authProvider = context.read<AuthProvider>();
+      final user = authProvider.currentUser;
+      final userId = user?.id;
+      if (userId == null) return;
+
+      await FCMService().saveTokenToDatabase(userId);
+      await NotificationSchedulingCoordinator()
+          .resyncAfterSettingsChange(userId);
+      if (user?.isDoctor ?? false) {
+        await NotificationSchedulingCoordinator()
+            .resyncDoctorDailySummaryAfterSettingsChange(userId);
+      }
+    } catch (e) {
+      debugPrint('Failed to refresh notification state after resume: $e');
+    }
+  }
+
   Future<void> _loadSettings() async {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.currentUser;
@@ -71,7 +124,7 @@ class _NotificationSettingsScreenState
 
     // Load from user document in Firestore
     final prefsMap = user?.notificationSettings;
-    
+
     setState(() {
       _prefs = NotificationPreferences.fromMap(
         prefsMap,
@@ -83,6 +136,7 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _updatePreferences(NotificationPreferences newPrefs) async {
+    final previousPrefs = _prefs;
     setState(() {
       _prefs = newPrefs;
     });
@@ -92,16 +146,29 @@ class _NotificationSettingsScreenState
     if (userId != null) {
       try {
         // 1. Save to user document in Firestore
-        await authProvider.updateNotificationPreferences(newPrefs.toMap());
+        final saved =
+            await authProvider.updateNotificationPreferences(newPrefs.toMap());
+        if (!saved) {
+          throw Exception(authProvider.errorMessage ??
+              'Unable to save notification settings.');
+        }
 
         // 2. Re-register device token so token document is updated with new preferences
         await FCMService().saveTokenToDatabase(userId);
 
         // 3. Resync reminders
-        await NotificationSchedulingCoordinator().resyncAfterSettingsChange(userId);
+        await NotificationSchedulingCoordinator()
+            .resyncAfterSettingsChange(userId);
+        if (authProvider.currentUser?.isDoctor ?? false) {
+          await NotificationSchedulingCoordinator()
+              .resyncDoctorDailySummaryAfterSettingsChange(userId);
+        }
       } catch (e) {
         debugPrint('Failed to update notification preferences: $e');
         if (mounted) {
+          setState(() {
+            _prefs = previousPrefs;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to save settings: $e'),
@@ -113,19 +180,19 @@ class _NotificationSettingsScreenState
     }
   }
 
-  Future<void> _requestPermissions() async {
-    final granted = await _notificationService.requestPermissions();
-    await _checkPermissions();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(granted
-              ? 'Notification permission granted!'
-              : 'Please enable notifications in system settings.'),
-          backgroundColor: granted ? AppColors.success : AppColors.warning,
-        ),
-      );
+  Future<void> _openNotificationSettings() async {
+    if (kIsWeb) {
+      try {
+        await FirebaseMessaging.instance.requestPermission();
+      } catch (e) {
+        debugPrint('Failed to request web notification permission: $e');
+      }
+      await _refreshAfterResume();
+      return;
     }
+
+    await _notificationService.openNotificationSettings();
+    await _refreshAfterResume();
   }
 
   @override
@@ -160,7 +227,7 @@ class _NotificationSettingsScreenState
                     ? 'Browser notifications are disabled or blocked.'
                     : 'UHC does not have permission to show notifications on this device.',
                 actionLabel: 'Enable Notifications',
-                onActionPressed: _requestPermissions,
+                onActionPressed: _openNotificationSettings,
               ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0),
 
             if (!_exactAlarmsAllowed && !kIsWeb)
@@ -168,7 +235,8 @@ class _NotificationSettingsScreenState
                 isDark: isDark,
                 icon: Icons.alarm_off_outlined,
                 title: 'Exact Alarms Restricted',
-                subtitle: 'Android system settings restrict exact alarms. Offline reminders may arrive slightly late.',
+                subtitle:
+                    'Android system settings restrict exact alarms. Offline reminders may arrive slightly late.',
                 actionLabel: 'Request Exact Alarms',
                 onActionPressed: () async {
                   await _notificationService.requestPermissions();
@@ -179,31 +247,49 @@ class _NotificationSettingsScreenState
             const SizedBox(height: 8),
 
             // 1. Notification Status Section
-            _buildStatusCard(isDark).animate().fadeIn(duration: 400.ms, delay: 50.ms).slideY(begin: 0.05, end: 0),
+            _buildStatusCard(isDark)
+                .animate()
+                .fadeIn(duration: 400.ms, delay: 50.ms)
+                .slideY(begin: 0.05, end: 0),
             const SizedBox(height: 16),
 
             // 2. Important Appointment Updates Section
-            _buildImportantUpdatesCard(isDark).animate().fadeIn(duration: 400.ms, delay: 100.ms).slideY(begin: 0.05, end: 0),
+            _buildImportantUpdatesCard(isDark)
+                .animate()
+                .fadeIn(duration: 400.ms, delay: 100.ms)
+                .slideY(begin: 0.05, end: 0),
             const SizedBox(height: 16),
 
             // 3. Online Push Notifications Section
-            _buildPushNotificationsCard(isDark).animate().fadeIn(duration: 400.ms, delay: 150.ms).slideY(begin: 0.05, end: 0),
+            _buildPushNotificationsCard(isDark)
+                .animate()
+                .fadeIn(duration: 400.ms, delay: 150.ms)
+                .slideY(begin: 0.05, end: 0),
             const SizedBox(height: 16),
 
             // 4. Appointment & Consultation Reminders Section (Non-doctors only)
             if (!isDoctor) ...[
-              _buildRemindersCard(isDark).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideY(begin: 0.05, end: 0),
+              _buildRemindersCard(isDark)
+                  .animate()
+                  .fadeIn(duration: 400.ms, delay: 200.ms)
+                  .slideY(begin: 0.05, end: 0),
               const SizedBox(height: 16),
             ],
 
             // 5. Daily Doctor Report Section (Doctors Only)
             if (isDoctor) ...[
-              _buildDoctorReportCard(isDark).animate().fadeIn(duration: 400.ms, delay: 250.ms).slideY(begin: 0.05, end: 0),
+              _buildDoctorReportCard(isDark)
+                  .animate()
+                  .fadeIn(duration: 400.ms, delay: 250.ms)
+                  .slideY(begin: 0.05, end: 0),
               const SizedBox(height: 16),
             ],
 
             // 6. Admin Announcements Section
-            _buildAdminAnnouncementsCard(isDark).animate().fadeIn(duration: 400.ms, delay: 300.ms).slideY(begin: 0.05, end: 0),
+            _buildAdminAnnouncementsCard(isDark)
+                .animate()
+                .fadeIn(duration: 400.ms, delay: 300.ms)
+                .slideY(begin: 0.05, end: 0),
             const SizedBox(height: 24),
           ],
         ),
@@ -259,12 +345,14 @@ class _NotificationSettingsScreenState
                   style: TextButton.styleFrom(
                     backgroundColor: AppColors.warning.withValues(alpha: 0.15),
                     foregroundColor: AppColors.warning,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: Text(actionLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(actionLabel,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -347,12 +435,18 @@ class _NotificationSettingsScreenState
     String platformName = 'Web';
     String localRemindersStatus = 'Not available';
     if (!kIsWeb) {
-      platformName = defaultTargetPlatform == TargetPlatform.android ? 'Android' : 'iOS';
+      platformName =
+          defaultTargetPlatform == TargetPlatform.android ? 'Android' : 'iOS';
       localRemindersStatus = 'Available';
     }
 
-    final pushStatusText = _areNotificationsEnabled ? 'Enabled' : 'Disabled / Needs permission';
-    final pushStatusColor = _areNotificationsEnabled ? AppColors.success : AppColors.error;
+    final pushStatusText =
+        _areNotificationsEnabled ? 'Enabled' : 'Disabled / Needs permission';
+    final pushStatusColor =
+        _areNotificationsEnabled ? AppColors.success : AppColors.error;
+
+    final bool needsPermissions =
+        !_areNotificationsEnabled || (!_exactAlarmsAllowed && !kIsWeb);
 
     return _buildSectionCard(
       title: 'Notification Status',
@@ -384,89 +478,45 @@ class _NotificationSettingsScreenState
           valueColor: kIsWeb ? Colors.grey : AppColors.success,
           showBadge: true,
         ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final useVerticalLayout = constraints.maxWidth < 400;
-            if (useVerticalLayout) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _checkPermissions,
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Refresh Status'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  if (!kIsWeb) ...[
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: _requestPermissions,
-                      icon: const Icon(Icons.settings, size: 18),
-                      label: const Text('Request Permissions'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ],
-                ],
-              );
-            }
-
-            return Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _checkPermissions,
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Refresh Status'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
-                if (!kIsWeb) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _requestPermissions,
-                      icon: const Icon(Icons.settings, size: 18),
-                      label: const Text('Request Permissions'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
+        if (needsPermissions && !kIsWeb) ...[
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _openNotificationSettings,
+            icon: const Icon(Icons.settings, size: 18),
+            label: const Text('Open Settings'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildInfoRow(String label, String value, bool isDark, {Color? valueColor, bool showBadge = false}) {
+  Widget _buildInfoRow(String label, String value, bool isDark,
+      {Color? valueColor, bool showBadge = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+          Text(label,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
           if (showBadge)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: (valueColor ?? (isDark ? Colors.grey[700] : Colors.grey[200]))!.withValues(alpha: 0.12),
+                color: (valueColor ??
+                        (isDark ? Colors.grey[700] : Colors.grey[200]))!
+                    .withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: (valueColor ?? (isDark ? Colors.grey[600] : Colors.grey[300]))!.withValues(alpha: 0.3),
+                  color: (valueColor ??
+                          (isDark ? Colors.grey[600] : Colors.grey[300]))!
+                      .withValues(alpha: 0.3),
                 ),
               ),
               child: Text(
@@ -509,7 +559,8 @@ class _NotificationSettingsScreenState
         const SizedBox(height: 12),
         ListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Appointment Updates', style: TextStyle(fontWeight: FontWeight.w600)),
+          title: const Text('Appointment Updates',
+              style: TextStyle(fontWeight: FontWeight.w600)),
           subtitle: const Text('Always saved in in-app alerts tab'),
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -543,8 +594,10 @@ class _NotificationSettingsScreenState
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Online push notifications', style: TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: const Text('Receive real-time notifications on this device when push is available.'),
+          title: const Text('Online push notifications',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: const Text(
+              'Receive real-time notifications on this device when push is available.'),
           value: _prefs.onlinePushEnabled,
           onChanged: (val) {
             var updatedPrefs = _prefs.copyWith(onlinePushEnabled: val);
@@ -553,14 +606,18 @@ class _NotificationSettingsScreenState
                 updatedPrefs = updatedPrefs.copyWith(
                   appointmentRemindersEnabled: false,
                   doctorDailySummaryEnabled: false,
+                  appointmentReminderDelivery: NotificationDeliveryMode.fcm,
+                  doctorDailySummaryDelivery: NotificationDeliveryMode.fcm,
                 );
               } else {
-                if (updatedPrefs.appointmentReminderDelivery == NotificationDeliveryMode.fcm) {
+                if (updatedPrefs.appointmentReminderDelivery ==
+                    NotificationDeliveryMode.fcm) {
                   updatedPrefs = updatedPrefs.copyWith(
                     appointmentReminderDelivery: NotificationDeliveryMode.local,
                   );
                 }
-                if (updatedPrefs.doctorDailySummaryDelivery == NotificationDeliveryMode.fcm) {
+                if (updatedPrefs.doctorDailySummaryDelivery ==
+                    NotificationDeliveryMode.fcm) {
                   updatedPrefs = updatedPrefs.copyWith(
                     doctorDailySummaryDelivery: NotificationDeliveryMode.local,
                   );
@@ -620,37 +677,54 @@ class _NotificationSettingsScreenState
           : [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Reminders', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Choose when and how UHC reminds you before appointments and consultations.'),
+                title: const Text('Reminders',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text(
+                    'Choose when and how UHC reminds you before appointments and consultations.'),
                 value: enabled,
                 onChanged: (val) {
-                  _updatePreferences(_prefs.copyWith(appointmentRemindersEnabled: val));
+                  var updatedPrefs =
+                      _prefs.copyWith(appointmentRemindersEnabled: val);
+                  if (!kIsWeb && val && !_prefs.onlinePushEnabled) {
+                    updatedPrefs = updatedPrefs.copyWith(
+                      appointmentReminderDelivery:
+                          NotificationDeliveryMode.local,
+                    );
+                  }
+                  _updatePreferences(updatedPrefs);
                 },
               ),
               if (enabled) ...[
                 const Divider(height: 24),
-                const Text('Timing switches', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const Text('Timing switches',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 8),
                 _buildSubSwitchTile(
                   title: '1 week before',
                   value: _prefs.reminderOneWeek,
-                  onChanged: (val) => _updatePreferences(_prefs.copyWith(reminderOneWeek: val)),
+                  onChanged: (val) =>
+                      _updatePreferences(_prefs.copyWith(reminderOneWeek: val)),
                   isDark: isDark,
                 ),
                 _buildSubSwitchTile(
                   title: '1 day before',
                   value: _prefs.reminderOneDay,
-                  onChanged: (val) => _updatePreferences(_prefs.copyWith(reminderOneDay: val)),
+                  onChanged: (val) =>
+                      _updatePreferences(_prefs.copyWith(reminderOneDay: val)),
                   isDark: isDark,
                 ),
                 _buildSubSwitchTile(
                   title: '1 hour before',
                   value: _prefs.reminderOneHour,
-                  onChanged: (val) => _updatePreferences(_prefs.copyWith(reminderOneHour: val)),
+                  onChanged: (val) =>
+                      _updatePreferences(_prefs.copyWith(reminderOneHour: val)),
                   isDark: isDark,
                 ),
                 const Divider(height: 24),
-                const Text('Delivery Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const Text('Delivery Method',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 12),
                 if (kIsWeb)
                   _buildWebDeliveryOption(isDark)
@@ -672,7 +746,8 @@ class _NotificationSettingsScreenState
       child: SwitchListTile(
         dense: true,
         contentPadding: EdgeInsets.zero,
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+        title: Text(title,
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
         value: value,
         onChanged: onChanged,
       ),
@@ -683,9 +758,12 @@ class _NotificationSettingsScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800]!.withValues(alpha: 0.4) : Colors.grey[100],
+        color: isDark
+            ? Colors.grey[800]!.withValues(alpha: 0.4)
+            : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+        border:
+            Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -705,7 +783,9 @@ class _NotificationSettingsScreenState
           const SizedBox(height: 6),
           Text(
             'Offline mobile reminders are not available in the browser.',
-            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+            style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.grey[400] : Colors.grey[600]),
           ),
         ],
       ),
@@ -720,8 +800,8 @@ class _NotificationSettingsScreenState
       children: [
         _buildDeliveryRadioCard(
           title: 'Online & synced',
-          subtitle: isPushDisabled 
-              ? 'Requires Online Push Notifications to be enabled.' 
+          subtitle: isPushDisabled
+              ? 'Requires Online Push Notifications to be enabled.'
               : 'Works across devices and appears in Alerts.',
           tag: isPushDisabled ? null : 'recommended',
           tagColor: AppColors.success,
@@ -732,24 +812,31 @@ class _NotificationSettingsScreenState
           onTap: isPushDisabled
               ? () {}
               : () {
-                  _updatePreferences(_prefs.copyWith(appointmentReminderDelivery: NotificationDeliveryMode.fcm));
+                  _updatePreferences(_prefs.copyWith(
+                      appointmentReminderDelivery:
+                          NotificationDeliveryMode.fcm));
                 },
         ),
         const SizedBox(height: 12),
         _buildDeliveryRadioCard(
           title: 'Offline on this device',
-          subtitle: 'Works without internet, but only on this phone. It can be lost after app data wipe or reinstall.',
+          subtitle:
+              'Works without internet, but only on this phone. It can be lost after app data wipe or reinstall.',
           icon: Icons.phone_android_outlined,
           isSelected: isPushDisabled || mode == NotificationDeliveryMode.local,
           isDark: isDark,
           onTap: () {
-            _updatePreferences(_prefs.copyWith(appointmentReminderDelivery: NotificationDeliveryMode.local));
+            _updatePreferences(_prefs.copyWith(
+                appointmentReminderDelivery: NotificationDeliveryMode.local));
           },
         ),
         const SizedBox(height: 8),
         Text(
           'Local reminders are only scheduled on this device. Web browsers cannot use them.',
-          style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: isDark ? Colors.grey[500] : Colors.grey[500]),
+          style: TextStyle(
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              color: isDark ? Colors.grey[500] : Colors.grey[500]),
         ),
       ],
     );
@@ -777,7 +864,9 @@ class _NotificationSettingsScreenState
               : (isDark ? Colors.grey[900] : Colors.grey[50]),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? AppColors.primary : (isDark ? Colors.grey[800]! : Colors.grey[300]!),
+            color: isSelected
+                ? AppColors.primary
+                : (isDark ? Colors.grey[800]! : Colors.grey[300]!),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -787,7 +876,9 @@ class _NotificationSettingsScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
                 color: isSelected ? AppColors.primary : Colors.grey,
                 size: 20,
               ),
@@ -798,14 +889,19 @@ class _NotificationSettingsScreenState
                   children: [
                     Row(
                       children: [
-                        Icon(icon, size: 16, color: isSelected ? AppColors.primary : Colors.grey),
+                        Icon(icon,
+                            size: 16,
+                            color:
+                                isSelected ? AppColors.primary : Colors.grey),
                         const SizedBox(width: 6),
                         Text(
                           title,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: isSelected ? AppColors.primary : (isDark ? Colors.white : Colors.black87),
+                            color: isSelected
+                                ? AppColors.primary
+                                : (isDark ? Colors.white : Colors.black87),
                           ),
                         ),
                         if (tag != null) ...[
@@ -874,16 +970,28 @@ class _NotificationSettingsScreenState
           : [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Daily report', style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: const Text('Receive a daily summary report of your upcoming schedule.'),
+                title: const Text('Daily report',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text(
+                    'Receive a daily summary report of your upcoming schedule.'),
                 value: enabled,
                 onChanged: (val) {
-                  _updatePreferences(_prefs.copyWith(doctorDailySummaryEnabled: val));
+                  var updatedPrefs =
+                      _prefs.copyWith(doctorDailySummaryEnabled: val);
+                  if (!kIsWeb && val && !_prefs.onlinePushEnabled) {
+                    updatedPrefs = updatedPrefs.copyWith(
+                      doctorDailySummaryDelivery:
+                          NotificationDeliveryMode.local,
+                    );
+                  }
+                  _updatePreferences(updatedPrefs);
                 },
               ),
               if (enabled) ...[
                 const Divider(height: 24),
-                const Text('Delivery Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const Text('Delivery Method',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 12),
                 if (kIsWeb)
                   _buildDoctorWebDeliveryOption(isDark)
@@ -892,20 +1000,27 @@ class _NotificationSettingsScreenState
                 const Divider(height: 24),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Report time', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Choose when to receive your daily summary'),
+                  title: const Text('Report time',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle:
+                      const Text('Choose when to receive your daily summary'),
                   trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                      border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.2)),
                     ),
                     child: Builder(
                       builder: (context) {
                         final parts = _prefs.doctorDailySummaryTime.split(':');
-                        final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 21 : 21;
-                        final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+                        final hour = parts.isNotEmpty
+                            ? int.tryParse(parts[0]) ?? 21
+                            : 21;
+                        final minute =
+                            parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
                         final time = TimeOfDay(hour: hour, minute: minute);
                         return Text(
                           time.format(context),
@@ -920,8 +1035,10 @@ class _NotificationSettingsScreenState
                   onTap: () async {
                     final parts = _prefs.doctorDailySummaryTime.split(':');
                     final initialTime = TimeOfDay(
-                      hour: parts.isNotEmpty ? int.tryParse(parts[0]) ?? 21 : 21,
-                      minute: parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0,
+                      hour:
+                          parts.isNotEmpty ? int.tryParse(parts[0]) ?? 21 : 21,
+                      minute:
+                          parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0,
                     );
                     final time = await showTimePicker(
                       context: context,
@@ -930,7 +1047,8 @@ class _NotificationSettingsScreenState
                     if (time != null) {
                       final timeStr =
                           '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-                      _updatePreferences(_prefs.copyWith(doctorDailySummaryTime: timeStr));
+                      _updatePreferences(
+                          _prefs.copyWith(doctorDailySummaryTime: timeStr));
                     }
                   },
                 ),
@@ -943,16 +1061,20 @@ class _NotificationSettingsScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800]!.withValues(alpha: 0.4) : Colors.grey[100],
+        color: isDark
+            ? Colors.grey[800]!.withValues(alpha: 0.4)
+            : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
+        border:
+            Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.assignment_turned_in_outlined, color: AppColors.success, size: 20),
+              const Icon(Icons.assignment_turned_in_outlined,
+                  color: AppColors.success, size: 20),
               const SizedBox(width: 8),
               const Text(
                 'Accurate online report',
@@ -965,7 +1087,9 @@ class _NotificationSettingsScreenState
           const SizedBox(height: 6),
           Text(
             'Calculated fresh from the backend at your chosen time.',
-            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
+            style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.grey[400] : Colors.grey[600]),
           ),
         ],
       ),
@@ -992,18 +1116,22 @@ class _NotificationSettingsScreenState
           onTap: isPushDisabled
               ? () {}
               : () {
-                  _updatePreferences(_prefs.copyWith(doctorDailySummaryDelivery: NotificationDeliveryMode.fcm));
+                  _updatePreferences(_prefs.copyWith(
+                      doctorDailySummaryDelivery:
+                          NotificationDeliveryMode.fcm));
                 },
         ),
         const SizedBox(height: 12),
         _buildDeliveryRadioCard(
           title: 'Offline reminder only',
-          subtitle: 'Shows a reminder to open UHC. It does not guarantee fresh appointment counts.',
+          subtitle:
+              'Shows a reminder to open UHC. It does not guarantee fresh appointment counts.',
           icon: Icons.phone_android_outlined,
           isSelected: isPushDisabled || mode == NotificationDeliveryMode.local,
           isDark: isDark,
           onTap: () {
-            _updatePreferences(_prefs.copyWith(doctorDailySummaryDelivery: NotificationDeliveryMode.local));
+            _updatePreferences(_prefs.copyWith(
+                doctorDailySummaryDelivery: NotificationDeliveryMode.local));
           },
         ),
       ],
@@ -1019,8 +1147,10 @@ class _NotificationSettingsScreenState
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Admin announcements', style: TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: const Text('Receive UHC announcements from administrators.'),
+          title: const Text('Admin announcements',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle:
+              const Text('Receive UHC announcements from administrators.'),
           value: _prefs.adminAnnouncementsEnabled,
           onChanged: (val) {
             _updatePreferences(_prefs.copyWith(adminAnnouncementsEnabled: val));

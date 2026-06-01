@@ -407,6 +407,33 @@ class AppointmentRepository {
     }
   }
 
+  /// Fast dashboard query: only today and future appointments.
+  Future<List<AppointmentModel>> getDoctorDashboardAppointments(
+    String doctorId,
+  ) async {
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+
+    try {
+      final docs = await _fetchAllPages(_appointmentsRef
+          .where('doctorId', isEqualTo: doctorId)
+          .where(
+            'appointmentDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
+          )
+          .orderBy('appointmentDate', descending: true));
+      final appointments =
+          docs.map((doc) => AppointmentModel.fromFirestore(doc)).toList();
+      appointments.sort(
+        (a, b) => a.appointmentDate.compareTo(b.appointmentDate),
+      );
+      return appointments;
+    } catch (e) {
+      debugPrint('Error getting doctor dashboard appointments: $e');
+      return [];
+    }
+  }
+
   /// Update medical notes on an appointment
   Future<void> updateMedicalNotes(
     String appointmentId,
