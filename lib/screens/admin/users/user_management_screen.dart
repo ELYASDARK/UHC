@@ -461,13 +461,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   // Super Admin can edit superAdmin rows, but destructive actions stay blocked.
                   final canEditSuperAdminTarget =
                       actorIsSuperAdmin && role == UserRole.superAdmin;
-                  // Admins can only manage non-admin targets; superAdmins can fully
-                  // manage non-superAdmin targets.
+                  // Admins can manage student/staff targets here; doctors are
+                  // handled through the separate doctors.manage boundary.
                   final canManageNonSuperAdminTarget = hasManagePerm &&
                       (actorIsSuperAdmin
                           ? role != UserRole.superAdmin
-                          : (role != UserRole.superAdmin &&
-                              role != UserRole.admin));
+                          : (role == UserRole.student ||
+                              role == UserRole.staff));
+                  final canChangeRole = canManageNonSuperAdminTarget &&
+                      (actorIsSuperAdmin
+                          ? role != UserRole.doctor
+                          : (role == UserRole.student ||
+                              role == UserRole.staff));
                   final hasLinkedGoogleEmail =
                       (data['googleEmail'] as String?)?.trim().isNotEmpty ??
                           false;
@@ -533,13 +538,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ),
                     PopupMenuItem(
                       value: 'role',
-                      enabled: canManageNonSuperAdminTarget,
+                      enabled: canChangeRole,
                       child: Row(
                         children: [
                           const Icon(Icons.admin_panel_settings, size: 18),
                           const SizedBox(width: 8),
                           const Text('Change Role'),
-                          if (!canManageNonSuperAdminTarget) ...[
+                          if (!canChangeRole) ...[
                             const Spacer(),
                             const Icon(Icons.lock_outline, size: 16),
                           ],
@@ -1015,8 +1020,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     if (actorRole == UserRole.superAdmin) {
       return targetRole != UserRole.superAdmin;
     }
-    // Admin can only manage non-admin, non-superAdmin targets
-    return targetRole != UserRole.admin && targetRole != UserRole.superAdmin;
+    // Admin can only manage student/staff targets from this screen; doctor
+    // accounts are managed through the separate doctors.manage boundary.
+    return targetRole == UserRole.student || targetRole == UserRole.staff;
   }
 
   Future<void> _toggleUserStatus(String id, bool currentStatus) async {
@@ -1202,6 +1208,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void _changeUserRole(String id, UserRole currentRole) {
     final actorIsSuperAdmin =
         context.read<AuthProvider>().currentUser?.role == UserRole.superAdmin;
+    if (currentRole == UserRole.doctor ||
+        (!actorIsSuperAdmin &&
+            currentRole != UserRole.student &&
+            currentRole != UserRole.staff)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only student/staff roles can be changed here.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(

@@ -2187,16 +2187,10 @@ export const changeUserRoleByAdmin = functions.https.onCall(
         const targetData = targetDoc.data()!;
         const oldRole = targetData.role as string;
 
-        if (oldRole === 'superAdmin' || oldRole === 'admin') {
+        if (!['student', 'staff'].includes(oldRole)) {
             throw new functions.https.HttpsError(
                 'failed-precondition',
-                'Cannot change admin/superAdmin roles via this function.',
-            );
-        }
-        if (callerRole === 'admin' && (oldRole === 'admin' || oldRole === 'superAdmin')) {
-            throw new functions.https.HttpsError(
-                'permission-denied',
-                'Admins cannot modify admin/superAdmin accounts.',
+                'Only student/staff roles can be changed via this function.',
             );
         }
 

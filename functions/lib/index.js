@@ -1564,11 +1564,8 @@ exports.changeUserRoleByAdmin = functions.https.onCall(async (request) => {
     }
     const targetData = targetDoc.data();
     const oldRole = targetData.role;
-    if (oldRole === 'superAdmin' || oldRole === 'admin') {
-        throw new functions.https.HttpsError('failed-precondition', 'Cannot change admin/superAdmin roles via this function.');
-    }
-    if (callerRole === 'admin' && (oldRole === 'admin' || oldRole === 'superAdmin')) {
-        throw new functions.https.HttpsError('permission-denied', 'Admins cannot modify admin/superAdmin accounts.');
+    if (!['student', 'staff'].includes(oldRole)) {
+        throw new functions.https.HttpsError('failed-precondition', 'Only student/staff roles can be changed via this function.');
     }
     if (oldRole === newRole) {
         return {

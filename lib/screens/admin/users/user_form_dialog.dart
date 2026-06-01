@@ -580,12 +580,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
       (r) => r.name == (widget.data?['role'] as String? ?? _selectedRole.name),
       orElse: () => _selectedRole,
     );
-    final isEditingNonAdminTarget = isEditing &&
-        targetRole != UserRole.admin &&
-        targetRole != UserRole.superAdmin;
+    final isEditingStudentStaffTarget = isEditing &&
+        (targetRole == UserRole.student || targetRole == UserRole.staff);
     final canEditRole = !isEditing ||
         actorIsSuperAdmin ||
-        (actorCanManageNonAdmin && isEditingNonAdminTarget);
+        (actorCanManageNonAdmin && isEditingStudentStaffTarget);
     final roleOptions = UserRole.values
         .where((role) =>
             role != UserRole.doctor &&
