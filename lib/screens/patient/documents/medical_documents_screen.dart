@@ -45,6 +45,12 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     ];
   }
 
+  bool _isTrustedMedicalDocumentUrl(Uri uri) {
+    return uri.scheme == 'https' &&
+        uri.host == 'firebasestorage.googleapis.com' &&
+        uri.path.contains('/o/medical_documents%2F');
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -824,7 +830,10 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     try {
       final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!_isTrustedMedicalDocumentUrl(uri)) {
+          throw Exception('Document URL is not trusted.');
+        }
+        await launchUrl(uri, mode: LaunchMode.inAppWebView);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

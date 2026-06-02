@@ -20,6 +20,13 @@ service cloud.firestore {
         currentUserData().isActive == true;
     }
 
+    function isGoogleLinkedAccount() {
+      return isActiveUser() &&
+        ('googleEmail' in currentUserData()) &&
+        currentUserData().googleEmail is string &&
+        currentUserData().googleEmail.size() > 0;
+    }
+
     function isOwner(userId) {
       return isActiveUser() && request.auth.uid == userId;
     }
@@ -41,7 +48,7 @@ service cloud.firestore {
     }
 
     function hasRolePermission(permissionKey) {
-      return isActiveUser() &&
+      return isGoogleLinkedAccount() &&
         (
           currentUserData().role == 'superAdmin' ||
           (
@@ -77,7 +84,7 @@ service cloud.firestore {
     }
 
     function canReadMedicalDocument(data) {
-      return isOwner(data.userId) ||
+      return (isGoogleLinkedAccount() && request.auth.uid == data.userId) ||
         hasDoctorPatientAccess(data.userId) ||
         hasAnyRolePermission(['reports.view', 'appointments.view', 'analytics.view']);
     }
@@ -91,6 +98,7 @@ service cloud.firestore {
         isSuperAdmin();
       allow create: if false;
       allow update: if isOwner(userId) &&
+        isGoogleLinkedAccount() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'fullName',
           'phoneNumber',
@@ -101,7 +109,6 @@ service cloud.firestore {
           'notificationSettings',
           'language',
           'themeMode',
-          'googleEmail',
           'updatedAt'
         ]) &&
         !request.resource.data.diff(resource.data).affectedKeys()
@@ -115,29 +122,29 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if isActiveUser() && resource.data.userId == request.auth.uid;
+      allow read: if isGoogleLinkedAccount() && resource.data.userId == request.auth.uid;
       allow create: if false;
-      allow update: if isActiveUser() &&
+      allow update: if isGoogleLinkedAccount() &&
         resource.data.userId == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-      allow delete: if isActiveUser() && resource.data.userId == request.auth.uid;
+      allow delete: if isGoogleLinkedAccount() && resource.data.userId == request.auth.uid;
     }
 
     match /user_tokens/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isOwner(userId) && isGoogleLinkedAccount();
 
       match /tokens/{tokenId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && isGoogleLinkedAccount();
       }
     }
 
     match /appointments/{appointmentId} {
-      allow read: if isActiveUser() && canReadAppointment(resource.data);
+      allow read: if isGoogleLinkedAccount() && canReadAppointment(resource.data);
       allow create, update, delete: if false;
     }
 
     match /doctor_availability_requests/{requestId} {
-      allow read: if isActiveUser() &&
+      allow read: if isGoogleLinkedAccount() &&
         (
           resource.data.doctorUserId == request.auth.uid ||
           hasRolePermission('doctors.manage')
@@ -146,8 +153,8 @@ service cloud.firestore {
     }
 
     match /doctors/{doctorId} {
-      allow read: if isActiveUser();
-      allow update: if isActiveUser() &&
+      allow read: if isGoogleLinkedAccount();
+      allow update: if isGoogleLinkedAccount() &&
         resource.data.userId == request.auth.uid &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny([
@@ -178,8 +185,8 @@ service cloud.firestore {
     }
 
     match /medical_documents/{docId} {
-      allow read: if isActiveUser() && canReadMedicalDocument(resource.data);
-      allow create: if isActiveUser() &&
+      allow read: if isGoogleLinkedAccount() && canReadMedicalDocument(resource.data);
+      allow create: if isGoogleLinkedAccount() &&
         request.resource.data.userId is string &&
         request.resource.data.addedBy == request.auth.uid &&
         request.resource.data.keys().hasOnly([
@@ -220,7 +227,7 @@ service cloud.firestore {
           request.resource.data.userId == request.auth.uid ||
           hasDoctorPatientAccess(request.resource.data.userId)
         );
-      allow update: if isActiveUser() &&
+      allow update: if isGoogleLinkedAccount() &&
         canReadMedicalDocument(resource.data) &&
         resource.data.addedBy == request.auth.uid &&
         request.resource.data.userId == resource.data.userId &&
@@ -235,7 +242,7 @@ service cloud.firestore {
           'notes',
           'updatedAt'
         ]);
-      allow delete: if isActiveUser() &&
+      allow delete: if isGoogleLinkedAccount() &&
         canReadMedicalDocument(resource.data) &&
         resource.data.addedBy == request.auth.uid;
     }

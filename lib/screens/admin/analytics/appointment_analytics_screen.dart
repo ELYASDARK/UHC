@@ -29,6 +29,8 @@ class _AppointmentAnalyticsScreenState
   int _completedAppointments = 0;
   int _cancelledAppointments = 0;
   double _completionRate = 0;
+  static const int _analyticsBatchSize = 500;
+  static const int _analyticsMaxDocs = 5000;
 
   @override
   void initState() {
@@ -68,9 +70,9 @@ class _AppointmentAnalyticsScreenState
 
       final allDocs = <QueryDocumentSnapshot>[];
       DocumentSnapshot? lastDoc;
-      const batchSize = 5000;
+      const batchSize = _analyticsBatchSize;
 
-      while (true) {
+      while (allDocs.length < _analyticsMaxDocs) {
         Query batchQuery = baseQuery.limit(batchSize);
         if (lastDoc != null) {
           batchQuery = batchQuery.startAfterDocument(lastDoc);

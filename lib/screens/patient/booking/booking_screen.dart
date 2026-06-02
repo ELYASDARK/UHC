@@ -885,16 +885,17 @@ class _BookingScreenState extends State<BookingScreen> {
         updatedAt: DateTime.now(),
       );
 
-      final appointmentId = await appointmentProvider.bookAppointment(
+      final bookingResult = await appointmentProvider.bookAppointment(
         appointment,
       );
 
-      if (appointmentId != null && mounted) {
+      if (bookingResult != null && mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => BookingSuccessScreen(
-              appointmentId: appointmentId,
+              appointmentId: bookingResult.appointmentId,
+              qrCode: bookingResult.qrCode,
               bookingReference: bookingReference,
               doctorName: _doctor.name,
               date: _selectedDay!,
@@ -940,6 +941,7 @@ class _BookingScreenState extends State<BookingScreen> {
 /// Booking success screen with QR code
 class BookingSuccessScreen extends StatelessWidget {
   final String appointmentId;
+  final String? qrCode;
   final String? bookingReference;
   final String doctorName;
   final DateTime date;
@@ -948,6 +950,7 @@ class BookingSuccessScreen extends StatelessWidget {
   const BookingSuccessScreen({
     super.key,
     required this.appointmentId,
+    this.qrCode,
     this.bookingReference,
     required this.doctorName,
     required this.date,
@@ -1086,7 +1089,7 @@ class BookingSuccessScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: QrImageView(
-            data: 'UHC_APPOINTMENT:$appointmentId',
+            data: qrCode ?? bookingReference ?? appointmentId,
             version: QrVersions.auto,
             size: 180,
             backgroundColor: Colors.white,

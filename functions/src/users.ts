@@ -52,6 +52,7 @@ export const completeInitialPasswordChange = functions.https.onCall(
         }
 
         const now = admin.firestore.Timestamp.now();
+        await auth.updateUser(callerUid, { password: data.newPassword });
         await userRef.update({
             requiresInitialPasswordChange: false,
             initialPasswordChangedAt: now,
@@ -59,6 +60,133 @@ export const completeInitialPasswordChange = functions.https.onCall(
         });
 
         return { success: true, message: 'Initial password change completed.' };
+    }
+);
+
+interface SyncGoogleLinkStatusData {
+    googleEmail?: string | null;
+}
+
+function sanitizeEmail(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const email = value.trim();
+    if (!email || !email.includes('@') || email.length > 254) return null;
+    return email;
+}
+
+async function delay(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function getLinkedGoogleProvider(uid: string): Promise<{
+    authUser: admin.auth.UserRecord;
+    googleProvider?: admin.auth.UserInfo;
+}> {
+    let authUser = await auth.getUser(uid);
+    let googleProvider = authUser.providerData.find((provider) => provider.providerId === 'google.com');
+
+    for (let attempt = 0; attempt < 3 && !googleProvider; attempt += 1) {
+        await delay(500);
+        authUser = await auth.getUser(uid);
+        googleProvider = authUser.providerData.find((provider) => provider.providerId === 'google.com');
+    }
+
+    return { authUser, googleProvider };
+}
+
+export const syncGoogleLinkStatus = functions.https.onCall(
+    async (request: functions.https.CallableRequest<SyncGoogleLinkStatusData>) => {
+        try {
+            const callerUid = requireAuth(request);
+            const { authUser, googleProvider } = await getLinkedGoogleProvider(callerUid);
+            if (!googleProvider) {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'No linked Google provider found for this account. Please try linking Google again.'
+                );
+            }
+
+            const userRef = db.collection('users').doc(callerUid);
+            const userDoc = await userRef.get();
+            if (!userDoc.exists || userDoc.data()?.isActive !== true) {
+                throw new functions.https.HttpsError('permission-denied', 'Your account is inactive or missing.');
+            }
+
+            const googleEmail =
+                sanitizeEmail(googleProvider.email) ||
+                sanitizeEmail(request.data?.googleEmail) ||
+                sanitizeEmail(authUser.email);
+            if (!googleEmail) {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Linked Google provider did not provide an email address.'
+                );
+            }
+
+            await userRef.update({
+                googleEmail,
+                updatedAt: admin.firestore.Timestamp.now(),
+            });
+
+            return { success: true, googleEmail };
+        } catch (error: unknown) {
+            if (error instanceof functions.https.HttpsError) {
+                throw error;
+            }
+            console.error('Error syncing Google link status:', error);
+            throw new functions.https.HttpsError(
+                'internal',
+                'Failed to sync Google link status. Please try again.'
+            );
+        }
+    }
+);
+
+export const unlinkOwnGoogleProvider = functions.https.onCall(
+    async (request: functions.https.CallableRequest<unknown>) => {
+        try {
+            const callerUid = requireAuth(request);
+            const userRef = db.collection('users').doc(callerUid);
+            const userDoc = await userRef.get();
+            if (!userDoc.exists || userDoc.data()?.isActive !== true) {
+                throw new functions.https.HttpsError('permission-denied', 'Your account is inactive or missing.');
+            }
+
+            const authUser = await auth.getUser(callerUid);
+            const providerIds = new Set(authUser.providerData.map((provider) => provider.providerId));
+            if (!providerIds.has('google.com')) {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'No Google account is linked.'
+                );
+            }
+            if (!providerIds.has('password')) {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Cannot unlink Google because it is your only sign-in method.'
+                );
+            }
+
+            await auth.updateUser(callerUid, {
+                providersToUnlink: ['google.com'],
+            });
+
+            await userRef.update({
+                googleEmail: null,
+                updatedAt: admin.firestore.Timestamp.now(),
+            });
+
+            return { success: true };
+        } catch (error: unknown) {
+            if (error instanceof functions.https.HttpsError) {
+                throw error;
+            }
+            console.error('Error unlinking own Google provider:', error);
+            throw new functions.https.HttpsError(
+                'internal',
+                'Failed to unlink Google account. Please try again.'
+            );
+        }
     }
 );
 
@@ -150,6 +278,7 @@ export const createUserAccount = functions.https.onCall(
                 initialPasswordChangedAt: null,
                 createdAt: now,
                 updatedAt: now,
+                googleEmail: null,
             });
 
             return {
@@ -306,6 +435,12 @@ export const setUserActiveStatus = functions.https.onCall(
                 'Use setAdminActiveStatus for admin accounts.'
             );
         }
+        if (targetRole === 'doctor') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Doctor accounts must be managed from Doctor Management.'
+            );
+        }
         if (callerRole === 'admin' && targetRole === 'admin') {
             throw new functions.https.HttpsError(
                 'permission-denied',
@@ -371,10 +506,10 @@ export const changeUserRoleByAdmin = functions.https.onCall(
         const targetData = targetDoc.data()!;
         const oldRole = targetData.role as string;
 
-        if (oldRole === 'superAdmin' || oldRole === 'admin') {
+        if (!['student', 'staff'].includes(oldRole)) {
             throw new functions.https.HttpsError(
                 'failed-precondition',
-                'Cannot change admin/superAdmin roles via this function.',
+                'Only student and staff roles can be changed here.',
             );
         }
         if (callerRole === 'admin' && (oldRole === 'admin' || oldRole === 'superAdmin')) {
@@ -456,6 +591,12 @@ export const unlinkGoogleProviderByAdmin = functions.https.onCall(
             throw new functions.https.HttpsError(
                 'failed-precondition',
                 'Use governance flow for admin account provider management.',
+            );
+        }
+        if (targetRole === 'doctor') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Doctor accounts must be managed from Doctor Management.',
             );
         }
         if (callerRole === 'admin' && (targetRole === 'admin' || targetRole === 'superAdmin')) {
@@ -554,6 +695,12 @@ export const updateUserProfileByAdmin = functions.https.onCall(
                 'Admins cannot edit admin accounts.'
             );
         }
+        if (targetRole === 'doctor') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Doctor accounts must be edited from Doctor Management.'
+            );
+        }
 
         const updates: Record<string, unknown> = {
             updatedAt: admin.firestore.Timestamp.now(),
@@ -573,6 +720,9 @@ export const updateUserProfileByAdmin = functions.https.onCall(
         if (data.photoUpload !== undefined && data.photoUpload !== null) {
             updates.photoUrl = await uploadProfilePhoto(data.targetUid, data.photoUpload);
         } else if (data.photoUrl !== undefined) {
+            if (data.photoUrl === null || data.photoUrl.trim() === '') {
+                await deleteProfilePhotos(data.targetUid);
+            }
             updates.photoUrl = data.photoUrl;
         }
         if (data.studentId !== undefined) updates.studentId = data.studentId;

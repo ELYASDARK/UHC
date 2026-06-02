@@ -8,6 +8,7 @@ import {
     revokeSessionsAndClearFcm,
 } from './shared/auth';
 import { MIN_PASSWORD_ERROR_LONG, MIN_PASSWORD_LENGTH } from './shared/errors';
+import { deleteProfilePhotos } from './shared/profilePhotos';
 
 interface CreateDoctorData {
     email: string;
@@ -23,6 +24,7 @@ interface CreateDoctorData {
     qualifications?: string[];
     weeklySchedule?: Record<string, unknown[]>;
     dateOfBirth?: string; // ISO date string
+    dailyNotificationTime?: string;
 }
 
 /**
@@ -88,6 +90,7 @@ export const createDoctorAccount = functions.https.onCall(
                 language: 'en',
                 requiresInitialPasswordChange: true,
                 initialPasswordChangedAt: null,
+                googleEmail: null,
             });
 
             // Use provided schedule or default to empty arrays
@@ -117,6 +120,7 @@ export const createDoctorAccount = functions.https.onCall(
                 isAvailable: true,
                 isActive: true,
                 weeklySchedule: data.weeklySchedule || defaultSchedule,
+                dailyNotificationTime: data.dailyNotificationTime || '21:00',
                 createdAt: now,
                 updatedAt: now,
             });
@@ -352,7 +356,12 @@ export const updateDoctorProfile = functions.https.onCall(
         if (data.specialization !== undefined) updates.specialization = data.specialization.trim();
         if (data.department !== undefined) updates.department = data.department;
         if (data.bio !== undefined) updates.bio = data.bio ?? '';
-        if (data.photoUrl !== undefined) updates.photoUrl = data.photoUrl;
+        if (data.photoUrl !== undefined) {
+            if (data.photoUrl === null || data.photoUrl.trim() === '') {
+                await deleteProfilePhotos(doctorSnap.data()?.userId || data.doctorId);
+            }
+            updates.photoUrl = data.photoUrl;
+        }
         if (data.experienceYears !== undefined) updates.experienceYears = data.experienceYears;
         if (data.consultationFee !== undefined) updates.consultationFee = data.consultationFee;
         if (data.qualifications !== undefined) updates.qualifications = data.qualifications;

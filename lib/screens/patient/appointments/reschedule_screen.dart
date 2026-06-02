@@ -233,7 +233,11 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                       ),
                       enabledDayPredicate: (day) {
                         final slots = _getAvailableSlots(day);
-                        return slots.isNotEmpty;
+                        return slots.any(
+                          (slot) =>
+                              slot.isAvailable &&
+                              !_isSlotPast(day, slot.startTime),
+                        );
                       },
                     ),
                   ),

@@ -1,5 +1,6 @@
 export {
     cancelAppointment,
+    confirmAppointmentCheckIn,
     createAppointment,
     deleteAppointment,
     incrementQrScanFailures,
@@ -23,6 +24,8 @@ export {
     createUserAccount,
     deleteUserAccount,
     setUserActiveStatus,
+    syncGoogleLinkStatus,
+    unlinkOwnGoogleProvider,
     unlinkGoogleProviderByAdmin,
     updateUserProfileByAdmin,
 } from './users';

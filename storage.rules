@@ -18,8 +18,15 @@ service firebase.storage {
       return userExists() && currentUser().isActive == true;
     }
 
-    function hasPermission(permissionKey) {
+    function googleLinkedUser() {
       return activeUser() &&
+        ('googleEmail' in currentUser()) &&
+        currentUser().googleEmail is string &&
+        currentUser().googleEmail.size() > 0;
+    }
+
+    function hasPermission(permissionKey) {
+      return googleLinkedUser() &&
         (
           currentUser().role == 'superAdmin' ||
           (
@@ -31,7 +38,7 @@ service firebase.storage {
     }
 
     function doctorHasPatientAccess(userId) {
-      return activeUser() &&
+      return googleLinkedUser() &&
         currentUser().role == 'doctor' &&
         firestore.exists(/databases/(default)/documents/doctor_patient_access/$(request.auth.uid)/patients/$(userId));
     }
@@ -49,41 +56,41 @@ service firebase.storage {
     }
 
     match /profile_images/{fileName} {
-      allow read: if activeUser();
-      allow write: if activeUser() &&
+      allow read: if googleLinkedUser();
+      allow write: if googleLinkedUser() &&
         fileName.matches(request.auth.uid + '\\.(jpg|jpeg|png|webp)') &&
         validProfileImage();
     }
 
     match /doctor_photos/{fileName} {
-      allow read: if activeUser();
+      allow read: if googleLinkedUser();
       allow create, update: if hasPermission('doctors.manage') &&
         validProfileImage();
       allow delete: if hasPermission('doctors.manage');
     }
 
     match /user_photos/{fileName} {
-      allow read: if activeUser();
+      allow read: if googleLinkedUser();
       allow create, update: if hasPermission('users.manageNonAdmin') &&
         validProfileImage();
       allow delete: if hasPermission('users.manageNonAdmin');
     }
 
     match /medical_documents/{userId}/{scope}/{fileName} {
-      allow read: if activeUser() &&
+      allow read: if googleLinkedUser() &&
         (
           request.auth.uid == userId ||
           doctorHasPatientAccess(userId) ||
           hasPermission('reports.view') ||
           hasPermission('appointments.view')
         );
-      allow write: if activeUser() &&
+      allow write: if googleLinkedUser() &&
         validMedicalDocument() &&
         (
           (request.auth.uid == userId && scope == 'self') ||
           (scope != 'self' && doctorHasPatientAccess(userId))
         );
-      allow delete: if activeUser() &&
+      allow delete: if googleLinkedUser() &&
         (
           request.auth.uid == userId ||
           (scope != 'self' && doctorHasPatientAccess(userId))
@@ -91,8 +98,8 @@ service firebase.storage {
     }
 
     match /medical_documents/{userId}/{fileName} {
-      allow read, delete: if activeUser() && request.auth.uid == userId;
-      allow write: if activeUser() &&
+      allow read, delete: if googleLinkedUser() && request.auth.uid == userId;
+      allow write: if googleLinkedUser() &&
         request.auth.uid == userId &&
         validMedicalDocument();
     }

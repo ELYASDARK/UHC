@@ -414,8 +414,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
     required bool isDark,
     required bool actorIsSuperAdmin,
   }) {
-    final enabledCount =
-        AdminPermissions.allKeys.where((k) => permissions.getByKey(k)).length;
+    final enabledCount = AdminPermissions.visibleKeys
+        .where((k) => permissions.getByKey(k))
+        .length;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -450,7 +451,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$enabledCount/${AdminPermissions.allKeys.length} permissions',
+                      '$enabledCount/${AdminPermissions.visibleKeys.length} permissions',
                       style: GoogleFonts.poppins(fontSize: 12),
                     ),
                   ],
@@ -607,7 +608,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                             ],
                           ),
                           const SizedBox(height: 16),
-                          ...AdminPermissions.allKeys.map((key) {
+                          ...AdminPermissions.visibleKeys.map((key) {
                             return SwitchListTile(
                               contentPadding: EdgeInsets.zero,
                               dense: true,
@@ -1417,7 +1418,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
       map[key] = value;
       await _governance.setAdminPermissions(
         targetUid: uid,
-        permissions: Map<String, bool>.from(map),
+        permissions: _permissionPayload(map),
       );
     } catch (e) {
       _showError('Failed to update permission: ${_readableError(e)}');
@@ -1428,12 +1429,19 @@ class _AdminControlScreenState extends State<AdminControlScreen>
     try {
       await _governance.setAdminPermissions(
         targetUid: uid,
-        permissions: Map<String, bool>.from(preset.toMap()),
+        permissions: _permissionPayload(preset.toMap()),
       );
       _showSuccess('Preset applied');
     } catch (e) {
       _showError('Failed: ${_readableError(e)}');
     }
+  }
+
+  Map<String, bool> _permissionPayload(Map<String, dynamic> permissions) {
+    final payload = Map<String, bool>.from(permissions);
+    payload['appointments.view'] = false;
+    payload['appointments.manage'] = false;
+    return payload;
   }
 
   void _showAssignSlotDialog(String slotType) {

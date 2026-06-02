@@ -17,7 +17,10 @@ void main() {
     });
 
     test('appointment slot checks use deterministic lock documents', () {
-      final functionsSource = readProjectFile('functions/src/index.ts');
+      final functionsSource = [
+        readProjectFile('functions/src/appointments.ts'),
+        readProjectFile('functions/src/shared/appointmentHelpers.ts'),
+      ].join('\n');
 
       expect(functionsSource, contains('await db.runTransaction'));
       expect(functionsSource, contains("collection('appointment_slot_locks')"));
@@ -38,12 +41,13 @@ void main() {
           'allow read, write, delete: if activeUser() && request.auth.uid == userId;',
         )),
       );
-      expect(storageRules, contains('allow write: if activeUser() &&'));
+      expect(storageRules, contains('allow write: if googleLinkedUser() &&'));
       expect(storageRules, contains('validMedicalDocument();'));
     });
 
     test('admin notification sends are audited and idempotent', () {
-      final functionsSource = readProjectFile('functions/src/index.ts');
+      final functionsSource =
+          readProjectFile('functions/src/notifications/admin.ts');
       final serviceSource =
           readProjectFile('lib/services/admin_notification_service.dart');
 
@@ -59,7 +63,8 @@ void main() {
     });
 
     test('legacy topic notifications are disabled', () {
-      final functionsSource = readProjectFile('functions/src/index.ts');
+      final functionsSource =
+          readProjectFile('functions/src/notifications/admin.ts');
 
       expect(
         functionsSource,
@@ -73,7 +78,10 @@ void main() {
     });
 
     test('admin permissions are strict booleans before storage', () {
-      final functionsSource = readProjectFile('functions/src/index.ts');
+      final functionsSource = [
+        readProjectFile('functions/src/shared/auth.ts'),
+        readProjectFile('functions/src/admin.ts'),
+      ].join('\n');
 
       expect(functionsSource, contains('function sanitizeAdminPermissions'));
       expect(functionsSource, contains('perms[permissionKey] !== true'));
@@ -85,9 +93,37 @@ void main() {
       );
     });
 
+    test('appointment admin permissions stay hidden until UI exists', () {
+      final permissionsSource =
+          readProjectFile('lib/data/models/admin_permissions_model.dart');
+      final adminControlSource =
+          readProjectFile('lib/screens/super_admin/admin_control_screen.dart');
+
+      expect(permissionsSource, contains("static const List<String> allKeys"));
+      expect(permissionsSource, contains("'appointments.view'"));
+      expect(permissionsSource, contains("'appointments.manage'"));
+      expect(
+          permissionsSource, contains("static const List<String> visibleKeys"));
+
+      final visibleKeysBlock = permissionsSource.substring(
+        permissionsSource.indexOf('static const List<String> visibleKeys'),
+        permissionsSource.indexOf('/// Human-readable labels'),
+      );
+      expect(visibleKeysBlock, isNot(contains("'appointments.view'")));
+      expect(visibleKeysBlock, isNot(contains("'appointments.manage'")));
+      expect(adminControlSource, contains('AdminPermissions.visibleKeys'));
+      expect(
+          adminControlSource, isNot(contains('AdminPermissions.allKeys.map')));
+      expect(
+          adminControlSource, contains("payload['appointments.view'] = false"));
+      expect(adminControlSource,
+          contains("payload['appointments.manage'] = false"));
+    });
+
     test('push delivery records push status separately from in-app delivery',
         () {
-      final functionsSource = readProjectFile('functions/src/index.ts');
+      final functionsSource =
+          readProjectFile('functions/src/notifications/delivery.ts');
 
       expect(functionsSource, contains("pushStatus: 'skipped_no_token'"));
       expect(functionsSource, contains("pushStatus: 'sent'"));
@@ -109,7 +145,8 @@ void main() {
     });
 
     test('admin notification recipient search avoids brittle indexes', () {
-      final functionsSource = readProjectFile('functions/src/index.ts');
+      final functionsSource =
+          readProjectFile('functions/src/notifications/admin.ts');
       final senderSource = readProjectFile(
         'lib/screens/admin/notifications/admin_notification_sender_screen.dart',
       );
@@ -186,6 +223,37 @@ void main() {
       );
     });
 
+    test('auth startup avoids persistent Firestore cache logout deadlocks', () {
+      final mainSource = readProjectFile('lib/main.dart');
+      final authServiceSource =
+          readProjectFile('lib/services/auth_service.dart');
+
+      expect(mainSource, contains('persistenceEnabled: false'));
+      expect(mainSource, isNot(contains('CACHE_SIZE_UNLIMITED')));
+      expect(authServiceSource, isNot(contains('.terminate()')));
+      expect(authServiceSource, isNot(contains('clearPersistence()')));
+    });
+
+    test('Google unlink clears security fields only through Functions', () {
+      final authServiceSource =
+          readProjectFile('lib/services/auth_service.dart');
+      final usersFunctionsSource = readProjectFile('functions/src/users.ts');
+      final indexSource = readProjectFile('functions/src/index.ts');
+
+      expect(authServiceSource,
+          contains("httpsCallable('unlinkOwnGoogleProvider')"));
+      expect(
+        authServiceSource,
+        isNot(contains("'googleEmail': null")),
+      );
+      expect(usersFunctionsSource,
+          contains('export const unlinkOwnGoogleProvider'));
+      expect(
+          usersFunctionsSource, contains("providersToUnlink: ['google.com']"));
+      expect(usersFunctionsSource, contains('googleEmail: null'));
+      expect(indexSource, contains('unlinkOwnGoogleProvider'));
+    });
+
     test('doctor appointment paging index includes document name ordering', () {
       final indexes = readProjectFile('firestore.indexes.json');
 
@@ -196,7 +264,8 @@ void main() {
     });
 
     test('doctor unavailable requests require admin approval', () {
-      final functionsSource = readProjectFile('functions/src/index.ts');
+      final functionsSource =
+          readProjectFile('functions/src/doctorAvailability.ts');
       final firestoreRules = readProjectFile('firestore.rules');
       final dashboardSource = readProjectFile(
         'lib/screens/doctor/dashboard/doctor_dashboard_screen.dart',
@@ -212,7 +281,7 @@ void main() {
           functionsSource, contains('DOCTOR_AVAILABILITY_MONTHLY_LIMIT = 2'));
       expect(functionsSource,
           contains('cancelActiveAppointmentsForUnavailableDoctor'));
-      expect(functionsSource, contains('doctorData?.isAvailable !== true'));
+      expect(functionsSource, contains('doctorData.isActive !== true'));
       expect(firestoreRules, contains("'isAvailable'"));
       expect(firestoreRules, contains('doctor_availability_requests'));
       expect(dashboardSource, contains('_showUnavailableRequestDialog'));

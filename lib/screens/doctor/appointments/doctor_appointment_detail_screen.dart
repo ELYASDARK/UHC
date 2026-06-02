@@ -147,6 +147,7 @@ class _DoctorAppointmentDetailScreenState
       MaterialPageRoute(
         builder: (_) => QrScanConfirmScreen(
           appointmentId: _appointment.id,
+          expectedQrCode: _appointment.qrCode ?? '',
           initialFailures: _qrScanFailures,
         ),
       ),
@@ -155,7 +156,7 @@ class _DoctorAppointmentDetailScreenState
     final failures = result['failures'] as int;
     setState(() => _qrScanFailures = failures);
     if (result['matched'] == true) {
-      _updateStatus(AppointmentStatus.confirmed);
+      _confirmCheckIn(result['qrCode'] as String? ?? '');
     } else if (failures >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -844,6 +845,36 @@ class _DoctorAppointmentDetailScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(provider.error ?? 'Failed to update status'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmCheckIn(String qrCode) async {
+    setState(() => _isSaving = true);
+    final l10n = AppLocalizations.of(context);
+    final provider = context.read<DoctorAppointmentProvider>();
+    final ok = await provider.confirmCheckIn(
+      _appointment.id,
+      qrCode,
+      widget.doctor.id,
+    );
+    if (mounted) {
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.statusUpdatedTo(AppointmentStatus.confirmed.name)),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        Navigator.pop(context);
+      } else {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(provider.error ?? 'Failed to confirm check-in'),
             backgroundColor: AppColors.error,
           ),
         );

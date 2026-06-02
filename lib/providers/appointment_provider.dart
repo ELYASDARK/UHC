@@ -97,7 +97,9 @@ class AppointmentProvider extends ChangeNotifier {
   }
 
   /// Book a new appointment
-  Future<String?> bookAppointment(AppointmentModel appointment) async {
+  Future<AppointmentBookingResult?> bookAppointment(
+    AppointmentModel appointment,
+  ) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -105,13 +107,13 @@ class AppointmentProvider extends ChangeNotifier {
     try {
       // The backend transaction is the source of truth for slot availability.
       // If two users book at once, only the one that gets the slot lock succeeds.
-      final appointmentId = await _appointmentRepo.createAppointment(
+      final bookingResult = await _appointmentRepo.createAppointment(
         appointment,
       );
 
       _error = null;
-      unawaited(_runPostBookingTasks(appointment, appointmentId));
-      return appointmentId;
+      unawaited(_runPostBookingTasks(appointment, bookingResult.appointmentId));
+      return bookingResult;
     } catch (e) {
       _error = e.toString();
       return null;

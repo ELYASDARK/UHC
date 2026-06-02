@@ -16,6 +16,10 @@ class AdminPermissions {
   final bool departmentsManage;
 
   // Analytics
+  final bool appointmentsView;
+  final bool appointmentsManage;
+
+  // Analytics
   final bool analyticsView;
 
   // Reports
@@ -32,6 +36,8 @@ class AdminPermissions {
     this.doctorsManage = false,
     this.departmentsView = false,
     this.departmentsManage = false,
+    this.appointmentsView = false,
+    this.appointmentsManage = false,
     this.analyticsView = false,
     this.reportsView = false,
     this.reportsExport = false,
@@ -46,6 +52,8 @@ class AdminPermissions {
     doctorsManage: true,
     departmentsView: true,
     departmentsManage: true,
+    appointmentsView: false,
+    appointmentsManage: false,
     analyticsView: true,
     reportsView: true,
     reportsExport: true,
@@ -63,6 +71,8 @@ class AdminPermissions {
     doctorsManage: false,
     departmentsView: true,
     departmentsManage: false,
+    appointmentsView: false,
+    appointmentsManage: false,
     analyticsView: true,
     reportsView: true,
     reportsExport: false,
@@ -77,6 +87,8 @@ class AdminPermissions {
     doctorsManage: true,
     departmentsView: true,
     departmentsManage: true,
+    appointmentsView: false,
+    appointmentsManage: false,
     analyticsView: true,
     reportsView: true,
     reportsExport: false,
@@ -92,6 +104,8 @@ class AdminPermissions {
       doctorsManage: map['doctors.manage'] ?? false,
       departmentsView: map['departments.view'] ?? false,
       departmentsManage: map['departments.manage'] ?? false,
+      appointmentsView: map['appointments.view'] ?? false,
+      appointmentsManage: map['appointments.manage'] ?? false,
       analyticsView: map['analytics.view'] ?? false,
       reportsView: map['reports.view'] ?? false,
       reportsExport: map['reports.export'] ?? false,
@@ -107,6 +121,8 @@ class AdminPermissions {
       'doctors.manage': doctorsManage,
       'departments.view': departmentsView,
       'departments.manage': departmentsManage,
+      'appointments.view': appointmentsView,
+      'appointments.manage': appointmentsManage,
       'analytics.view': analyticsView,
       'reports.view': reportsView,
       'reports.export': reportsExport,
@@ -121,6 +137,8 @@ class AdminPermissions {
     bool? doctorsManage,
     bool? departmentsView,
     bool? departmentsManage,
+    bool? appointmentsView,
+    bool? appointmentsManage,
     bool? analyticsView,
     bool? reportsView,
     bool? reportsExport,
@@ -133,6 +151,8 @@ class AdminPermissions {
       doctorsManage: doctorsManage ?? this.doctorsManage,
       departmentsView: departmentsView ?? this.departmentsView,
       departmentsManage: departmentsManage ?? this.departmentsManage,
+      appointmentsView: appointmentsView ?? this.appointmentsView,
+      appointmentsManage: appointmentsManage ?? this.appointmentsManage,
       analyticsView: analyticsView ?? this.analyticsView,
       reportsView: reportsView ?? this.reportsView,
       reportsExport: reportsExport ?? this.reportsExport,
@@ -142,6 +162,25 @@ class AdminPermissions {
 
   /// List of all permission keys for iteration in UI
   static const List<String> allKeys = [
+    'users.view',
+    'users.manageNonAdmin',
+    'doctors.view',
+    'doctors.manage',
+    'departments.view',
+    'departments.manage',
+    'appointments.view',
+    'appointments.manage',
+    'analytics.view',
+    'reports.view',
+    'reports.export',
+    'notifications.send',
+  ];
+
+  /// Permission keys shown in the Super Admin permissions UI.
+  ///
+  /// Appointment permissions remain in [allKeys] for backend security checks,
+  /// but are hidden until the app has visible admin appointment workflows.
+  static const List<String> visibleKeys = [
     'users.view',
     'users.manageNonAdmin',
     'doctors.view',
@@ -162,6 +201,8 @@ class AdminPermissions {
     'doctors.manage': 'Manage Doctors',
     'departments.view': 'View Departments',
     'departments.manage': 'Manage Departments',
+    'appointments.view': 'View Appointments',
+    'appointments.manage': 'Manage Appointments',
     'analytics.view': 'View Analytics',
     'reports.view': 'View Reports',
     'reports.export': 'Export Reports',
@@ -177,6 +218,9 @@ class AdminPermissions {
     'doctors.manage': 'Can create, edit, and delete doctor accounts',
     'departments.view': 'Can view department information',
     'departments.manage': 'Can create, edit, and delete departments',
+    'appointments.view': 'Can view appointment records',
+    'appointments.manage':
+        'Can reschedule, cancel, update, and delete appointments',
     'analytics.view': 'Can view analytics dashboard and statistics',
     'reports.view': 'Can view generated reports',
     'reports.export': 'Can export reports to CSV/PDF',
@@ -198,6 +242,10 @@ class AdminPermissions {
         return departmentsView;
       case 'departments.manage':
         return departmentsManage;
+      case 'appointments.view':
+        return appointmentsView;
+      case 'appointments.manage':
+        return appointmentsManage;
       case 'analytics.view':
         return analyticsView;
       case 'reports.view':

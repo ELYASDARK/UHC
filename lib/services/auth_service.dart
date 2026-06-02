@@ -212,30 +212,27 @@ class AuthService {
   }
 
   /// Link current user's account with Google
-  Future<UserCredential> linkWithGoogle() async {
+  Future<void> linkWithGoogle() async {
     final user = currentUser;
     if (user == null) {
       throw Exception('No user logged in');
     }
 
     try {
+      if (isGoogleLinked) {
+        await _refreshLinkedGoogleAuthState(user);
+        await _syncGoogleLinkStatus(googleEmail: googleEmail);
+        return;
+      }
+
       if (kIsWeb) {
         // On web, use Firebase Auth popup for linking
         final provider = GoogleAuthProvider();
         final userCredential = await user.linkWithPopup(provider);
 
-        // Save Google email to Firestore
-        if (userCredential.user != null) {
-          final googleInfo = userCredential.user!.providerData.firstWhere(
-            (info) => info.providerId == 'google.com',
-            orElse: () => userCredential.user!.providerData.first,
-          );
-          await _firestore.collection('users').doc(user.uid).update({
-            'updatedAt': Timestamp.fromDate(DateTime.now()),
-            'googleEmail': googleInfo.email,
-          });
-        }
-        return userCredential;
+        await _refreshLinkedGoogleAuthState(userCredential.user);
+        await _syncGoogleLinkStatus(googleEmail: googleEmail);
+        return;
       }
 
       await _ensureGoogleInitializedForMobile();
@@ -250,29 +247,44 @@ class AuthService {
 
       final userCredential = await user.linkWithCredential(credential);
 
-      if (userCredential.user != null) {
-        final googleInfo = userCredential.user!.providerData.firstWhere(
-          (info) => info.providerId == 'google.com',
-          orElse: () => userCredential.user!.providerData.first,
-        );
-        await _firestore.collection('users').doc(user.uid).update({
-          'updatedAt': Timestamp.fromDate(DateTime.now()),
-          'googleEmail': googleInfo.email,
-        });
-      }
+      await _refreshLinkedGoogleAuthState(userCredential.user);
+      await _syncGoogleLinkStatus(googleEmail: googleEmail);
 
-      return userCredential;
+      return;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'credential-already-in-use') {
         throw Exception(
             'This Google account is already linked to another user.');
       } else if (e.code == 'provider-already-linked') {
-        throw Exception('A Google account is already linked.');
+        await _refreshLinkedGoogleAuthState(user);
+        await _syncGoogleLinkStatus(googleEmail: googleEmail);
+        return;
       }
       throw _handleAuthException(e);
     } catch (e) {
       throw Exception('Failed to link Google account: $e');
     }
+  }
+
+  Future<void> syncLinkedGoogleAccount() async {
+    final user = currentUser;
+    if (user == null || !isGoogleLinked) return;
+
+    await _refreshLinkedGoogleAuthState(user);
+    await _syncGoogleLinkStatus(googleEmail: googleEmail);
+  }
+
+  Future<void> _refreshLinkedGoogleAuthState(User? linkedUser) async {
+    await linkedUser?.reload();
+    await _auth.currentUser?.reload();
+    await _auth.currentUser?.getIdToken(true);
+  }
+
+  Future<void> _syncGoogleLinkStatus({String? googleEmail}) async {
+    final callable = _functions.httpsCallable('syncGoogleLinkStatus');
+    await callable.call<Map<String, dynamic>>({
+      'googleEmail': googleEmail,
+    });
   }
 
   /// Unlink current user's account from Google
@@ -294,13 +306,11 @@ class AuthService {
         );
       }
 
-      await user.unlink('google.com');
+      final callable = _functions.httpsCallable('unlinkOwnGoogleProvider');
+      await callable.call<Map<String, dynamic>>();
       await user.reload();
-
-      await _firestore.collection('users').doc(user.uid).update({
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-        'googleEmail': null,
-      });
+      await _auth.currentUser?.reload();
+      await _auth.currentUser?.getIdToken(true);
 
       if (!kIsWeb) {
         await _ensureGoogleInitializedForMobile();
@@ -410,8 +420,6 @@ class AuthService {
     }
 
     try {
-      await user.updatePassword(newPassword);
-
       final callable = _functions.httpsCallable(
         'completeInitialPasswordChange',
       );
@@ -554,11 +562,29 @@ class AuthService {
     if (bloodType != null) updates['bloodType'] = bloodType;
     if (allergies != null) updates['allergies'] = allergies;
 
+    if (photoUrl != null && photoUrl.isEmpty) {
+      await _deleteProfileImages(uid);
+    }
+
     await _firestore.collection('users').doc(uid).update(updates);
 
     // Update Firebase Auth display name if changed
     if (fullName != null && currentUser != null) {
       await currentUser!.updateDisplayName(fullName);
+    }
+  }
+
+  Future<void> _deleteProfileImages(String uid) async {
+    final folders = ['profile_images', 'user_photos'];
+    final extensions = ['jpg', 'jpeg', 'png', 'webp'];
+    for (final folder in folders) {
+      for (final extension in extensions) {
+        try {
+          await _storage.ref().child(folder).child('$uid.$extension').delete();
+        } on FirebaseException catch (e) {
+          if (e.code != 'object-not-found') rethrow;
+        }
+      }
     }
   }
 

@@ -23,6 +23,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
   String _selectedReportType = 'appointments';
+  static const int _reportBatchSize = 500;
+  static const int _reportMaxDocs = 10000;
 
   final List<Map<String, dynamic>> _reportTypes = [
     {
@@ -437,13 +439,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<List<QueryDocumentSnapshot>> _paginatedFetch(
     Query query, {
-    int batchSize = 5000,
+    int batchSize = _reportBatchSize,
+    int maxDocs = _reportMaxDocs,
   }) async {
     final allDocs = <QueryDocumentSnapshot>[];
     DocumentSnapshot? lastDoc;
 
-    while (true) {
-      Query batchQuery = query.limit(batchSize);
+    while (allDocs.length < maxDocs) {
+      final remaining = maxDocs - allDocs.length;
+      Query batchQuery = query.limit(remaining < batchSize ? remaining : batchSize);
       if (lastDoc != null) {
         batchQuery = batchQuery.startAfterDocument(lastDoc);
       }

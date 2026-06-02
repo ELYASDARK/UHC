@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart'; // Added
@@ -17,6 +19,7 @@ class AuthProvider with ChangeNotifier {
   UserModel? _currentUser;
   String? _errorMessage;
   bool _skipNextAuthStateUserLoad = false;
+  bool _receivedInitialAuthState = false;
 
   AuthState get state => _state;
   UserModel? get currentUser => _currentUser;
@@ -33,12 +36,26 @@ class AuthProvider with ChangeNotifier {
   /// Initialize and listen to auth state changes
   void _init() {
     _authService.authStateChanges.listen((user) async {
+      _receivedInitialAuthState = true;
       if (user != null) {
         if (_skipNextAuthStateUserLoad) {
           _skipNextAuthStateUserLoad = false;
           return;
         }
         await _loadUserData(user.uid);
+      } else {
+        _state = AuthState.unauthenticated;
+        _currentUser = null;
+        notifyListeners();
+      }
+    });
+
+    Timer(const Duration(seconds: 2), () {
+      if (_receivedInitialAuthState || _state != AuthState.initial) return;
+
+      final user = _authService.currentUser;
+      if (user != null) {
+        _loadUserData(user.uid);
       } else {
         _state = AuthState.unauthenticated;
         _currentUser = null;
@@ -203,8 +220,10 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Whether the current user has a Google provider linked
-  bool get isGoogleLinked => _authService.isGoogleLinked;
+  /// Whether the current user has a Google provider linked and synced server-side.
+  bool get isGoogleLinked =>
+      _authService.isGoogleLinked &&
+      (_currentUser?.googleEmail?.trim().isNotEmpty ?? false);
 
   /// Whether the current user has an email/password provider linked
   bool get isPasswordLinked => _authService.isPasswordLinked;

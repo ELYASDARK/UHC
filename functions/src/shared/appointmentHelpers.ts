@@ -74,15 +74,18 @@ export function releaseAppointmentSlot(
     transaction: FirebaseFirestore.Transaction,
     appointmentId: string,
     appointmentData: FirebaseFirestore.DocumentData
-): void {
+): Promise<void> {
     const appointmentDate = firestoreDateToDate(appointmentData.appointmentDate);
-    if (!appointmentData.doctorId || !appointmentDate || !appointmentData.timeSlot) return;
+    if (!appointmentData.doctorId || !appointmentDate || !appointmentData.timeSlot) return Promise.resolve();
     const slotRef = appointmentSlotLockRef(
         appointmentData.doctorId,
         appointmentDate,
         appointmentData.timeSlot
     );
-    transaction.delete(slotRef);
+    return transaction.get(slotRef).then((slotSnap) => {
+        if (!slotSnap.exists || slotSnap.data()?.appointmentId !== appointmentId) return;
+        transaction.delete(slotRef);
+    });
 }
 
 
@@ -129,6 +132,13 @@ export function isAdminWithAppointmentAccess(data: FirebaseFirestore.DocumentDat
     return !!(perms?.['appointments.view'] || perms?.['analytics.view'] || perms?.['reports.view']);
 }
 
+export function isAdminWithAppointmentMutationAccess(data: FirebaseFirestore.DocumentData): boolean {
+    if (data.role === 'superAdmin') return true;
+    if (data.role !== 'admin') return false;
+    const perms = data.adminPermissions as Record<string, boolean> | undefined;
+    return perms?.['appointments.manage'] === true;
+}
+
 export async function getDoctorForUser(uid: string): Promise<FirebaseFirestore.DocumentSnapshot | null> {
     const snap = await db.collection('doctors')
         .where('userId', '==', uid)
@@ -146,7 +156,7 @@ export async function canMutateAppointment(
 ): Promise<boolean> {
     const callerData = callerDoc.data()!;
     if (options.allowPatient && appointmentData.patientId === callerUid) return true;
-    if (options.allowAdmin && isAdminWithAppointmentAccess(callerData)) return true;
+    if (options.allowAdmin && isAdminWithAppointmentMutationAccess(callerData)) return true;
     if (options.allowDoctor && callerData.role === 'doctor') {
         const doctorDoc = await getDoctorForUser(callerUid);
         return doctorDoc?.id === appointmentData.doctorId;

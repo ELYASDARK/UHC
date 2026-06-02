@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { randomUUID } from 'crypto';
 
 import { admin, db } from './firebase';
 import {
@@ -6,6 +7,7 @@ import {
     APPOINTMENT_STATUSES,
     APPOINTMENT_TYPES,
     appointmentSlotLockRef,
+    appointmentExactTime,
     canMutateAppointment,
     firestoreDateToDate,
     formatDateForNotification,
@@ -57,6 +59,37 @@ interface UpdateMedicalNotesData extends AppointmentMutationData {
     notes: string;
 }
 
+interface ConfirmAppointmentCheckInData extends AppointmentMutationData {
+    qrCode: string;
+}
+
+function assertFutureAppointmentTime(appointmentDate: Date, timeSlot: string): void {
+    const exactTime = appointmentExactTime(appointmentDate, timeSlot);
+    if (exactTime.getTime() <= Date.now()) {
+        throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Appointment time must be in the future.'
+        );
+    }
+}
+
+function assertConfirmWindow(appointmentData: FirebaseFirestore.DocumentData): void {
+    const appointmentDate = firestoreDateToDate(appointmentData.appointmentDate);
+    if (!appointmentDate || typeof appointmentData.timeSlot !== 'string') {
+        throw new functions.https.HttpsError('failed-precondition', 'Appointment time is unavailable.');
+    }
+    const exactTime = appointmentExactTime(appointmentDate, appointmentData.timeSlot);
+    const now = Date.now();
+    const windowStart = exactTime.getTime() - 5 * 60 * 1000;
+    const windowEnd = exactTime.getTime() + 10 * 60 * 1000;
+    if (now < windowStart || now > windowEnd) {
+        throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Appointment can only be confirmed during the QR check-in window.'
+        );
+    }
+}
+
 export const createAppointment = functions.https.onCall(
     async (request: functions.https.CallableRequest<CreateAppointmentData>) => {
         const callerUid = requireAuth(request);
@@ -75,11 +108,13 @@ export const createAppointment = functions.https.onCall(
             throw new functions.https.HttpsError('invalid-argument', 'Invalid appointment type.');
         }
         const appointmentDate = parseAppointmentDate(data.appointmentDate);
+        assertFutureAppointmentTime(appointmentDate, data.timeSlot);
         const now = admin.firestore.Timestamp.now();
 
         let doctorUserId: string | undefined;
         const ref = db.collection('appointments').doc();
         const bookingReference = (data.bookingReference || ref.id.substring(0, 8)).toUpperCase();
+        const qrCode = `UHC_APPOINTMENT:${ref.id}:${randomUUID()}`;
         let trustedDoctorName = 'Any Available';
         let trustedDepartment = data.department;
 
@@ -126,7 +161,7 @@ export const createAppointment = functions.https.onCall(
                 status: 'pending',
                 notes: data.notes || null,
                 medicalNotes: null,
-                qrCode: null,
+                qrCode,
                 isCheckedIn: false,
                 checkedInAt: null,
                 createdAt: now,
@@ -161,7 +196,7 @@ export const createAppointment = functions.https.onCall(
             timeSlot: data.timeSlot,
         });
 
-        return { success: true, appointmentId: ref.id, bookingReference };
+        return { success: true, appointmentId: ref.id, bookingReference, qrCode };
     }
 );
 
@@ -185,6 +220,7 @@ export const rescheduleAppointment = functions.https.onCall(
         }
 
         const parsedDate = parseAppointmentDate(appointmentDate);
+        assertFutureAppointmentTime(parsedDate, timeSlot);
         await db.runTransaction(async (transaction) => {
             const transactionSnap = await transaction.get(ref);
             if (!transactionSnap.exists) {
@@ -193,6 +229,18 @@ export const rescheduleAppointment = functions.https.onCall(
             const currentAppointment = transactionSnap.data()!;
             if (!ACTIVE_APPOINTMENT_STATUSES.includes(currentAppointment.status)) {
                 throw new functions.https.HttpsError('failed-precondition', 'Only active appointments can be rescheduled.');
+            }
+
+            const currentDate = firestoreDateToDate(currentAppointment.appointmentDate);
+            let currentSlotRef: FirebaseFirestore.DocumentReference | null = null;
+            let currentSlotSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+            if (currentAppointment.doctorId && currentDate && currentAppointment.timeSlot) {
+                currentSlotRef = appointmentSlotLockRef(
+                    currentAppointment.doctorId,
+                    currentDate,
+                    currentAppointment.timeSlot
+                );
+                currentSlotSnap = await transaction.get(currentSlotRef);
             }
 
             let newSlotRef: FirebaseFirestore.DocumentReference | null = null;
@@ -207,15 +255,11 @@ export const rescheduleAppointment = functions.https.onCall(
                 });
             }
 
-            const currentDate = firestoreDateToDate(currentAppointment.appointmentDate);
-            if (currentAppointment.doctorId && currentDate && currentAppointment.timeSlot) {
-                const currentSlotRef = appointmentSlotLockRef(
-                    currentAppointment.doctorId,
-                    currentDate,
-                    currentAppointment.timeSlot
-                );
+            if (currentSlotRef) {
                 if (!newSlotRef || currentSlotRef.path !== newSlotRef.path) {
-                    transaction.delete(currentSlotRef);
+                    if (currentSlotSnap?.data()?.appointmentId === appointmentId) {
+                        transaction.delete(currentSlotRef);
+                    }
                 }
             }
 
@@ -271,7 +315,7 @@ export const cancelAppointment = functions.https.onCall(
                 throw new functions.https.HttpsError('not-found', 'Appointment not found.');
             }
             const currentAppointment = transactionSnap.data()!;
-            releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
+            await releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
             transaction.update(ref, {
                 status: 'cancelled',
                 cancelReason: reason || null,
@@ -309,6 +353,24 @@ export const updateAppointmentStatus = functions.https.onCall(
         if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowDoctor: true, allowAdmin: true })) {
             throw new functions.https.HttpsError('permission-denied', 'You cannot update this appointment status.');
         }
+        if (status === 'confirmed') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Use QR check-in confirmation to confirm appointments.'
+            );
+        }
+        if (status === 'completed' && appointment.status !== 'confirmed') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Only confirmed appointments can be completed.'
+            );
+        }
+        if (status === 'noShow' && appointment.status !== 'pending') {
+            throw new functions.https.HttpsError(
+                'failed-precondition',
+                'Only pending appointments can be marked no-show.'
+            );
+        }
         let previousStatus = appointment.status as string | undefined;
         let updatedAppointment: FirebaseFirestore.DocumentData = appointment;
         await db.runTransaction(async (transaction) => {
@@ -335,7 +397,7 @@ export const updateAppointmentStatus = functions.https.onCall(
                     excludeAppointmentId: appointmentId,
                 });
             } else {
-                releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
+                await releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
             }
 
             transaction.update(ref, {
@@ -354,6 +416,46 @@ export const updateAppointmentStatus = functions.https.onCall(
                 status,
             });
         }
+        return { success: true };
+    }
+);
+
+export const confirmAppointmentCheckIn = functions.https.onCall(
+    async (request: functions.https.CallableRequest<ConfirmAppointmentCheckInData>) => {
+        const callerUid = requireAuth(request);
+        const callerDoc = await getCallerUserDoc(callerUid);
+        const { appointmentId, qrCode } = request.data;
+        if (!appointmentId || typeof qrCode !== 'string' || !qrCode.trim()) {
+            throw new functions.https.HttpsError('invalid-argument', 'appointmentId and qrCode are required.');
+        }
+
+        const ref = db.collection('appointments').doc(appointmentId);
+        const snap = await ref.get();
+        if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+        const appointment = snap.data()!;
+        if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowDoctor: true })) {
+            throw new functions.https.HttpsError('permission-denied', 'You cannot confirm this appointment.');
+        }
+        if (appointment.status !== 'pending') {
+            throw new functions.https.HttpsError('failed-precondition', 'Only pending appointments can be confirmed.');
+        }
+        if (appointment.qrCode !== qrCode.trim()) {
+            throw new functions.https.HttpsError('permission-denied', 'QR code does not match this appointment.');
+        }
+        assertConfirmWindow(appointment);
+
+        await ref.update({
+            status: 'confirmed',
+            isCheckedIn: true,
+            checkedInAt: admin.firestore.Timestamp.now(),
+            statusUpdatedBy: callerUid,
+            updatedAt: admin.firestore.Timestamp.now(),
+        });
+        await createAppointmentStatusNotification({
+            appointmentId,
+            appointment: { ...appointment, status: 'confirmed' },
+            status: 'confirmed',
+        });
         return { success: true };
     }
 );
@@ -419,7 +521,7 @@ export const deleteAppointment = functions.https.onCall(
             if (!transactionSnap.exists) {
                 throw new functions.https.HttpsError('not-found', 'Appointment not found.');
             }
-            releaseAppointmentSlot(transaction, appointmentId, transactionSnap.data()!);
+            await releaseAppointmentSlot(transaction, appointmentId, transactionSnap.data()!);
             transaction.delete(ref);
         });
         await deleteAppointmentNotifications(appointmentId);

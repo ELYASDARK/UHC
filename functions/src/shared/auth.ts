@@ -22,6 +22,14 @@ export async function getCallerUserDoc(uid: string): Promise<FirebaseFirestore.D
     if (doc.data()?.isActive !== true) {
         throw new functions.https.HttpsError('permission-denied', 'Your account is inactive.');
     }
+    const authUser = await auth.getUser(uid);
+    const hasGoogleProvider = authUser.providerData.some((provider) => provider.providerId === 'google.com');
+    if (!hasGoogleProvider) {
+        throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Link your Google account before accessing UHC services.'
+        );
+    }
     return doc;
 }
 
@@ -79,6 +87,8 @@ export const READ_ONLY_ADMIN_PERMISSIONS: Record<string, boolean> = {
     'doctors.manage': false,
     'departments.view': true,
     'departments.manage': false,
+    'appointments.view': false,
+    'appointments.manage': false,
     'analytics.view': true,
     'reports.view': true,
     'reports.export': false,

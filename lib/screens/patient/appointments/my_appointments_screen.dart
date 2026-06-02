@@ -665,7 +665,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
                       ],
                     ),
                     child: QrImageView(
-                      data: 'UHC_APPOINTMENT:${appointment.id}',
+                      data: appointment.qrCode ?? 'UHC_APPOINTMENT:${appointment.id}',
                       version: QrVersions.auto,
                       size: 160,
                       backgroundColor: Colors.white,

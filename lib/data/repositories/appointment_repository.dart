@@ -3,6 +3,19 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import '../models/appointment_model.dart';
 
+/// Result returned by the trusted appointment creation callable.
+class AppointmentBookingResult {
+  final String appointmentId;
+  final String bookingReference;
+  final String? qrCode;
+
+  const AppointmentBookingResult({
+    required this.appointmentId,
+    required this.bookingReference,
+    this.qrCode,
+  });
+}
+
 /// Repository for appointment-related Firestore operations
 class AppointmentRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -192,7 +205,9 @@ class AppointmentRepository {
   }
 
   /// Create appointment
-  Future<String> createAppointment(AppointmentModel appointment) async {
+  Future<AppointmentBookingResult> createAppointment(
+    AppointmentModel appointment,
+  ) async {
     final callable = _functions.httpsCallable('createAppointment');
     final result = await callable.call<Map<String, dynamic>>({
       'bookingReference': appointment.bookingReference,
@@ -205,7 +220,11 @@ class AppointmentRepository {
       'type': appointment.type.name,
       'notes': appointment.notes,
     });
-    return result.data['appointmentId'] as String;
+    return AppointmentBookingResult(
+      appointmentId: result.data['appointmentId'] as String,
+      bookingReference: result.data['bookingReference'] as String,
+      qrCode: result.data['qrCode'] as String?,
+    );
   }
 
   /// Delete appointment permanently
@@ -242,6 +261,18 @@ class AppointmentRepository {
       'appointmentId': appointmentId,
       'status': status.name,
       'statusUpdatedBy': statusUpdatedBy,
+    });
+  }
+
+  /// Confirm appointment check-in using the server-validated QR code.
+  Future<void> confirmAppointmentCheckIn(
+    String appointmentId,
+    String qrCode,
+  ) async {
+    final callable = _functions.httpsCallable('confirmAppointmentCheckIn');
+    await callable.call<void>({
+      'appointmentId': appointmentId,
+      'qrCode': qrCode,
     });
   }
 

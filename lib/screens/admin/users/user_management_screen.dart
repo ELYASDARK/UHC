@@ -29,6 +29,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   String _searchQuery = '';
   Set<UserRole> _selectedRoles = {};
   int _displayLimit = 200;
+  static const int _maxDisplayLimit = 1000;
 
   bool get _canManageNonAdminUsers =>
       context
@@ -201,7 +202,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           child: Center(
                             child: OutlinedButton.icon(
                               onPressed: () {
-                                setState(() => _displayLimit += 200);
+                                setState(() {
+                                  _displayLimit =
+                                      (_displayLimit + 200).clamp(200, _maxDisplayLimit);
+                                });
                               },
                               icon: const Icon(Icons.expand_more),
                               label: Text(
@@ -465,9 +469,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   // manage non-superAdmin targets.
                   final canManageNonSuperAdminTarget = hasManagePerm &&
                       (actorIsSuperAdmin
-                          ? role != UserRole.superAdmin
+                          ? role != UserRole.superAdmin &&
+                              role != UserRole.doctor
                           : (role != UserRole.superAdmin &&
-                              role != UserRole.admin));
+                              role != UserRole.admin &&
+                              role != UserRole.doctor));
                   final hasLinkedGoogleEmail =
                       (data['googleEmail'] as String?)?.trim().isNotEmpty ??
                           false;
@@ -1013,10 +1019,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       orElse: () => UserRole.student,
     );
     if (actorRole == UserRole.superAdmin) {
-      return targetRole != UserRole.superAdmin;
+      return targetRole != UserRole.superAdmin && targetRole != UserRole.doctor;
     }
-    // Admin can only manage non-admin, non-superAdmin targets
-    return targetRole != UserRole.admin && targetRole != UserRole.superAdmin;
+    // Admin can only manage student/staff targets here.
+    return targetRole == UserRole.student || targetRole == UserRole.staff;
   }
 
   Future<void> _toggleUserStatus(String id, bool currentStatus) async {
@@ -1200,6 +1206,15 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   void _changeUserRole(String id, UserRole currentRole) {
+    if (currentRole != UserRole.student && currentRole != UserRole.staff) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only student and staff roles can be changed here.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
     final actorIsSuperAdmin =
         context.read<AuthProvider>().currentUser?.role == UserRole.superAdmin;
     showDialog(

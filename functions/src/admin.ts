@@ -58,6 +58,7 @@ export const createAdminAccount = functions.https.onCall(
                 notificationSettings: { email: true, push: true, sms: false },
                 language: 'en', createdAt: now, updatedAt: now,
                 bloodType: null, allergies: null, studentId: null, staffId: null,
+                googleEmail: null,
             });
             await writeAdminAuditLog({
                 actorUid: callerUid, actorRole: callerDoc.data()!.role,

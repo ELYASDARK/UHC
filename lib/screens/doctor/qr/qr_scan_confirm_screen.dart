@@ -11,15 +11,17 @@ import '../../../providers/doctor_appointment_provider.dart';
 /// QR scanner screen for confirming appointments.
 ///
 /// Returns a Map when popping:
-///   { 'matched': true/false, 'failures': int }
+///   { 'matched': true/false, 'failures': int, 'qrCode': string? }
 /// Returns null if the user closes without scanning.
 class QrScanConfirmScreen extends StatefulWidget {
   final String appointmentId;
+  final String expectedQrCode;
   final int initialFailures;
 
   const QrScanConfirmScreen({
     super.key,
     required this.appointmentId,
+    required this.expectedQrCode,
     required this.initialFailures,
   });
 
@@ -54,12 +56,15 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
 
     setState(() => _isProcessing = true);
 
-    final expected = 'UHC_APPOINTMENT:${widget.appointmentId}';
-
-    if (barcode.rawValue == expected) {
+    final scannedValue = barcode.rawValue!.trim();
+    if (scannedValue == widget.expectedQrCode) {
       // ── Match ──
       if (mounted) {
-        Navigator.pop(context, {'matched': true, 'failures': _failures});
+        Navigator.pop(context, {
+          'matched': true,
+          'failures': _failures,
+          'qrCode': scannedValue,
+        });
       }
       return;
     }

@@ -11,7 +11,7 @@
         "path": "./plugins/drawio"
       },
       "policy": {
-        "installation": "INSTALLED_BY_DEFAULT",
+        "installation": "INSTALLED_BY_USER",
         "authentication": "ON_INSTALL"
       },
       "category": "Productivity"

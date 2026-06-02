@@ -244,7 +244,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                     tabletColumns: 1,
                     laptopColumns: 2,
                     desktopColumns: 3,
-                    childAspectRatio: 4.0,
+                    childAspectRatio: 3.5,
                     padding: UhcResponsive.pagePadding(
                       context,
                       top: 8,

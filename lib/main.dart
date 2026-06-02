@@ -23,7 +23,6 @@ import 'providers/doctor_appointment_provider.dart';
 import 'providers/document_provider.dart';
 import 'services/local_notification_service.dart';
 import 'services/fcm_service.dart';
-import 'services/notification_scheduling_coordinator.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
@@ -104,8 +103,7 @@ void main() async {
 Future<void> _configureFirestoreDefaults() async {
   try {
     FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      persistenceEnabled: false,
     );
   } catch (e) {
     debugPrint('Failed to configure Firestore defaults: $e');
@@ -269,7 +267,6 @@ class _AppNavigatorState extends State<AppNavigator> {
   String? _lastLocaleSyncedCode;
   String? _lastThemeSyncedUserId;
   String? _lastThemeSyncedMode;
-  String? _lastNotificationSyncedUserId;
 
   @override
   void initState() {
@@ -410,15 +407,6 @@ class _AppNavigatorState extends State<AppNavigator> {
     });
   }
 
-  void _syncNotificationsForAuthenticatedUser(UserModel currentUser) {
-    if (_lastNotificationSyncedUserId == currentUser.id) return;
-    _lastNotificationSyncedUserId = currentUser.id;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await NotificationSchedulingCoordinator().resyncAfterLogin(currentUser.id);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -453,7 +441,6 @@ class _AppNavigatorState extends State<AppNavigator> {
       if (currentUser != null) {
         _syncThemeForAuthenticatedUser(currentUser, themeProvider);
         _syncLocaleForAuthenticatedUser(currentUser, localeProvider);
-        _syncNotificationsForAuthenticatedUser(currentUser);
       }
 
       // Admin-created doctors and patients must replace the temporary password
@@ -561,7 +548,6 @@ class _AppNavigatorState extends State<AppNavigator> {
       _lastLocaleSyncedCode = null;
       _lastThemeSyncedUserId = null;
       _lastThemeSyncedMode = null;
-      _lastNotificationSyncedUserId = null;
 
       // Auth screens
       switch (_authScreen) {

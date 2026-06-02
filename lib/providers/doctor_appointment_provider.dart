@@ -194,6 +194,27 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> confirmCheckIn(
+    String appointmentId,
+    String qrCode,
+    String doctorId,
+  ) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _appointmentRepo.confirmAppointmentCheckIn(appointmentId, qrCode);
+      await loadAppointments(doctorId);
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Cancel appointment with a reason
   ///
   /// [appointment] is needed to send a cancellation notification to the patient.
