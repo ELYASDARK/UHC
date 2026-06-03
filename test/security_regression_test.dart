@@ -45,6 +45,37 @@ void main() {
       expect(storageRules, contains('validMedicalDocument();'));
     });
 
+    test('mobile medical image documents use Flutter fullscreen viewer', () {
+      final patientDocsSource = readProjectFile(
+          'lib/screens/patient/documents/medical_documents_screen.dart');
+      final doctorDocsSource = readProjectFile(
+          'lib/screens/doctor/documents/doctor_patient_documents_screen.dart');
+      final viewerSource = readProjectFile(
+          'lib/screens/shared/medical_document_viewer_screen.dart');
+
+      expect(patientDocsSource, contains('MedicalDocumentViewerScreen'));
+      expect(doctorDocsSource, contains('MedicalDocumentViewerScreen'));
+      expect(patientDocsSource, contains('!kIsWeb && _isImageDocument(doc)'));
+      expect(doctorDocsSource, contains('!kIsWeb && _isImageDocument(doc)'));
+      expect(viewerSource, contains('InteractiveViewer'));
+      expect(viewerSource, contains('fit: BoxFit.contain'));
+      expect(viewerSource, contains('alignment: Alignment.center'));
+      expect(viewerSource, contains('panEnabled: false'));
+      expect(viewerSource, contains('scaleEnabled: true'));
+      expect(viewerSource, contains('TransformationController'));
+      expect(viewerSource, contains('onDoubleTap: _handleDoubleTap'));
+      expect(viewerSource, contains('Reset zoom'));
+    });
+
+    test('Flutter run does not rewrite generated l10n files every launch', () {
+      final pubspec = readProjectFile('pubspec.yaml');
+
+      expect(
+        pubspec,
+        contains('flutter:\n  generate: false\n  uses-material-design: true'),
+      );
+    });
+
     test('admin notification sends are audited and idempotent', () {
       final functionsSource =
           readProjectFile('functions/src/notifications/admin.ts');

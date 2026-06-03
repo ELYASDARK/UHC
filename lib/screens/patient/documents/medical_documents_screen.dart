@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +10,7 @@ import '../../../providers/document_provider.dart';
 import '../../../data/models/medical_document_model.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/widgets/responsive_layout.dart';
+import '../../shared/medical_document_viewer_screen.dart';
 
 /// Medical document upload and management screen
 class MedicalDocumentsScreen extends StatefulWidget {
@@ -226,7 +228,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.hardEdge,
         child: InkWell(
-          onTap: () => _viewDocument(doc.url),
+          onTap: () => _viewDocument(doc),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -306,7 +308,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   onSelected: (value) {
                     switch (value) {
                       case 'view':
-                        _viewDocument(doc.url);
+                        _viewDocument(doc);
                         break;
                       case 'edit':
                         _showEditDialog(context, doc);
@@ -819,8 +821,17 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     }
   }
 
-  Future<void> _viewDocument(String? url) async {
-    if (url == null || url.isEmpty) {
+  bool _isImageDocument(MedicalDocumentModel doc) {
+    final fileName = doc.fileName.toLowerCase();
+    return fileName.endsWith('.jpg') ||
+        fileName.endsWith('.jpeg') ||
+        fileName.endsWith('.png') ||
+        fileName.endsWith('.webp');
+  }
+
+  Future<void> _viewDocument(MedicalDocumentModel doc) async {
+    final url = doc.url;
+    if (url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).noURLProvided)),
       );
@@ -832,6 +843,19 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       if (await canLaunchUrl(uri)) {
         if (!_isTrustedMedicalDocumentUrl(uri)) {
           throw Exception('Document URL is not trusted.');
+        }
+        if (!kIsWeb && _isImageDocument(doc)) {
+          if (!mounted) return;
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MedicalDocumentViewerScreen(
+                imageUrl: url,
+                title: doc.name,
+              ),
+            ),
+          );
+          return;
         }
         await launchUrl(uri, mode: LaunchMode.inAppWebView);
       } else {

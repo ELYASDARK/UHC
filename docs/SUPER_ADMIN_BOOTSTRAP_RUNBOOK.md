@@ -1,337 +1,485 @@
-# Super Admin Governance — Bootstrap & Migration Runbook
+# Super Admin Governance Bootstrap Runbook
 
-> **Version:** 1.0  
-> **Last Updated:** 2026-04-25  
-> **Audience:** Project owner / DevOps
+> Version: 2.0  
+> Last Updated: 2026-06-03  
+> Audience: project owner, Firebase owner, deployment operator
+
+This runbook explains how to connect and bootstrap the current Super Admin governance system. It matches the current implementation in:
+
+- `functions/src/admin.ts`
+- `functions/src/shared/auth.ts`
+- `lib/screens/super_admin/super_admin_shell.dart`
+- `lib/screens/super_admin/admin_control_screen.dart`
+- `firestore.rules`
 
 ---
 
 ## Table of Contents
 
-1. [Prerequisites](#1-prerequisites)
-2. [Deploy Backend (Cloud Functions + Rules + Indexes)](#2-deploy-backend)
-3. [Bootstrap the First Super Admin](#3-bootstrap-first-super-admin)
-4. [Verify the Governance System](#4-verify-governance-system)
-5. [Ongoing Operations](#5-ongoing-operations)
-6. [Rollback Procedure](#6-rollback-procedure)
-7. [Security Checklist](#7-security-checklist)
+1. [Current Governance Model](#1-current-governance-model)
+2. [Prerequisites](#2-prerequisites)
+3. [Deploy Firebase Backend](#3-deploy-firebase-backend)
+4. [Bootstrap the First Super Admin](#4-bootstrap-the-first-super-admin)
+5. [Create the Backup Super Admin](#5-create-the-backup-super-admin)
+6. [Verify the System](#6-verify-the-system)
+7. [Ongoing Operations](#7-ongoing-operations)
+8. [Troubleshooting](#8-troubleshooting)
+9. [Security Checklist](#9-security-checklist)
+10. [Permissions Reference](#10-permissions-reference)
 
 ---
 
-## 1. Prerequisites
+## 1. Current Governance Model
+
+The app supports these user roles:
+
+| Role | Purpose |
+|---|---|
+| `student` | Patient account |
+| `staff` | Staff patient account |
+| `doctor` | Doctor dashboard account |
+| `admin` | Operational admin with granular permissions |
+| `superAdmin` | Governance owner with full access |
+
+The Super Admin system uses a strict two-slot model:
+
+| Slot | Field value | Purpose |
+|---|---|---|
+| Primary | `superAdminType: "primary"` | Main governance owner |
+| Backup | `superAdminType: "backup"` | Recovery/governance backup |
+
+Important current rules:
+
+- There should be one primary and one backup Super Admin.
+- Super Admin bypasses granular admin permissions in the app and backend.
+- Normal admins require explicit `adminPermissions`.
+- New admins created from Super Admin governance start with the read-only permission preset.
+- Governance actions are performed through Cloud Functions, not direct client writes.
+- Firestore blocks direct client writes to `role`, `isActive`, `superAdminType`, and `adminPermissions`.
+- Governance Cloud Functions require an active Super Admin caller.
+- Governance Cloud Functions also require the caller's Firebase Auth account to have a linked Google provider.
+
+The current Super Admin shell has 4 main tabs:
+
+| Main tab | Purpose |
+|---|---|
+| Dashboard | Governance KPIs and slot health |
+| Admins | Admin Control panel |
+| Audit Logs | Governance audit trail |
+| Profile | Super Admin profile/settings |
+
+Inside the Admin Control panel, there are 3 tabs:
+
+| Admin Control tab | Purpose |
+|---|---|
+| Admins | Create admins, activate/deactivate, change role, reset password, delete, force sign-out |
+| Permissions | Edit admin permission maps and apply presets |
+| Slots | Assign or rotate primary/backup Super Admin slots |
+
+---
+
+## 2. Prerequisites
 
 | Requirement | Details |
 |---|---|
-| **Firebase CLI** | `npm install -g firebase-tools` (v13+) |
-| **Node.js** | v22+ (matches `runtime` in `firebase.json`) |
-| **Authenticated** | `firebase login` with project-owner Google account |
-| **Project** | `firebase use uhca-20800` (or your project ID) |
-| **Functions build** | `cd functions && npm install && npm run build` must pass |
-| **Flutter SDK** | v3.x with `flutter pub get` passing |
+| Firebase CLI | `npm install -g firebase-tools` |
+| Node.js | Node.js 22, matching `firebase.json` |
+| Flutter SDK | Flutter 3.x with `flutter pub get` passing |
+| Firebase login | `firebase login` with a project-owner Google account |
+| Firebase project | Select with `firebase use --add` or `firebase use <project-id>` |
+| Functions dependencies | `cd functions && npm install` |
+| Functions build | `cd functions && npm run build` must pass |
+| Google-linked bootstrap user | The first Super Admin must be able to link/sign in with Google |
+
+If the app is being handed to a new owner, connect the repo to the new Firebase project first:
+
+```bash
+firebase login
+firebase use --add
+flutterfire configure --project=<firebase-project-id> --platforms=android,ios,web --out=lib/firebase_options.dart
+```
+
+Then confirm these files point to the new Firebase project:
+
+- `.firebaserc`
+- `lib/firebase_options.dart`
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+- `web/firebase-messaging-sw.js`
 
 ---
 
-## 2. Deploy Backend
+## 3. Deploy Firebase Backend
 
-Deploy all three components in order. Each can be deployed independently but the full deploy ensures consistency.
-
-### 2a. Deploy Firestore Indexes
+Build Functions first:
 
 ```bash
-firebase deploy --only firestore:indexes
+cd functions
+npm install
+npm run build
+cd ..
 ```
 
-> **Note:** Index creation is async. New composite indexes can take 5–15 minutes to build.  
-> Monitor status in the [Firebase Console → Firestore → Indexes](https://console.firebase.google.com).
-
-**New indexes added in this migration:**
-
-| Collection | Fields | Purpose |
-|---|---|---|
-| `admin_audit_logs` | `actorUid` ASC + `createdAt` DESC | Filter logs by actor |
-| `admin_audit_logs` | `targetUid` ASC + `createdAt` DESC | Filter logs by target |
-| `admin_audit_logs` | `action` ASC + `createdAt` DESC | Filter logs by action type |
-| `users` | `role` ASC + `isActive` ASC | Dashboard admin status queries |
-| `users` | `role` ASC + `superAdminType` ASC | Slot management queries |
-
-### 2b. Deploy Firestore Security Rules
+Deploy Firestore rules, indexes, Storage rules, and Functions:
 
 ```bash
-firebase deploy --only firestore:rules
+firebase deploy --only firestore:rules,firestore:indexes,storage,functions
 ```
 
-**Key rule changes:**
-- `users/{userId}` — owner writes blocked for `role`, `isActive`, `superAdminType`, `adminPermissions`
-- `admin_audit_logs` — read: superAdmin only; write: denied (Cloud Functions only)
-- `departments` — write requires `departments.manage` permission
-- `doctors` — write requires `doctors.manage` permission
-
-### 2c. Deploy Cloud Functions
+Optional dry run before a real deploy:
 
 ```bash
-firebase deploy --only functions
+firebase deploy --only firestore:rules,firestore:indexes,storage,functions --dry-run
 ```
 
-**New callable functions deployed:**
+Current governance callable functions:
 
 | Function | Access | Purpose |
 |---|---|---|
-| `createAdminAccount` | Super Admin only | Create admin users |
-| `changeAdminRole` | Super Admin only | Promote/demote admin roles |
-| `setAdminActiveStatus` | Super Admin only | Activate/deactivate admins |
-| `resetAdminPassword` | Super Admin only | Reset admin passwords |
-| `deleteAdminAccount` | Super Admin only | Delete admin accounts |
-| `forceSignOutUser` | Super Admin only | Force user sign-out |
-| `setAdminPermissions` | Super Admin only | Set admin RBAC permissions |
-| `assignSuperAdminSlot` | Super Admin only | Assign primary/backup slot |
-| `rotateSuperAdminSlot` | Super Admin only | Rotate slot holder |
-| `listAdminAuditLogs` | Super Admin only | Query audit logs |
+| `createAdminAccount` | Super Admin only | Create admin Auth/user records |
+| `changeAdminRole` | Super Admin only | Change non-super-admin user role to `admin`, `student`, or `staff` |
+| `setAdminActiveStatus` | Super Admin only | Activate/deactivate admin accounts |
+| `resetAdminPassword` | Super Admin only | Reset admin password, minimum 8 characters |
+| `deleteAdminAccount` | Super Admin only | Delete admin Auth/user records |
+| `forceSignOutUser` | Super Admin only | Revoke sessions and clear FCM tokens |
+| `setAdminPermissions` | Super Admin only | Replace an admin permission map |
+| `assignSuperAdminSlot` | Super Admin only | Assign an empty primary/backup slot |
+| `rotateSuperAdminSlot` | Super Admin only | Replace an existing primary/backup slot holder |
+| `listAdminAuditLogs` | Super Admin only | Query governance audit logs |
 
-### 2d. Full Deploy (all at once)
+Current governance-related indexes:
 
-```bash
-firebase deploy
-```
+| Collection | Fields | Purpose |
+|---|---|---|
+| `admin_audit_logs` | `actorUid` ASC, `createdAt` DESC | Filter audit logs by actor |
+| `admin_audit_logs` | `targetUid` ASC, `createdAt` DESC | Filter audit logs by target |
+| `admin_audit_logs` | `action` ASC, `createdAt` DESC | Filter audit logs by action |
+| `users` | `role` ASC, `isActive` ASC | Admin status queries |
+| `users` | `role` ASC, `superAdminType` ASC | Super Admin slot queries |
+
+Index creation can take several minutes. Check Firebase Console -> Firestore -> Indexes if queries fail immediately after deploy.
 
 ---
 
-## 3. Bootstrap the First Super Admin
+## 4. Bootstrap the First Super Admin
 
-Since the governance system requires a Super Admin to create admins, and there are no Super Admins at first, you need to manually bootstrap the initial one.
+At the very beginning there is no Super Admin, so the first account must be promoted manually in Firebase Console.
 
-### Step 1: Identify the Bootstrap User
+### Step 1: Choose the Bootstrap Account
 
-Choose the Google account that will become the **Primary Super Admin**. This user must already exist in Firebase Auth (i.e., they've signed into the app at least once).
+Choose the person who will become the Primary Super Admin.
 
-### Step 2: Get the User's UID
+The account must have:
 
-Find the UID from the [Firebase Console → Authentication → Users](https://console.firebase.google.com) tab, or run:
+- A Firebase Authentication user.
+- A matching Firestore document at `users/{uid}`.
+- `isActive: true`.
+- A linked Google account.
 
-```bash
-# If you know the email:
-firebase auth:export users.json --format=json
-# Then search for the email in users.json
-```
+The linked Google account matters because `getCallerUserDoc()` checks Firebase Auth provider data and requires `google.com` before allowing UHC Cloud Function access.
 
-### Step 3: Set Super Admin Fields in Firestore
+### Step 2: Create or Prepare the User
 
-Open the [Firebase Console → Firestore](https://console.firebase.google.com) and navigate to:
+Recommended path:
 
-```
-users/{USER_UID}
-```
+1. Open the app.
+2. Create/sign in with the bootstrap account.
+3. Link Google from the app if the account was created with email/password.
+4. Confirm the user appears in Firebase Console -> Authentication -> Users.
+5. Confirm the Firestore document exists at `users/{uid}`.
 
-Update the following fields:
+If the Firestore user document does not exist, create it manually with these minimum fields:
+
+| Field | Value | Type |
+|---|---|---|
+| `email` | bootstrap email | string |
+| `fullName` | owner/admin name | string |
+| `role` | `student` temporarily | string |
+| `isActive` | `true` | boolean |
+| `googleEmail` | linked Google email, if already linked | string or null |
+| `createdAt` | current timestamp | timestamp |
+| `updatedAt` | current timestamp | timestamp |
+| `language` | `en` | string |
+| `themeMode` | `system` | string |
+| `requiresInitialPasswordChange` | `false` | boolean |
+| `notificationSettings` | `{ email: true, push: true, sms: false }` | map |
+
+### Step 3: Get the User UID
+
+Find the UID in:
+
+- Firebase Console -> Authentication -> Users
+- or Firestore document ID under `users/{uid}`
+
+### Step 4: Promote the User in Firestore
+
+Open Firebase Console -> Firestore -> `users/{uid}` and set:
 
 | Field | Value | Type |
 |---|---|---|
 | `role` | `superAdmin` | string |
 | `superAdminType` | `primary` | string |
 | `isActive` | `true` | boolean |
-| `adminPermissions` | *(leave empty or delete)* | — |
+| `googleEmail` | the linked Google email | string |
+| `requiresInitialPasswordChange` | `false` | boolean |
+| `updatedAt` | current timestamp | timestamp |
 
-> **Why manual?** Security rules block client-side `role` writes. Admin SDK (used by Cloud Functions) bypasses rules, but the callable functions themselves require an existing Super Admin to authorize the request — creating a chicken-and-egg problem. The Firestore console uses the Admin SDK internally, so this bypass is safe.
+Remove `adminPermissions` from this Super Admin document if it exists. Super Admin bypasses permissions, so this map is not needed.
 
-### Step 4: Verify the Bootstrap
+### Step 5: Verify Login
 
-1. **Sign out** of the app completely
-2. **Sign back in** with the bootstrap account
-3. You should see the **Super Admin shell** (5-tab layout: Dashboard, Admins, Permissions, Audit, Profile)
-4. Navigate to **Admin Control → Slots tab** — the Primary slot should show as filled
-
-### Step 5: Create the Backup Super Admin (Recommended)
-
-From the Super Admin Dashboard:
-1. Go to **Admin Control**
-2. Tap the **FAB (+)** to create a new admin account
-3. Once created, go to the **Slots** tab
-4. Assign the new admin as the **Backup** Super Admin
-
-> ⚠️ **Best Practice:** Always maintain both Primary and Backup slots filled. The dashboard will show a risk warning if any slot is empty.
+1. Fully sign out of the app.
+2. Sign in again as the bootstrap account.
+3. If prompted to link Google, complete the Google link flow.
+4. Confirm the app opens the Super Admin shell.
+5. Confirm the main tabs are Dashboard, Admins, Audit Logs, and Profile.
+6. Open Admins -> Slots and confirm the Primary slot is filled.
 
 ---
 
-## 4. Verify the Governance System
+## 5. Create the Backup Super Admin
 
-After bootstrap, run through this verification checklist:
+Always create a backup Super Admin after the primary account is working.
 
-### 4a. Super Admin Capabilities
+Recommended path from the app:
 
-- [ ] Can see Super Admin Dashboard with KPIs
-- [ ] Can create admin accounts via Admin Control → FAB
-- [ ] Can set admin permissions via Permissions tab
-- [ ] Can assign/rotate Super Admin slots
-- [ ] Can view audit logs
-- [ ] Can force sign-out users
-- [ ] Can activate/deactivate admin accounts
+1. Sign in as the Primary Super Admin.
+2. Open Admins.
+3. Tap the add-admin button.
+4. Create a new admin with an email, name, and password of at least 8 characters.
+5. Ask the backup owner to sign in and link Google.
+6. Open Admins -> Slots.
+7. Assign the Backup slot using the backup user's UID or email.
 
-### 4b. Admin RBAC Verification
+Alternative path:
 
-1. Create a test admin account with **Read Only** preset
-2. Sign in as that admin
-3. Verify:
-   - [ ] Cannot see FAB on Doctor Management screen
-   - [ ] Cannot see FAB on Department Management screen
-   - [ ] Cannot see FAB on User Management screen
-   - [ ] Cannot click Generate Report on Reports screen
-   - [ ] Can still browse and view data (read-only)
+1. Prepare an existing active user/admin with a linked Google account.
+2. Open Admins -> Slots.
+3. Assign the Backup slot using UID or email.
 
-4. Change the test admin to **Full Access** preset
-5. Verify:
-   - [ ] Can see all FABs and mutation actions
-   - [ ] Can add/edit/delete doctors, departments, users
-
-### 4c. Audit Trail
-
-1. Perform several governance actions (create admin, change role, etc.)
-2. Navigate to **Audit Logs** screen
-3. Verify:
-   - [ ] All actions appear with correct actor/target
-   - [ ] Filters (action type, target UID, actor UID, date range) work
-   - [ ] Timestamps are displayed correctly
+The slot assignment function promotes the target to `role: "superAdmin"` and sets `superAdminType: "backup"`.
 
 ---
 
-## 5. Ongoing Operations
+## 6. Verify the System
 
-### Adding a New Admin
+### Super Admin Verification
 
-1. Sign in as Super Admin
-2. Go to **Admin Control** → tap **FAB (+)**
-3. Enter email, name, and initial password
-4. The new admin is created with the **Read Only** preset by default
-5. Navigate to **Permissions** tab to customize their permissions
+- [ ] Super Admin Dashboard loads.
+- [ ] Admins tab loads the Admin Control panel.
+- [ ] Admin Control has Admins, Permissions, and Slots tabs.
+- [ ] Primary slot appears as filled.
+- [ ] Backup slot appears as filled after setup.
+- [ ] Audit Logs tab loads.
+- [ ] Super Admin can create an admin account.
+- [ ] Super Admin can set admin permissions.
+- [ ] Super Admin can force sign-out a test user.
+- [ ] Super Admin cannot accidentally delete or demote another Super Admin from normal admin row actions.
 
-### Rotating a Super Admin Slot
+### Admin RBAC Verification
 
-1. Go to **Admin Control → Slots** tab
-2. Identify the slot to rotate (Primary or Backup)
-3. Provide the replacement user's UID
-4. The old holder is demoted to `admin`, the new holder is promoted to `superAdmin`
+Create a test admin. By default, it should receive the read-only preset:
 
-### Deactivating an Admin
+- [ ] `users.view: true`
+- [ ] `doctors.view: true`
+- [ ] `departments.view: true`
+- [ ] `analytics.view: true`
+- [ ] `reports.view: true`
+- [ ] manage/export/send permissions disabled
 
-1. Go to **Admin Control → Admins** tab
-2. Tap the admin's card → select **Deactivate**
-3. The admin can no longer sign in (enforced at auth level)
+Sign in as the test admin and verify:
 
-### Viewing Governance Audit
+- [ ] Can view allowed screens.
+- [ ] Cannot create/edit/delete doctors without `doctors.manage`.
+- [ ] Cannot create/edit/delete departments without `departments.manage`.
+- [ ] Cannot create/edit/delete users without `users.manageNonAdmin`.
+- [ ] Cannot export reports without `reports.export`.
+- [ ] Cannot send admin notifications without `notifications.send`.
 
-1. Go to **Audit Logs** screen
-2. Use the filter bar (action type, target, actor, date range)
-3. All governance actions are permanently logged and immutable
+Then apply the Full Access preset and verify those operations become available.
 
----
+### Audit Verification
 
-## 6. Rollback Procedure
+Perform several governance actions:
 
-If issues arise after deployment:
+- Create admin.
+- Update permissions.
+- Reset password.
+- Force sign-out.
+- Assign or rotate slot.
 
-### Quick Rollback (Rules Only)
+Then open Audit Logs and verify:
 
-```bash
-# Revert to previous rules
-git checkout HEAD~1 -- firestore.rules
-firebase deploy --only firestore:rules
-```
-
-### Function Rollback
-
-```bash
-# Revert functions
-git checkout HEAD~1 -- functions/src/index.ts
-cd functions && npm run build
-firebase deploy --only functions
-```
-
-### Full Rollback
-
-```bash
-git checkout HEAD~1 -- firestore.rules firestore.indexes.json functions/
-cd functions && npm run build
-firebase deploy
-```
-
-> ⚠️ **Index rollback:** Removing indexes from `firestore.indexes.json` and redeploying will delete them. This is safe but may cause queries to fail if the indexes are still needed by other code paths.
+- [ ] Actions appear with actor UID/name.
+- [ ] Target UID/name appears.
+- [ ] Action type is correct.
+- [ ] Created timestamp is correct.
+- [ ] Filters for actor, target, action, and date work.
 
 ---
 
-## 7. Security Checklist
+## 7. Ongoing Operations
 
-Before considering the deployment production-ready, verify:
+### Add a New Admin
 
-- [ ] **No direct client writes to sensitive fields** — `role`, `isActive`, `superAdminType`, `adminPermissions` are blocked by Firestore rules
-- [ ] **All governance callables require Super Admin** — verified via `requireSuperAdmin()` guard
-- [ ] **Audit logs are immutable** — `allow write: if false` in rules; only Cloud Functions (Admin SDK) can write
-- [ ] **Max 2 Super Admin slots** — enforced transactionally in `assignSuperAdminSlot`
-- [ ] **Slot rotation is atomic** — `rotateSuperAdminSlot` uses Firestore transactions
-- [ ] **Admin can only manage non-admin users** — enforced in both UI (`canManageTarget`) and backend (`requirePermission`)
-- [ ] **Permission presets differentiated** — `operations` preset blocks `reports.export` and `notifications.send`
-- [ ] **Self-registration restricted** — `createUserAccount` only allows `student`/`staff` roles
-- [ ] **Firebase Auth tokens** — consider setting custom claims for role in a future iteration for server-side token validation
+1. Sign in as Super Admin.
+2. Open Admins.
+3. Tap the add-admin button.
+4. Enter email, full name, optional profile details, and password.
+5. The admin starts with read-only permissions.
+6. Open Permissions to apply Operations or Full Access if needed.
 
----
+### Change Admin Permissions
 
-## Architecture Reference
+1. Open Admins -> Permissions.
+2. Select the admin.
+3. Toggle individual permissions or apply a preset.
+4. Save changes.
 
-```
-┌─────────────────────────────────────────────┐
-│                  Flutter App                │
-│                                             │
-│  ┌─────────┐  ┌──────────┐  ┌────────────┐  │
-│  │ Patient │  │  Admin   │  │Super Admin │  │
-│  │  Shell  │  │  Shell   │  │   Shell    │  │
-│  └─────────┘  └──────────┘  └────────────┘  │
-│       │            │              │         │
-│       │     ┌──────┴───────┐      │         │
-│       │     │ AuthProvider │      │         │
-│       │     │ hasPermission│      │         │
-│       │     └──────┬───────┘      │         │
-│       │            │              │         │
-│       └────────────┴──────────────┘         │
-│                    │                        │
-│     ┌──────────────┴──────────────┐         │
-│     │  AdminGovernanceService     │         │
-│     │  (Cloud Function callables) │         │
-│     └──────────────┬──────────────┘         │
-└────────────────────┼────────────────────────┘
-                     │ HTTPS
-┌────────────────────┼────────────────────────┐
-│           Cloud Functions (Gen2)            │
-│                    │                        │
-│  ┌─────────────────┴───────────────────────┐│
-│  │  Guards: requireAuth, requireSuperAdmin ││
-│  │  requirePermission, writeAuditLog       ││
-│  └─────────────────┬───────────────────────┘│
-│                    │ Admin SDK              │
-│           ┌────────┴────────┐               │
-│           │   Firestore     │               │
-│           │  ┌───────────┐  │               │
-│           │  │   users   │  │               │
-│           │  │  doctors  │  │               │
-│           │  │audit_logs │  │               │
-│           │  └───────────┘  │               │
-│           └─────────────────┘               │
-└─────────────────────────────────────────────┘
-```
+The backend sanitizes the permission payload and rejects unknown permission keys.
+
+### Deactivate an Admin
+
+1. Open Admins.
+2. Use the admin row menu.
+3. Choose Deactivate.
+
+The backend sets `isActive: false`, revokes sessions, and clears FCM tokens.
+
+### Force Sign-Out
+
+1. Open Admins.
+2. Use the admin row menu.
+3. Choose Force Sign-Out.
+
+This revokes refresh tokens and clears FCM tokens. The user may need to reopen or refresh the app before the local session fully reflects the server-side revocation.
+
+### Rotate a Super Admin Slot
+
+1. Prepare the replacement user/admin.
+2. Make sure the replacement account is active and Google-linked.
+3. Open Admins -> Slots.
+4. Choose Rotate on Primary or Backup.
+5. Enter the replacement UID or email.
+
+Rotation demotes the old slot holder to `admin`, removes `superAdminType`, and promotes the replacement to `superAdmin`.
+
+### Assign an Empty Super Admin Slot
+
+1. Open Admins -> Slots.
+2. Choose Assign for the empty slot.
+3. Enter the target UID or email.
+
+Use Assign only for an empty slot. Use Rotate when the slot already has a holder.
 
 ---
 
-## Permissions Reference
+## 8. Troubleshooting
 
-| Permission Key | Description | Full Access | Read Only | Operations |
+### "Link your Google account before accessing UHC services."
+
+Cause:
+
+- The caller's Firebase Auth user does not have a `google.com` provider.
+
+Fix:
+
+1. Sign in to the app.
+2. Link Google from the account/profile flow.
+3. Confirm Firebase Console -> Authentication -> Users shows Google as a provider.
+4. Confirm `users/{uid}.googleEmail` is set.
+
+### "Only Super Admins can perform this action."
+
+Cause:
+
+- `users/{callerUid}.role` is not `superAdmin`, or the wrong Firebase project is selected.
+
+Fix:
+
+1. Confirm `.firebaserc` points to the intended project.
+2. Confirm `lib/firebase_options.dart` points to the intended project.
+3. Confirm the signed-in user's Firestore document has `role: "superAdmin"`.
+
+### "The primary/backup slot is already occupied."
+
+Cause:
+
+- You used Assign on a filled slot.
+
+Fix:
+
+- Use Rotate instead.
+
+### "Replacement already holds a Super Admin slot."
+
+Cause:
+
+- The replacement user is already primary or backup.
+
+Fix:
+
+- Choose a non-Super-Admin replacement, or manually repair slots in Firebase Console if the system is already inconsistent.
+
+### Admin can view UI but actions fail
+
+Cause:
+
+- Missing explicit permission in `adminPermissions`, or the admin is not Google-linked.
+
+Fix:
+
+1. Open Super Admin -> Admins -> Permissions.
+2. Confirm the required permission is true.
+3. Confirm the admin is active and Google-linked.
+
+---
+
+## 9. Security Checklist
+
+Before production handoff, verify:
+
+- [ ] `.firebaserc` points to the intended Firebase project.
+- [ ] `lib/firebase_options.dart`, `google-services.json`, and `GoogleService-Info.plist` point to the intended Firebase project.
+- [ ] Firestore rules are deployed.
+- [ ] Storage rules are deployed.
+- [ ] Firestore indexes are deployed and built.
+- [ ] Functions build and deploy successfully.
+- [ ] Direct client writes to `role`, `isActive`, `superAdminType`, and `adminPermissions` are blocked.
+- [ ] `admin_audit_logs` read is Super Admin only.
+- [ ] `admin_audit_logs` write is denied to clients.
+- [ ] Governance functions require `requireSuperAdmin()`.
+- [ ] Admin permission functions reject unknown permission keys.
+- [ ] Primary Super Admin slot is filled.
+- [ ] Backup Super Admin slot is filled.
+- [ ] Both Super Admin accounts are active and Google-linked.
+- [ ] No service account JSON/private key is included in the CD/source handoff.
+- [ ] No real Firebase Auth user export, Firestore export, Storage export, or patient data is included unless authorized.
+
+---
+
+## 10. Permissions Reference
+
+Super Admin bypasses all permission checks. Admin accounts require explicit permission values.
+
+| Permission key | Description | Read Only | Operations | Full Access |
 |---|---|:---:|:---:|:---:|
-| `doctors.view` | View doctor list | ✅ | ✅ | ✅ |
-| `doctors.manage` | Add/edit/delete doctors | ✅ | ❌ | ✅ |
-| `departments.view` | View departments | ✅ | ✅ | ✅ |
-| `departments.manage` | Add/edit/delete departments | ✅ | ❌ | ✅ |
-| `users.view` | View user list | ✅ | ✅ | ✅ |
-| `users.manageNonAdmin` | Add/edit/delete non-admin users | ✅ | ❌ | ✅ |
-| `appointments.view` | View all appointments | ✅ | ✅ | ✅ |
-| `analytics.view` | View analytics dashboard | ✅ | ✅ | ✅ |
-| `reports.view` | View reports page | ✅ | ✅ | ✅ |
-| `reports.export` | Generate/export reports | ✅ | ❌ | ❌ |
-| `notifications.view` | View notifications | ✅ | ✅ | ✅ |
-| `notifications.send` | Send topic notifications | ✅ | ❌ | ❌ |
+| `users.view` | View user list and details | yes | yes | yes |
+| `users.manageNonAdmin` | Create/edit/activate/deactivate non-admin users | no | yes | yes |
+| `doctors.view` | View doctor profiles and schedules | yes | yes | yes |
+| `doctors.manage` | Create/edit/delete doctor accounts and schedules | no | yes | yes |
+| `departments.view` | View departments | yes | yes | yes |
+| `departments.manage` | Create/edit/delete departments | no | yes | yes |
+| `appointments.view` | Backend appointment-read permission | no | no | no |
+| `appointments.manage` | Backend appointment-mutation permission | no | no | no |
+| `analytics.view` | View analytics/dashboard data | yes | yes | yes |
+| `reports.view` | View reports screen/data | yes | yes | yes |
+| `reports.export` | Export reports | no | no | yes |
+| `notifications.send` | Send admin notifications | no | no | yes |
 
-> **Super Admin** automatically bypasses all permission checks via `hasPermission()`.
+Current UI note:
+
+- `appointments.view` and `appointments.manage` remain in the backend permission schema.
+- The Super Admin permissions UI hides appointment permissions for now and sends both as `false`.
+- Appointment reads for admin workflows are currently covered by permissions such as `analytics.view` and `reports.view` in Firestore rules.
+

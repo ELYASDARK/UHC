@@ -333,6 +333,65 @@ Enable the following in your [Firebase Console](https://console.firebase.google.
 - ✅ **Cloud Functions** — Upgrade project to Blaze plan (required for Node.js functions)
 - ✅ **Cloud Scheduler** — Required by scheduled notification delivery (`deliverScheduledNotifications`, `sendDoctorDailyReports`)
 
+### Connect to a New Firebase Project
+
+Use this checklist when handing the app to another owner or connecting the codebase to a different Firebase project.
+
+1. Create or open the target project in the [Firebase Console](https://console.firebase.google.com).
+2. Enable the required Firebase services listed above.
+3. Install the Firebase CLI and FlutterFire CLI if they are not already installed:
+
+```bash
+npm install -g firebase-tools
+dart pub global activate flutterfire_cli
+```
+
+4. Sign in and connect this repository to the target Firebase project:
+
+```bash
+firebase login
+firebase use --add
+```
+
+Choose the new Firebase project, then set an alias such as `default`. This updates `.firebaserc` so deploy commands use the new project instead of the previous project.
+
+5. Register the app platforms in Firebase:
+
+| Platform | Firebase app type | App identifier to register |
+|:---|:---|:---|
+| Android | Android app | `com.example.uhc` from `android/app/build.gradle.kts` |
+| iOS | iOS app | `com.example.uhc` from `ios/Runner.xcodeproj/project.pbxproj` |
+| Web | Web app | Any Firebase web app nickname |
+
+If you change the Android package name or iOS bundle identifier for production, register the new identifiers in Firebase before downloading config files.
+
+6. Regenerate Flutter Firebase configuration for the new project:
+
+```bash
+flutterfire configure --project=<your-firebase-project-id> --platforms=android,ios,web --out=lib/firebase_options.dart
+```
+
+This command updates:
+
+- `lib/firebase_options.dart`
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+
+7. For Web builds, also confirm that `web/firebase-messaging-sw.js` uses the same Firebase project values as the generated web configuration.
+
+8. Deploy backend configuration to the new Firebase project:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes,storage
+firebase deploy --only functions
+```
+
+9. Create the first Super Admin using the bootstrap guide:
+
+- See `docs/SUPER_ADMIN_BOOTSTRAP_RUNBOOK.md`
+
+> Do not copy real user, doctor, appointment, medical document, FCM token, or audit-log data from the old Firebase project unless the new owner is authorized to receive that data.
+
 ### Platform Configuration
 
 | Platform | Config File | Location | Instructions |
