@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="11in" height="8.5in" viewBox="0 0 3300 2550">
+  <style>
+    .title { font: 700 42px Arial, Helvetica, sans-serif; fill: #1f2933; }
+    .entity { font: 700 22px Arial, Helvetica, sans-serif; fill: #1f2a1f; }
+    .attr { font: 700 16px Arial, Helvetica, sans-serif; fill: #1f2a1f; }
+    .rel { font: 700 15px Arial, Helvetica, sans-serif; fill: #16333a; }
+    .card { font: 700 18px Arial, Helvetica, sans-serif; fill: #333333; }
+    .note { font: 18px Arial, Helvetica, sans-serif; fill: #33444e; }
+  </style>
+  <rect width="3300" height="2550" fill="#ffffff"/>
+  <text x="1650" y="84" class="title" text-anchor="middle">Figure 2A: Entity Relationship Diagram of the University Health Center System</text>
+  <g id="edges"><line x1="130" y1="296" x2="235" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="305" y1="296" x2="235" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="140" y1="756" x2="235" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="235" y1="506" x2="465" y2="500" stroke="#7e8a92" stroke-width="3"/>
+<line x1="465" y1="500" x2="885" y2="506" stroke="#7e8a92" stroke-width="3"/>
+<line x1="745" y1="296" x2="885" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="960" y1="291" x2="885" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="750" y1="731" x2="885" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="990" y1="761" x2="885" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1150" y1="493" x2="885" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="750" y1="899" x2="885" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="885" y1="506" x2="1335" y2="500" stroke="#7e8a92" stroke-width="3"/>
+<line x1="1335" y1="500" x2="1775" y2="506" stroke="#7e8a92" stroke-width="3"/>
+<line x1="1605" y1="288" x2="1775" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1855" y1="288" x2="1775" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1572.5" y1="754" x2="1775" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2002.5" y1="754" x2="1775" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1645" y1="879" x2="1775" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2000" y1="887.5" x2="1775" y2="506" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2547.5" y1="281" x2="2705" y2="456" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2820" y1="281" x2="2705" y2="456" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="3045" y1="446" x2="2705" y2="456" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2630" y1="670" x2="2705" y2="456" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2705" y1="456" x2="2295" y2="490" stroke="#7e8a92" stroke-width="3"/>
+<line x1="2295" y1="490" x2="1775" y2="506" stroke="#7e8a92" stroke-width="3"/>
+<line x1="885" y1="506" x2="1160" y2="975" stroke="#7e8a92" stroke-width="3"/>
+<line x1="1160" y1="975" x2="1755" y2="1296" stroke="#7e8a92" stroke-width="3"/>
+<line x1="1775" y1="506" x2="1965" y2="975" stroke="#7e8a92" stroke-width="3"/>
+<line x1="1965" y1="975" x2="1755" y2="1296" stroke="#7e8a92" stroke-width="3"/>
+<line x1="1630" y1="1083" x2="1755" y2="1296" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1382.5" y1="1277.5" x2="1755" y2="1296" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2102.5" y1="1252.5" x2="1755" y2="1296" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1485" y1="1521" x2="1755" y2="1296" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1887.5" y1="1534" x2="1755" y2="1296" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2135" y1="1536" x2="1755" y2="1296" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1697.5" y1="1735" x2="1755" y2="1296" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="142.5" y1="1436" x2="245" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="340" y1="1431" x2="245" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="252.5" y1="1785" x2="245" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="885" y1="506" x2="475" y2="1605" stroke="#7e8a92" stroke-width="3"/>
+<line x1="475" y1="1605" x2="245" y2="1606" stroke="#7e8a92" stroke-width="3"/>
+<line x1="885" y1="506" x2="595" y2="1275" stroke="#7e8a92" stroke-width="3"/>
+<line x1="595" y1="1275" x2="770" y2="1646" stroke="#7e8a92" stroke-width="3"/>
+<line x1="592.5" y1="1814" x2="770" y2="1646" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="550" y1="1497" x2="770" y2="1646" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="945" y1="1491" x2="770" y2="1646" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="935" y1="1820" x2="770" y2="1646" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1152.5" y1="1659" x2="770" y2="1646" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1755" y1="1296" x2="1335" y2="1510" stroke="#7e8a92" stroke-width="3"/>
+<line x1="1335" y1="1510" x2="770" y2="1646" stroke="#7e8a92" stroke-width="3"/>
+<line x1="2425" y1="1789" x2="2615" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2352.5" y1="1447" x2="2615" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2865" y1="1441" x2="2615" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2930" y1="1629" x2="2615" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2705" y1="1846" x2="2615" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="2407.5" y1="1609" x2="2615" y2="1606" stroke="#9aa5ad" stroke-width="2"/>
+<line x1="1755" y1="1296" x2="2280" y2="1405" stroke="#7e8a92" stroke-width="3"/>
+<line x1="2280" y1="1405" x2="2615" y2="1606" stroke="#7e8a92" stroke-width="3"/>
+<line x1="885" y1="506" x2="2235" y2="1880" stroke="#7e8a92" stroke-width="3"/>
+<line x1="2235" y1="1880" x2="2615" y2="1606" stroke="#7e8a92" stroke-width="3"/></g>
+  <g id="nodes"><rect x="120" y="470" width="230" height="72" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="235" y="514" text-anchor="middle" class="entity">Firebase Auth</text>
+<ellipse cx="130" cy="296" rx="75" ry="36" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="130" y="282" text-anchor="middle" class="attr">uid</text><text x="130" y="302" text-anchor="middle" class="attr">(PK)</text>
+<ellipse cx="305" cy="296" rx="75" ry="36" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="305" y="282" text-anchor="middle" class="attr">email</text>
+<ellipse cx="140" cy="756" rx="85" ry="36" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="140" y="742" text-anchor="middle" class="attr">provider</text>
+<polygon points="465,455 540,500 465,545 390,500" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="465" y="490" text-anchor="middle" class="rel">Creates</text><text x="465" y="510" text-anchor="middle" class="rel">Profile</text>
+<rect x="770" y="470" width="230" height="72" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="885" y="514" text-anchor="middle" class="entity">Users</text>
+<ellipse cx="745" cy="296" rx="95" ry="36" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="745" y="282" text-anchor="middle" class="attr">userId</text><text x="745" y="302" text-anchor="middle" class="attr">(PK)</text>
+<ellipse cx="960" cy="291" rx="105" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="960" y="277" text-anchor="middle" class="attr">email</text><text x="960" y="297" text-anchor="middle" class="attr">fullName</text>
+<ellipse cx="750" cy="731" rx="115" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="750" y="717" text-anchor="middle" class="attr">phoneNumber</text><text x="750" y="737" text-anchor="middle" class="attr">dateOfBirth</text>
+<ellipse cx="990" cy="761" rx="115" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="990" y="747" text-anchor="middle" class="attr">bloodType</text><text x="990" y="767" text-anchor="middle" class="attr">allergies</text>
+<ellipse cx="1150" cy="493" rx="95" ry="38" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1150" y="479" text-anchor="middle" class="attr">role</text><text x="1150" y="499" text-anchor="middle" class="attr">isActive</text>
+<ellipse cx="750" cy="899" rx="165" ry="59" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="750" y="885" text-anchor="middle" class="attr">studentId staffId</text><text x="750" y="905" text-anchor="middle" class="attr">language googleEmail</text><text x="750" y="925" text-anchor="middle" class="attr">notificationSettings</text><text x="750" y="945" text-anchor="middle" class="attr">adminPermissions</text>
+<polygon points="1335,455 1410,500 1335,545 1260,500" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="1335" y="490" text-anchor="middle" class="rel">Doctor</text><text x="1335" y="510" text-anchor="middle" class="rel">Profile</text>
+<rect x="1660" y="470" width="230" height="72" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1775" y="514" text-anchor="middle" class="entity">Doctors</text>
+<ellipse cx="1605" cy="288" rx="100" ry="38" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1605" y="274" text-anchor="middle" class="attr">doctorId</text><text x="1605" y="294" text-anchor="middle" class="attr">(PK)</text>
+<ellipse cx="1855" cy="288" rx="95" ry="38" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1855" y="274" text-anchor="middle" class="attr">userId</text><text x="1855" y="294" text-anchor="middle" class="attr">(FK)</text>
+<ellipse cx="1572.5" cy="754" rx="122.5" ry="44" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1572.5" y="740" text-anchor="middle" class="attr">name email</text><text x="1572.5" y="760" text-anchor="middle" class="attr">photoUrl</text>
+<ellipse cx="2002.5" cy="754" rx="122.5" ry="44" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2002.5" y="740" text-anchor="middle" class="attr">department</text><text x="2002.5" y="760" text-anchor="middle" class="attr">specialization</text>
+<ellipse cx="1645" cy="879" rx="135" ry="44" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1645" y="865" text-anchor="middle" class="attr">bio qualifications</text><text x="1645" y="885" text-anchor="middle" class="attr">experienceYears</text>
+<ellipse cx="2000" cy="887.5" rx="160" ry="52.5" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2000" y="873.5" text-anchor="middle" class="attr">isAvailable isActive</text><text x="2000" y="893.5" text-anchor="middle" class="attr">weeklySchedule</text><text x="2000" y="913.5" text-anchor="middle" class="attr">dailyNotificationTime</text>
+<rect x="2590" y="420" width="230" height="72" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2705" y="464" text-anchor="middle" class="entity">Departments</text>
+<ellipse cx="2547.5" cy="281" rx="87.5" ry="36" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2547.5" y="267" text-anchor="middle" class="attr">key</text><text x="2547.5" y="287" text-anchor="middle" class="attr">(PK)</text>
+<ellipse cx="2820" cy="281" rx="120" ry="36" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2820" y="267" text-anchor="middle" class="attr">name description</text>
+<ellipse cx="3045" cy="446" rx="105" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="3045" y="432" text-anchor="middle" class="attr">iconName</text><text x="3045" y="452" text-anchor="middle" class="attr">colorHex</text>
+<ellipse cx="2630" cy="670" rx="130" ry="50" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2630" y="656" text-anchor="middle" class="attr">workingHours</text><text x="2630" y="676" text-anchor="middle" class="attr">isActive</text><text x="2630" y="696" text-anchor="middle" class="attr">doctorCount</text>
+<polygon points="2295,445 2370,490 2295,535 2220,490" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="2295" y="480" text-anchor="middle" class="rel">Contains</text>
+<rect x="1640" y="1260" width="230" height="72" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1755" y="1304" text-anchor="middle" class="entity">Appointments</text>
+<ellipse cx="1630" cy="1083" rx="115" ry="38" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1630" y="1069" text-anchor="middle" class="attr">appointmentId</text><text x="1630" y="1089" text-anchor="middle" class="attr">(PK)</text>
+<ellipse cx="1382.5" cy="1277.5" rx="142.5" ry="52.5" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1382.5" y="1263.5" text-anchor="middle" class="attr">patientId (FK)</text><text x="1382.5" y="1283.5" text-anchor="middle" class="attr">patientName</text><text x="1382.5" y="1303.5" text-anchor="middle" class="attr">patientEmail</text>
+<ellipse cx="2102.5" cy="1252.5" rx="142.5" ry="52.5" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2102.5" y="1238.5" text-anchor="middle" class="attr">doctorId (FK)</text><text x="2102.5" y="1258.5" text-anchor="middle" class="attr">doctorName</text><text x="2102.5" y="1278.5" text-anchor="middle" class="attr">department</text>
+<ellipse cx="1485" cy="1521" rx="125" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1485" y="1507" text-anchor="middle" class="attr">appointmentDate</text><text x="1485" y="1527" text-anchor="middle" class="attr">timeSlot</text>
+<ellipse cx="1887.5" cy="1534" rx="117.5" ry="44" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1887.5" y="1520" text-anchor="middle" class="attr">type status</text><text x="1887.5" y="1540" text-anchor="middle" class="attr">isCheckedIn</text>
+<ellipse cx="2135" cy="1536" rx="110" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2135" y="1522" text-anchor="middle" class="attr">notes</text><text x="2135" y="1542" text-anchor="middle" class="attr">medicalNotes</text>
+<ellipse cx="1697.5" cy="1735" rx="157.5" ry="65" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1697.5" y="1721" text-anchor="middle" class="attr">qrCode</text><text x="1697.5" y="1741" text-anchor="middle" class="attr">bookingReference</text><text x="1697.5" y="1761" text-anchor="middle" class="attr">cancelReason</text><text x="1697.5" y="1781" text-anchor="middle" class="attr">rescheduleReason</text><text x="1697.5" y="1801" text-anchor="middle" class="attr">reminders</text>
+<polygon points="1160,930 1235,975 1160,1020 1085,975" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="1160" y="965" text-anchor="middle" class="rel">Books</text>
+<polygon points="1965,930 2040,975 1965,1020 1890,975" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="1965" y="965" text-anchor="middle" class="rel">Receives</text>
+<rect x="655" y="1610" width="230" height="72" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="770" y="1654" text-anchor="middle" class="entity">Notifications</text>
+<ellipse cx="592.5" cy="1814" rx="122.5" ry="39" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="592.5" y="1800" text-anchor="middle" class="attr">notificationId</text><text x="592.5" y="1820" text-anchor="middle" class="attr">(PK)</text>
+<ellipse cx="550" cy="1497" rx="95" ry="37" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="550" y="1483" text-anchor="middle" class="attr">userId</text><text x="550" y="1503" text-anchor="middle" class="attr">(FK)</text>
+<ellipse cx="945" cy="1491" rx="115" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="945" y="1477" text-anchor="middle" class="attr">title body</text><text x="945" y="1497" text-anchor="middle" class="attr">type data</text>
+<ellipse cx="935" cy="1820" rx="150" ry="60" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="935" y="1806" text-anchor="middle" class="attr">isRead createdAt</text><text x="935" y="1826" text-anchor="middle" class="attr">scheduledFor</text><text x="935" y="1846" text-anchor="middle" class="attr">reminderType</text><text x="935" y="1866" text-anchor="middle" class="attr">isDelivered</text>
+<ellipse cx="1152.5" cy="1659" rx="117.5" ry="39" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="1152.5" y="1645" text-anchor="middle" class="attr">appointmentId</text><text x="1152.5" y="1665" text-anchor="middle" class="attr">(FK)</text>
+<polygon points="1335,1465 1410,1510 1335,1555 1260,1510" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="1335" y="1500" text-anchor="middle" class="rel">Triggers</text>
+<polygon points="595,1230 670,1275 595,1320 520,1275" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="595" y="1265" text-anchor="middle" class="rel">Receives</text>
+<rect x="130" y="1570" width="230" height="72" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="245" y="1614" text-anchor="middle" class="entity">User Tokens</text>
+<ellipse cx="142.5" cy="1436" rx="87.5" ry="36" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="142.5" y="1422" text-anchor="middle" class="attr">userId</text><text x="142.5" y="1442" text-anchor="middle" class="attr">(FK)</text>
+<ellipse cx="340" cy="1431" rx="105" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="340" y="1417" text-anchor="middle" class="attr">token</text><text x="340" y="1437" text-anchor="middle" class="attr">tokenHash</text>
+<ellipse cx="252.5" cy="1785" rx="122.5" ry="50" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="252.5" y="1771" text-anchor="middle" class="attr">deviceInfo</text><text x="252.5" y="1791" text-anchor="middle" class="attr">timezone</text><text x="252.5" y="1811" text-anchor="middle" class="attr">updatedAt</text>
+<polygon points="475,1560 550,1605 475,1650 400,1605" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="475" y="1595" text-anchor="middle" class="rel">Has</text><text x="475" y="1615" text-anchor="middle" class="rel">Token</text>
+<rect x="2490" y="1560" width="250" height="92" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2615" y="1614" text-anchor="middle" class="entity">Medical
+Documents</text>
+<ellipse cx="2425" cy="1789" rx="115" ry="39" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2425" y="1775" text-anchor="middle" class="attr">documentId</text><text x="2425" y="1795" text-anchor="middle" class="attr">(PK)</text>
+<ellipse cx="2352.5" cy="1447" rx="92.5" ry="37" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2352.5" y="1433" text-anchor="middle" class="attr">userId</text><text x="2352.5" y="1453" text-anchor="middle" class="attr">(FK)</text>
+<ellipse cx="2865" cy="1441" rx="105" ry="41" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2865" y="1427" text-anchor="middle" class="attr">name type</text><text x="2865" y="1447" text-anchor="middle" class="attr">notes</text>
+<ellipse cx="2930" cy="1629" rx="120" ry="44" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2930" y="1615" text-anchor="middle" class="attr">fileName url</text><text x="2930" y="1635" text-anchor="middle" class="attr">storagePath</text>
+<ellipse cx="2705" cy="1846" rx="165" ry="56" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2705" y="1832" text-anchor="middle" class="attr">uploadedAt updatedAt</text><text x="2705" y="1852" text-anchor="middle" class="attr">addedBy addedByRole</text><text x="2705" y="1872" text-anchor="middle" class="attr">addedByName</text>
+<ellipse cx="2407.5" cy="1609" rx="112.5" ry="39" fill="#b8e94b" stroke="#6c9f1b" stroke-width="3"/><text x="2407.5" y="1595" text-anchor="middle" class="attr">appointmentId</text><text x="2407.5" y="1615" text-anchor="middle" class="attr">(FK)</text>
+<polygon points="2280,1360 2355,1405 2280,1450 2205,1405" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="2280" y="1395" text-anchor="middle" class="rel">Attached</text><text x="2280" y="1415" text-anchor="middle" class="rel">To</text>
+<polygon points="2235,1835 2310,1880 2235,1925 2160,1880" fill="#5acfe6" stroke="#1590ad" stroke-width="3"/><text x="2235" y="1870" text-anchor="middle" class="rel">Uploads</text>
+<rect x="120" y="2235" width="1390" height="120" rx="18" fill="#f8fbfd" stroke="#b9c7d3" stroke-width="2"/><text x="146" y="2269" text-anchor="start" class="note">Figure 2A keeps the old Chen ERD style: green entities/attributes and blue relationship diamonds.</text><text x="146" y="2297" text-anchor="start" class="note">All field names come from the updated Table 1.</text>
+<rect x="1780" y="2235" width="1390" height="120" rx="18" fill="#f8fbfd" stroke="#b9c7d3" stroke-width="2"/><text x="1806" y="2269" text-anchor="start" class="note">This page covers core operational collections. The support/governance collections continue in Figure 2B.</text>
+<text x="363" y="435" class="card">1</text>
+<text x="565" y="435" class="card">1</text>
+<text x="1170" y="435" class="card">1</text>
+<text x="1435" y="435" class="card">0..1</text>
+<text x="2410" y="415" class="card">1</text>
+<text x="2545" y="415" class="card">N</text>
+<text x="1030" y="900" class="card">1</text>
+<text x="1505" y="1175" class="card">N</text>
+<text x="1830" y="900" class="card">1</text>
+<text x="1805" y="1165" class="card">N</text>
+<text x="690" y="1510" class="card">N</text>
+<text x="2310" y="1515" class="card">N</text></g>
+</svg>

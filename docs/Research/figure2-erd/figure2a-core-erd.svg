@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="11in" height="8.5in" viewBox="0 0 3300 2550">
+  <defs>
+    <marker id="arrow" markerWidth="16" markerHeight="16" refX="13" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 13 5 L 0 10 z" fill="#64717a"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#18242c" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <style>
+    .pageTitle { font: 700 52px Arial, Helvetica, sans-serif; fill: #1f2933; }
+    .pageSubtitle { font: 500 25px Arial, Helvetica, sans-serif; fill: #52616b; }
+    .title { font: 700 25px Arial, Helvetica, sans-serif; fill: #ffffff; }
+    .subtitle { font: 600 15px Arial, Helvetica, sans-serif; fill: #ecfeff; letter-spacing: 0; }
+    .field { font: 18px Arial, Helvetica, sans-serif; fill: #24343d; }
+    .edgeLabel { font: 700 18px Arial, Helvetica, sans-serif; fill: #34444d; }
+    .note { font: 20px Arial, Helvetica, sans-serif; fill: #33444e; }
+    g[id] { filter: none; }
+  </style>
+  <rect width="3300" height="2550" fill="#f7f9fb"/>
+  <rect x="50" y="50" width="3200" height="2450" rx="34" fill="#ffffff" stroke="#d7e0e7" stroke-width="2"/>
+  <text x="1650" y="112" class="pageTitle" text-anchor="middle">Figure 2A: Core Entity Relationship Diagram</text>
+  <text x="1650" y="154" class="pageSubtitle" text-anchor="middle">University Health Center System - application data collections</text>
+  <g id="edges">
+
+    <path d="M 480 335 C 525 335, 565 335, 610 335" fill="none" stroke="#5661b3" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="427" y="282" width="236" height="36" rx="16" fill="#ffffff" stroke="#5661b3" stroke-width="2"/>
+      <text x="545" y="307" class="edgeLabel" text-anchor="middle">1:1 profile</text>
+    </g>
+
+    <path d="M 1155 365 C 1245 365, 1375 365, 1465 365" fill="none" stroke="#2f855a" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="1192" y="307" width="236" height="36" rx="16" fill="#ffffff" stroke="#2f855a" stroke-width="2"/>
+      <text x="1310" y="332" class="edgeLabel" text-anchor="middle">0..1 doctor profile</text>
+    </g>
+
+    <path d="M 2375 365 C 2260 365, 2130 365, 2005 365" fill="none" stroke="#b7791f" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="2072" y="307" width="236" height="36" rx="16" fill="#ffffff" stroke="#b7791f" stroke-width="2"/>
+      <text x="2190" y="332" class="edgeLabel" text-anchor="middle">1:N contains</text>
+    </g>
+
+    <path d="M 860 768 C 900 880, 1185 1020, 1415 1035" fill="none" stroke="#c05621" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="1002" y="912" width="236" height="36" rx="16" fill="#ffffff" stroke="#c05621" stroke-width="2"/>
+      <text x="1120" y="937" class="edgeLabel" text-anchor="middle">patientId</text>
+    </g>
+
+    <path d="M 1730 684 C 1730 760, 1730 820, 1730 900" fill="none" stroke="#c05621" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="1732" y="772" width="236" height="36" rx="16" fill="#ffffff" stroke="#c05621" stroke-width="2"/>
+      <text x="1850" y="797" class="edgeLabel" text-anchor="middle">doctorId</text>
+    </g>
+
+    <path d="M 2645 566 C 2600 740, 2210 950, 1985 1035" fill="none" stroke="#c05621" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="2172" y="782" width="236" height="36" rx="16" fill="#ffffff" stroke="#c05621" stroke-width="2"/>
+      <text x="2290" y="807" class="edgeLabel" text-anchor="middle">department</text>
+    </g>
+
+    <path d="M 2035 1235 C 2110 1235, 2210 1235, 2300 1235" fill="none" stroke="#2b6cb0" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="2052" y="1177" width="236" height="36" rx="16" fill="#ffffff" stroke="#2b6cb0" stroke-width="2"/>
+      <text x="2170" y="1202" class="edgeLabel" text-anchor="middle">0..N files</text>
+    </g>
+
+    <path d="M 980 768 C 1180 1150, 1885 1080, 2300 1095" fill="none" stroke="#2b6cb0" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="1512" y="1120" width="236" height="36" rx="16" fill="#ffffff" stroke="#2b6cb0" stroke-width="2"/>
+      <text x="1630" y="1145" class="edgeLabel" text-anchor="middle">userId / addedBy</text>
+    </g>
+
+    <path d="M 790 768 C 790 810, 790 865, 790 920" fill="none" stroke="#805ad5" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="820" y="827" width="236" height="36" rx="16" fill="#ffffff" stroke="#805ad5" stroke-width="2"/>
+      <text x="938" y="852" class="edgeLabel" text-anchor="middle">1:N receives</text>
+    </g>
+
+    <path d="M 1415 1385 C 1320 1360, 1255 1295, 1205 1180" fill="none" stroke="#805ad5" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="1172" y="1287" width="236" height="36" rx="16" fill="#ffffff" stroke="#805ad5" stroke-width="2"/>
+      <text x="1290" y="1312" class="edgeLabel" text-anchor="middle">appointmentId</text>
+    </g>
+
+    <path d="M 530 1030 C 565 1030, 610 1030, 650 1030" fill="none" stroke="#5661b3" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="472" y="972" width="236" height="36" rx="16" fill="#ffffff" stroke="#5661b3" stroke-width="2"/>
+      <text x="590" y="997" class="edgeLabel" text-anchor="middle">1:N devices</text>
+    </g>
+
+    <path d="M 1860 1597 C 1950 1770, 2200 1800, 2380 1845" fill="none" stroke="#285e61" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="2022" y="1720" width="236" height="36" rx="16" fill="#ffffff" stroke="#285e61" stroke-width="2"/>
+      <text x="2140" y="1745" class="edgeLabel" text-anchor="middle">appointmentId</text>
+    </g>
+
+    <path d="M 1780 684 C 2010 1010, 2070 1580, 2285 1845" fill="none" stroke="#285e61" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="2032" y="1462" width="236" height="36" rx="16" fill="#ffffff" stroke="#285e61" stroke-width="2"/>
+      <text x="2150" y="1487" class="edgeLabel" text-anchor="middle">doctorId</text>
+    </g>
+
+    <path d="M 1110 768 C 1250 1540, 1740 1870, 2165 1915" fill="none" stroke="#285e61" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <g>
+      <rect x="1552" y="1737" width="236" height="36" rx="16" fill="#ffffff" stroke="#285e61" stroke-width="2"/>
+      <text x="1670" y="1762" class="edgeLabel" text-anchor="middle">patientId</text>
+    </g>
+  </g>
+  <g id="entities">
+
+  <g id="auth">
+    <rect x="100" y="210" width="380" height="250" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="100" y="210" width="380" height="72" rx="18" fill="#5661b3" stroke="#25343b" stroke-width="3"/>
+    <path d="M 100 262 L 100 282 L 480 282 L 480 262" fill="#5661b3" stroke="none"/>
+    <text x="290" y="241" class="title" text-anchor="middle">Firebase Auth</text>
+    <text x="290" y="266" class="subtitle" text-anchor="middle">identity provider</text>
+<rect x="100" y="282" width="380" height="34" fill="#eceffd" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="305" class="field" font-weight="700">uid (PK)</text>
+<rect x="100" y="316" width="380" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="339" class="field" font-weight="500">email</text>
+<rect x="100" y="350" width="380" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="373" class="field" font-weight="500">provider</text>
+  </g>
+
+  <g id="users">
+    <rect x="610" y="190" width="545" height="602" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="610" y="190" width="545" height="72" rx="18" fill="#1f6f78" stroke="#25343b" stroke-width="3"/>
+    <path d="M 610 242 L 610 262 L 1155 262 L 1155 242" fill="#1f6f78" stroke="none"/>
+    <text x="882.5" y="221" class="title" text-anchor="middle">users</text>
+    <text x="882.5" y="246" class="subtitle" text-anchor="middle">profiles and roles</text>
+<rect x="610" y="262" width="545" height="34" fill="#d7f0f2" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="285" class="field" font-weight="700">userId / uid (PK)</text>
+<rect x="610" y="296" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="319" class="field" font-weight="500">email</text>
+<rect x="610" y="330" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="353" class="field" font-weight="500">fullName</text>
+<rect x="610" y="364" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="387" class="field" font-weight="500">phoneNumber</text>
+<rect x="610" y="398" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="421" class="field" font-weight="500">dateOfBirth</text>
+<rect x="610" y="432" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="455" class="field" font-weight="500">bloodType</text>
+<rect x="610" y="466" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="489" class="field" font-weight="500">allergies</text>
+<rect x="610" y="500" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="523" class="field" font-weight="500">role</text>
+<rect x="610" y="534" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="557" class="field" font-weight="500">studentId</text>
+<rect x="610" y="568" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="591" class="field" font-weight="500">staffId</text>
+<rect x="610" y="602" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="625" class="field" font-weight="500">isActive</text>
+<rect x="610" y="636" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="659" class="field" font-weight="500">language</text>
+<rect x="610" y="670" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="693" class="field" font-weight="500">notificationSettings</text>
+<rect x="610" y="704" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="727" class="field" font-weight="500">googleEmail</text>
+<rect x="610" y="738" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="632" y="761" class="field" font-weight="500">adminPermissions</text>
+  </g>
+
+  <g id="doctors">
+    <rect x="1465" y="190" width="540" height="568" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="1465" y="190" width="540" height="72" rx="18" fill="#2f855a" stroke="#25343b" stroke-width="3"/>
+    <path d="M 1465 242 L 1465 262 L 2005 262 L 2005 242" fill="#2f855a" stroke="none"/>
+    <text x="1735" y="221" class="title" text-anchor="middle">doctors</text>
+    <text x="1735" y="246" class="subtitle" text-anchor="middle">doctor profiles</text>
+<rect x="1465" y="262" width="540" height="34" fill="#ddf3e5" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="285" class="field" font-weight="700">doctorId (PK)</text>
+<rect x="1465" y="296" width="540" height="34" fill="#ddf3e5" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="319" class="field" font-weight="700">userId (FK)</text>
+<rect x="1465" y="330" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="353" class="field" font-weight="500">name</text>
+<rect x="1465" y="364" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="387" class="field" font-weight="500">email</text>
+<rect x="1465" y="398" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="421" class="field" font-weight="500">photoUrl</text>
+<rect x="1465" y="432" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="455" class="field" font-weight="500">department</text>
+<rect x="1465" y="466" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="489" class="field" font-weight="500">specialization</text>
+<rect x="1465" y="500" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="523" class="field" font-weight="500">bio</text>
+<rect x="1465" y="534" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="557" class="field" font-weight="500">experienceYears</text>
+<rect x="1465" y="568" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="591" class="field" font-weight="500">qualifications</text>
+<rect x="1465" y="602" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="625" class="field" font-weight="500">isAvailable</text>
+<rect x="1465" y="636" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="659" class="field" font-weight="500">isActive</text>
+<rect x="1465" y="670" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="693" class="field" font-weight="500">weeklySchedule</text>
+<rect x="1465" y="704" width="540" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1487" y="727" class="field" font-weight="500">dailyNotificationTime</text>
+  </g>
+
+  <g id="departments">
+    <rect x="2375" y="190" width="545" height="364" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="2375" y="190" width="545" height="72" rx="18" fill="#b7791f" stroke="#25343b" stroke-width="3"/>
+    <path d="M 2375 242 L 2375 262 L 2920 262 L 2920 242" fill="#b7791f" stroke="none"/>
+    <text x="2647.5" y="221" class="title" text-anchor="middle">departments</text>
+    <text x="2647.5" y="246" class="subtitle" text-anchor="middle">clinic areas</text>
+<rect x="2375" y="262" width="545" height="34" fill="#fff2d6" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2397" y="285" class="field" font-weight="700">key (PK)</text>
+<rect x="2375" y="296" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2397" y="319" class="field" font-weight="500">name</text>
+<rect x="2375" y="330" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2397" y="353" class="field" font-weight="500">description</text>
+<rect x="2375" y="364" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2397" y="387" class="field" font-weight="500">iconName</text>
+<rect x="2375" y="398" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2397" y="421" class="field" font-weight="500">colorHex</text>
+<rect x="2375" y="432" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2397" y="455" class="field" font-weight="500">workingHours</text>
+<rect x="2375" y="466" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2397" y="489" class="field" font-weight="500">isActive</text>
+<rect x="2375" y="500" width="545" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2397" y="523" class="field" font-weight="500">doctorCount</text>
+  </g>
+
+  <g id="user_tokens">
+    <rect x="100" y="860" width="430" height="330" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="100" y="860" width="430" height="72" rx="18" fill="#5661b3" stroke="#25343b" stroke-width="3"/>
+    <path d="M 100 912 L 100 932 L 530 932 L 530 912" fill="#5661b3" stroke="none"/>
+    <text x="315" y="891" class="title" text-anchor="middle">user_tokens</text>
+    <text x="315" y="916" class="subtitle" text-anchor="middle">push devices</text>
+<rect x="100" y="932" width="430" height="34" fill="#eceffd" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="955" class="field" font-weight="700">userId (FK)</text>
+<rect x="100" y="966" width="430" height="34" fill="#eceffd" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="989" class="field" font-weight="700">tokens (subcollection)</text>
+<rect x="100" y="1000" width="430" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="1023" class="field" font-weight="500">token</text>
+<rect x="100" y="1034" width="430" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="1057" class="field" font-weight="500">tokenHash</text>
+<rect x="100" y="1068" width="430" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="1091" class="field" font-weight="500">deviceInfo</text>
+<rect x="100" y="1102" width="430" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="1125" class="field" font-weight="500">timezone</text>
+<rect x="100" y="1136" width="430" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="122" y="1159" class="field" font-weight="500">updatedAt</text>
+  </g>
+
+  <g id="notifications">
+    <rect x="650" y="920" width="555" height="500" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="650" y="920" width="555" height="72" rx="18" fill="#805ad5" stroke="#25343b" stroke-width="3"/>
+    <path d="M 650 972 L 650 992 L 1205 992 L 1205 972" fill="#805ad5" stroke="none"/>
+    <text x="927.5" y="951" class="title" text-anchor="middle">notifications</text>
+    <text x="927.5" y="976" class="subtitle" text-anchor="middle">messages and reminders</text>
+<rect x="650" y="992" width="555" height="34" fill="#efe8ff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1015" class="field" font-weight="700">notificationId (PK)</text>
+<rect x="650" y="1026" width="555" height="34" fill="#efe8ff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1049" class="field" font-weight="700">userId (FK)</text>
+<rect x="650" y="1060" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1083" class="field" font-weight="500">title</text>
+<rect x="650" y="1094" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1117" class="field" font-weight="500">body</text>
+<rect x="650" y="1128" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1151" class="field" font-weight="500">type</text>
+<rect x="650" y="1162" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1185" class="field" font-weight="500">data</text>
+<rect x="650" y="1196" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1219" class="field" font-weight="500">isRead</text>
+<rect x="650" y="1230" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1253" class="field" font-weight="500">createdAt</text>
+<rect x="650" y="1264" width="555" height="34" fill="#efe8ff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1287" class="field" font-weight="700">appointmentId (FK)</text>
+<rect x="650" y="1298" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1321" class="field" font-weight="500">scheduledFor</text>
+<rect x="650" y="1332" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1355" class="field" font-weight="500">reminderType</text>
+<rect x="650" y="1366" width="555" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="672" y="1389" class="field" font-weight="500">isDelivered</text>
+  </g>
+
+  <g id="appointments">
+    <rect x="1415" y="900" width="620" height="738" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="1415" y="900" width="620" height="72" rx="18" fill="#c05621" stroke="#25343b" stroke-width="3"/>
+    <path d="M 1415 952 L 1415 972 L 2035 972 L 2035 952" fill="#c05621" stroke="none"/>
+    <text x="1725" y="931" class="title" text-anchor="middle">appointments</text>
+    <text x="1725" y="956" class="subtitle" text-anchor="middle">booking records</text>
+<rect x="1415" y="972" width="620" height="34" fill="#ffeadb" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="995" class="field" font-weight="700">appointmentId (PK)</text>
+<rect x="1415" y="1006" width="620" height="34" fill="#ffeadb" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1029" class="field" font-weight="700">patientId (FK)</text>
+<rect x="1415" y="1040" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1063" class="field" font-weight="500">patientName</text>
+<rect x="1415" y="1074" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1097" class="field" font-weight="500">patientEmail</text>
+<rect x="1415" y="1108" width="620" height="34" fill="#ffeadb" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1131" class="field" font-weight="700">doctorId (FK)</text>
+<rect x="1415" y="1142" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1165" class="field" font-weight="500">doctorName</text>
+<rect x="1415" y="1176" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1199" class="field" font-weight="500">department</text>
+<rect x="1415" y="1210" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1233" class="field" font-weight="500">appointmentDate</text>
+<rect x="1415" y="1244" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1267" class="field" font-weight="500">timeSlot</text>
+<rect x="1415" y="1278" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1301" class="field" font-weight="500">type</text>
+<rect x="1415" y="1312" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1335" class="field" font-weight="500">status</text>
+<rect x="1415" y="1346" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1369" class="field" font-weight="500">notes</text>
+<rect x="1415" y="1380" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1403" class="field" font-weight="500">medicalNotes</text>
+<rect x="1415" y="1414" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1437" class="field" font-weight="500">qrCode</text>
+<rect x="1415" y="1448" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1471" class="field" font-weight="500">bookingReference</text>
+<rect x="1415" y="1482" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1505" class="field" font-weight="500">isCheckedIn</text>
+<rect x="1415" y="1516" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1539" class="field" font-weight="500">cancelReason</text>
+<rect x="1415" y="1550" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1573" class="field" font-weight="500">rescheduleReason</text>
+<rect x="1415" y="1584" width="620" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="1437" y="1607" class="field" font-weight="500">reminders</text>
+  </g>
+
+  <g id="medical_documents">
+    <rect x="2300" y="890" width="595" height="568" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="2300" y="890" width="595" height="72" rx="18" fill="#2b6cb0" stroke="#25343b" stroke-width="3"/>
+    <path d="M 2300 942 L 2300 962 L 2895 962 L 2895 942" fill="#2b6cb0" stroke="none"/>
+    <text x="2597.5" y="921" class="title" text-anchor="middle">medical_documents</text>
+    <text x="2597.5" y="946" class="subtitle" text-anchor="middle">uploaded file metadata</text>
+<rect x="2300" y="962" width="595" height="34" fill="#e3f0ff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="985" class="field" font-weight="700">documentId (PK)</text>
+<rect x="2300" y="996" width="595" height="34" fill="#e3f0ff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1019" class="field" font-weight="700">userId (FK)</text>
+<rect x="2300" y="1030" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1053" class="field" font-weight="500">name</text>
+<rect x="2300" y="1064" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1087" class="field" font-weight="500">type</text>
+<rect x="2300" y="1098" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1121" class="field" font-weight="500">notes</text>
+<rect x="2300" y="1132" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1155" class="field" font-weight="500">fileName</text>
+<rect x="2300" y="1166" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1189" class="field" font-weight="500">url</text>
+<rect x="2300" y="1200" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1223" class="field" font-weight="500">storagePath</text>
+<rect x="2300" y="1234" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1257" class="field" font-weight="500">uploadedAt</text>
+<rect x="2300" y="1268" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1291" class="field" font-weight="500">updatedAt</text>
+<rect x="2300" y="1302" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1325" class="field" font-weight="500">addedBy</text>
+<rect x="2300" y="1336" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1359" class="field" font-weight="500">addedByRole</text>
+<rect x="2300" y="1370" width="595" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1393" class="field" font-weight="500">addedByName</text>
+<rect x="2300" y="1404" width="595" height="34" fill="#e3f0ff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2322" y="1427" class="field" font-weight="700">appointmentId (FK)</text>
+  </g>
+
+  <g id="doctor_patient_access">
+    <rect x="2165" y="1845" width="610" height="262" rx="18" fill="#ffffff" stroke="#25343b" stroke-width="3"/>
+    <rect x="2165" y="1845" width="610" height="72" rx="18" fill="#285e61" stroke="#25343b" stroke-width="3"/>
+    <path d="M 2165 1897 L 2165 1917 L 2775 1917 L 2775 1897" fill="#285e61" stroke="none"/>
+    <text x="2470" y="1876" class="title" text-anchor="middle">doctor_patient_access</text>
+    <text x="2470" y="1901" class="subtitle" text-anchor="middle">scoped document visibility</text>
+<rect x="2165" y="1917" width="610" height="34" fill="#d7f0f2" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2187" y="1940" class="field" font-weight="700">accessId (PK)</text>
+<rect x="2165" y="1951" width="610" height="34" fill="#d7f0f2" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2187" y="1974" class="field" font-weight="700">doctorId (FK)</text>
+<rect x="2165" y="1985" width="610" height="34" fill="#d7f0f2" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2187" y="2008" class="field" font-weight="700">patientId (FK)</text>
+<rect x="2165" y="2019" width="610" height="34" fill="#d7f0f2" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2187" y="2042" class="field" font-weight="700">appointmentId (FK)</text>
+<rect x="2165" y="2053" width="610" height="34" fill="#ffffff" stroke="#c7d1d8" stroke-width="1"/>
+<text x="2187" y="2076" class="field" font-weight="500">grantedAt</text>
+  </g>
+  </g>
+
+  <g>
+    <rect x="100" y="2190" width="1290" height="98" rx="18" fill="#f4fbfa" stroke="#9aa8b2" stroke-width="2"/>
+<text x="124" y="2232" class="note">PK = primary document identifier, FK = stored reference field.</text>
+<text x="124" y="2260" class="note">All field names are taken from the updated Table 1.</text>
+  </g>
+
+  <g>
+    <rect x="1530" y="2190" width="1290" height="98" rx="18" fill="#f8f7ff" stroke="#9aa8b2" stroke-width="2"/>
+<text x="1554" y="2232" class="note">The diagram is vector SVG so text remains sharp in PDF export.</text>
+<text x="1554" y="2260" class="note">This page covers users, doctors, bookings, documents, notifications, and access scope.</text>
+  </g>
+</svg>
