@@ -67,13 +67,21 @@ void main() {
       expect(viewerSource, contains('Reset zoom'));
     });
 
-    test('Flutter run does not rewrite generated l10n files every launch', () {
+    test('developer l10n config is present and generated files are in source',
+        () {
       final pubspec = readProjectFile('pubspec.yaml');
+      final l10nConfig = readProjectFile('l10n.yaml');
 
       expect(
         pubspec,
-        contains('flutter:\n  generate: false\n  uses-material-design: true'),
+        contains('flutter:\n  generate: true\n  uses-material-design: true'),
       );
+      expect(l10nConfig, contains('arb-dir: lib/l10n'));
+      expect(
+        l10nConfig,
+        contains('output-localization-file: app_localizations.dart'),
+      );
+      expect(File('lib/l10n/app_localizations.dart').existsSync(), isTrue);
     });
 
     test('admin notification sends are audited and idempotent', () {

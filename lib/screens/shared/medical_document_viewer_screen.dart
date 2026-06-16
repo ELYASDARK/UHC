@@ -175,11 +175,34 @@ class _MedicalDocumentViewerScreenState
                               );
                             },
                             errorBuilder: (context, error, stackTrace) {
-                              return const Center(
-                                child: Icon(
-                                  Icons.broken_image_outlined,
-                                  color: Colors.white70,
-                                  size: 48,
+                              return Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.broken_image_outlined,
+                                      color: Colors.white70,
+                                      size: 64,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'Image not available',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'The file may have been deleted\nfrom storage.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.45),
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             },

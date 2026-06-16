@@ -244,7 +244,10 @@ service cloud.firestore {
         ]);
       allow delete: if isGoogleLinkedAccount() &&
         canReadMedicalDocument(resource.data) &&
-        resource.data.addedBy == request.auth.uid;
+        (
+          resource.data.addedBy == request.auth.uid ||
+          (!('addedBy' in resource.data) && resource.data.userId == request.auth.uid)
+        );
     }
   }
 }
