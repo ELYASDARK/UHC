@@ -28,6 +28,11 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   Set<Department> _selectedDepartments = {};
   Set<_DoctorStatusFilter> _selectedStatusFilters = {};
 
+  String _displayDoctorName(Object? value) {
+    final name = (value ?? 'Unknown').toString().trim();
+    return name.toLowerCase().startsWith('dr. ') ? name : 'Dr. $name';
+  }
+
   /// Whether the current admin can perform doctor management mutations
   bool get _canManage =>
       context
@@ -55,6 +60,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
             IconButton(
               icon: const Icon(Icons.filter_list),
               onPressed: _showFilterDialog,
+              tooltip: 'Filter',
             ),
           ],
         ),
@@ -404,7 +410,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Dr. ${data['name'] ?? 'Unknown'}',
+                      _displayDoctorName(data['name']),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.bold),
@@ -942,7 +948,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
 
                       // Doctor Name
                       Text(
-                        'Dr. $name',
+                        _displayDoctorName(name),
                         style:
                             Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,

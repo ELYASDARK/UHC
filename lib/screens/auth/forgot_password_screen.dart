@@ -14,12 +14,14 @@ class ForgotPasswordScreen extends StatefulWidget {
   final VoidCallback onBackTap;
   final String? initialEmail;
   final bool launchedFromProfile;
+  final bool initialSuccess;
 
   const ForgotPasswordScreen({
     super.key,
     required this.onBackTap,
     this.initialEmail,
     this.launchedFromProfile = false,
+    this.initialSuccess = false,
   });
 
   @override
@@ -39,6 +41,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     _emailController.text = (widget.initialEmail?.trim().isNotEmpty ?? false)
         ? widget.initialEmail!.trim()
         : (authProvider.firebaseUser?.email?.trim() ?? '');
+    _emailSent = widget.initialSuccess;
   }
 
   @override

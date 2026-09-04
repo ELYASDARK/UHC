@@ -9,7 +9,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 
 class InitialPasswordChangeScreen extends StatefulWidget {
-  const InitialPasswordChangeScreen({super.key});
+  const InitialPasswordChangeScreen({
+    super.key,
+    this.autofocusPassword = true,
+  });
+
+  final bool autofocusPassword;
 
   @override
   State<InitialPasswordChangeScreen> createState() =>
@@ -165,7 +170,7 @@ class _InitialPasswordChangeScreenState
                   obscureText: true,
                   prefixIcon: Icons.lock_outline_rounded,
                   textInputAction: TextInputAction.next,
-                  autofocus: true,
+                  autofocus: widget.autofocusPassword,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter a new password';

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
@@ -17,12 +18,14 @@ class QrScanConfirmScreen extends StatefulWidget {
   final String appointmentId;
   final String expectedQrCode;
   final int initialFailures;
+  final String? captureState;
 
   const QrScanConfirmScreen({
     super.key,
     required this.appointmentId,
     required this.expectedQrCode,
     required this.initialFailures,
+    this.captureState,
   });
 
   @override
@@ -30,7 +33,7 @@ class QrScanConfirmScreen extends StatefulWidget {
 }
 
 class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
-  final MobileScannerController _controller = MobileScannerController();
+  MobileScannerController? _controller;
   late int _failures;
   bool _isProcessing = false;
   String? _errorMessage;
@@ -41,11 +44,14 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
   void initState() {
     super.initState();
     _failures = widget.initialFailures;
+    if (widget.captureState == null) {
+      _controller = MobileScannerController();
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -99,145 +105,188 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final captureError = switch (widget.captureState) {
+      'invalid' || 'manual-unlocked' => l10n.invalidQrCode,
+      _ => null,
+    };
+    final visibleError = _errorMessage ?? captureError;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // ── Camera preview ──
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
-          ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            // ── Camera preview ──
+            if (_controller != null)
+              MobileScanner(
+                controller: _controller!,
+                onDetect: _onDetect,
+              )
+            else
+              const _CaptureCameraPreview(),
 
-          // ── Semi-transparent overlay with viewfinder cutout ──
-          CustomPaint(
-            size: MediaQuery.sizeOf(context),
-            painter: _ViewfinderPainter(
-              cutoutFactor: UhcResponsive.isWide(context) ? 0.42 : 0.65,
-            ),
-          ),
-
-          // ── Top bar ──
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close,
-                          color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.scanPatientQrCode,
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _failures > 0
-                            ? AppColors.error.withValues(alpha: 0.8)
-                            : Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        l10n.qrScanAttempts(_failures, _maxAttempts),
-                        style: GoogleFonts.roboto(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+            // ── Semi-transparent overlay with viewfinder cutout ──
+            CustomPaint(
+              size: MediaQuery.sizeOf(context),
+              painter: _ViewfinderPainter(
+                cutoutFactor: UhcResponsive.isWide(context) ? 0.42 : 0.65,
               ),
             ),
-          ),
 
-          // ── Bottom instruction text ──
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
-                child: Text(
-                  l10n.pointCameraAtQr,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.roboto(
-                    fontSize: 15,
-                    color: Colors.white.withValues(alpha: 0.9),
+            // ── Top bar ──
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close,
+                            color: Colors.white, size: 28),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.scanPatientQrCode,
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _failures > 0
+                              ? AppColors.error.withValues(alpha: 0.8)
+                              : Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          l10n.qrScanAttempts(_failures, _maxAttempts),
+                          style: GoogleFonts.roboto(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ),
 
-          // ── Error overlay ──
-          if (_errorMessage != null)
-            Positioned.fill(
-              child: Container(
-                color: AppColors.error.withValues(alpha: 0.3),
-                child: Center(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 40),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+            // ── Bottom instruction text ──
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+                  child: Text(
+                    l10n.pointCameraAtQr,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.roboto(
+                      fontSize: 15,
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline,
-                            color: AppColors.error, size: 48),
-                        const SizedBox(height: 12),
-                        Text(
-                          _errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.error,
-                          ),
-                        ),
-                        if (_failures >= _maxAttempts) ...[
-                          const SizedBox(height: 8),
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Error overlay ──
+            if (visibleError != null)
+              Positioned.fill(
+                child: Container(
+                  color: AppColors.error.withValues(alpha: 0.3),
+                  child: Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 40),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline,
+                              color: AppColors.error, size: 48),
+                          const SizedBox(height: 12),
                           Text(
-                            l10n.manualConfirmUnlocked,
+                            visibleError,
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.roboto(
-                              fontSize: 14,
-                              color: Colors.grey[700],
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.error,
                             ),
                           ),
+                          if (_failures >= _maxAttempts) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              l10n.manualConfirmUnlocked,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.roboto(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CaptureCameraPreview extends StatelessWidget {
+  const _CaptureCameraPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF18333B), Color(0xFF0B1216), Color(0xFF25434A)],
+        ),
+      ),
+      child: Center(
+        child: Container(
+          width: 210,
+          height: 150,
+          decoration: BoxDecoration(
+            color: const Color(0xFFDBE7E8).withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: const Icon(
+            Icons.badge_outlined,
+            size: 72,
+            color: Color(0x66FFFFFF),
+          ),
+        ),
       ),
     );
   }

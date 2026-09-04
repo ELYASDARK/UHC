@@ -33,16 +33,34 @@ class _SlideData {
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
+  final int initialPage;
 
-  const OnboardingScreen({super.key, required this.onComplete});
+  const OnboardingScreen({
+    super.key,
+    required this.onComplete,
+    this.initialPage = 0,
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
+  late final PageController _pageController;
+  late int _currentPage;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.initialPage.clamp(0, 2).toInt();
+    _pageController = PageController(initialPage: _currentPage);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   List<_SlideData> _getSlides(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -71,12 +89,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ];
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
   void _nextPage() {
     final slides = _getSlides(context);
     if (_currentPage < slides.length - 1) {
@@ -98,8 +110,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final bgColor =
         isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
     final textPrimary = isDark ? Colors.white : const Color(0xFF1A1A2E);
-    final textSecondary =
-        isDark ? Colors.white60 : const Color(0xFF6B7280);
+    final textSecondary = isDark ? Colors.white60 : const Color(0xFF6B7280);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -279,8 +290,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             return AnimatedContainer(
                               duration: const Duration(milliseconds: 350),
                               curve: Curves.easeInOut,
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 4),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
                               width: isActive ? 28 : 8,
                               height: 8,
                               decoration: BoxDecoration(
@@ -497,7 +507,8 @@ class _IllustrationPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(clockCenter,
         Offset(clockCenter.dx, clockCenter.dy - unit * 0.7), handPaint);
-    canvas.drawLine(clockCenter,
+    canvas.drawLine(
+        clockCenter,
         Offset(clockCenter.dx + unit * 0.5, clockCenter.dy + unit * 0.2),
         handPaint);
 
@@ -538,11 +549,11 @@ class _IllustrationPainter extends CustomPainter {
       ..quadraticBezierTo(cx - unit * 2, cy - unit * 2.5, cx, cy - unit * 3)
       ..quadraticBezierTo(
           cx + unit * 2, cy - unit * 2.5, cx + unit * 2, cy + unit * 0.8)
-      ..quadraticBezierTo(cx + unit * 2.2, cy + unit * 1.3,
-          cx + unit * 2.6, cy + unit * 1.5)
+      ..quadraticBezierTo(
+          cx + unit * 2.2, cy + unit * 1.3, cx + unit * 2.6, cy + unit * 1.5)
       ..lineTo(cx - unit * 2.6, cy + unit * 1.5)
-      ..quadraticBezierTo(cx - unit * 2.2, cy + unit * 1.3, cx - unit * 2,
-          cy + unit * 0.8)
+      ..quadraticBezierTo(
+          cx - unit * 2.2, cy + unit * 1.3, cx - unit * 2, cy + unit * 0.8)
       ..close();
 
     canvas.drawPath(

@@ -27,12 +27,14 @@ class DoctorDashboardScreen extends StatefulWidget {
   final DoctorModel doctor;
   final VoidCallback? onDoctorUpdated;
   final VoidCallback? onNotificationsTap;
+  final DateTime? referenceTime;
 
   const DoctorDashboardScreen({
     super.key,
     required this.doctor,
     this.onDoctorUpdated,
     this.onNotificationsTap,
+    this.referenceTime,
   });
 
   @override
@@ -43,6 +45,8 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   late DoctorModel _doctor;
   final DoctorFunctionsService _doctorFunctions = DoctorFunctionsService();
   bool _togglingAvailability = false;
+
+  DateTime get _now => widget.referenceTime ?? DateTime.now();
 
   @override
   void initState() {
@@ -152,7 +156,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
   // ---- 1. Greeting + availability toggle (Merged with Profile & Notifications) ----
   Widget _buildGreetingCard(bool isDark, AppLocalizations l10n) {
-    final hour = DateTime.now().hour;
+    final hour = _now.hour;
     final greeting = hour < 12
         ? l10n.goodMorning
         : hour < 17
@@ -373,16 +377,20 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : Switch(
-                      value: _doctor.isAvailable,
-                      onChanged: hasPendingAvailabilityRequest
-                          ? null
-                          : _toggleAvailability,
-                      activeThumbColor: Colors.white,
-                      activeTrackColor:
-                          AppColors.success.withValues(alpha: 0.8),
-                      inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
-                      inactiveThumbColor: Colors.white70,
+                  : Semantics(
+                      label: '$availabilityLabel availability switch',
+                      child: Switch(
+                        value: _doctor.isAvailable,
+                        onChanged: hasPendingAvailabilityRequest
+                            ? null
+                            : _toggleAvailability,
+                        activeThumbColor: Colors.white,
+                        activeTrackColor:
+                            AppColors.success.withValues(alpha: 0.8),
+                        inactiveTrackColor:
+                            Colors.white.withValues(alpha: 0.2),
+                        inactiveThumbColor: Colors.white70,
+                      ),
                     ),
             ],
           ),
@@ -446,7 +454,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   // ---- 2. Stats row ----
   Widget _buildStatsRow(
       bool isDark, DoctorAppointmentProvider provider, AppLocalizations l10n) {
-    final now = DateTime.now();
+    final now = _now;
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
     final todayAppts = provider.appointments.where((apt) {
@@ -729,7 +737,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   // ---- 4. Today's appointments ----
   Widget _buildTodaysList(
       bool isDark, DoctorAppointmentProvider provider, AppLocalizations l10n) {
-    final now = DateTime.now();
+    final now = _now;
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
@@ -1082,7 +1090,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           availabilityRequestStatus: 'pending',
           pendingAvailabilityRequestId: requestId,
           availabilityRequestReason: reason,
-          availabilityRequestedAt: DateTime.now(),
+          availabilityRequestedAt: _now,
         );
         _togglingAvailability = false;
       });

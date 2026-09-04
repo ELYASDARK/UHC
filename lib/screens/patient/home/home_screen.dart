@@ -25,6 +25,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onBookNowTap;
   final VoidCallback? onDepartmentsTap; // New callback
   final Function(String departmentKey)? onDepartmentTap;
+  final bool captureDepartmentsError;
 
   const HomeScreen({
     super.key,
@@ -35,6 +36,7 @@ class HomeScreen extends StatefulWidget {
     this.onBookNowTap,
     this.onDepartmentsTap,
     this.onDepartmentTap,
+    this.captureDepartmentsError = false,
   });
 
   @override
@@ -62,6 +64,16 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = true;
         _error = null;
       });
+    }
+
+    if (widget.captureDepartmentsError) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = AppLocalizations.of(context).connectionError;
+        });
+      }
+      return;
     }
 
     try {

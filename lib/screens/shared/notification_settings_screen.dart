@@ -14,7 +14,14 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class NotificationSettingsScreen extends StatefulWidget {
-  const NotificationSettingsScreen({super.key});
+  const NotificationSettingsScreen({
+    super.key,
+    this.notificationsEnabledOverride,
+    this.exactAlarmsAllowedOverride,
+  });
+
+  final bool? notificationsEnabledOverride;
+  final bool? exactAlarmsAllowedOverride;
 
   @override
   State<NotificationSettingsScreen> createState() =>
@@ -54,6 +61,19 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 
   Future<void> _checkPermissions() async {
+    if (widget.notificationsEnabledOverride != null ||
+        widget.exactAlarmsAllowedOverride != null) {
+      if (mounted) {
+        setState(() {
+          _areNotificationsEnabled =
+              widget.notificationsEnabledOverride ?? _areNotificationsEnabled;
+          _exactAlarmsAllowed =
+              widget.exactAlarmsAllowedOverride ?? _exactAlarmsAllowed;
+        });
+      }
+      return;
+    }
+
     bool enabled = true;
     bool exactAllowed = true;
     final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();

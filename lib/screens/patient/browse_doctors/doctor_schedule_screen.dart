@@ -14,8 +14,17 @@ import '../appointments/emergency_request_screen.dart';
 
 class DoctorScheduleScreen extends StatefulWidget {
   final DoctorModel doctor;
+  final DateTime? initialDate;
+  final DateTime? captureNow;
+  final List<String>? captureBookedSlots;
 
-  const DoctorScheduleScreen({super.key, required this.doctor});
+  const DoctorScheduleScreen({
+    super.key,
+    required this.doctor,
+    this.initialDate,
+    this.captureNow,
+    this.captureBookedSlots,
+  });
 
   @override
   State<DoctorScheduleScreen> createState() => _DoctorScheduleScreenState();
@@ -27,17 +36,25 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   late DoctorModel _doctor;
   StreamSubscription<DocumentSnapshot>? _doctorSubscription;
   CalendarFormat _calendarFormat = CalendarFormat.week;
-  DateTime _focusedDay = DateTime.now();
-  DateTime _selectedDay = DateTime.now();
+  late DateTime _focusedDay;
+  late DateTime _selectedDay;
   List<String> _bookedSlots = [];
   bool _isLoading = false;
+
+  DateTime get _now => widget.captureNow ?? DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _doctor = widget.doctor;
-    _subscribeToDoctor();
-    _loadBookedSlots(_selectedDay);
+    _selectedDay = widget.initialDate ?? _now;
+    _focusedDay = _selectedDay;
+    if (widget.captureBookedSlots != null) {
+      _bookedSlots = List<String>.from(widget.captureBookedSlots!);
+    } else {
+      _subscribeToDoctor();
+      _loadBookedSlots(_selectedDay);
+    }
   }
 
   void _subscribeToDoctor() {
@@ -87,7 +104,9 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
         _selectedDay = selectedDay;
         _focusedDay = focusedDay;
       });
-      _loadBookedSlots(selectedDay);
+      if (widget.captureBookedSlots == null) {
+        _loadBookedSlots(selectedDay);
+      }
     }
   }
 
@@ -206,8 +225,8 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                 ],
               ),
               child: TableCalendar(
-                firstDay: DateTime.now(),
-                lastDay: DateTime.now().add(const Duration(days: 60)),
+                firstDay: _now,
+                lastDay: _now.add(const Duration(days: 60)),
                 focusedDay: _focusedDay,
                 calendarFormat: _calendarFormat,
                 selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
@@ -251,7 +270,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                 enabledDayPredicate: (day) {
                   // Allow only future days
                   return day.isAfter(
-                    DateTime.now().subtract(const Duration(days: 1)),
+                    _now.subtract(const Duration(days: 1)),
                   );
                 },
               ),
@@ -380,31 +399,36 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
         final isPast = _isSlotPast(_selectedDay, slot.startTime);
         final isAvailable = slot.isAvailable && !isBooked && !isPast;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isAvailable
-                  ? AppColors.primary.withValues(alpha: 0.3)
-                  : Colors.grey.withValues(alpha: 0.2),
-              width: 1,
+        return Semantics(
+          label: isAvailable
+              ? 'Available time slot ${slot.fullDisplay}'
+              : slot.fullDisplay,
+          button: isAvailable,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isAvailable
+                    ? AppColors.primary.withValues(alpha: 0.3)
+                    : Colors.grey.withValues(alpha: 0.2),
+                width: 1,
+              ),
+              boxShadow: isAvailable
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
             ),
-            boxShadow: isAvailable
-                ? [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Material(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.hardEdge,
-            child: ListTile(
+            child: Material(
+              color: isDark ? AppColors.surfaceDark : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              clipBehavior: Clip.hardEdge,
+              child: ListTile(
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 20,
                 vertical: 8,
@@ -467,7 +491,8 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                       ),
                     )
                   : const Icon(Icons.block, color: Colors.grey, size: 20),
-              onTap: isAvailable ? () => _onSlotTap(slot) : null,
+                onTap: isAvailable ? () => _onSlotTap(slot) : null,
+              ),
             ),
           ),
         );
@@ -476,7 +501,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   }
 
   bool _isSlotPast(DateTime date, String startTime) {
-    if (!isSameDay(date, DateTime.now())) return false;
+    if (!isSameDay(date, _now)) return false;
 
     // Parse start time (e.g., "09:00")
     final parts = startTime.split(':');
@@ -486,7 +511,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
     final minute = int.tryParse(parts[1]) ?? 0;
     final slotTime = DateTime(date.year, date.month, date.day, hour, minute);
 
-    return slotTime.isBefore(DateTime.now());
+    return slotTime.isBefore(_now);
   }
 
   void _onSlotTap(TimeSlot slot) {

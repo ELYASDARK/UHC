@@ -17,15 +17,19 @@ import '../../../l10n/app_localizations.dart';
 import '../booking/booking_screen.dart';
 import 'doctor_schedule_screen.dart';
 
+enum DoctorListCaptureState { live, empty, error }
+
 /// Doctor list screen with search and filters
 class DoctorListScreen extends StatefulWidget {
   final Department? initialDepartment;
   final String? initialDepartmentKey; // New: string-based department key
+  final DoctorListCaptureState captureState;
 
   const DoctorListScreen({
     super.key,
     this.initialDepartment,
     this.initialDepartmentKey,
+    this.captureState = DoctorListCaptureState.live,
   });
 
   @override
@@ -55,7 +59,14 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     } else if (widget.initialDepartment != null) {
       _selectedDepartmentName = widget.initialDepartment!.name;
     }
-    _subscribeToData();
+    if (widget.captureState == DoctorListCaptureState.live) {
+      _subscribeToData();
+    } else {
+      _isLoading = false;
+      if (widget.captureState == DoctorListCaptureState.error) {
+        _error = 'Failed to load doctors. Pull to retry.';
+      }
+    }
   }
 
   @override
@@ -114,6 +125,17 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
 
   /// Refresh data - used for pull-to-refresh
   Future<void> _refreshData() async {
+    if (widget.captureState != DoctorListCaptureState.live) {
+      setState(() {
+        _isLoading = false;
+        _doctors = const [];
+        _error = widget.captureState == DoctorListCaptureState.error
+            ? 'Failed to load doctors. Pull to retry.'
+            : null;
+      });
+      return;
+    }
+
     // Cancel existing subscription and resubscribe
     _subscribeToData();
   }

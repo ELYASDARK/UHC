@@ -10,8 +10,15 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/constants/department_icons.dart';
 import '../browse_doctors/doctor_list_screen.dart';
 
+enum DepartmentCaptureState { live, empty, error }
+
 class DepartmentBrowsingScreen extends StatefulWidget {
-  const DepartmentBrowsingScreen({super.key});
+  final DepartmentCaptureState captureState;
+
+  const DepartmentBrowsingScreen({
+    super.key,
+    this.captureState = DepartmentCaptureState.live,
+  });
 
   @override
   State<DepartmentBrowsingScreen> createState() =>
@@ -27,10 +34,25 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDepartments();
+    if (widget.captureState == DepartmentCaptureState.live) {
+      _loadDepartments();
+    } else {
+      _isLoading = false;
+    }
   }
 
   Future<void> _loadDepartments() async {
+    if (widget.captureState != DepartmentCaptureState.live) {
+      setState(() {
+        _isLoading = false;
+        _departments = const [];
+        _error = widget.captureState == DepartmentCaptureState.error
+            ? AppLocalizations.of(context).connectionError
+            : null;
+      });
+      return;
+    }
+
     // Only set loading to true if we don't have data yet
     if (_departments.isEmpty) {
       setState(() {
@@ -60,6 +82,10 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayError =
+        widget.captureState == DepartmentCaptureState.error
+            ? AppLocalizations.of(context).connectionError
+            : _error;
     final breakpoint = UhcResponsive.breakpointOf(context);
     final departmentCardAspectRatio = breakpoint.isWide
         ? 1.05
@@ -75,12 +101,15 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
         ),
         centerTitle: true,
       ),
-      body: _error != null && _departments.isEmpty
+      body: displayError != null && _departments.isEmpty
           ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_error!, style: const TextStyle(color: AppColors.error)),
+                  Text(
+                    displayError,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _loadDepartments,

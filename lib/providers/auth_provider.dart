@@ -14,6 +14,8 @@ enum AuthState { initial, loading, authenticated, unauthenticated, error }
 /// Authentication provider for state management
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final bool? _googleLinkedOverride;
+  final bool? _passwordLinkedOverride;
 
   AuthState _state = AuthState.initial;
   UserModel? _currentUser;
@@ -29,7 +31,11 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _state == AuthState.loading;
   User? get firebaseUser => _authService.currentUser;
 
-  AuthProvider() {
+  AuthProvider({
+    bool? googleLinkedOverride,
+    bool? passwordLinkedOverride,
+  })  : _googleLinkedOverride = googleLinkedOverride,
+        _passwordLinkedOverride = passwordLinkedOverride {
     _init();
   }
 
@@ -222,11 +228,13 @@ class AuthProvider with ChangeNotifier {
 
   /// Whether the current user has a Google provider linked and synced server-side.
   bool get isGoogleLinked =>
-      _authService.isGoogleLinked &&
-      (_currentUser?.googleEmail?.trim().isNotEmpty ?? false);
+      _googleLinkedOverride ??
+      (_authService.isGoogleLinked &&
+          (_currentUser?.googleEmail?.trim().isNotEmpty ?? false));
 
   /// Whether the current user has an email/password provider linked
-  bool get isPasswordLinked => _authService.isPasswordLinked;
+  bool get isPasswordLinked =>
+      _passwordLinkedOverride ?? _authService.isPasswordLinked;
 
   /// The linked Google email (from Firestore or Firebase Auth fallback)
   String? get googleEmail =>

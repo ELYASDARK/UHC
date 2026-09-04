@@ -20,8 +20,16 @@ import '../shared/notifications_screen.dart';
 class DoctorShell extends StatefulWidget {
   final DoctorModel doctor;
   final int initialIndex;
+  final bool enableLiveDoctorUpdates;
+  final DateTime? referenceTime;
 
-  const DoctorShell({super.key, required this.doctor, this.initialIndex = 0});
+  const DoctorShell({
+    super.key,
+    required this.doctor,
+    this.initialIndex = 0,
+    this.enableLiveDoctorUpdates = true,
+    this.referenceTime,
+  });
 
   @override
   State<DoctorShell> createState() => _DoctorShellState();
@@ -40,7 +48,9 @@ class _DoctorShellState extends State<DoctorShell> {
     _doctor = widget.doctor;
     _currentIndex = widget.initialIndex;
     _visitedScreens = {widget.initialIndex};
-    _startDoctorStream();
+    if (widget.enableLiveDoctorUpdates) {
+      _startDoctorStream();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initNotifications();
     });
@@ -51,7 +61,17 @@ class _DoctorShellState extends State<DoctorShell> {
     super.didUpdateWidget(oldWidget);
     if (widget.doctor.id != oldWidget.doctor.id) {
       _doctor = widget.doctor;
-      _startDoctorStream();
+      if (widget.enableLiveDoctorUpdates) {
+        _startDoctorStream();
+      }
+    }
+    if (widget.enableLiveDoctorUpdates != oldWidget.enableLiveDoctorUpdates) {
+      if (widget.enableLiveDoctorUpdates) {
+        _startDoctorStream();
+      } else {
+        _doctorSubscription?.cancel();
+        _doctorSubscription = null;
+      }
     }
   }
 
@@ -117,11 +137,15 @@ class _DoctorShellState extends State<DoctorShell> {
                 doctor: _doctor,
                 onDoctorUpdated: _refreshDoctor,
                 onNotificationsTap: () => _onTabTapped(3),
+                referenceTime: widget.referenceTime,
               )
             : const SizedBox.shrink(),
         // Tab 1: Appointments
         _visitedScreens.contains(1)
-            ? DoctorAppointmentsScreen(doctor: _doctor)
+            ? DoctorAppointmentsScreen(
+                doctor: _doctor,
+                referenceTime: widget.referenceTime,
+              )
             : const SizedBox.shrink(),
         // Tab 2: Schedule
         _visitedScreens.contains(2)

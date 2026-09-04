@@ -16,8 +16,15 @@ import 'departments/department_browsing_screen.dart';
 /// Main navigation shell with bottom navigation
 class MainShell extends StatefulWidget {
   final int initialIndex;
+  final bool initializeNotifications;
+  final bool captureHomeDepartmentsError;
 
-  const MainShell({super.key, this.initialIndex = 0});
+  const MainShell({
+    super.key,
+    this.initialIndex = 0,
+    this.initializeNotifications = true,
+    this.captureHomeDepartmentsError = false,
+  });
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -37,9 +44,22 @@ class _MainShellState extends State<MainShell> {
     // Only mark the initial screen as visited
     _visitedScreens = {widget.initialIndex};
     // Load notifications after first frame (non-blocking)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadNotifications();
-    });
+    if (widget.initializeNotifications) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadNotifications();
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _listenToNotificationsOnly();
+      });
+    }
+  }
+
+  void _listenToNotificationsOnly() {
+    final user = context.read<AuthProvider>().user;
+    if (user != null) {
+      context.read<NotificationProvider>().startListening(user.id);
+    }
   }
 
   Future<void> _loadNotifications() async {
@@ -112,6 +132,7 @@ class _MainShellState extends State<MainShell> {
                   );
                 },
                 onDepartmentTap: _onDepartmentTapped,
+                captureDepartmentsError: widget.captureHomeDepartmentsError,
               )
             : const SizedBox.shrink(),
         // Index 1: Doctors Screen (lazy loaded)

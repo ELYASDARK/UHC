@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_colors.dart';
 
@@ -253,6 +254,7 @@ class AppTheme {
     backgroundColor: Colors.transparent,
     foregroundColor: AppColors.textPrimaryLight,
     surfaceTintColor: Colors.transparent,
+    systemOverlayStyle: SystemUiOverlayStyle.dark,
   );
 
   static const AppBarTheme _darkAppBarTheme = AppBarTheme(
@@ -261,6 +263,7 @@ class AppTheme {
     backgroundColor: Colors.transparent,
     foregroundColor: AppColors.textPrimaryDark,
     surfaceTintColor: Colors.transparent,
+    systemOverlayStyle: SystemUiOverlayStyle.light,
   );
 
   // Card Theme

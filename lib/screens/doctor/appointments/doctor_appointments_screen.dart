@@ -14,8 +14,13 @@ import 'doctor_appointment_detail_screen.dart';
 /// Doctor-facing appointments screen with Upcoming / Past tabs
 class DoctorAppointmentsScreen extends StatefulWidget {
   final DoctorModel doctor;
+  final DateTime? referenceTime;
 
-  const DoctorAppointmentsScreen({super.key, required this.doctor});
+  const DoctorAppointmentsScreen({
+    super.key,
+    required this.doctor,
+    this.referenceTime,
+  });
 
   @override
   State<DoctorAppointmentsScreen> createState() =>
@@ -186,6 +191,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
             appointment: appointment,
             isDark: isDark,
             photoUrl: patientPhoto,
+            referenceTime: widget.referenceTime,
             onTap: () => _openDetail(appointment),
           )
               .animate(delay: Duration(milliseconds: index * 100))
@@ -216,12 +222,14 @@ class _DoctorAppointmentCard extends StatelessWidget {
   final AppointmentModel appointment;
   final bool isDark;
   final String? photoUrl;
+  final DateTime? referenceTime;
   final VoidCallback onTap;
 
   const _DoctorAppointmentCard({
     required this.appointment,
     required this.isDark,
     this.photoUrl,
+    this.referenceTime,
     required this.onTap,
   });
 
@@ -438,7 +446,7 @@ class _DoctorAppointmentCard extends StatelessWidget {
   }
 
   String _formatDate(DateTime date, AppLocalizations l10n) {
-    final now = DateTime.now();
+    final now = referenceTime ?? DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final tomorrow = today.add(const Duration(days: 1));
     final appointmentDay = DateTime(date.year, date.month, date.day);

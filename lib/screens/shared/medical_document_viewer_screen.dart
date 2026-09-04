@@ -8,11 +8,13 @@ import 'package:flutter/material.dart';
 class MedicalDocumentViewerScreen extends StatefulWidget {
   final String imageUrl;
   final String title;
+  final Widget? captureContent;
 
   const MedicalDocumentViewerScreen({
     super.key,
     required this.imageUrl,
     required this.title,
+    this.captureContent,
   });
 
   @override
@@ -151,62 +153,64 @@ class _MedicalDocumentViewerScreenState
                         width: constraints.maxWidth,
                         height: constraints.maxHeight,
                         child: Center(
-                          child: Image.network(
-                            widget.imageUrl,
-                            fit: BoxFit.contain,
-                            alignment: Alignment.center,
-                            loadingBuilder: (
-                              context,
-                              child,
-                              loadingProgress,
-                            ) {
-                              if (loadingProgress == null) return child;
-                              final expected =
-                                  loadingProgress.expectedTotalBytes;
-                              final loaded =
-                                  loadingProgress.cumulativeBytesLoaded;
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  value: expected == null
-                                      ? null
-                                      : loaded / expected,
-                                  color: Colors.white,
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.broken_image_outlined,
-                                      color: Colors.white70,
-                                      size: 64,
+                          child: widget.captureContent ??
+                              Image.network(
+                                widget.imageUrl,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.center,
+                                loadingBuilder: (
+                                  context,
+                                  child,
+                                  loadingProgress,
+                                ) {
+                                  if (loadingProgress == null) return child;
+                                  final expected =
+                                      loadingProgress.expectedTotalBytes;
+                                  final loaded =
+                                      loadingProgress.cumulativeBytesLoaded;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value: expected == null
+                                          ? null
+                                          : loaded / expected,
+                                      color: Colors.white,
                                     ),
-                                    const SizedBox(height: 16),
-                                    const Text(
-                                      'Image not available',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.broken_image_outlined,
+                                          color: Colors.white70,
+                                          size: 64,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          'Image not available',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'The file may have been deleted\nfrom storage.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.45),
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'The file may have been deleted\nfrom storage.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.45),
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+                                  );
+                                },
+                              ),
                         ),
                       ),
                     ),
