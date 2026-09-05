@@ -3,6 +3,7 @@
     "description": "Cloud Functions for UHC",
     "scripts": {
         "build": "tsc",
+        "test": "npm run build && node test/admin_deletion.test.js",
         "serve": "npm run build && firebase emulators:start --only functions",
         "shell": "npm run build && firebase functions:shell",
         "start": "npm run shell",

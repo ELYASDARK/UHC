@@ -96,7 +96,7 @@ class AdminPermissions {
   );
 
   factory AdminPermissions.fromMap(Map<String, dynamic>? map) {
-    if (map == null) return AdminPermissions.fullAccess;
+    if (map == null) return AdminPermissions.noAccess;
     return AdminPermissions(
       usersView: map['users.view'] ?? false,
       usersManageNonAdmin: map['users.manageNonAdmin'] ?? false,

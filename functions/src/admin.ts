@@ -211,7 +211,13 @@ export const deleteAdminAccount = functions.https.onCall(
         if (targetData.role !== 'admin')
             throw new functions.https.HttpsError('failed-precondition', 'This function can only target admin accounts.');
 
-        try { await auth.deleteUser(targetUid); } catch (e) { console.log('Auth user may not exist:', e); }
+        try {
+            await auth.deleteUser(targetUid);
+        } catch (error) {
+            if ((error as { code?: string })?.code !== 'auth/user-not-found') {
+                throw toHttpsError(error, 'Failed to delete admin authentication account.');
+            }
+        }
         await deleteProfilePhotos(targetUid);
         await db.collection('users').doc(targetUid).delete();
         await writeAdminAuditLog({
