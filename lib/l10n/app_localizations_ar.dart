@@ -2357,4 +2357,7 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get assistantHistoryLoadFailed =>
       'تعذر تحميل سجل المحادثة. يرجى التحقق من اتصالك.';
+
+  @override
+  String get assistantBadge => 'المساعد الذكي';
 }

@@ -775,5 +775,6 @@
   "assistantInfoTimezoneTitle": "توقيت العيادة",
   "assistantInfoTooltip": "معلومات المساعد",
   "assistantClearChatFailed": "فشل مسح سجل المحادثة على الخادم.",
-  "assistantHistoryLoadFailed": "تعذر تحميل سجل المحادثة. يرجى التحقق من اتصالك."
+  "assistantHistoryLoadFailed": "تعذر تحميل سجل المحادثة. يرجى التحقق من اتصالك.",
+  "assistantBadge": "المساعد الذكي"
 }

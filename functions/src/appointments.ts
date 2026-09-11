@@ -584,6 +584,20 @@ export const rescheduleAppointment = functions.https.onCall(
             throw new functions.https.HttpsError('failed-precondition', 'Only active appointments can be rescheduled.');
         }
 
+        const currentApptDate = firestoreDateToDate(appointment.appointmentDate);
+        if (callerDoc.data()?.role === 'patient' && currentApptDate && appointment.timeSlot) {
+            const currentApptDateKey = appointmentDateKey(currentApptDate);
+            const currentExactUtc = appointmentExactUtcTime(currentApptDateKey, appointment.timeSlot);
+            const diffMs = currentExactUtc.getTime() - Date.now();
+            const minNoticeMs = 24 * 60 * 60 * 1000;
+            if (diffMs < minNoticeMs) {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Appointments cannot be rescheduled within 24 hours of the appointment time.'
+                );
+            }
+        }
+
         const parsedDate = parseAppointmentDate(appointmentDate);
         assertFutureAppointmentTime(parsedDate, timeSlot);
 

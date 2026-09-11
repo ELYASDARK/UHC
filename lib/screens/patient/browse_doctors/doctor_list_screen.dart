@@ -362,7 +362,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   }
 
   void _navigateToDetail(DoctorModel doctor) {
-    if (!doctor.isAvailable) {
+    if (!doctor.isAvailable || !doctor.canBook) {
       _showDoctorUnavailableMessage();
       return;
     }
@@ -398,7 +398,7 @@ class _DoctorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canOpen = doctor.isAvailable;
+    final canOpen = doctor.canBook;
 
     return GestureDetector(
       onTap: onTap,
@@ -461,7 +461,7 @@ class _DoctorCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (!doctor.isAvailable)
+                      if (!doctor.canBook)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -666,15 +666,15 @@ class DoctorDetailScreen extends StatelessWidget {
                           isDark,
                         ),
                         _buildStatItem(
-                          doctor.isAvailable
+                          doctor.canBook
                               ? AppLocalizations.of(context).yes
                               : AppLocalizations.of(context).no,
                           AppLocalizations.of(context).available,
-                          doctor.isAvailable
+                          doctor.canBook
                               ? Icons.check_circle_rounded
                               : Icons.cancel_rounded,
                           isDark,
-                          valueColor: doctor.isAvailable
+                          valueColor: doctor.canBook
                               ? AppColors.success
                               : Colors.red,
                         ),
@@ -762,7 +762,7 @@ class DoctorDetailScreen extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    if (!doctor.isAvailable) {
+                    if (!doctor.canBook) {
                       _showUnavailableDoctorMessage(context);
                       return;
                     }
@@ -775,14 +775,14 @@ class DoctorDetailScreen extends StatelessWidget {
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor:
-                        doctor.isAvailable ? AppColors.primary : Colors.grey,
+                        doctor.canBook ? AppColors.primary : Colors.grey,
                     minimumSize: const Size(0, 56),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                     side: BorderSide(
                       color:
-                          doctor.isAvailable ? AppColors.primary : Colors.grey,
+                          doctor.canBook ? AppColors.primary : Colors.grey,
                       width: 1.5,
                     ),
                   ),
@@ -801,7 +801,7 @@ class DoctorDetailScreen extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    if (!doctor.isAvailable) {
+                    if (!doctor.canBook) {
                       _showUnavailableDoctorMessage(context);
                       return;
                     }
@@ -814,7 +814,7 @@ class DoctorDetailScreen extends StatelessWidget {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
-                        doctor.isAvailable ? AppColors.primary : Colors.grey,
+                        doctor.canBook ? AppColors.primary : Colors.grey,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(0, 56),
                     shape: RoundedRectangleBorder(
@@ -957,13 +957,13 @@ class DoctorDetailScreen extends StatelessWidget {
                           isDark,
                         ),
                         _buildStatItem(
-                          doctor.isAvailable ? l10n.yes : l10n.no,
+                          doctor.canBook ? l10n.yes : l10n.no,
                           l10n.available,
-                          doctor.isAvailable
+                          doctor.canBook
                               ? Icons.check_circle_rounded
                               : Icons.cancel_rounded,
                           isDark,
-                          valueColor: doctor.isAvailable
+                          valueColor: doctor.canBook
                               ? AppColors.success
                               : Colors.red,
                         ),
@@ -1067,7 +1067,7 @@ class DoctorDetailScreen extends StatelessWidget {
   }
 
   Widget _buildDoctorActions(BuildContext context, {bool vertical = false}) {
-    final canBook = doctor.isAvailable;
+    final canBook = doctor.canBook;
     final scheduleButton = SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(

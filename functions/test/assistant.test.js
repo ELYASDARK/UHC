@@ -1715,27 +1715,55 @@ test('12.6 Invalid synthetic configuration fails closed before touching Auth, Fi
 
 
 test('PR5 expired daily-limit history unlocks while current exhaustion stays blocked', async (t) => {
-    await withFrozenTime(FROZEN_NOW, async () => {
+    const origEnv = { ...process.env };
+    process.env.AI_ASSISTANT_ENABLED = 'true';
+    process.env.AI_PRIVACY_RELEASE_GATE_ACCEPTED = 'true';
+    process.env.GEMINI_API_KEY = 'test_key';
+    try {
+        await withFrozenTime(FROZEN_NOW, async () => {
+            const { mockDb, store } = createMockFirestore();
+            t.mock.method(db, 'collection', mockDb.collection);
+            t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+            t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: [{ providerId: 'google.com' }] }));
+            store.get('users').set('reset_patient', { isActive: true, role: 'student' });
+            const resetAt = new Date(FROZEN_NOW.getTime() - 3600000).toISOString();
+            const chat = createInitialChatDoc('reset_patient', FROZEN_NOW);
+            chat.lastResult = { success: true, status: 'daily_limit', reasonCode: 'upstream_daily_limit_reached', message: 'Limit', replyLanguage: 'en', offers: [], resetAt, revision: 1 };
+            chat.resetAt = resetAt;
+            store.get('assistant_chats').set('reset_patient', chat);
+            const request = { auth: { uid: 'reset_patient' }, data: {} };
+            const resumed = await getAssistantHistory.run(request);
+            assert.equal(resumed.status, 'ready');
+            assert.equal(resumed.resetAt, null);
+            assert.equal(resumed.reasonCode, null);
+            await mockDb.collection('assistant_project_quota').doc(getPacificDateKey(FROZEN_NOW)).set({ isDailyExhausted: true });
+            const blocked = await getAssistantHistory.run(request);
+            assert.equal(blocked.status, 'daily_limit');
+            assert.ok(Date.parse(blocked.resetAt) > FROZEN_NOW.getTime());
+        });
+    } finally {
+        process.env = origEnv;
+    }
+});
+
+test('PR5 getAssistantHistory reflects disabled gate by default without loading catalogs', async (t) => {
+    const origEnv = { ...process.env };
+    delete process.env.AI_ASSISTANT_ENABLED;
+    delete process.env.AI_OFFLINE_SYNTHETIC_TESTING;
+    delete process.env.GEMINI_API_KEY;
+    try {
         const { mockDb, store } = createMockFirestore();
         t.mock.method(db, 'collection', mockDb.collection);
-        t.mock.method(db, 'runTransaction', mockDb.runTransaction);
         t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: [{ providerId: 'google.com' }] }));
-        store.get('users').set('reset_patient', { isActive: true, role: 'student' });
-        const resetAt = new Date(FROZEN_NOW.getTime() - 3600000).toISOString();
-        const chat = createInitialChatDoc('reset_patient', FROZEN_NOW);
-        chat.lastResult = { success: true, status: 'daily_limit', reasonCode: 'upstream_daily_limit_reached', message: 'Limit', replyLanguage: 'en', offers: [], resetAt, revision: 1 };
-        chat.resetAt = resetAt;
-        store.get('assistant_chats').set('reset_patient', chat);
-        const request = { auth: { uid: 'reset_patient' }, data: {} };
-        const resumed = await getAssistantHistory.run(request);
-        assert.equal(resumed.status, 'ready');
-        assert.equal(resumed.resetAt, null);
-        assert.equal(resumed.reasonCode, null);
-        await mockDb.collection('assistant_project_quota').doc(getPacificDateKey(FROZEN_NOW)).set({ isDailyExhausted: true });
-        const blocked = await getAssistantHistory.run(request);
-        assert.equal(blocked.status, 'daily_limit');
-        assert.ok(Date.parse(blocked.resetAt) > FROZEN_NOW.getTime());
-    });
+        store.get('users').set('disabled_patient', { isActive: true, role: 'student' });
+        const request = { auth: { uid: 'disabled_patient' }, data: {} };
+        const result = await getAssistantHistory.run(request);
+        assert.equal(result.success, true);
+        assert.equal(result.status, 'disabled');
+        assert.equal(result.reasonCode, 'assistant_disabled');
+    } finally {
+        process.env = origEnv;
+    }
 });
 
 test('PR5 new activity extends chat TTL without retaining expired messages', async () => {
@@ -1793,4 +1821,81 @@ test('PR5 availability requires an active Google-linked caller', async (t) => {
     await assert.rejects(getDoctorDayAvailability.run(request), e => e.code === 'failed-precondition');
     providers = [{ providerId: 'google.com' }];
     await assert.rejects(getDoctorDayAvailability.run(request), e => e.code === 'invalid-argument');
+});
+
+test('PR5 calendar date validation rejects roll-over dates like 2026-02-30', () => {
+    const { parseAppointmentDate, isValidCalendarDate } = require('../lib/shared/appointmentHelpers');
+    assert.equal(isValidCalendarDate('2026-02-28'), true);
+    assert.equal(isValidCalendarDate('2026-02-29'), false);
+    assert.equal(isValidCalendarDate('2026-02-30'), false);
+    assert.equal(isValidCalendarDate('2026-02-31'), false);
+    assert.equal(isValidCalendarDate('2026-04-31'), false);
+    assert.throws(() => parseAppointmentDate('2026-02-30'), e => e.code === 'invalid-argument');
+    assert.throws(() => parseAppointmentDate('2026-02-31T10:00:00.000Z'), e => e.code === 'invalid-argument');
+    assert.doesNotThrow(() => parseAppointmentDate('2026-02-28'));
+});
+
+test('PR5 matchesTimeSlot invalidates offers when scheduled end time changes', () => {
+    const { matchesTimeSlot } = require('../lib/shared/appointmentHelpers');
+    const slotA = { startTime: '09:00', endTime: '09:30', isAvailable: true };
+    const slotB = { startTime: '09:00', endTime: '10:00', isAvailable: true };
+    // Exact range matches slotA but not slotB
+    assert.equal(matchesTimeSlot(slotA, '09:00 - 09:30'), true);
+    assert.equal(matchesTimeSlot(slotB, '09:00 - 09:30'), false);
+    assert.equal(matchesTimeSlot(slotB, '09:00 - 10:00'), true);
+    // Start-only query matches either
+    assert.equal(matchesTimeSlot(slotA, '09:00'), true);
+    assert.equal(matchesTimeSlot(slotB, '09:00'), true);
+});
+
+test('PR5 sendAssistantMessage rejects messages exceeding 500 characters', async (t) => {
+    const { sendAssistantMessage } = require('../lib/assistant');
+    const { mockDb, store } = createMockFirestore();
+    t.mock.method(db, 'collection', mockDb.collection);
+    t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: [{ providerId: 'google.com' }] }));
+    store.get('users').set('limit_pat', { isActive: true, role: 'student' });
+    const longMessage = 'A'.repeat(501);
+    await assert.rejects(
+        sendAssistantMessage.run({
+            auth: { uid: 'limit_pat' },
+            data: { message: longMessage },
+        }),
+        e => e.code === 'invalid-argument' && e.message.includes('cannot exceed 500')
+    );
+});
+
+test('PR5 unaccepted turn commits explanation without persisting unsent patient message', async () => {
+    const { mockDb, store } = createMockFirestore();
+    const chat = createInitialChatDoc('unsent_pat', FROZEN_NOW);
+    store.get('assistant_chats').set('unsent_pat', chat);
+
+    const reserved = await reserveAssistantTurn(mockDb, {
+        patientId: 'unsent_pat',
+        userMessage: 'This message will fail',
+        clientRequestId: 'req_fail_1',
+        now: FROZEN_NOW,
+    });
+    assert.equal(reserved.history.length, 1);
+    assert.equal(reserved.history[0].sender, 'patient');
+
+    // Turn fails with daily_limit (unaccepted by client)
+    const commitRes = await commitAssistantTurn(mockDb, {
+        patientId: 'unsent_pat',
+        generationId: reserved.generationId,
+        reservedRevision: reserved.reservedRevision,
+        turnId: reserved.turnId,
+        assistantMessage: 'Daily limit reached',
+        status: 'daily_limit',
+        reasonCode: 'upstream_daily_limit_reached',
+        replyLanguage: 'en',
+        offers: [],
+        now: new Date(FROZEN_NOW.getTime() + 1000),
+    });
+    assert.equal(commitRes.committed, true);
+
+    const after = (await getPatientChatDoc(mockDb, 'unsent_pat', FROZEN_NOW)).doc;
+    // Server history must contain only the assistant explanation, NOT the unaccepted patient turn
+    assert.equal(after.messages.length, 1);
+    assert.equal(after.messages[0].sender, 'assistant');
+    assert.equal(after.messages[0].text, 'Daily limit reached');
 });

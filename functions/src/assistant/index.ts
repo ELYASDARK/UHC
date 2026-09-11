@@ -94,7 +94,14 @@ export const sendAssistantMessage = functions.https.onCall(
             }
         }
 
-        const sanitizedMessage = rawMessage.substring(0, ASSISTANT_CONFIG.MAX_MESSAGE_LENGTH);
+        if (rawMessage.length > ASSISTANT_CONFIG.MAX_MESSAGE_LENGTH) {
+            throw new functions.https.HttpsError(
+                'invalid-argument',
+                `Message cannot exceed ${ASSISTANT_CONFIG.MAX_MESSAGE_LENGTH} characters.`
+            );
+        }
+
+        const sanitizedMessage = rawMessage;
         const clientLocale = normalizeLocale(data.locale);
         const now = new Date();
 
@@ -408,6 +415,20 @@ export const getAssistantHistory = functions.https.onCall(
         requirePatientRole(callerDoc);
 
         const now = new Date();
+        const gate = evaluateTransmissionGate(adminProjectId);
+        if (!gate.enabled) {
+            const { doc: chatDoc } = await getPatientChatDoc(db, callerUid, now);
+            return {
+                success: true,
+                messages: chatDoc.messages,
+                offers: [],
+                revision: chatDoc.revision,
+                resetAt: null,
+                status: 'disabled',
+                reasonCode: gate.reasonCode,
+            };
+        }
+
         const [deptsSnap, doctorsSnap] = await Promise.all([
             db.collection('departments').where('isActive', '==', true).limit(51).get(),
             db.collection('doctors').where('isActive', '==', true).where('isAvailable', '==', true).limit(101).get(),
@@ -450,7 +471,7 @@ export const getAssistantHistory = functions.https.onCall(
 
         let status = chatDoc.lastResult?.status || null;
         let reasonCode = chatDoc.lastResult?.reasonCode || null;
-        let resetAt = chatDoc.resetAt || null;
+        let resetAt = chatDoc.resetAt || chatDoc.lastResult?.resetAt || null;
 
         if (!isProjectDailyExhausted && status === 'daily_limit' &&
             resetAt && Date.parse(resetAt) <= now.getTime()) {
@@ -473,7 +494,7 @@ export const getAssistantHistory = functions.https.onCall(
             offers: refreshed.offers,
             revision: refreshed.revision,
             resetAt,
-            status,
+            status: status || 'ready',
             reasonCode,
         };
     }

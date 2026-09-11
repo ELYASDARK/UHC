@@ -775,5 +775,6 @@
   "assistantInfoTimezoneTitle": "کاتی کلینیک",
   "assistantInfoTooltip": "زانیاری دەربارەی یاریدەدەر",
   "assistantClearChatFailed": "سڕینەوەی مێژووی گفتوگۆ لەسەر سێرڤەر سەرکەوتوو نەبوو.",
-  "assistantHistoryLoadFailed": "بارکردنی مێژووی گفتوگۆ سەرکەوتوو نەبوو. هێڵی ئینتەرنێتەکەت بپشکنە."
+  "assistantHistoryLoadFailed": "بارکردنی مێژووی گفتوگۆ سەرکەوتوو نەبوو. هێڵی ئینتەرنێتەکەت بپشکنە.",
+  "assistantBadge": "یاریدەدەری زیرەک"
 }

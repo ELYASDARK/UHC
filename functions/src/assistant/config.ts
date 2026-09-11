@@ -50,7 +50,7 @@ export function parseLoopbackHostAndPort(hostString?: string): ParsedHostPort | 
     }
 
     // Check standard host:port: e.g. localhost:8080, 127.0.0.1:8080, or ::1:8080
-    const hostPortMatch = trimmed.match(/^([a-zA-Z0-9.-]+):(\d+)$/);
+    const hostPortMatch = trimmed.match(/^([a-zA-Z0-9.-]+|::1):(\d+)$/);
     if (hostPortMatch) {
         const host = hostPortMatch[1].toLowerCase();
         const port = parseInt(hostPortMatch[2], 10);

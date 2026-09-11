@@ -2371,4 +2371,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get assistantHistoryLoadFailed =>
       'Unable to load conversation history. Check your connection.';
+
+  @override
+  String get assistantBadge => 'AI Assistant';
 }

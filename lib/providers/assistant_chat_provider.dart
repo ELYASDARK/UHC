@@ -148,11 +148,21 @@ class AssistantChatProvider extends ChangeNotifier {
       _revision = history.revision;
       _resetAt = history.resetAt;
       _currentStatus = history.status ?? AssistantMessageStatus.ready;
+      _errorMessage = null;
+      _reasonCode = null;
     } on AssistantFunctionException catch (e) {
       if (_isDisposed || currentGen != _generation) return;
       _errorMessage = e.message;
-      if (e.status != null) _currentStatus = e.status!;
-      if (e.reasonCode != null) _reasonCode = e.reasonCode;
+      if (e.status != null) {
+        _currentStatus = e.status!;
+      } else if (e.isDailyLimit) {
+        _currentStatus = AssistantMessageStatus.dailyLimit;
+      } else if (e.isThrottled) {
+        _currentStatus = AssistantMessageStatus.throttled;
+      } else if (e.isUnavailable) {
+        _currentStatus = AssistantMessageStatus.unavailable;
+      }
+      _reasonCode = e.reasonCode ?? e.code;
       _resetAt = e.resetAt;
     } catch (e) {
       if (_isDisposed || currentGen != _generation) return;
@@ -197,11 +207,21 @@ class AssistantChatProvider extends ChangeNotifier {
         _revision = history.revision;
         _resetAt = history.resetAt;
         _currentStatus = history.status ?? AssistantMessageStatus.ready;
+        _errorMessage = null;
+        _reasonCode = null;
       }
     } on AssistantFunctionException catch (e) {
       if (_isDisposed || currentGen != _generation) return;
       _errorMessage = e.message;
-      if (e.status != null) _currentStatus = e.status!;
+      if (e.status != null) {
+        _currentStatus = e.status!;
+      } else if (e.isDailyLimit) {
+        _currentStatus = AssistantMessageStatus.dailyLimit;
+      } else if (e.isThrottled) {
+        _currentStatus = AssistantMessageStatus.throttled;
+      } else if (e.isUnavailable) {
+        _currentStatus = AssistantMessageStatus.unavailable;
+      }
       _reasonCode = e.reasonCode ?? e.code;
       _resetAt = e.resetAt;
       debugPrint('Failed to refresh assistant history: $e');
@@ -352,7 +372,15 @@ class AssistantChatProvider extends ChangeNotifier {
       _unsentDraft = cleanText;
       // Retain _activeClientRequestId so retrying this draft reuses the clientRequestId
       _errorMessage = e.message;
-      if (e.status != null) _currentStatus = e.status!;
+      if (e.status != null) {
+        _currentStatus = e.status!;
+      } else if (e.isDailyLimit) {
+        _currentStatus = AssistantMessageStatus.dailyLimit;
+      } else if (e.isThrottled) {
+        _currentStatus = AssistantMessageStatus.throttled;
+      } else if (e.isUnavailable) {
+        _currentStatus = AssistantMessageStatus.unavailable;
+      }
       _reasonCode = e.reasonCode ?? e.code;
       _resetAt = e.resetAt;
 
@@ -390,10 +418,12 @@ class AssistantChatProvider extends ChangeNotifier {
     // Backend checks appointment_idempotency before checking offer expiry.
     // If not a retry, check bookable locally before calling server.
     if (!isRetry && !offer.isBookable(DateTime.now())) {
-      _errorMessage = 'This appointment slot is no longer available.';
       _offersById[offer.offerId] = offer.copyWith(isAvailable: false);
       notifyListeners();
       await refreshHistory();
+      _errorMessage = 'This appointment slot is no longer available.';
+      _reasonCode = 'offer_expired';
+      notifyListeners();
       return null;
     }
 
@@ -436,6 +466,7 @@ class AssistantChatProvider extends ChangeNotifier {
     } on AssistantFunctionException catch (e) {
       if (_isDisposed || currentGen != _generation) return null;
       _errorMessage = e.message;
+      _reasonCode = e.reasonCode ?? e.code;
 
       if (e.isOfferExpiredOrTaken) {
         // Slot taken or expired: reset idempotency key, mark unavailable and refresh

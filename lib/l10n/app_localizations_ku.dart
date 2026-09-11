@@ -2380,4 +2380,7 @@ class AppLocalizationsKu extends AppLocalizations {
   @override
   String get assistantHistoryLoadFailed =>
       'بارکردنی مێژووی گفتوگۆ سەرکەوتوو نەبوو. هێڵی ئینتەرنێتەکەت بپشکنە.';
+
+  @override
+  String get assistantBadge => 'یاریدەدەری زیرەک';
 }

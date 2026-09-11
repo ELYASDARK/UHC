@@ -354,7 +354,7 @@ export class GeminiAssistantClient {
                 } catch {
                     errorBody = rawText;
                 }
-                console.error('[GeminiAssistantClient] HTTP Error:', response.status, JSON.stringify(errorBody));
+                console.error('[GeminiAssistantClient] HTTP Error status:', response.status);
                 return {
                     httpStatus: response.status,
                     errorBody,

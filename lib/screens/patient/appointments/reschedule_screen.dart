@@ -124,7 +124,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   DateTime _getExactAppointmentTime() {
     final date = widget.appointment.appointmentDate;
     final timeSlot = widget.appointment.timeSlot; // e.g., '14:30 - 15:00'
-    final startTimeStr = timeSlot.split(' - ').first; // '14:30'
+    final startTimeStr = timeSlot.split(' - ').first.trim(); // '14:30'
     final parts = startTimeStr.split(':');
     int hour = 0;
     int minute = 0;
@@ -132,15 +132,16 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       hour = int.tryParse(parts[0]) ?? 0;
       minute = int.tryParse(parts[1]) ?? 0;
     }
-    return DateTime(date.year, date.month, date.day, hour, minute);
+    // Clinic is in Baghdad timezone (UTC+3, no DST)
+    return DateTime.utc(date.year, date.month, date.day, hour, minute)
+        .subtract(const Duration(hours: 3));
   }
 
   bool _canReschedule() {
-    // Check 24-hour policy using UTC to avoid timezone issues
-    final appointmentTime = _getExactAppointmentTime().toUtc();
+    // Check 24-hour policy against canonical UTC appointment time
+    final appointmentTime = _getExactAppointmentTime();
     final now = DateTime.now().toUtc();
-    final hoursUntil = appointmentTime.difference(now).inHours;
-    return hoursUntil >= 24;
+    return appointmentTime.difference(now).inMinutes >= 24 * 60;
   }
 
   @override

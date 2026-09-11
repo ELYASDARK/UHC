@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/locale_utils.dart';
 import '../../../core/utils/localization_helper.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/appointment_model.dart';
@@ -198,7 +199,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_provider.errorMessage ?? l10n.assistantClearChatFailed),
+              content: Text(l10n.assistantClearChatFailed),
               backgroundColor: AppColors.error,
             ),
           );
@@ -609,12 +610,17 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
                                         setModalState(() => isSubmitting = false);
                                       }
                                       if (mounted) {
+                                        final reason = _provider.reasonCode;
+                                        final isStaleOffer = reason == 'already-exists' ||
+                                            reason == 'offer_taken' ||
+                                            reason == 'failed-precondition' ||
+                                            reason == 'offer_expired';
+                                        final errorText = isStaleOffer
+                                            ? l10n.assistantStaleOffer
+                                            : l10n.bookingFailed;
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
-                                            content: Text(
-                                              _provider.errorMessage ??
-                                                  l10n.bookingFailed,
-                                            ),
+                                            content: Text(errorText),
                                             backgroundColor: AppColors.error,
                                           ),
                                         );
@@ -719,7 +725,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
   String _formatDate(String yyyyMmDd, BuildContext context) {
     try {
       final date = DateTime.parse(yyyyMmDd);
-      final locale = Localizations.localeOf(context).languageCode;
+      final locale = safeIntlLocale(context);
       return intl.DateFormat.yMMMMEEEEd(locale).format(date);
     } catch (_) {
       return yyyyMmDd;
@@ -827,7 +833,8 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
     String resetText = '';
     if (provider.resetAt != null) {
       final localReset = provider.resetAt!.toLocal();
-      final formattedTime = intl.DateFormat('h:mm a, MMM d').format(localReset);
+      final locale = safeIntlLocale(context);
+      final formattedTime = intl.DateFormat('h:mm a, MMM d', locale).format(localReset);
       resetText = l10n.assistantResetsAt(formattedTime);
     }
 

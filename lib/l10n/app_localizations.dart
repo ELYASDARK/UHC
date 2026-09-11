@@ -4605,6 +4605,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unable to load conversation history. Check your connection.'**
   String get assistantHistoryLoadFailed;
+
+  /// No description provided for @assistantBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Assistant'**
+  String get assistantBadge;
 }
 
 class _AppLocalizationsDelegate

@@ -892,5 +892,6 @@
   "assistantInfoTimezoneTitle": "Clinic Timezone",
   "assistantInfoTooltip": "Assistant Information",
   "assistantClearChatFailed": "Failed to clear chat history on server.",
-  "assistantHistoryLoadFailed": "Unable to load conversation history. Check your connection."
+  "assistantHistoryLoadFailed": "Unable to load conversation history. Check your connection.",
+  "assistantBadge": "AI Assistant"
 }

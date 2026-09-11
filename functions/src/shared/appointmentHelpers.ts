@@ -227,8 +227,15 @@ export async function releaseAppointmentSlot(
 }
 
 export function parseAppointmentDate(value: string): Date {
+    if (!value || typeof value !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentDate must be a valid ISO date string.');
+    }
+    const datePart = value.split('T')[0];
+    if (!isValidCalendarDate(datePart)) {
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentDate must be a valid ISO date string with a valid calendar date.');
+    }
     const parsed = new Date(value);
-    if (!value || Number.isNaN(parsed.getTime())) {
+    if (Number.isNaN(parsed.getTime())) {
         throw new functions.https.HttpsError('invalid-argument', 'appointmentDate must be a valid ISO date string.');
     }
     return parsed;
@@ -403,6 +410,12 @@ export function getDoctorDaySchedule(
 
 export function matchesTimeSlot(slot: DoctorScheduleSlot, requestedTimeSlot: string): boolean {
     const normalizedReq = requestedTimeSlot.trim();
+    const explicitRange = parseExplicitSlotRange(normalizedReq);
+    if (explicitRange) {
+        if (slot.startTime !== explicitRange.startTime) return false;
+        if (slot.endTime && slot.endTime !== explicitRange.endTime) return false;
+        return true;
+    }
     const startOnly = canonicalSlotStartTime(normalizedReq);
     if (slot.startTime === normalizedReq || slot.startTime === startOnly) {
         return true;

@@ -241,12 +241,16 @@ export async function commitAssistantTurn(
             createdAt: nowIso,
         };
 
-        const updatedMessages = [...(currentDoc.messages || []), assistantMsg]
-            .slice(-ASSISTANT_CONFIG.MAX_CHAT_MESSAGES);
+        const isAccepted = params.status === 'ready' || params.status === 'clarify' || params.status === 'out_of_scope';
+        const baseMessages = isAccepted
+            ? (currentDoc.messages || [])
+            : (currentDoc.messages || []).slice(0, -1);
 
-        const updatedOffers = params.offers.length > 0
-            ? params.offers.slice(0, ASSISTANT_CONFIG.MAX_ACTIVE_OFFERS)
-            : (currentDoc.offers || []);
+        const updatedMessages = params.assistantMessage
+            ? [...baseMessages, assistantMsg].slice(-ASSISTANT_CONFIG.MAX_CHAT_MESSAGES)
+            : baseMessages.slice(-ASSISTANT_CONFIG.MAX_CHAT_MESSAGES);
+
+        const updatedOffers = (params.offers || []).slice(0, ASSISTANT_CONFIG.MAX_ACTIVE_OFFERS);
 
         const finalResult: SendAssistantMessageResult = {
             success: true,

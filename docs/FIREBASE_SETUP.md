@@ -166,7 +166,7 @@ Use the project's actual results for handoff. The documentation review does not 
 | `appointments` | Booking records with status tracking, QR check-in, and scan failure counts |
 | `appointment_slot_locks` | Transactional slot lock documents preventing double-booking (server-managed, client access denied) |
 | `appointment_day_coordination` | Transactional day coordination documents serializing booking and rescheduling across overlapping/differently-sized slot ranges (server-managed, client access denied) |
-| `appointment_idempotency` | Booking and rescheduling idempotency receipts enabling safe lost-response retries (server-managed, client access denied) |
+| `appointment_idempotency` | Booking and assistant-confirmation idempotency receipts enabling safe lost-response retries (server-managed, client access denied) |
 | `assistant_chats` | Server-side conversational session state, turn leasing, and structured booking offers (server-managed, client access denied, TTL-managed) |
 | `assistant_user_limits` | Per-user rate-limiting records tracking per-minute turn usage (`USER_RPM` cap, keyed by `${patientId}_${minuteKey}`) per `functions/src/assistant/quota.ts` (server-managed, client access denied, TTL-managed) |
 | `assistant_project_quota` | Global daily upstream Gemini API quota tracker with midnight America/Los_Angeles reset (server-managed, client access denied, TTL-managed) |
@@ -339,7 +339,7 @@ flutter run -d chrome --dart-define=USE_FIREBASE_EMULATOR=true
 ##### 5. Sign In and Test the Appointment Assistant
 1. When the login screen loads in Chrome, note the blue **LOCAL EMULATOR MODE (demo-uhc-test)** banner.
 2. Click **Sign In as Demo Patient (No OAuth)** (authenticates directly with email `synthetic.patient@demo.uhc.edu` / `TestPassword123!` against the local Auth emulator; external OAuth is disabled in emulator mode).
-3. On the Patient Home screen (first tab in bottom navigation bar), locate the **AI Health Assistant** / **AI Booking Assistant** card (`_buildAssistantCard` in `lib/screens/patient/home_screen.dart`, rendered as a gradient banner with robot icon). Note: This is an entry card on the Home screen, not a separate bottom navigation tab. Click the card to open the assistant.
+3. On the Patient Home screen (first tab in bottom navigation bar), locate the **AI Health Assistant** / **AI Booking Assistant** card (`_buildAssistantCard` in `lib/screens/patient/home/home_screen.dart`, rendered as a gradient banner with robot icon). Note: This is an entry card on the Home screen, not a separate bottom navigation tab. Click the card to open the assistant.
 4. Type the documented synthetic phrase:
    > "I want an appointment with Dr. Noor in dermatology on Tuesday"
 5. The assistant returns real expiring schedule offers for Dr. Noor on Tuesday.

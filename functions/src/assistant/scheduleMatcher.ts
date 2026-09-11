@@ -212,36 +212,47 @@ export async function matchScheduleAndGenerateOffers(
     const offers: AssistantOffer[] = [];
     const expiresAt = new Date(now.getTime() + ASSISTANT_CONFIG.OFFER_EXPIRATION_MINUTES * 60000).toISOString();
 
-    for (const doctor of candidates) {
+    const eligibleDoctors = candidates
+        .map((doctor) => ({ doctor, daySlots: getDoctorDaySchedule(doctor.data, targetDate) }))
+        .filter((entry) => entry.daySlots.length > 0);
+
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < eligibleDoctors.length; i += BATCH_SIZE) {
         if (offers.length >= ASSISTANT_CONFIG.MAX_ACTIVE_OFFERS) break;
 
-        const daySlots = getDoctorDaySchedule(doctor.data, targetDate);
-        if (daySlots.length === 0) continue;
+        const batch = eligibleDoctors.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+            batch.map(async ({ doctor, daySlots }) => {
+                const [appointmentsSnap, locksSnap] = await Promise.all([
+                    db.collection('appointments')
+                        .where('doctorId', '==', doctor.id)
+                        .where('appointmentDate', '>=', startOfDay)
+                        .where('appointmentDate', '<=', endOfDay)
+                        .get(),
+                    db.collection('appointment_slot_locks')
+                        .where('doctorId', '==', doctor.id)
+                        .where('appointmentDateKey', '==', targetDate)
+                        .get(),
+                ]);
 
-        // Bounded doctor availability queries: 1 query for appointments, 1 for locks
-        const [appointmentsSnap, locksSnap] = await Promise.all([
-            db.collection('appointments')
-                .where('doctorId', '==', doctor.id)
-                .where('appointmentDate', '>=', startOfDay)
-                .where('appointmentDate', '<=', endOfDay)
-                .get(),
-            db.collection('appointment_slot_locks')
-                .where('doctorId', '==', doctor.id)
-                .where('appointmentDateKey', '==', targetDate)
-                .get(),
-        ]);
+                const activeAppointments = appointmentsSnap.docs
+                    .map((d) => d.data())
+                    .filter((appt) => ACTIVE_APPOINTMENT_STATUSES.includes(appt.status));
 
-        const activeAppointments = appointmentsSnap.docs
-            .map((doc) => doc.data())
-            .filter((appt) => ACTIVE_APPOINTMENT_STATUSES.includes(appt.status));
+                const activeLocks = locksSnap.docs
+                    .map((d) => d.data())
+                    .filter((lock) => ACTIVE_APPOINTMENT_STATUSES.includes(lock.status || 'pending'));
 
-        const activeLocks = locksSnap.docs
-            .map((doc) => doc.data())
-            .filter((lock) => ACTIVE_APPOINTMENT_STATUSES.includes(lock.status || 'pending'));
+                return { doctor, daySlots, activeAppointments, activeLocks };
+            })
+        );
 
-        for (const slot of daySlots) {
+        for (const { doctor, daySlots, activeAppointments, activeLocks } of batchResults) {
             if (offers.length >= ASSISTANT_CONFIG.MAX_ACTIVE_OFFERS) break;
-            if (slot.isAvailable === false || !slot.startTime) continue;
+
+            for (const slot of daySlots) {
+                if (offers.length >= ASSISTANT_CONFIG.MAX_ACTIVE_OFFERS) break;
+                if (slot.isAvailable === false || !slot.startTime) continue;
 
             if (!matchesTimeFilter(slot.startTime, intent.timeFilter)) {
                 continue;
@@ -286,6 +297,7 @@ export async function matchScheduleAndGenerateOffers(
                 isAvailable: true,
             });
         }
+    }
     }
 
     if (offers.length === 0) {

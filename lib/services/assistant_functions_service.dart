@@ -83,7 +83,7 @@ class FirebaseAssistantFunctionsService implements AssistantFunctionsService {
     try {
       final callable = _functions.httpsCallable(
         'sendAssistantMessage',
-        options: HttpsCallableOptions(timeout: const Duration(seconds: 70)),
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 60)),
       );
 
       final payload = <String, dynamic>{

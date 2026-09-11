@@ -4,12 +4,13 @@ import { admin, db } from './firebase';
 import { writeAdminAuditLog } from './shared/audit';
 import {
     ACTIVE_APPOINTMENT_STATUSES,
-    appointmentSlotLockRef,
     availabilityDateParts,
     baghdadStartOfToday,
+    canonicalAppointmentSlotLockRef,
     firestoreDateToDate,
     formatDateForNotification,
     getDoctorForUser,
+    legacyAppointmentSlotLockRef,
 } from './shared/appointmentHelpers';
 import { getCallerUserDoc, requireAuth, requirePermission } from './shared/auth';
 import { errorMessage } from './shared/errors';
@@ -257,7 +258,8 @@ async function cancelActiveAppointmentsForUnavailableDoctor(params: {
                 updatedAt: admin.firestore.Timestamp.now(),
             });
             if (appointmentDate && timeSlot) {
-                batch.delete(appointmentSlotLockRef(params.doctorId, appointmentDate, timeSlot));
+                batch.delete(canonicalAppointmentSlotLockRef(params.doctorId, appointmentDate, timeSlot));
+                batch.delete(legacyAppointmentSlotLockRef(params.doctorId, appointmentDate, timeSlot));
             }
             notifications.push({
                 appointmentId: doc.id,
