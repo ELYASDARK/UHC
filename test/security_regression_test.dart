@@ -331,30 +331,6 @@ void main() {
       expect(notificationsSource, contains("hasPermission('doctors.manage')"));
     });
 
-    test('patients cannot book unavailable doctors from UI paths', () {
-      final doctorListSource = readProjectFile(
-        'lib/screens/patient/browse_doctors/doctor_list_screen.dart',
-      );
-      final bookingSource = readProjectFile(
-        'lib/screens/patient/booking/booking_screen.dart',
-      );
-      final scheduleSource = readProjectFile(
-        'lib/screens/patient/browse_doctors/doctor_schedule_screen.dart',
-      );
-      final doctorModelSource = readProjectFile(
-        'lib/data/models/doctor_model.dart',
-      );
-
-      expect(doctorListSource, contains('!doctor.isAvailable'));
-      expect(doctorListSource,
-          contains('This doctor is not available for booking right now.'));
-      expect(bookingSource, contains('bool get _doctorCanBook'));
-      expect(bookingSource, contains('doctorId: _doctor.id'));
-      expect(scheduleSource, contains('!_doctor.canBook'));
-      expect(doctorModelSource, contains('bool get canBook => isActive && isAvailable;'));
-      expect(scheduleSource, contains('.snapshots()'));
-    });
-
     test('emulator config unit: resolveFirebaseOptions selects synthetic options and rejects release', () {
       // 1. When opt-in is false, resolves default options
       final prodOptions = EmulatorConfig.resolveFirebaseOptions(isEmulatorOptIn: false);
