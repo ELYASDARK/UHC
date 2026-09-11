@@ -143,7 +143,7 @@ UHC is a Flutter application for university health centers. Students and staff c
 | **File Storage** | Firebase Storage | Medical document & image hosting |
 | **Messaging** | Firebase Cloud Messaging | Push notifications |
 | **Server Logic** | Firebase Cloud Functions (TypeScript) | Privileged admin operations & AI assistant pipeline |
-| **AI & NLP** | Google Gemini (gemini-3.5-flash-lite) | Server-side structured scheduling intent interpretation with fail-closed privacy gates and offline emulator fixtures |
+| **AI & NLP** | Google Gemini (gemini-3.5-flash-lite) | Interprets appointment requests on the server |
 | **Local Storage** | SharedPreferences | User preferences & theme persistence |
 | **Notifications** | flutter_local_notifications | Scheduled local reminders |
 | **UI Framework** | Material Design 3, Google Fonts | App styling and typography |
@@ -169,18 +169,18 @@ flowchart TB
     storage[Firebase Storage]
     auth[Firebase Authentication]
     functions[Cloud Functions]
+    gemini["Google Gemini API<br/>(Structured Intent)"]
     firestore[(Cloud Firestore)]
     push["Firebase Cloud<br/>Messaging"]
-    gemini["Google Gemini API<br/>(Structured Intent)"]
 
     data -->|File access| storage
     data -->|"Sign-in and<br/>account linking"| auth
     data -->|"Appointment and<br/>assistant operations"| functions
     data -->|"Permitted<br/>reads and writes"| firestore
     functions --->|"Auth checks and<br/>account updates"| auth
+    functions -->|"Scheduling request<br/>interpretation"| gemini
     functions -->|"Validated<br/>writes"| firestore
     functions -->|"Push<br/>delivery"| push
-    functions -->|"Sanitized intent<br/>interpretation"| gemini
     push -->|Device notifications| screens
     style client fill:transparent,stroke:transparent
 ```
@@ -308,34 +308,22 @@ See the [Cloud Functions reference](docs/CLOUD_FUNCTIONS.md) for the full functi
 
 ## AI Appointment Assistant
 
-UHC includes an AI-powered conversational appointment assistant that enables patients (students and staff) to discover available doctors and schedule appointments using natural language in English, Arabic, and Kurdish Sorani.
+Patients can ask for an appointment in English, Arabic, or Kurdish Sorani. The backend uses Gemini `gemini-3.5-flash-lite` to extract the doctor, department, date, and time preferences. It then checks Firestore schedules and existing bookings in Baghdad time.
 
-### Key Capabilities
+- **Booking offers:** Up to six available slots, each valid for ten minutes. The patient selects a slot and confirms it before the backend creates the appointment. Slot locks and retry receipts protect against conflicting or duplicate bookings.
+- **Conversation history:** Up to 20 messages with seven-day retention. Resuming a conversation rechecks its offers; expired offers from the last successful search can be replaced without another Gemini call.
+- **Usage limits:** The app defaults to 500 requests per day and 15 per minute across the project, plus ten per minute per user. These are application limits, not a promise of Google's free allowance. When the daily limit is reached, patients can use manual booking or wait until the displayed reset time at midnight Pacific Time.
+- **Scheduling scope:** The model extracts scheduling intent. Replies come from application templates, and medical questions receive an out-of-scope response. It does not provide an assessment or diagnosis.
 
-- **Multilingual Intent Interpretation**. Powered by Google Gemini (`gemini-3.5-flash-lite`), parsing patient queries, preferred dates/times, doctor names, and departments across English, Arabic (`ar`), and Central Kurdish (`ckb`/`ku`).
-- **Real-Time Schedule Matching**. Evaluates active doctor weekly schedules in the Asia/Baghdad timezone (UTC+3, no DST), verifying working hours, active doctor status, and checking for existing appointments and slot locks before generating offers.
-- **Expiring Structured Offers**. Returns up to 6 concrete appointment slots with a 10-minute expiry window. Offers refresh automatically upon conversation resumption.
-- **Affirmative Booking Confirmation**. The model never books appointments autonomously. Patients review the selected offer in a confirmation modal and must explicitly confirm the booking, executing canonical appointment creation with transactional slot locking and idempotency.
+### Configuration and data sent to Gemini
 
-### Safety, Privacy & Guardrails
+The API key stays in Firebase Secret Manager. Live requests require both `AI_ASSISTANT_ENABLED=true` and `AI_PRIVACY_RELEASE_GATE_ACCEPTED=true`; the code defaults to disabled.
 
-- **Strict Prompt Boundary**. Outbound calls to Gemini only receive sanitized patient messages, recent conversation history (<= 20 messages), and department/doctor catalog metadata. Patient IDs, emails, and medical documents are never transmitted to the external model.
-- **Medical Refusal & Emergency Guidance**. Medical, symptom, and diagnostic inquiries are strictly classified as out-of-scope; the assistant provides neutral, server-controlled emergency guidance directing patients to standard clinical care.
-- **Server-Controlled Localized Copy**. All user-facing UI messages, status explanations, and error banners are rendered using server-side localization strings rather than arbitrary LLM prose.
-- **Input & Quota Controls**. Messages are validated and capped at 500 characters. Users are rate-limited to 10 requests/minute (`USER_RPM_CAP`), with a shared project quota of 500 requests/day (`DEFAULT_RPD_CAP`) resetting at midnight Pacific Time (`America/Los_Angeles`).
+Gemini receives the patient's message (up to 500 characters), up to four recent messages truncated to 200 characters each, and doctor/department catalog details. The app does not attach patient account records or medical documents. **Free-text messages are not automatically redacted** and can contain personal information entered by the patient. Review the provider's data terms before enabling live use.
 
-### Offline Local Testing with Emulators
+An optional local synthetic mode exercises booking with fixed responses and no Gemini calls. It requires emulator setup; it does not measure the model's response quality.
 
-The assistant includes a deterministic offline synthetic mode that tests full conversational flows, schedule matching, and slot locking without calling external Gemini APIs or requiring a live API key:
-
-```powershell
-# Run with Firebase Local Emulator Suite
-flutter run -d chrome --dart-define=USE_FIREBASE_EMULATOR=true
-```
-
-For complete architectural details, schema specifications, and deployment steps, see:
-- [AI Appointment Assistant Setup & Architecture](docs/FIREBASE_SETUP.md#ai-appointment-assistant-setup--architecture)
-- [Assistant Cloud Functions API Reference](docs/CLOUD_FUNCTIONS.md#ai-appointment-assistant)
+See [assistant configuration](docs/FIREBASE_SETUP.md#ai-assistant-configuration--privacy-gate), [optional emulator setup](docs/FIREBASE_SETUP.md#controlled-local-offline-synthetic-testing), and the [callable API reference](docs/CLOUD_FUNCTIONS.md#ai-appointment-assistant).
 
 ---
 

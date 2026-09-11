@@ -413,7 +413,7 @@ export function matchesTimeSlot(slot: DoctorScheduleSlot, requestedTimeSlot: str
     const explicitRange = parseExplicitSlotRange(normalizedReq);
     if (explicitRange) {
         if (slot.startTime !== explicitRange.startTime) return false;
-        if (slot.endTime && slot.endTime !== explicitRange.endTime) return false;
+        if (slot.endTime !== explicitRange.endTime) return false;
         return true;
     }
     const startOnly = canonicalSlotStartTime(normalizedReq);

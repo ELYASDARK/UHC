@@ -32,7 +32,8 @@ class AssistantFunctionException implements Exception {
   bool get isUnauthenticated => code == 'unauthenticated';
   bool get isPermissionDenied => code == 'permission-denied';
   bool get isNotFound => code == 'not-found';
-  bool get isUnavailable => code == 'unavailable';
+  bool get isUnavailable =>
+      code == 'unavailable' || code == 'deadline-exceeded';
 
   @override
   String toString() => 'AssistantFunctionException(code: $code, message: $message)';
@@ -83,7 +84,8 @@ class FirebaseAssistantFunctionsService implements AssistantFunctionsService {
     try {
       final callable = _functions.httpsCallable(
         'sendAssistantMessage',
-        options: HttpsCallableOptions(timeout: const Duration(seconds: 60)),
+        // Leave a five-second margin before the 75-second server deadline.
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 70)),
       );
 
       final payload = <String, dynamic>{

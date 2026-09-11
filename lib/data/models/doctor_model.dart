@@ -302,7 +302,8 @@ class TimeSlot {
   String get display => startTime;
 
   /// Full display with range (for detailed views)
-  String get fullDisplay => '$startTime - $endTime';
+  String get fullDisplay =>
+      endTime.isEmpty ? startTime : '$startTime - $endTime';
 
   /// Matches canonical 2-digit 24-hour time HH:mm (00:00 - 23:59)
   /// Group 1: hour (00-23)
@@ -319,13 +320,14 @@ class TimeSlot {
     return hour * 60 + minute;
   }
 
-  /// Whether this slot is available and has valid, non-malformed start and end times
-  /// where end time is strictly after start time.
+  /// Accepts legacy start-only slots; an explicit end must follow the start.
   bool get isValid {
     if (!isAvailable) return false;
     final startMin = parseMinutes(startTime);
+    if (startMin == null) return false;
+    if (endTime.isEmpty) return true;
     final endMin = parseMinutes(endTime);
-    if (startMin == null || endMin == null) return false;
+    if (endMin == null) return false;
     return endMin > startMin;
   }
 }

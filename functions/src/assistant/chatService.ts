@@ -510,7 +510,8 @@ export async function refreshPatientChatHistory(
 
     // If all existing offers are expired and preferences exist, revalidate fresh offers
     const allExpired = refreshedOffers.every((o) => !o.isAvailable);
-    if (allExpired && chatDoc.searchPreferences) {
+    if (allExpired && existingOffers.length > 0 &&
+        (!chatDoc.lastResult || chatDoc.lastResult.status === 'ready') && chatDoc.searchPreferences) {
         const pref = chatDoc.searchPreferences;
         const freshMatch = await matchScheduleAndGenerateOffers(
             db,

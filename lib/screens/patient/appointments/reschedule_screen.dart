@@ -122,7 +122,9 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   }
 
   DateTime _getExactAppointmentTime() {
-    final date = widget.appointment.appointmentDate;
+    // Extract the calendar day in clinic time, regardless of device timezone.
+    final date = widget.appointment.appointmentDate.toUtc()
+        .add(const Duration(hours: 3));
     final timeSlot = widget.appointment.timeSlot; // e.g., '14:30 - 15:00'
     final startTimeStr = timeSlot.split(' - ').first.trim(); // '14:30'
     final parts = startTimeStr.split(':');

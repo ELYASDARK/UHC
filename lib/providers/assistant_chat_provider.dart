@@ -149,7 +149,7 @@ class AssistantChatProvider extends ChangeNotifier {
       _resetAt = history.resetAt;
       _currentStatus = history.status ?? AssistantMessageStatus.ready;
       _errorMessage = null;
-      _reasonCode = null;
+      _reasonCode = history.reasonCode;
     } on AssistantFunctionException catch (e) {
       if (_isDisposed || currentGen != _generation) return;
       _errorMessage = e.message;
@@ -183,7 +183,7 @@ class AssistantChatProvider extends ChangeNotifier {
   /// Refreshes availability of offers on open/resume without invoking AI.
   Future<void> refreshHistory({bool force = false}) async {
     if (_patientId == null || _patientId!.isEmpty || _isDisposed || _isClearing) return;
-    if (_isSending || _isConfirming || _isLoading) {
+    if (_isSending || (_isConfirming && !force) || _isLoading) {
       _refreshPending = true;
       return;
     }
@@ -208,7 +208,7 @@ class AssistantChatProvider extends ChangeNotifier {
         _resetAt = history.resetAt;
         _currentStatus = history.status ?? AssistantMessageStatus.ready;
         _errorMessage = null;
-        _reasonCode = null;
+        _reasonCode = history.reasonCode;
       }
     } on AssistantFunctionException catch (e) {
       if (_isDisposed || currentGen != _generation) return;
@@ -473,7 +473,10 @@ class AssistantChatProvider extends ChangeNotifier {
         _activeBookingIdempotencyKey = null;
         _activeBookingOfferId = null;
         _offersById[offer.offerId] = offer.copyWith(isAvailable: false);
-        await refreshHistory();
+        await refreshHistory(force: true);
+        if (_isDisposed || currentGen != _generation) return null;
+        _errorMessage = e.message;
+        _reasonCode = e.reasonCode ?? e.code;
       }
       // For network errors, preserve _activeBookingIdempotencyKey for retry!
       return null;

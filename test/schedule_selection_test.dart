@@ -284,7 +284,7 @@ void main() {
         TimeSlot(startTime: '10:00', endTime: '10:00', isAvailable: true), // zero duration
         TimeSlot(startTime: '10:00', endTime: 'bad_end', isAvailable: true), // malformed end
         TimeSlot(startTime: '', endTime: '11:00', isAvailable: true), // empty start
-        TimeSlot(startTime: '10:00', endTime: '', isAvailable: true), // empty end
+        TimeSlot(startTime: '10:00', endTime: '', isAvailable: true), // legacy start-only slot
         TimeSlot(startTime: '11:00', endTime: '11:30', isAvailable: true), // VALID
       ];
 
@@ -297,7 +297,7 @@ void main() {
       expect(slots[5].isValid, isFalse);
       expect(slots[6].isValid, isFalse);
       expect(slots[7].isValid, isFalse);
-      expect(slots[8].isValid, isFalse);
+      expect(slots[8].isValid, isTrue);
       expect(slots[9].isValid, isTrue);
 
       final doctor = createTestDoctor(
@@ -305,9 +305,8 @@ void main() {
       );
 
       final available = doctor.getAvailableSlots(mondayDate);
-      expect(available.length, equals(1));
-      expect(available.first.startTime, equals('11:00'));
-      expect(available.first.endTime, equals('11:30'));
+      expect(available.map((slot) => slot.fullDisplay),
+          ['10:00', '11:00 - 11:30']);
     });
 
     test('day containing only disabled/malformed slots is treated as empty', () {

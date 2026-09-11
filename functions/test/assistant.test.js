@@ -1086,6 +1086,13 @@ test('refreshPatientChatHistory re-matches doctor availability using saved prefe
     assert.equal(refreshed.offers[0].doctorId, 'doc_ped');
     assert.equal(refreshed.offers[0].department, 'pediatrics');
     assert.notEqual(refreshed.offers[0].offerId, 'offer_old'); // Fresh new offer generated
+
+    const saved = store.get('assistant_chats').get(patientId);
+    saved.offers = [];
+    saved.lastResult = { status: 'clarify' };
+    const clarified = await refreshPatientChatHistory(mockDb, patientId, departments, doctors, FROZEN_NOW);
+    assert.deepEqual(clarified.offers, []);
+
 });
 
 // ---------------------------------------------------------------------------
@@ -1898,4 +1905,30 @@ test('PR5 unaccepted turn commits explanation without persisting unsent patient 
     assert.equal(after.messages.length, 1);
     assert.equal(after.messages[0].sender, 'assistant');
     assert.equal(after.messages[0].text, 'Daily limit reached');
+});
+
+
+test('patient rescheduling enforces 24-hour notice for both student and staff accounts', async (t) => {
+    const { rescheduleAppointment } = require('../lib/appointments');
+    await withFrozenTime(FROZEN_NOW, async () => {
+        const { mockDb, store } = createMockFirestore();
+        t.mock.method(db, 'collection', mockDb.collection);
+        t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: [{ providerId: 'google.com' }] }));
+        for (const role of ['student', 'staff']) {
+            await mockDb.collection('users').doc(role).set({ role, isActive: true });
+            await mockDb.collection('appointments').doc(role).set({
+                patientId: role,
+                doctorId: 'doctor_notice',
+                status: 'pending',
+                appointmentDate: admin.firestore.Timestamp.fromDate(new Date('2026-09-11T00:00:00Z')),
+                timeSlot: '12:00 - 12:30',
+            });
+            await assert.rejects(rescheduleAppointment.run({
+                auth: { uid: role },
+                data: { appointmentId: role, appointmentDate: '2026-09-12', timeSlot: '12:00 - 12:30' },
+            }), e => e.code === 'failed-precondition' && e.message.includes('within 24 hours'));
+            assert.equal(store.get('appointments').get(role).status, 'pending');
+        }
+    });
 });

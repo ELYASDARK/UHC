@@ -329,6 +329,7 @@ class GetAssistantHistoryResult {
   final int revision;
   final DateTime? resetAt;
   final AssistantMessageStatus? status;
+  final String? reasonCode;
 
   const GetAssistantHistoryResult({
     required this.success,
@@ -337,6 +338,7 @@ class GetAssistantHistoryResult {
     required this.revision,
     this.resetAt,
     this.status,
+    this.reasonCode,
   });
 
   factory GetAssistantHistoryResult.fromJson(Map<String, dynamic> json) {
@@ -382,6 +384,7 @@ class GetAssistantHistoryResult {
       revision: (json['revision'] as num?)?.toInt() ?? 0,
       resetAt: parsedResetAt,
       status: parsedStatus,
+      reasonCode: json['reasonCode'] as String?,
     );
   }
 }

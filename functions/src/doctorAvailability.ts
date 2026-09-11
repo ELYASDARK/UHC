@@ -6,11 +6,10 @@ import {
     ACTIVE_APPOINTMENT_STATUSES,
     availabilityDateParts,
     baghdadStartOfToday,
-    canonicalAppointmentSlotLockRef,
     firestoreDateToDate,
     formatDateForNotification,
     getDoctorForUser,
-    legacyAppointmentSlotLockRef,
+    releaseAppointmentSlot,
 } from './shared/appointmentHelpers';
 import { getCallerUserDoc, requireAuth, requirePermission } from './shared/auth';
 import { errorMessage } from './shared/errors';
@@ -236,7 +235,6 @@ async function cancelActiveAppointmentsForUnavailableDoctor(params: {
 
         if (snap.empty) break;
 
-        const batch = db.batch();
         const notifications: Array<{
             appointmentId: string;
             patientId: string;
@@ -246,21 +244,25 @@ async function cancelActiveAppointmentsForUnavailableDoctor(params: {
         }> = [];
 
         for (const doc of snap.docs) {
-            const appointment = doc.data();
+            const appointment = await db.runTransaction(async (transaction) => {
+                const current = await transaction.get(doc.ref);
+                const data = current.data();
+                if (!current.exists || !data || data.doctorId !== params.doctorId ||
+                    !ACTIVE_APPOINTMENT_STATUSES.includes(data.status)) return null;
+                await releaseAppointmentSlot(transaction, doc.id, data);
+                transaction.update(doc.ref, {
+                    status: 'cancelled',
+                    cancelReason: 'Doctor unavailable. Please cancel or reschedule with another available time.',
+                    statusUpdatedBy: params.reviewedByUid,
+                    cancellationSource: 'doctorAvailabilityApproved',
+                    availabilityRequestId: params.requestId,
+                    updatedAt: admin.firestore.Timestamp.now(),
+                });
+                return data;
+            });
+            if (!appointment) continue;
             const appointmentDate = firestoreDateToDate(appointment.appointmentDate);
             const timeSlot = (appointment.timeSlot as string | undefined) || '';
-            batch.update(doc.ref, {
-                status: 'cancelled',
-                cancelReason: 'Doctor unavailable. Please cancel or reschedule with another available time.',
-                statusUpdatedBy: params.reviewedByUid,
-                cancellationSource: 'doctorAvailabilityApproved',
-                availabilityRequestId: params.requestId,
-                updatedAt: admin.firestore.Timestamp.now(),
-            });
-            if (appointmentDate && timeSlot) {
-                batch.delete(canonicalAppointmentSlotLockRef(params.doctorId, appointmentDate, timeSlot));
-                batch.delete(legacyAppointmentSlotLockRef(params.doctorId, appointmentDate, timeSlot));
-            }
             notifications.push({
                 appointmentId: doc.id,
                 patientId: appointment.patientId as string,
@@ -272,8 +274,6 @@ async function cancelActiveAppointmentsForUnavailableDoctor(params: {
             });
             appointmentIds.push(doc.id);
         }
-
-        await batch.commit();
 
         for (const notification of notifications) {
             if (!notification.patientId) continue;
@@ -293,7 +293,7 @@ async function cancelActiveAppointmentsForUnavailableDoctor(params: {
             });
         }
 
-        cancelledCount += snap.size;
+        cancelledCount += notifications.length;
         if (snap.size < DOCTOR_AVAILABILITY_APPOINTMENT_BATCH_SIZE) break;
     }
 

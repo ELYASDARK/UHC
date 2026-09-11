@@ -362,7 +362,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   }
 
   void _navigateToDetail(DoctorModel doctor) {
-    if (!doctor.isAvailable || !doctor.canBook) {
+    if (!doctor.canBook) {
       _showDoctorUnavailableMessage();
       return;
     }

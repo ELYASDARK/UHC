@@ -584,20 +584,6 @@ export const rescheduleAppointment = functions.https.onCall(
             throw new functions.https.HttpsError('failed-precondition', 'Only active appointments can be rescheduled.');
         }
 
-        const currentApptDate = firestoreDateToDate(appointment.appointmentDate);
-        if (callerDoc.data()?.role === 'patient' && currentApptDate && appointment.timeSlot) {
-            const currentApptDateKey = appointmentDateKey(currentApptDate);
-            const currentExactUtc = appointmentExactUtcTime(currentApptDateKey, appointment.timeSlot);
-            const diffMs = currentExactUtc.getTime() - Date.now();
-            const minNoticeMs = 24 * 60 * 60 * 1000;
-            if (diffMs < minNoticeMs) {
-                throw new functions.https.HttpsError(
-                    'failed-precondition',
-                    'Appointments cannot be rescheduled within 24 hours of the appointment time.'
-                );
-            }
-        }
-
         const parsedDate = parseAppointmentDate(appointmentDate);
         assertFutureAppointmentTime(parsedDate, timeSlot);
 
@@ -611,6 +597,20 @@ export const rescheduleAppointment = functions.https.onCall(
             const currentAppointment = transactionSnap.data()!;
             if (!ACTIVE_APPOINTMENT_STATUSES.includes(currentAppointment.status)) {
                 throw new functions.https.HttpsError('failed-precondition', 'Only active appointments can be rescheduled.');
+            }
+
+            const currentApptDate = firestoreDateToDate(currentAppointment.appointmentDate);
+            if (['student', 'staff'].includes(callerDoc.data()?.role) && currentApptDate && currentAppointment.timeSlot) {
+                const currentApptDateKey = appointmentDateKey(currentApptDate);
+                const currentExactUtc = appointmentExactUtcTime(currentApptDateKey, currentAppointment.timeSlot);
+                const diffMs = currentExactUtc.getTime() - Date.now();
+                const minNoticeMs = 24 * 60 * 60 * 1000;
+                if (diffMs < minNoticeMs) {
+                    throw new functions.https.HttpsError(
+                        'failed-precondition',
+                        'Appointments cannot be rescheduled within 24 hours of the appointment time.'
+                    );
+                }
             }
 
             const doctorId = currentAppointment.doctorId;

@@ -51,7 +51,7 @@ import {
  * interprets intent with Gemini, matches against real doctor schedules, and saves bounded history.
  */
 export const sendAssistantMessage = functions.https.onCall(
-    { secrets: ['GEMINI_API_KEY'], timeoutSeconds: 60 },
+    { secrets: ['GEMINI_API_KEY'], timeoutSeconds: 75 },
     async (
         request: functions.https.CallableRequest<SendAssistantMessageData>
     ): Promise<SendAssistantMessageResult> => {

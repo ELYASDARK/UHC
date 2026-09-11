@@ -254,50 +254,50 @@ export async function matchScheduleAndGenerateOffers(
                 if (offers.length >= ASSISTANT_CONFIG.MAX_ACTIVE_OFFERS) break;
                 if (slot.isAvailable === false || !slot.startTime) continue;
 
-            if (!matchesTimeFilter(slot.startTime, intent.timeFilter)) {
-                continue;
+                if (!matchesTimeFilter(slot.startTime, intent.timeFilter)) {
+                    continue;
+                }
+
+                if (intent.preferredTimeSlot && !matchesTimeSlot(slot, intent.preferredTimeSlot)) {
+                    continue;
+                }
+
+                // Verify not in past
+                const exactUtc = appointmentExactUtcTime(targetDate, slot.startTime);
+                if (exactUtc.getTime() <= now.getTime()) {
+                    continue;
+                }
+
+                const slotRange = `${slot.startTime}${slot.endTime ? ' - ' + slot.endTime : ''}`;
+
+                // Check locks (both canonical start-time lock and legacy lock)
+                const isLocked = activeLocks.some((l) => {
+                    const lockStart = canonicalSlotStartTime(l.startTime || l.timeSlot || '');
+                    return lockStart === slot.startTime || l.timeSlot === slotRange;
+                });
+                if (isLocked) continue;
+
+                // Check active appointments using trusted schedule duration
+                const hasConflict = activeAppointments.some((appt) => {
+                    return doesAppointmentOverlapSlot(appt, slot, doctor.data, targetDate);
+                });
+                if (hasConflict) continue;
+
+                offers.push({
+                    offerId: randomUUID(),
+                    doctorId: doctor.id,
+                    doctorName: typeof doctor.data.name === 'string' && doctor.data.name.trim()
+                        ? doctor.data.name.trim()
+                        : 'Doctor',
+                    department: doctor.data.department || 'generalMedicine',
+                    departmentName: deptMap.get(doctor.data.department) || doctor.data.department,
+                    appointmentDate: targetDate,
+                    timeSlot: slotRange,
+                    expiresAt,
+                    isAvailable: true,
+                });
             }
-
-            if (intent.preferredTimeSlot && !matchesTimeSlot(slot, intent.preferredTimeSlot)) {
-                continue;
-            }
-
-            // Verify not in past
-            const exactUtc = appointmentExactUtcTime(targetDate, slot.startTime);
-            if (exactUtc.getTime() <= now.getTime()) {
-                continue;
-            }
-
-            const slotRange = `${slot.startTime}${slot.endTime ? ' - ' + slot.endTime : ''}`;
-
-            // Check locks (both canonical start-time lock and legacy lock)
-            const isLocked = activeLocks.some((l) => {
-                const lockStart = canonicalSlotStartTime(l.startTime || l.timeSlot || '');
-                return lockStart === slot.startTime || l.timeSlot === slotRange;
-            });
-            if (isLocked) continue;
-
-            // Check active appointments using trusted schedule duration
-            const hasConflict = activeAppointments.some((appt) => {
-                return doesAppointmentOverlapSlot(appt, slot, doctor.data, targetDate);
-            });
-            if (hasConflict) continue;
-
-            offers.push({
-                offerId: randomUUID(),
-                doctorId: doctor.id,
-                doctorName: typeof doctor.data.name === 'string' && doctor.data.name.trim()
-                    ? doctor.data.name.trim()
-                    : 'Doctor',
-                department: doctor.data.department || 'generalMedicine',
-                departmentName: deptMap.get(doctor.data.department) || doctor.data.department,
-                appointmentDate: targetDate,
-                timeSlot: slotRange,
-                expiresAt,
-                isAvailable: true,
-            });
         }
-    }
     }
 
     if (offers.length === 0) {
