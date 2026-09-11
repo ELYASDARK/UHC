@@ -23,3 +23,5 @@ coverage
 
 # Clinvar / dbSNP cache, etc.
 .env
+.secret.local
+.secret.*.local

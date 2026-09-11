@@ -717,5 +717,63 @@
   "noAdminsFound": "No admin accounts found",
   "createFirstAdmin": "Create your first admin account",
   "bootstrapSuperAdmin": "Bootstrap Super Admin",
-  "migrationRunbook": "Migration Runbook"
+  "migrationRunbook": "Migration Runbook",
+
+  "assistantTitle": "مساعد المواعيد الذكي",
+  "assistantSubtitle": "ابحث عن المواعيد واحجزها عبر المحادثة",
+  "assistantDailyLimitHeading": "وصل المساعد إلى الحد اليومي الأقصى.",
+  "assistantSharedLimitExplanation": "هذا حد مشترك للمساعد وليس حصة فردية. الحجز الاعتيادي لا يزال متاحاً.",
+  "assistantResetsAt": "يُعاد التعيين في {time}",
+  "@assistantResetsAt": {
+    "description": "Explains when the assistant limit resets",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "assistantClearChat": "مسح المحادثة",
+  "assistantClearChatConfirmTitle": "مسح سجل المحادثة؟",
+  "assistantClearChatConfirmMessage": "هل أنت متأكد من مسح سجل المحادثة؟ ستتم أيضاً إزالة أي اقتراحات مواعيد نشطة.",
+  "assistantChatCleared": "تم مسح سجل المحادثة بنجاح.",
+  "assistantRetentionNotice": "يتم حفظ سجل المحادثة لمدة تصل إلى 7 أيام للمساعدة في تنظيم مواعيدك.",
+  "assistantPrivacyNotice": "يساعدك المساعد في البحث عن المواعيد وحجزها. لا يقدم نصائح طبية أو تشخيصاً. يرجى عدم مشاركة السجلات الطبية الحساسة.",
+  "assistantClinicTimezone": "توقيت العيادة (بغداد، غرينتش+3)",
+  "assistantSlotsNotReserved": "المواعيد غير محجوزة حتى يتم التأكيد.",
+  "assistantSelectSlot": "اختيار الموعد",
+  "assistantConfirmAppointment": "تأكيد الموعد",
+  "assistantSelectedSlot": "الموعد المختار",
+  "assistantConfirmNotice": "هل ترغب في تأكيد هذا الموعد؟ سيبقى الحجز قيد الانتظار حتى تسجيل الدخول في العيادة.",
+  "assistantNotesOptional": "ملاحظات للطبيب (اختياري)",
+  "assistantBookingInProgress": "جاري حجز الموعد...",
+  "assistantStaleOffer": "هذا الموعد لم يعد متاحاً. يرجى اختيار موعد آخر أو إرسال رسالة جديدة.",
+  "assistantOfferExpired": "منتهي الصلاحية",
+  "assistantOfferAvailable": "متاح",
+  "assistantDisabledNotice": "المساعد الذكي للمواعيد معطل حالياً وفقاً للسياسة. الحجز الاعتيادي لا يزال متاحاً.",
+  "assistantUnavailableNotice": "خدمة المساعد غير متاحة مؤقتاً. الحجز الاعتيادي لا يزال متاحاً.",
+  "assistantThrottledNotice": "لقد أرسلت عدة رسائل بسرعة. يرجى الانتظار لحظة قبل إرسال رسالة أخرى.",
+  "assistantInputPlaceholder": "اكتب طلب الحجز (مثلاً: حجز موعد مع طبيب غداً)...",
+  "assistantCharacterLimit": "لا يمكن أن تتجاوز الرسالة 500 حرف.",
+  "assistantInitialHelpPrompt": "مرحباً! يمكنني مساعدتك في العثور على مواعيد مع أطباء المركز الصحي وحجزها. أخبرني بالقسم أو الطبيب أو التاريخ الذي ترغب في الحجز له.",
+  "assistantBookDirectly": "حجز مباشر",
+  "assistantRetrySending": "إعادة المحاولة",
+  "assistantExpiresInMinutes": "ينتهي خلال {minutes} د",
+  "@assistantExpiresInMinutes": {
+    "description": "Minutes remaining until offer expires",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "assistantBookThisSlot": "حجز هذا الموعد",
+  "assistantErrorUnauthenticated": "يرجى تسجيل الدخول للوصول إلى مساعد المواعيد.",
+  "assistantErrorPermissionDenied": "ليس لديك إذن للوصول إلى مساعد المواعيد.",
+  "assistantErrorNotFound": "خدمة المساعد غير مهيأة أو غير متوفرة حالياً.",
+  "assistantInfoScopeTitle": "النطاق والخصوصية",
+  "assistantInfoRetentionTitle": "سياسة الاحتفاظ بالبيانات",
+  "assistantInfoTimezoneTitle": "توقيت العيادة",
+  "assistantInfoTooltip": "معلومات المساعد",
+  "assistantClearChatFailed": "فشل مسح سجل المحادثة على الخادم.",
+  "assistantHistoryLoadFailed": "تعذر تحميل سجل المحادثة. يرجى التحقق من اتصالك."
 }

@@ -2234,4 +2234,150 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get migrationRunbook => 'Migration Runbook';
+
+  @override
+  String get assistantTitle => 'یاریدەدەری زیرەکی نۆرەگرتن';
+
+  @override
+  String get assistantSubtitle =>
+      'بە گفتوگۆیەکی ئاسان نۆرەکان بدۆزەرەوە و بییانگرە';
+
+  @override
+  String get assistantDailyLimitHeading =>
+      'یاریدەدەر گەیشتووەتە سنووری ڕۆژانەی ئەمڕۆ.';
+
+  @override
+  String get assistantSharedLimitExplanation =>
+      'ئەمە سنوورێکی هاوبەشی یاریدەدەرە، نەک بڕی تایبەت بە کەسێک. نۆرەگرتنی ئاسایی بەردەستە.';
+
+  @override
+  String assistantResetsAt(String time) {
+    return 'لە $time نوێ دەبێتەوە';
+  }
+
+  @override
+  String get assistantClearChat => 'سڕینەوەی گفتوگۆ';
+
+  @override
+  String get assistantClearChatConfirmTitle => 'مێژووی گفتوگۆ بسڕدرێتەوە؟';
+
+  @override
+  String get assistantClearChatConfirmMessage =>
+      'دڵنیایت لە سڕینەوەی مێژووی گفتوگۆکە؟ هەر پێشنیارێکی چالاکی نۆرەش لادەبرێت.';
+
+  @override
+  String get assistantChatCleared => 'مێژووی گفتوگۆکە بە سەرکەوتوویی سڕایەوە.';
+
+  @override
+  String get assistantRetentionNotice =>
+      'مێژووی گفتوگۆ تاوەکو ٧ ڕۆژ هەڵدەگیرێت بۆ هاوکاری لە دیاریکردنی نۆرەکانت.';
+
+  @override
+  String get assistantPrivacyNotice =>
+      'یاریدەدەری نۆرەگرتن هاوکاریت دەکات لە دۆزینەوە و گرتنی نۆرەکان. ڕاوێژ یان دەستنیشانکردنی پزیشکی پێشکەش ناکات. تکایە زانیارییە پزیشکییە هەستیارەکان هاوبەش مەکە.';
+
+  @override
+  String get assistantClinicTimezone => 'کاتی کلینیک (بەغدا، GMT+3)';
+
+  @override
+  String get assistantSlotsNotReserved =>
+      'کاتەکان پارێزراو نین تا پشتڕاست دەکرێنەوە.';
+
+  @override
+  String get assistantSelectSlot => 'دیاریکردنی کات';
+
+  @override
+  String get assistantConfirmAppointment => 'پشتڕاستکردنەوەی نۆرە';
+
+  @override
+  String get assistantSelectedSlot => 'کاتی نۆرەی هەڵبژێردراو';
+
+  @override
+  String get assistantConfirmNotice =>
+      'دەتەوێت ئەم نۆرەیە پشتڕاست بکەیتەوە؟ نۆرەکە وەک چاوەڕوانکراو دەمێنێتەوە تا پشکنینی ئاسایی لە کلینیک.';
+
+  @override
+  String get assistantNotesOptional => 'تێبینی بۆ پزیشک (ئارەزوومەندانە)';
+
+  @override
+  String get assistantBookingInProgress => 'نۆرەکە دادەنرێت...';
+
+  @override
+  String get assistantStaleOffer =>
+      'ئەم کاتە چیتر بەردەست نییە. تکایە کاتێکی تر هەڵبژێرە یان نامەیەکی نوێ بنێرە.';
+
+  @override
+  String get assistantOfferExpired => 'بەسەرچووە';
+
+  @override
+  String get assistantOfferAvailable => 'بەردەستە';
+
+  @override
+  String get assistantDisabledNotice =>
+      'یاریدەدەری زیرەکی نۆرەگرتن لە ئێستادا بەردەست نییە بەپێی ڕێنماییەکان. نۆرەگرتنی ئاسایی بەردەستە.';
+
+  @override
+  String get assistantUnavailableNotice =>
+      'خزمەتگوزاری یاریدەدەر لە ئێستادا بەردەست نییە. نۆرەگرتنی ئاسایی بەردەستە.';
+
+  @override
+  String get assistantThrottledNotice =>
+      'چەندین نامەت بە خێرایی ناردووە. تکایە کەمێک بوەستە پێش ناردنی نامەیەکی تر.';
+
+  @override
+  String get assistantInputPlaceholder =>
+      'داواکاری نۆرەکەت بنووسە (بۆ نموونە: سبەی نۆرەیەک لای پزیشک دابنێ)...';
+
+  @override
+  String get assistantCharacterLimit => 'نامەکە ناتوانێت لە ٥٠٠ پیت زیاتر بێت.';
+
+  @override
+  String get assistantInitialHelpPrompt =>
+      'سڵاو! دەتوانم هاوکاریت بکەم لە دۆزینەوە و دیاریکردنی نۆرە لەگەڵ پزیشکانی مەڵبەندی تەندروستی. پێم بڵێ دەتەوێت لە چ بەشێک، لای چ پزیشکێک یان چ بەروارێک نۆرە بگریت.';
+
+  @override
+  String get assistantBookDirectly => 'نۆرەگرتنی ڕاستەوخۆ';
+
+  @override
+  String get assistantRetrySending => 'دووبارە هەوڵدانەوە';
+
+  @override
+  String assistantExpiresInMinutes(int minutes) {
+    return 'لەماوەی $minutes خولەکدا بەسەردەچێت';
+  }
+
+  @override
+  String get assistantBookThisSlot => 'گرتنی ئەم کاتە';
+
+  @override
+  String get assistantErrorUnauthenticated =>
+      'تکایە بچۆ ژوورەوە بۆ بەکارهێنانی یاریدەدەری نۆرەگرتن.';
+
+  @override
+  String get assistantErrorPermissionDenied =>
+      'دەسەڵاتت نییە بۆ بەکارهێنانی یاریدەدەری نۆرەگرتن.';
+
+  @override
+  String get assistantErrorNotFound =>
+      'خزمەتگوزاری یاریدەدەر لە ئێستادا ئامادە نەکراوە یان بەردەست نییە.';
+
+  @override
+  String get assistantInfoScopeTitle => 'سنووری کار و تایبەتمەندی';
+
+  @override
+  String get assistantInfoRetentionTitle => 'ڕێسای پاراستنی مێژوو';
+
+  @override
+  String get assistantInfoTimezoneTitle => 'کاتی کلینیک';
+
+  @override
+  String get assistantInfoTooltip => 'زانیاری دەربارەی یاریدەدەر';
+
+  @override
+  String get assistantClearChatFailed =>
+      'سڕینەوەی مێژووی گفتوگۆ لەسەر سێرڤەر سەرکەوتوو نەبوو.';
+
+  @override
+  String get assistantHistoryLoadFailed =>
+      'بارکردنی مێژووی گفتوگۆ سەرکەوتوو نەبوو. هێڵی ئینتەرنێتەکەت بپشکنە.';
 }

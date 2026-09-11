@@ -2225,4 +2225,150 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationRunbook => 'Migration Runbook';
+
+  @override
+  String get assistantTitle => 'AI Scheduling Assistant';
+
+  @override
+  String get assistantSubtitle =>
+      'Find and book appointments with natural chat';
+
+  @override
+  String get assistantDailyLimitHeading =>
+      'The assistant has reached today’s limit.';
+
+  @override
+  String get assistantSharedLimitExplanation =>
+      'This is a shared assistant limit, not an individual allowance. Standard booking remains available.';
+
+  @override
+  String assistantResetsAt(String time) {
+    return 'Resets at $time';
+  }
+
+  @override
+  String get assistantClearChat => 'Clear Chat';
+
+  @override
+  String get assistantClearChatConfirmTitle => 'Clear Conversation History?';
+
+  @override
+  String get assistantClearChatConfirmMessage =>
+      'Are you sure you want to clear your chat history? Any active appointment suggestions will also be removed.';
+
+  @override
+  String get assistantChatCleared => 'Chat history cleared successfully.';
+
+  @override
+  String get assistantRetentionNotice =>
+      'Chat history is saved for up to 7 days to assist your scheduling.';
+
+  @override
+  String get assistantPrivacyNotice =>
+      'The scheduling assistant helps you find and book appointments. It does not provide medical advice or diagnosis. Please do not share sensitive medical records.';
+
+  @override
+  String get assistantClinicTimezone => 'Clinic Time (Baghdad, GMT+3)';
+
+  @override
+  String get assistantSlotsNotReserved =>
+      'Slots are not reserved until confirmed.';
+
+  @override
+  String get assistantSelectSlot => 'Select Slot';
+
+  @override
+  String get assistantConfirmAppointment => 'Confirm Appointment';
+
+  @override
+  String get assistantSelectedSlot => 'Selected Appointment Slot';
+
+  @override
+  String get assistantConfirmNotice =>
+      'Would you like to confirm this appointment? Bookings will be pending until normal clinic check-in.';
+
+  @override
+  String get assistantNotesOptional => 'Notes for doctor (optional)';
+
+  @override
+  String get assistantBookingInProgress => 'Booking appointment...';
+
+  @override
+  String get assistantStaleOffer =>
+      'This appointment slot is no longer available. Please choose another slot or send a new message.';
+
+  @override
+  String get assistantOfferExpired => 'Expired';
+
+  @override
+  String get assistantOfferAvailable => 'Available';
+
+  @override
+  String get assistantDisabledNotice =>
+      'The AI appointment assistant is currently unavailable by policy. Standard booking remains available.';
+
+  @override
+  String get assistantUnavailableNotice =>
+      'The assistant service is temporarily unavailable. Standard booking remains available.';
+
+  @override
+  String get assistantThrottledNotice =>
+      'You have sent several messages quickly. Please wait a moment before sending another message.';
+
+  @override
+  String get assistantInputPlaceholder =>
+      'Type your scheduling request (e.g. book doctor tomorrow)...';
+
+  @override
+  String get assistantCharacterLimit => 'Message cannot exceed 500 characters.';
+
+  @override
+  String get assistantInitialHelpPrompt =>
+      'Hello! I can help you find and schedule appointments with doctors at the health center. Let me know which department, doctor, or date you would like to book.';
+
+  @override
+  String get assistantBookDirectly => 'Book Directly';
+
+  @override
+  String get assistantRetrySending => 'Retry';
+
+  @override
+  String assistantExpiresInMinutes(int minutes) {
+    return 'Expires in ${minutes}m';
+  }
+
+  @override
+  String get assistantBookThisSlot => 'Book This Slot';
+
+  @override
+  String get assistantErrorUnauthenticated =>
+      'Please sign in to access the scheduling assistant.';
+
+  @override
+  String get assistantErrorPermissionDenied =>
+      'You do not have permission to access the scheduling assistant.';
+
+  @override
+  String get assistantErrorNotFound =>
+      'The assistant service is currently unconfigured or unavailable.';
+
+  @override
+  String get assistantInfoScopeTitle => 'Scope & Privacy';
+
+  @override
+  String get assistantInfoRetentionTitle => 'Retention Policy';
+
+  @override
+  String get assistantInfoTimezoneTitle => 'Clinic Timezone';
+
+  @override
+  String get assistantInfoTooltip => 'Assistant Information';
+
+  @override
+  String get assistantClearChatFailed =>
+      'Failed to clear chat history on server.';
+
+  @override
+  String get assistantHistoryLoadFailed =>
+      'Unable to load conversation history. Check your connection.';
 }

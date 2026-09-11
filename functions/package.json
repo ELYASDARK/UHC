@@ -3,7 +3,9 @@
     "description": "Cloud Functions for UHC",
     "scripts": {
         "build": "tsc",
-        "test": "npm run build && node test/admin_deletion.test.js",
+        "seed:emulator": "npm run build && node lib/assistant/seedCli.js",
+        "test": "npm run build && node test/admin_deletion.test.js && node test/assistant.test.js",
+        "test:emulator": "npm run build && node test/emulator_integration.test.js",
         "serve": "npm run build && firebase emulators:start --only functions",
         "shell": "npm run build && firebase functions:shell",
         "start": "npm run shell",

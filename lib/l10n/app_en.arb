@@ -834,5 +834,63 @@
   "createFirstAdmin": "Create your first admin account",
 
   "bootstrapSuperAdmin": "Bootstrap Super Admin",
-  "migrationRunbook": "Migration Runbook"
+  "migrationRunbook": "Migration Runbook",
+
+  "assistantTitle": "AI Scheduling Assistant",
+  "assistantSubtitle": "Find and book appointments with natural chat",
+  "assistantDailyLimitHeading": "The assistant has reached today’s limit.",
+  "assistantSharedLimitExplanation": "This is a shared assistant limit, not an individual allowance. Standard booking remains available.",
+  "assistantResetsAt": "Resets at {time}",
+  "@assistantResetsAt": {
+    "description": "Explains when the assistant limit resets",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "assistantClearChat": "Clear Chat",
+  "assistantClearChatConfirmTitle": "Clear Conversation History?",
+  "assistantClearChatConfirmMessage": "Are you sure you want to clear your chat history? Any active appointment suggestions will also be removed.",
+  "assistantChatCleared": "Chat history cleared successfully.",
+  "assistantRetentionNotice": "Chat history is saved for up to 7 days to assist your scheduling.",
+  "assistantPrivacyNotice": "The scheduling assistant helps you find and book appointments. It does not provide medical advice or diagnosis. Please do not share sensitive medical records.",
+  "assistantClinicTimezone": "Clinic Time (Baghdad, GMT+3)",
+  "assistantSlotsNotReserved": "Slots are not reserved until confirmed.",
+  "assistantSelectSlot": "Select Slot",
+  "assistantConfirmAppointment": "Confirm Appointment",
+  "assistantSelectedSlot": "Selected Appointment Slot",
+  "assistantConfirmNotice": "Would you like to confirm this appointment? Bookings will be pending until normal clinic check-in.",
+  "assistantNotesOptional": "Notes for doctor (optional)",
+  "assistantBookingInProgress": "Booking appointment...",
+  "assistantStaleOffer": "This appointment slot is no longer available. Please choose another slot or send a new message.",
+  "assistantOfferExpired": "Expired",
+  "assistantOfferAvailable": "Available",
+  "assistantDisabledNotice": "The AI appointment assistant is currently unavailable by policy. Standard booking remains available.",
+  "assistantUnavailableNotice": "The assistant service is temporarily unavailable. Standard booking remains available.",
+  "assistantThrottledNotice": "You have sent several messages quickly. Please wait a moment before sending another message.",
+  "assistantInputPlaceholder": "Type your scheduling request (e.g. book doctor tomorrow)...",
+  "assistantCharacterLimit": "Message cannot exceed 500 characters.",
+  "assistantInitialHelpPrompt": "Hello! I can help you find and schedule appointments with doctors at the health center. Let me know which department, doctor, or date you would like to book.",
+  "assistantBookDirectly": "Book Directly",
+  "assistantRetrySending": "Retry",
+  "assistantExpiresInMinutes": "Expires in {minutes}m",
+  "@assistantExpiresInMinutes": {
+    "description": "Minutes remaining until offer expires",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "assistantBookThisSlot": "Book This Slot",
+  "assistantErrorUnauthenticated": "Please sign in to access the scheduling assistant.",
+  "assistantErrorPermissionDenied": "You do not have permission to access the scheduling assistant.",
+  "assistantErrorNotFound": "The assistant service is currently unconfigured or unavailable.",
+  "assistantInfoScopeTitle": "Scope & Privacy",
+  "assistantInfoRetentionTitle": "Retention Policy",
+  "assistantInfoTimezoneTitle": "Clinic Timezone",
+  "assistantInfoTooltip": "Assistant Information",
+  "assistantClearChatFailed": "Failed to clear chat history on server.",
+  "assistantHistoryLoadFailed": "Unable to load conversation history. Check your connection."
 }

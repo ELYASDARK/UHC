@@ -17,6 +17,7 @@ class DoctorScheduleScreen extends StatefulWidget {
   final DateTime? initialDate;
   final DateTime? captureNow;
   final List<String>? captureBookedSlots;
+  final AppointmentRepository? appointmentRepository;
 
   const DoctorScheduleScreen({
     super.key,
@@ -24,14 +25,16 @@ class DoctorScheduleScreen extends StatefulWidget {
     this.initialDate,
     this.captureNow,
     this.captureBookedSlots,
+    this.appointmentRepository,
   });
 
   @override
   State<DoctorScheduleScreen> createState() => _DoctorScheduleScreenState();
 }
 
-class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
-  final AppointmentRepository _appointmentRepo = AppointmentRepository();
+class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
+    with WidgetsBindingObserver {
+  late final AppointmentRepository _appointmentRepo;
 
   late DoctorModel _doctor;
   StreamSubscription<DocumentSnapshot>? _doctorSubscription;
@@ -40,12 +43,17 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   late DateTime _selectedDay;
   List<String> _bookedSlots = [];
   bool _isLoading = false;
+  String? _availabilityError;
+  int _availabilityRequestId = 0;
+  Map<String, bool>? _serverAvailability;
 
   DateTime get _now => widget.captureNow ?? DateTime.now();
 
   @override
   void initState() {
     super.initState();
+    _appointmentRepo = widget.appointmentRepository ?? AppointmentRepository();
+    WidgetsBinding.instance.addObserver(this);
     _doctor = widget.doctor;
     _selectedDay = widget.initialDate ?? _now;
     _focusedDay = _selectedDay;
@@ -53,7 +61,16 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
       _bookedSlots = List<String>.from(widget.captureBookedSlots!);
     } else {
       _subscribeToDoctor();
-      _loadBookedSlots(_selectedDay);
+      _loadAvailability(_selectedDay);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        widget.captureBookedSlots == null &&
+        mounted) {
+      _loadAvailability(_selectedDay);
     }
   }
 
@@ -67,34 +84,64 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
       setState(() {
         _doctor = DoctorModel.fromFirestore(snapshot);
       });
+      if (widget.captureBookedSlots == null) {
+        _loadAvailability(_selectedDay);
+      }
     });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _doctorSubscription?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadBookedSlots(DateTime date) async {
+  Future<void> _loadAvailability(DateTime date) async {
+    if (widget.captureBookedSlots != null) {
+      _bookedSlots = List<String>.from(widget.captureBookedSlots!);
+      _isLoading = false;
+      _availabilityError = null;
+      if (mounted) setState(() {});
+      return;
+    }
+
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    final requestId = ++_availabilityRequestId;
+    setState(() {
+      _isLoading = true;
+      _availabilityError = null;
+    });
 
     try {
-      final appointments = await _appointmentRepo.getDoctorAppointments(
-        _doctor.id,
-        date,
+      final availability = await _appointmentRepo.getDoctorDayAvailability(
+        doctorId: _doctor.id,
+        date: date,
       );
-      if (!mounted) return;
+      if (!mounted || requestId != _availabilityRequestId) return;
+      if (!isSameDay(_selectedDay, date)) return;
+
+      final map = <String, bool>{};
+      for (final slot in availability.slots) {
+        map[slot.startTime] = slot.isAvailable;
+        if (slot.timeSlot.isNotEmpty) {
+          map[slot.timeSlot] = slot.isAvailable;
+        }
+      }
+
       setState(() {
-        _bookedSlots = appointments.map((a) => a.timeSlot).toList();
+        _serverAvailability = map;
+        _isLoading = false;
+        _availabilityError = null;
       });
     } catch (e) {
-      debugPrint('Error loading booked slots: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (!mounted || requestId != _availabilityRequestId) return;
+      debugPrint('Error loading doctor availability: $e');
+      setState(() {
+        _serverAvailability = null;
+        _isLoading = false;
+        _availabilityError = e.toString();
+      });
     }
   }
 
@@ -103,65 +150,18 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
       setState(() {
         _selectedDay = selectedDay;
         _focusedDay = focusedDay;
+        if (widget.captureBookedSlots == null) {
+          _serverAvailability = null;
+        }
       });
       if (widget.captureBookedSlots == null) {
-        _loadBookedSlots(selectedDay);
+        _loadAvailability(selectedDay);
       }
     }
   }
 
-  String _getDayName(DateTime date) {
-    const days = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ];
-    return days[date.weekday - 1];
-  }
-
   List<TimeSlot> _getAvailableSlots(DateTime date) {
-    if (!_doctor.isAvailable || !_doctor.isActive) {
-      return [];
-    }
-
-    final dayName = _getDayName(date);
-    final doctorSlots = _doctor.weeklySchedule[dayName];
-
-    // If doctor has specific slots for this day, use them
-    if (doctorSlots != null && doctorSlots.isNotEmpty) {
-      return doctorSlots;
-    }
-
-    // Check if doctor has ANY schedule set
-    final hasAnySchedule = _doctor.weeklySchedule.values.any(
-      (slots) => slots.isNotEmpty,
-    );
-
-    // If doctor has a schedule but this day is not in it, return empty
-    if (hasAnySchedule) {
-      return [];
-    }
-
-    // Fallback: No schedule set at all, return default time slots for weekdays
-    if (date.weekday >= 1 && date.weekday <= 5) {
-      return [
-        TimeSlot(startTime: '09:00', endTime: '09:30'),
-        TimeSlot(startTime: '09:30', endTime: '10:00'),
-        TimeSlot(startTime: '10:00', endTime: '10:30'),
-        TimeSlot(startTime: '10:30', endTime: '11:00'),
-        TimeSlot(startTime: '11:00', endTime: '11:30'),
-        TimeSlot(startTime: '14:00', endTime: '14:30'),
-        TimeSlot(startTime: '14:30', endTime: '15:00'),
-        TimeSlot(startTime: '15:00', endTime: '15:30'),
-        TimeSlot(startTime: '15:30', endTime: '16:00'),
-      ];
-    }
-
-    return [];
+    return _doctor.getAvailableSlots(date);
   }
 
   @override
@@ -329,11 +329,58 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : availableSlots.isEmpty
-                    ? _buildNoSlotsMessage()
-                    : _buildTimeSlotsList(availableSlots),
+                : _availabilityError != null && widget.captureBookedSlots == null
+                    ? _buildErrorMessage()
+                    : availableSlots.isEmpty
+                        ? _buildNoSlotsMessage()
+                        : _buildTimeSlotsList(availableSlots),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildErrorMessage() {
+    final l10n = AppLocalizations.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 56,
+              color: AppColors.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.somethingWentWrong,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _loadAvailability(_selectedDay),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text(l10n.retry),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -341,6 +388,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   Widget _buildNoSlotsMessage() {
     final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasSchedule = _doctor.hasActiveSchedule;
 
     return Center(
       child: Column(
@@ -356,10 +404,11 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            l10n.noAvailableSlots,
+            hasSchedule ? l10n.noAvailableSlotsOnThisDay : l10n.noScheduleSet,
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
@@ -395,9 +444,21 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
       itemCount: slots.length,
       itemBuilder: (context, index) {
         final slot = slots[index];
-        final isBooked = _bookedSlots.contains(slot.display);
         final isPast = _isSlotPast(_selectedDay, slot.startTime);
-        final isAvailable = slot.isAvailable && !isBooked && !isPast;
+        final bool isBooked;
+        final bool isAvailable;
+
+        if (widget.captureBookedSlots != null) {
+          isBooked = _bookedSlots.contains(slot.display) ||
+              _bookedSlots.contains(slot.fullDisplay) ||
+              _bookedSlots.contains(slot.startTime);
+          isAvailable = slot.isAvailable && !isBooked && !isPast;
+        } else {
+          final serverAvail = _serverAvailability?[slot.startTime] ??
+              _serverAvailability?[slot.fullDisplay];
+          isBooked = serverAvail == false && !isPast && slot.isAvailable;
+          isAvailable = slot.isAvailable && (serverAvail == true) && !isPast;
+        }
 
         return Semantics(
           label: isAvailable
@@ -515,7 +576,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   }
 
   void _onSlotTap(TimeSlot slot) {
-    if (!_doctor.isAvailable || !_doctor.isActive) {
+    if (!_doctor.canBook) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('This doctor is not available for booking right now.'),

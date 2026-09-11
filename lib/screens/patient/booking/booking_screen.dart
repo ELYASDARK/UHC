@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/models/appointment_model.dart';
+import '../../../data/repositories/appointment_repository.dart';
 import '../../../providers/appointment_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -23,12 +24,14 @@ class BookingScreen extends StatefulWidget {
   final DoctorModel doctor;
   final DateTime? initialDate;
   final TimeSlot? initialTimeSlot;
+  final AppointmentRepository? appointmentRepository;
 
   const BookingScreen({
     super.key,
     required this.doctor,
     this.initialDate,
     this.initialTimeSlot,
+    this.appointmentRepository,
   });
 
   @override
@@ -36,6 +39,7 @@ class BookingScreen extends StatefulWidget {
 }
 
 class _BookingScreenState extends State<BookingScreen> {
+  late final AppointmentRepository _appointmentRepo;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -49,13 +53,16 @@ class _BookingScreenState extends State<BookingScreen> {
   late DoctorModel _doctor;
   StreamSubscription<DocumentSnapshot>? _doctorSubscription;
 
-  // Track booked slots to prevent double-booking
-  Set<String> _bookedSlots = {};
-  StreamSubscription<QuerySnapshot>? _appointmentsSubscription;
+  // Server availability state
+  bool _isLoadingAvailability = false;
+  String? _availabilityError;
+  int _availabilityRequestId = 0;
+  Map<String, bool>? _serverAvailability;
 
   @override
   void initState() {
     super.initState();
+    _appointmentRepo = widget.appointmentRepository ?? AppointmentRepository();
     _doctor = widget.doctor;
     _subscribeToDoctor();
 
@@ -64,10 +71,16 @@ class _BookingScreenState extends State<BookingScreen> {
       _selectedDay = widget.initialDate;
       _focusedDay = widget.initialDate!;
       _currentStep = 1; // Jump to time selection step
-      _fetchBookedAppointments(widget.initialDate!);
+      _fetchAvailability(widget.initialDate!);
 
       if (widget.initialTimeSlot != null) {
-        _selectedTimeSlot = widget.initialTimeSlot;
+        final availableSlots = _getAvailableSlots(widget.initialDate!);
+        final slotStillExists = availableSlots.any(
+          (s) => s.startTime == widget.initialTimeSlot!.startTime,
+        );
+        if (slotStillExists) {
+          _selectedTimeSlot = widget.initialTimeSlot;
+        }
       }
     }
   }
@@ -96,68 +109,61 @@ class _BookingScreenState extends State<BookingScreen> {
             }
           }
         });
+        if (_selectedDay != null) {
+          _fetchAvailability(_selectedDay!);
+        }
       }
     });
   }
 
-  /// Fetch booked appointments for the selected date to prevent double-booking
-  Future<void> _fetchBookedAppointments(DateTime date) async {
-    _appointmentsSubscription?.cancel();
-
-    // Create start and end of the selected day for filtering
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+  /// Fetch availability for the selected date via trusted callable
+  Future<void> _fetchAvailability(DateTime date) async {
+    final requestId = ++_availabilityRequestId;
+    setState(() {
+      _isLoadingAvailability = true;
+      _availabilityError = null;
+    });
 
     try {
-      // One-time fetch instead of subscription to avoid performance issues
-      final snapshot = await FirebaseFirestore.instance
-          .collection('appointments')
-          .where('doctorId', isEqualTo: _doctor.id)
-          .limit(500)
-          .get();
+      final availability = await _appointmentRepo.getDoctorDayAvailability(
+        doctorId: _doctor.id,
+        date: date,
+      );
+      if (!mounted || requestId != _availabilityRequestId) return;
+      if (_selectedDay == null || !isSameDay(_selectedDay!, date)) return;
 
-      if (!mounted) return;
-
-      final bookedSlots = snapshot.docs
-          .where((doc) {
-            final data = doc.data();
-            // Filter by status
-            final status = data['status'] as String? ?? '';
-            if (status != 'pending' && status != 'confirmed') {
-              return false;
-            }
-            // Filter by date
-            final appointmentDate =
-                (data['appointmentDate'] as Timestamp?)?.toDate();
-            if (appointmentDate == null) return false;
-            return (appointmentDate.isAfter(startOfDay) &&
-                    appointmentDate.isBefore(endOfDay)) ||
-                appointmentDate.year == startOfDay.year &&
-                    appointmentDate.month == startOfDay.month &&
-                    appointmentDate.day == startOfDay.day;
-          })
-          .map((doc) {
-            final data = doc.data();
-            return data['timeSlot'] as String? ?? '';
-          })
-          .where((slot) => slot.isNotEmpty)
-          .toSet();
-
-      if (!mounted) return;
+      final map = <String, bool>{};
+      for (final slot in availability.slots) {
+        map[slot.startTime] = slot.isAvailable;
+        if (slot.timeSlot.isNotEmpty) {
+          map[slot.timeSlot] = slot.isAvailable;
+        }
+      }
 
       setState(() {
-        _bookedSlots = bookedSlots;
+        _serverAvailability = map;
+        _isLoadingAvailability = false;
+        _availabilityError = null;
 
-        // Reset selected time slot if it's now booked by someone else
-        if (_selectedTimeSlot != null &&
-            _bookedSlots.contains(_selectedTimeSlot!.startTime)) {
-          _selectedTimeSlot = null;
+        // Reset selected time slot if it's no longer available
+        if (_selectedTimeSlot != null) {
+          final isAvail = (map[_selectedTimeSlot!.startTime] ??
+                  map[_selectedTimeSlot!.fullDisplay]) ??
+              false;
+          if (!isAvail) {
+            _selectedTimeSlot = null;
+          }
         }
       });
-    } catch (error) {
-      // Silently handle errors - booking can still proceed
-      // The server-side check will catch any conflicts
-      debugPrint('Error fetching booked slots: $error');
+    } catch (e) {
+      if (!mounted || requestId != _availabilityRequestId) return;
+      debugPrint('Error fetching availability: $e');
+      setState(() {
+        _serverAvailability = null;
+        _isLoadingAvailability = false;
+        _availabilityError = e.toString();
+        _selectedTimeSlot = null;
+      });
     }
   }
 
@@ -165,62 +171,11 @@ class _BookingScreenState extends State<BookingScreen> {
   void dispose() {
     _notesController.dispose();
     _doctorSubscription?.cancel();
-    _appointmentsSubscription?.cancel();
     super.dispose();
   }
 
-  String _getDayName(DateTime date) {
-    const days = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ];
-    return days[date.weekday - 1];
-  }
-
   List<TimeSlot> _getAvailableSlots(DateTime date) {
-    if (!_doctorCanBook) {
-      return [];
-    }
-
-    final dayName = _getDayName(date);
-    final doctorSlots = _doctor.weeklySchedule[dayName];
-
-    // If doctor has specific slots for this day, use them
-    if (doctorSlots != null && doctorSlots.isNotEmpty) {
-      return doctorSlots;
-    }
-
-    // Check if doctor has ANY schedule set
-    final hasAnySchedule = _doctor.weeklySchedule.values.any(
-      (slots) => slots.isNotEmpty,
-    );
-
-    // If doctor has a schedule but this day is not in it, return empty
-    if (hasAnySchedule) {
-      return [];
-    }
-
-    // Fallback: No schedule set at all, return default time slots for weekdays
-    if (date.weekday >= 1 && date.weekday <= 5) {
-      return [
-        TimeSlot(startTime: '09:00', endTime: '09:30'),
-        TimeSlot(startTime: '09:30', endTime: '10:00'),
-        TimeSlot(startTime: '10:00', endTime: '10:30'),
-        TimeSlot(startTime: '10:30', endTime: '11:00'),
-        TimeSlot(startTime: '11:00', endTime: '11:30'),
-        TimeSlot(startTime: '14:00', endTime: '14:30'),
-        TimeSlot(startTime: '14:30', endTime: '15:00'),
-        TimeSlot(startTime: '15:00', endTime: '15:30'),
-        TimeSlot(startTime: '15:30', endTime: '16:00'),
-      ];
-    }
-
-    return [];
+    return _doctor.getAvailableSlots(date);
   }
 
   bool _isSlotPast(DateTime date, String startTime) {
@@ -233,7 +188,7 @@ class _BookingScreenState extends State<BookingScreen> {
     return slotTime.isBefore(DateTime.now());
   }
 
-  bool get _doctorCanBook => _doctor.isActive && _doctor.isAvailable;
+  bool get _doctorCanBook => _doctor.canBook;
 
   String get _doctorUnavailableMessage =>
       'This doctor is not available for booking right now.';
@@ -403,117 +358,135 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _buildCalendarStep(bool isDark) {
     final l10n = AppLocalizations.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    final hasSchedule = _doctor.hasActiveSchedule;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!hasSchedule)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: AppColors.warning),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    l10n.noScheduleSet,
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-      child: TableCalendar(
-        firstDay: DateTime.now(),
-        lastDay: DateTime.now().add(const Duration(days: 60)),
-        focusedDay: _focusedDay,
-        calendarFormat: _calendarFormat,
-        selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-        onDaySelected: (selectedDay, focusedDay) {
-          setState(() {
-            _selectedDay = selectedDay;
-            _focusedDay = focusedDay;
-            _selectedTimeSlot = null;
-            _bookedSlots = {}; // Clear stale data while fetching new
-          });
-          // Fetch booked appointments for the selected date
-          _fetchBookedAppointments(selectedDay);
-        },
-        onFormatChanged: (format) {
-          setState(() {
-            _calendarFormat = format;
-          });
-        },
-        availableCalendarFormats: {
-          CalendarFormat.month: l10n.month,
-          CalendarFormat.twoWeeks: l10n.twoWeeks,
-          CalendarFormat.week: l10n.week,
-        },
-        calendarStyle: CalendarStyle(
-          // Enabled days: black text
-          defaultTextStyle: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-            fontWeight: FontWeight.w500,
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          // Weekend days (if enabled): same as default
-          weekendTextStyle: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-            fontWeight: FontWeight.w500,
-          ),
-          // Disabled days: gray text
-          disabledTextStyle: TextStyle(
-            color: isDark ? Colors.grey[600] : Colors.grey[400],
-          ),
-          // Selected day styling
-          selectedDecoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
-          selectedTextStyle: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-          // Today styling
-          todayDecoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            shape: BoxShape.circle,
-          ),
-          todayTextStyle: TextStyle(
-            color: isDark ? Colors.white : Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-          // Outside days (other months): lighter color
-          outsideTextStyle: TextStyle(
-            color: isDark ? Colors.grey[700] : Colors.grey[300],
+          child: TableCalendar(
+            firstDay: DateTime.now(),
+            lastDay: DateTime.now().add(const Duration(days: 60)),
+            focusedDay: _focusedDay,
+            calendarFormat: _calendarFormat,
+            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+                _selectedTimeSlot = null;
+                _serverAvailability = null;
+                _availabilityError = null;
+              });
+              _fetchAvailability(selectedDay);
+            },
+            onFormatChanged: (format) {
+              setState(() {
+                _calendarFormat = format;
+              });
+            },
+            availableCalendarFormats: {
+              CalendarFormat.month: l10n.month,
+              CalendarFormat.twoWeeks: l10n.twoWeeks,
+              CalendarFormat.week: l10n.week,
+            },
+            calendarStyle: CalendarStyle(
+              // Enabled days: black text
+              defaultTextStyle: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.w500,
+              ),
+              // Weekend days (if enabled): same as default
+              weekendTextStyle: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.w500,
+              ),
+              // Disabled days: gray text
+              disabledTextStyle: TextStyle(
+                color: isDark ? Colors.grey[600] : Colors.grey[400],
+              ),
+              // Selected day styling
+              selectedDecoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              selectedTextStyle: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+              // Today styling
+              todayDecoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              todayTextStyle: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+              // Outside days (other months): lighter color
+              outsideTextStyle: TextStyle(
+                color: isDark ? Colors.grey[700] : Colors.grey[300],
+              ),
+            ),
+            headerStyle: const HeaderStyle(
+              formatButtonVisible: true,
+              titleCentered: true,
+            ),
+            enabledDayPredicate: (day) {
+              if (!_doctorCanBook) return false;
+
+              // Check if this day is in the future
+              final isFuture = day.isAfter(
+                DateTime.now().subtract(const Duration(days: 1)),
+              );
+              if (!isFuture) return false;
+
+              // Only enable the day if doctor has active, valid slots for this day
+              return _getAvailableSlots(day).isNotEmpty;
+            },
           ),
         ),
-        headerStyle: const HeaderStyle(
-          formatButtonVisible: true,
-          titleCentered: true,
-        ),
-        enabledDayPredicate: (day) {
-          if (!_doctorCanBook) return false;
-
-          // Check if this day is in the future
-          final isFuture = day.isAfter(
-            DateTime.now().subtract(const Duration(days: 1)),
-          );
-          if (!isFuture) return false;
-
-          // Get the day name and check if doctor has slots for this day
-          final dayName = _getDayName(day);
-          final doctorSlots = _doctor.weeklySchedule[dayName];
-
-          // Enable the day if doctor has specific slots for this day
-          if (doctorSlots != null && doctorSlots.isNotEmpty) {
-            return true;
-          }
-
-          // Fallback: allow weekdays if no schedule is set
-          final hasAnySchedule = _doctor.weeklySchedule.values.any(
-            (slots) => slots.isNotEmpty,
-          );
-          if (!hasAnySchedule) {
-            // No schedule set at all, default to weekdays
-            return day.weekday >= 1 && day.weekday <= 5;
-          }
-
-          // Doctor has a schedule but this day is not in it
-          return false;
-        },
-      ),
+      ],
     );
   }
 
@@ -521,6 +494,54 @@ class _BookingScreenState extends State<BookingScreen> {
     final l10n = AppLocalizations.of(context);
     if (_selectedDay == null) {
       return Center(child: Text(l10n.pleaseSelectDateFirst));
+    }
+
+    if (_isLoadingAvailability) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 32.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_availabilityError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: AppColors.error,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l10n.somethingWentWrong,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () => _fetchAvailability(_selectedDay!),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(l10n.retry),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final slots = _getAvailableSlots(_selectedDay!);
@@ -531,7 +552,11 @@ class _BookingScreenState extends State<BookingScreen> {
           children: [
             Icon(Icons.event_busy, size: 48, color: Colors.grey[400]),
             const SizedBox(height: 12),
-            Text(l10n.noAvailableSlotsOnThisDay),
+            Text(
+              _doctor.hasActiveSchedule
+                  ? l10n.noAvailableSlotsOnThisDay
+                  : l10n.noScheduleSet,
+            ),
           ],
         ),
       );
@@ -552,8 +577,10 @@ class _BookingScreenState extends State<BookingScreen> {
           runSpacing: 10,
           children: slots.map((slot) {
             final isPast = _isSlotPast(_selectedDay!, slot.startTime);
-            final isBooked = _bookedSlots.contains(slot.startTime);
-            final isAvailable = slot.isAvailable && !isPast && !isBooked;
+            final serverAvailable = (_serverAvailability?[slot.startTime] ??
+                    _serverAvailability?[slot.fullDisplay]) ??
+                false;
+            final isAvailable = slot.isAvailable && !isPast && serverAvailable;
             final isSelected = _selectedTimeSlot?.startTime == slot.startTime;
 
             return GestureDetector(
@@ -804,9 +831,19 @@ class _BookingScreenState extends State<BookingScreen> {
       _showError(_doctorUnavailableMessage);
       return;
     }
-    if (_currentStep == 0 && _selectedDay == null) {
-      _showError(AppLocalizations.of(context).pleaseSelectDate);
-      return;
+    if (_currentStep == 0) {
+      if (_selectedDay == null) {
+        _showError(AppLocalizations.of(context).pleaseSelectDate);
+        return;
+      }
+      if (_getAvailableSlots(_selectedDay!).isEmpty) {
+        _showError(
+          _doctor.hasActiveSchedule
+              ? AppLocalizations.of(context).noAvailableSlotsOnThisDay
+              : AppLocalizations.of(context).noScheduleSet,
+        );
+        return;
+      }
     }
     if (_currentStep == 1 && _selectedTimeSlot == null) {
       _showError(AppLocalizations.of(context).pleaseSelectTime);
@@ -848,6 +885,14 @@ class _BookingScreenState extends State<BookingScreen> {
     if (_isLoading) return;
     if (!_doctorCanBook) {
       _showError(_doctorUnavailableMessage);
+      return;
+    }
+    if (_selectedDay == null || _selectedTimeSlot == null) {
+      return;
+    }
+    final currentAvailable = _getAvailableSlots(_selectedDay!);
+    if (!currentAvailable.any((s) => s.startTime == _selectedTimeSlot!.startTime)) {
+      _showError(AppLocalizations.of(context).noAvailableSlotsOnThisDay);
       return;
     }
 

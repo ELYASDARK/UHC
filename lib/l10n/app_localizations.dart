@@ -4359,6 +4359,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Migration Runbook'**
   String get migrationRunbook;
+
+  /// No description provided for @assistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Scheduling Assistant'**
+  String get assistantTitle;
+
+  /// No description provided for @assistantSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find and book appointments with natural chat'**
+  String get assistantSubtitle;
+
+  /// No description provided for @assistantDailyLimitHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant has reached today’s limit.'**
+  String get assistantDailyLimitHeading;
+
+  /// No description provided for @assistantSharedLimitExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a shared assistant limit, not an individual allowance. Standard booking remains available.'**
+  String get assistantSharedLimitExplanation;
+
+  /// Explains when the assistant limit resets
+  ///
+  /// In en, this message translates to:
+  /// **'Resets at {time}'**
+  String assistantResetsAt(String time);
+
+  /// No description provided for @assistantClearChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Chat'**
+  String get assistantClearChat;
+
+  /// No description provided for @assistantClearChatConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Conversation History?'**
+  String get assistantClearChatConfirmTitle;
+
+  /// No description provided for @assistantClearChatConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to clear your chat history? Any active appointment suggestions will also be removed.'**
+  String get assistantClearChatConfirmMessage;
+
+  /// No description provided for @assistantChatCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat history cleared successfully.'**
+  String get assistantChatCleared;
+
+  /// No description provided for @assistantRetentionNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat history is saved for up to 7 days to assist your scheduling.'**
+  String get assistantRetentionNotice;
+
+  /// No description provided for @assistantPrivacyNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'The scheduling assistant helps you find and book appointments. It does not provide medical advice or diagnosis. Please do not share sensitive medical records.'**
+  String get assistantPrivacyNotice;
+
+  /// No description provided for @assistantClinicTimezone.
+  ///
+  /// In en, this message translates to:
+  /// **'Clinic Time (Baghdad, GMT+3)'**
+  String get assistantClinicTimezone;
+
+  /// No description provided for @assistantSlotsNotReserved.
+  ///
+  /// In en, this message translates to:
+  /// **'Slots are not reserved until confirmed.'**
+  String get assistantSlotsNotReserved;
+
+  /// No description provided for @assistantSelectSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Slot'**
+  String get assistantSelectSlot;
+
+  /// No description provided for @assistantConfirmAppointment.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Appointment'**
+  String get assistantConfirmAppointment;
+
+  /// No description provided for @assistantSelectedSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Appointment Slot'**
+  String get assistantSelectedSlot;
+
+  /// No description provided for @assistantConfirmNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Would you like to confirm this appointment? Bookings will be pending until normal clinic check-in.'**
+  String get assistantConfirmNotice;
+
+  /// No description provided for @assistantNotesOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes for doctor (optional)'**
+  String get assistantNotesOptional;
+
+  /// No description provided for @assistantBookingInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking appointment...'**
+  String get assistantBookingInProgress;
+
+  /// No description provided for @assistantStaleOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'This appointment slot is no longer available. Please choose another slot or send a new message.'**
+  String get assistantStaleOffer;
+
+  /// No description provided for @assistantOfferExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get assistantOfferExpired;
+
+  /// No description provided for @assistantOfferAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get assistantOfferAvailable;
+
+  /// No description provided for @assistantDisabledNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI appointment assistant is currently unavailable by policy. Standard booking remains available.'**
+  String get assistantDisabledNotice;
+
+  /// No description provided for @assistantUnavailableNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant service is temporarily unavailable. Standard booking remains available.'**
+  String get assistantUnavailableNotice;
+
+  /// No description provided for @assistantThrottledNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'You have sent several messages quickly. Please wait a moment before sending another message.'**
+  String get assistantThrottledNotice;
+
+  /// No description provided for @assistantInputPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Type your scheduling request (e.g. book doctor tomorrow)...'**
+  String get assistantInputPlaceholder;
+
+  /// No description provided for @assistantCharacterLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Message cannot exceed 500 characters.'**
+  String get assistantCharacterLimit;
+
+  /// No description provided for @assistantInitialHelpPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Hello! I can help you find and schedule appointments with doctors at the health center. Let me know which department, doctor, or date you would like to book.'**
+  String get assistantInitialHelpPrompt;
+
+  /// No description provided for @assistantBookDirectly.
+  ///
+  /// In en, this message translates to:
+  /// **'Book Directly'**
+  String get assistantBookDirectly;
+
+  /// No description provided for @assistantRetrySending.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get assistantRetrySending;
+
+  /// Minutes remaining until offer expires
+  ///
+  /// In en, this message translates to:
+  /// **'Expires in {minutes}m'**
+  String assistantExpiresInMinutes(int minutes);
+
+  /// No description provided for @assistantBookThisSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Book This Slot'**
+  String get assistantBookThisSlot;
+
+  /// No description provided for @assistantErrorUnauthenticated.
+  ///
+  /// In en, this message translates to:
+  /// **'Please sign in to access the scheduling assistant.'**
+  String get assistantErrorUnauthenticated;
+
+  /// No description provided for @assistantErrorPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to access the scheduling assistant.'**
+  String get assistantErrorPermissionDenied;
+
+  /// No description provided for @assistantErrorNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant service is currently unconfigured or unavailable.'**
+  String get assistantErrorNotFound;
+
+  /// No description provided for @assistantInfoScopeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scope & Privacy'**
+  String get assistantInfoScopeTitle;
+
+  /// No description provided for @assistantInfoRetentionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Retention Policy'**
+  String get assistantInfoRetentionTitle;
+
+  /// No description provided for @assistantInfoTimezoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clinic Timezone'**
+  String get assistantInfoTimezoneTitle;
+
+  /// No description provided for @assistantInfoTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant Information'**
+  String get assistantInfoTooltip;
+
+  /// No description provided for @assistantClearChatFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to clear chat history on server.'**
+  String get assistantClearChatFailed;
+
+  /// No description provided for @assistantHistoryLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to load conversation history. Check your connection.'**
+  String get assistantHistoryLoadFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -157,6 +157,31 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Sign in as synthetic demo patient during local emulator testing
+  Future<bool> signInWithEmulatorDemoPatient() async {
+    try {
+      _state = AuthState.loading;
+      _errorMessage = null;
+      notifyListeners();
+
+      _skipNextAuthStateUserLoad = true;
+      final credential = await _authService.signInWithEmulatorDemoPatient();
+      await _loadUserData(credential.user!.uid);
+
+      if (_state == AuthState.error) {
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _skipNextAuthStateUserLoad = false;
+      _state = AuthState.error;
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Register with email and password
   Future<bool> registerWithEmail({
     required String email,

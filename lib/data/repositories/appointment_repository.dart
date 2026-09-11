@@ -16,11 +16,102 @@ class AppointmentBookingResult {
   });
 }
 
-/// Repository for appointment-related Firestore operations
+/// Slot availability information returned by getDoctorDayAvailability.
+class DoctorDaySlot {
+  final String timeSlot;
+  final String startTime;
+  final String endTime;
+  final bool isAvailable;
+
+  const DoctorDaySlot({
+    required this.timeSlot,
+    required this.startTime,
+    required this.endTime,
+    required this.isAvailable,
+  });
+
+  factory DoctorDaySlot.fromMap(Map<String, dynamic> map) {
+    return DoctorDaySlot(
+      timeSlot: map['timeSlot'] as String? ?? '',
+      startTime: map['startTime'] as String? ?? '',
+      endTime: map['endTime'] as String? ?? '',
+      isAvailable: map['isAvailable'] as bool? ?? false,
+    );
+  }
+}
+
+/// Result returned by getDoctorDayAvailability trusted callable.
+class DoctorDayAvailability {
+  final bool success;
+  final String doctorId;
+  final String appointmentDate;
+  final String doctorName;
+  final String department;
+  final List<DoctorDaySlot> slots;
+
+  const DoctorDayAvailability({
+    required this.success,
+    required this.doctorId,
+    required this.appointmentDate,
+    required this.doctorName,
+    required this.department,
+    required this.slots,
+  });
+
+  factory DoctorDayAvailability.fromMap(Map<String, dynamic> map) {
+    final rawSlots = map['slots'] as List<dynamic>? ?? [];
+    final parsedSlots = rawSlots
+        .whereType<Map>()
+        .map((s) => DoctorDaySlot.fromMap(Map<String, dynamic>.from(s)))
+        .toList();
+
+    return DoctorDayAvailability(
+      success: map['success'] as bool? ?? false,
+      doctorId: map['doctorId'] as String? ?? '',
+      appointmentDate: map['appointmentDate'] as String? ?? '',
+      doctorName: map['doctorName'] as String? ?? '',
+      department: map['department'] as String? ?? '',
+      slots: parsedSlots,
+    );
+  }
+}
+
+/// Repository for appointment-related Firestore operations and callables
 class AppointmentRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
   static const String _collection = 'appointments';
+
+  AppointmentRepository({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _functions = functions ?? FirebaseFunctions.instance;
+
+  /// Format a DateTime as clinic calendar date YYYY-MM-DD without UTC timezone shift.
+  static String formatClinicDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
+  /// Get doctor's day availability via trusted server callable getDoctorDayAvailability.
+  /// Does not fetch other patients' appointment documents or identifying data.
+  Future<DoctorDayAvailability> getDoctorDayAvailability({
+    required String doctorId,
+    required DateTime date,
+  }) async {
+    final dateStr = formatClinicDate(date);
+    final callable = _functions.httpsCallable('getDoctorDayAvailability');
+    final result = await callable.call({
+      'doctorId': doctorId,
+      'date': dateStr,
+    });
+    return DoctorDayAvailability.fromMap(
+      Map<String, dynamic>.from(result.data as Map),
+    );
+  }
 
   CollectionReference<Map<String, dynamic>> get _appointmentsRef =>
       _firestore.collection(_collection);

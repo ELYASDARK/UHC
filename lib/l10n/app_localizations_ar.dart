@@ -2213,4 +2213,148 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get migrationRunbook => 'Migration Runbook';
+
+  @override
+  String get assistantTitle => 'مساعد المواعيد الذكي';
+
+  @override
+  String get assistantSubtitle => 'ابحث عن المواعيد واحجزها عبر المحادثة';
+
+  @override
+  String get assistantDailyLimitHeading =>
+      'وصل المساعد إلى الحد اليومي الأقصى.';
+
+  @override
+  String get assistantSharedLimitExplanation =>
+      'هذا حد مشترك للمساعد وليس حصة فردية. الحجز الاعتيادي لا يزال متاحاً.';
+
+  @override
+  String assistantResetsAt(String time) {
+    return 'يُعاد التعيين في $time';
+  }
+
+  @override
+  String get assistantClearChat => 'مسح المحادثة';
+
+  @override
+  String get assistantClearChatConfirmTitle => 'مسح سجل المحادثة؟';
+
+  @override
+  String get assistantClearChatConfirmMessage =>
+      'هل أنت متأكد من مسح سجل المحادثة؟ ستتم أيضاً إزالة أي اقتراحات مواعيد نشطة.';
+
+  @override
+  String get assistantChatCleared => 'تم مسح سجل المحادثة بنجاح.';
+
+  @override
+  String get assistantRetentionNotice =>
+      'يتم حفظ سجل المحادثة لمدة تصل إلى 7 أيام للمساعدة في تنظيم مواعيدك.';
+
+  @override
+  String get assistantPrivacyNotice =>
+      'يساعدك المساعد في البحث عن المواعيد وحجزها. لا يقدم نصائح طبية أو تشخيصاً. يرجى عدم مشاركة السجلات الطبية الحساسة.';
+
+  @override
+  String get assistantClinicTimezone => 'توقيت العيادة (بغداد، غرينتش+3)';
+
+  @override
+  String get assistantSlotsNotReserved =>
+      'المواعيد غير محجوزة حتى يتم التأكيد.';
+
+  @override
+  String get assistantSelectSlot => 'اختيار الموعد';
+
+  @override
+  String get assistantConfirmAppointment => 'تأكيد الموعد';
+
+  @override
+  String get assistantSelectedSlot => 'الموعد المختار';
+
+  @override
+  String get assistantConfirmNotice =>
+      'هل ترغب في تأكيد هذا الموعد؟ سيبقى الحجز قيد الانتظار حتى تسجيل الدخول في العيادة.';
+
+  @override
+  String get assistantNotesOptional => 'ملاحظات للطبيب (اختياري)';
+
+  @override
+  String get assistantBookingInProgress => 'جاري حجز الموعد...';
+
+  @override
+  String get assistantStaleOffer =>
+      'هذا الموعد لم يعد متاحاً. يرجى اختيار موعد آخر أو إرسال رسالة جديدة.';
+
+  @override
+  String get assistantOfferExpired => 'منتهي الصلاحية';
+
+  @override
+  String get assistantOfferAvailable => 'متاح';
+
+  @override
+  String get assistantDisabledNotice =>
+      'المساعد الذكي للمواعيد معطل حالياً وفقاً للسياسة. الحجز الاعتيادي لا يزال متاحاً.';
+
+  @override
+  String get assistantUnavailableNotice =>
+      'خدمة المساعد غير متاحة مؤقتاً. الحجز الاعتيادي لا يزال متاحاً.';
+
+  @override
+  String get assistantThrottledNotice =>
+      'لقد أرسلت عدة رسائل بسرعة. يرجى الانتظار لحظة قبل إرسال رسالة أخرى.';
+
+  @override
+  String get assistantInputPlaceholder =>
+      'اكتب طلب الحجز (مثلاً: حجز موعد مع طبيب غداً)...';
+
+  @override
+  String get assistantCharacterLimit => 'لا يمكن أن تتجاوز الرسالة 500 حرف.';
+
+  @override
+  String get assistantInitialHelpPrompt =>
+      'مرحباً! يمكنني مساعدتك في العثور على مواعيد مع أطباء المركز الصحي وحجزها. أخبرني بالقسم أو الطبيب أو التاريخ الذي ترغب في الحجز له.';
+
+  @override
+  String get assistantBookDirectly => 'حجز مباشر';
+
+  @override
+  String get assistantRetrySending => 'إعادة المحاولة';
+
+  @override
+  String assistantExpiresInMinutes(int minutes) {
+    return 'ينتهي خلال $minutes د';
+  }
+
+  @override
+  String get assistantBookThisSlot => 'حجز هذا الموعد';
+
+  @override
+  String get assistantErrorUnauthenticated =>
+      'يرجى تسجيل الدخول للوصول إلى مساعد المواعيد.';
+
+  @override
+  String get assistantErrorPermissionDenied =>
+      'ليس لديك إذن للوصول إلى مساعد المواعيد.';
+
+  @override
+  String get assistantErrorNotFound =>
+      'خدمة المساعد غير مهيأة أو غير متوفرة حالياً.';
+
+  @override
+  String get assistantInfoScopeTitle => 'النطاق والخصوصية';
+
+  @override
+  String get assistantInfoRetentionTitle => 'سياسة الاحتفاظ بالبيانات';
+
+  @override
+  String get assistantInfoTimezoneTitle => 'توقيت العيادة';
+
+  @override
+  String get assistantInfoTooltip => 'معلومات المساعد';
+
+  @override
+  String get assistantClearChatFailed => 'فشل مسح سجل المحادثة على الخادم.';
+
+  @override
+  String get assistantHistoryLoadFailed =>
+      'تعذر تحميل سجل المحادثة. يرجى التحقق من اتصالك.';
 }
