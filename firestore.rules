@@ -143,6 +143,34 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /assistant_chats/{userId} {
+      allow read, write: if false;
+    }
+
+    match /assistant_project_quota/{docId} {
+      allow read, write: if false;
+    }
+
+    match /assistant_user_limits/{docId} {
+      allow read, write: if false;
+    }
+
+    match /appointment_idempotency/{docId} {
+      allow read, write: if false;
+    }
+
+    match /appointment_slot_locks/{docId} {
+      allow read, write: if false;
+    }
+
+    match /appointment_day_coordination/{docId} {
+      allow read, write: if false;
+    }
+
+    match /doctor_availability_usage/{docId} {
+      allow read, write: if false;
+    }
+
     match /doctor_availability_requests/{requestId} {
       allow read: if isGoogleLinkedAccount() &&
         (

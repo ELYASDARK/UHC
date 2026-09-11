@@ -11,6 +11,7 @@ import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import '../core/config/emulator_config.dart';
 import '../core/notifications/notification_preferences.dart';
 import 'local_notification_service.dart';
 
@@ -28,7 +29,14 @@ class FCMService {
   factory FCMService() => _instance;
   FCMService._internal();
 
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _messagingInstance;
+  FirebaseMessaging get _messaging {
+    if (EmulatorConfig.isEmulatorEnabled) {
+      throw StateError('FirebaseMessaging is disabled in emulator mode.');
+    }
+    return _messagingInstance ??= FirebaseMessaging.instance;
+  }
+
   final LocalNotificationService _localNotificationService =
       LocalNotificationService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -48,6 +56,7 @@ class FCMService {
   /// Initialize FCM and local notifications.
   /// Safe to call multiple times — subsequent calls are no-ops.
   Future<void> initialize() async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
     if (_initialized) return;
     try {
       // Request permission
@@ -87,6 +96,7 @@ class FCMService {
 
   /// Request notification permission
   Future<bool> _requestPermission() async {
+    if (EmulatorConfig.isEmulatorEnabled) return false;
     final settings = await _messaging.requestPermission(
       alert: true,
       announcement: false,
@@ -123,23 +133,37 @@ class FCMService {
 
   /// Get FCM token
   Future<String?> getToken() async {
+    if (EmulatorConfig.isEmulatorEnabled) return null;
     return await _messaging.getToken();
   }
 
   /// Subscribe to topic (not supported on web)
   Future<void> subscribeToTopic(String topic) async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
     if (kIsWeb) return; // Topic subscription not supported on web
     await _messaging.subscribeToTopic(topic);
   }
 
   /// Unsubscribe from topic (not supported on web)
   Future<void> unsubscribeFromTopic(String topic) async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
     if (kIsWeb) return; // Topic unsubscription not supported on web
     await _messaging.unsubscribeFromTopic(topic);
   }
 
+  /// Explicitly delete local FCM token (no-op in emulator mode)
+  Future<void> deleteToken() async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
+    try {
+      await _messaging.deleteToken();
+    } catch (e) {
+      debugPrint('Failed to delete local FCM token: $e');
+    }
+  }
+
   /// Save FCM token to Firestore for user
   Future<void> saveTokenToDatabase(String userId) async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
     final sessionVersion = ++_tokenSessionVersion;
     await _tokenRefreshSubscription?.cancel();
     _tokenRefreshSubscription = null;
@@ -176,6 +200,7 @@ class FCMService {
   }
 
   Future<void> _saveToken(String userId, String token) async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
     try {
       final userSnap = await _firestore.collection('users').doc(userId).get();
       final userData = userSnap.data();
@@ -239,6 +264,7 @@ class FCMService {
 
   /// Remove FCM token when user logs out
   Future<void> removeTokenFromDatabase(String userId) async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
     final shouldInvalidateDeviceToken =
         _tokenOwnerUserId == null || _tokenOwnerUserId == userId;
 
@@ -280,6 +306,7 @@ class FCMService {
     String? role,
     String? department,
   }) async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
     // Keep topic subscriptions limited to non-sensitive broadcasts.
     // Private/user/role/department messages are delivered by token from Cloud Functions.
     await subscribeToTopic('announcements');
@@ -291,6 +318,7 @@ class FCMService {
     String? role,
     String? department,
   }) async {
+    if (EmulatorConfig.isEmulatorEnabled) return;
     await unsubscribeFromTopic('announcements');
   }
 
@@ -322,7 +350,7 @@ class FCMService {
     StackTrace stack, {
     required String reason,
   }) {
-    if (kIsWeb) return;
+    if (kIsWeb || EmulatorConfig.isEmulatorEnabled) return;
     try {
       FirebaseCrashlytics.instance.recordError(error, stack, reason: reason);
     } catch (_) {

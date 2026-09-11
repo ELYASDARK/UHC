@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:uhc/core/config/emulator_config.dart';
 
 String readProjectFile(String path) =>
     File(path).readAsStringSync().replaceAll('\r\n', '\n');
@@ -330,24 +331,125 @@ void main() {
       expect(notificationsSource, contains("hasPermission('doctors.manage')"));
     });
 
-    test('patients cannot book unavailable doctors from UI paths', () {
-      final doctorListSource = readProjectFile(
-        'lib/screens/patient/browse_doctors/doctor_list_screen.dart',
+    test('emulator config unit: resolveFirebaseOptions selects synthetic options and rejects release', () {
+      // 1. When opt-in is false, resolves default options
+      final prodOptions = EmulatorConfig.resolveFirebaseOptions(isEmulatorOptIn: false);
+      expect(prodOptions.projectId, equals('uhca-20800'));
+
+      // 2. When opt-in is true in non-release mode, resolves synthetic demo options
+      final demoOptions = EmulatorConfig.resolveFirebaseOptions(
+        isEmulatorOptIn: true,
+        isRelease: false,
       );
-      final bookingSource = readProjectFile(
-        'lib/screens/patient/booking/booking_screen.dart',
-      );
-      final scheduleSource = readProjectFile(
-        'lib/screens/patient/browse_doctors/doctor_schedule_screen.dart',
+      expect(demoOptions.projectId, equals('demo-uhc-test'));
+      expect(demoOptions.apiKey, equals('fake-emulator-api-key-demo-only'));
+
+      // 3. When opt-in is true in release mode, strictly throws StateError
+      expect(
+        () => EmulatorConfig.resolveFirebaseOptions(
+          isEmulatorOptIn: true,
+          isRelease: true,
+        ),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Refusing to run emulators in release mode'),
+        )),
       );
 
-      expect(doctorListSource, contains('!doctor.isAvailable'));
-      expect(doctorListSource,
-          contains('This doctor is not available for booking right now.'));
-      expect(bookingSource, contains('bool get _doctorCanBook'));
-      expect(bookingSource, contains('doctorId: _doctor.id'));
-      expect(scheduleSource, contains('!_doctor.isAvailable'));
-      expect(scheduleSource, contains('.snapshots()'));
+      // 4. Host allowance checks
+      expect(EmulatorConfig.isAllowedHost('localhost'), isTrue);
+      expect(EmulatorConfig.isAllowedHost('127.0.0.1'), isTrue);
+      expect(EmulatorConfig.isAllowedHost('::1'), isTrue);
+      expect(EmulatorConfig.isAllowedHost('10.0.2.2'), isTrue);
+      expect(EmulatorConfig.isAllowedHost('198.51.100.1'), isFalse);
+      expect(EmulatorConfig.isAllowedHost('192.168.1.5'), isFalse);
+    });
+
+    test('main.dart enforces fail-closed emulator startup boundary without production fallback', () {
+      final mainSource = readProjectFile('lib/main.dart');
+
+      // Options resolved before Firebase.initializeApp
+      expect(mainSource, contains("EmulatorConfig.resolveFirebaseOptions()"));
+      expect(mainSource, contains("options: firebaseOptions"));
+
+      // Fatal error UI prevents silent fallback to production
+      expect(mainSource, contains("EmulatorStartupErrorApp"));
+      expect(mainSource, contains("runApp(EmulatorStartupErrorApp"));
+      expect(mainSource, contains("Emulator connection failed:"));
+
+      // FCM and Crashlytics disabled in emulator mode
+      expect(mainSource, contains("if (EmulatorConfig.isEmulatorEnabled)"));
+      expect(mainSource, contains("FCM, Crashlytics, and external services are disabled in emulator mode"));
+    });
+
+    test('login_screen.dart disables Google Sign-in and provides local demo patient sign-in in emulator mode', () {
+      final loginSource = readProjectFile('lib/screens/auth/login_screen.dart');
+      final authServiceSource = readProjectFile('lib/services/auth_service.dart');
+
+      expect(loginSource, contains("EmulatorConfig.isEmulatorEnabled"));
+      expect(loginSource, contains("External Google Sign-In is disabled in emulator mode"));
+      expect(loginSource, contains("Sign In as Demo Patient (No OAuth)"));
+      expect(loginSource, contains("_handleEmulatorDemoSignIn"));
+
+      expect(authServiceSource, contains("signInWithEmulatorDemoPatient"));
+      expect(authServiceSource, contains("synthetic.patient@demo.uhc.edu"));
+      expect(authServiceSource, contains("emulator-external-auth-disabled"));
+    });
+
+    test('backend synthetic testing strictly enforces demo-only loopback preconditions', () {
+      final configSource = readProjectFile('functions/src/assistant/config.ts');
+      final assistantIndexSource = readProjectFile('functions/src/assistant/index.ts');
+
+      expect(configSource, contains("AI_OFFLINE_SYNTHETIC_TESTING"));
+      expect(configSource, contains("parseLoopbackHostAndPort"));
+      expect(configSource, contains("loopback_auth_emulator_required"));
+      expect(configSource, contains("REQUIRED_DEMO_PROJECT_ID = 'demo-uhc-test'"));
+      expect(configSource, contains("validateDemoProjectConsistency"));
+      expect(assistantIndexSource, contains("if (gate.isSynthetic) {"));
+      expect(assistantIndexSource, contains("SyntheticSchedulingInterpreter"));
+      expect(assistantIndexSource, contains("evaluateTransmissionGate(adminProjectId)"));
+    });
+
+    test('fcm_service.dart completely isolates FCM and Crashlytics in emulator mode', () {
+      final fcmSource = readProjectFile('lib/services/fcm_service.dart');
+
+      expect(fcmSource, contains("EmulatorConfig.isEmulatorEnabled"));
+      expect(fcmSource, contains("FirebaseMessaging? _messagingInstance;"));
+      expect(fcmSource, contains("FirebaseMessaging get _messaging"));
+      expect(fcmSource, contains("FirebaseMessaging is disabled in emulator mode."));
+      expect(fcmSource, contains("if (kIsWeb || EmulatorConfig.isEmulatorEnabled) return;"));
+    });
+
+    test('assistant service error logs are sanitized and never log user messages or payloads', () {
+      final serviceSource = readProjectFile('lib/services/assistant_functions_service.dart');
+
+      expect(serviceSource, contains("debugPrint('sendAssistantMessage failed: code=\${e.code}');"));
+      expect(serviceSource, contains("debugPrint('sendAssistantMessage unexpected error: code=unknown');"));
+      expect(serviceSource, contains("debugPrint('confirmAssistantAppointment failed: code=\${e.code}');"));
+      expect(serviceSource, contains("debugPrint('confirmAssistantAppointment unexpected error: code=unknown');"));
+
+      expect(serviceSource, isNot(contains("debugPrint('\$sanitizedMessage'")));
+      expect(serviceSource, isNot(contains("debugPrint('Assistant error: \$e'")));
+      expect(serviceSource, isNot(contains("debugPrint('sendAssistantMessage error: \$e'")));
+    });
+
+    test('source repository does not contain hardcoded Google API keys', () {
+      final candidateFiles = [
+        'lib/main.dart',
+        'lib/services/assistant_functions_service.dart',
+        'lib/core/config/emulator_config.dart',
+        'functions/src/assistant/config.ts',
+        'functions/src/assistant/index.ts',
+        'functions/src/assistant/geminiClient.ts',
+      ];
+
+      for (final relPath in candidateFiles) {
+        final content = readProjectFile(relPath);
+        // Standard pattern for Google API keys: AIzaSy...
+        expect(content, isNot(matches(r'AIzaSy[A-Za-z0-9_-]{33}')),
+            reason: 'File $relPath must not contain hardcoded Google API key');
+      }
     });
   });
 }

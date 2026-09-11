@@ -10,8 +10,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/kurdish_material_localizations.dart';
-import 'firebase_options.dart';
 import 'core/constants/app_colors.dart';
+import 'core/config/emulator_config.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
@@ -57,15 +57,26 @@ void main() async {
     ),
   );
 
-  // Initialize only Firebase core before app starts - it's required for auth
+  // 1. Resolve FirebaseOptions BEFORE Firebase.initializeApp
+  final FirebaseOptions firebaseOptions;
+  try {
+    firebaseOptions = EmulatorConfig.resolveFirebaseOptions();
+  } catch (e) {
+    debugPrint('Fatal configuration error during options resolution: $e');
+    runApp(EmulatorStartupErrorApp(errorMessage: e.toString()));
+    return;
+  }
+
+  // 2. Initialize Firebase and configure SDKs
   try {
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+      options: firebaseOptions,
     );
     await _configureFirestoreDefaults();
-    // Crashlytics is not supported on web in this app setup.
-    // Guard all Crashlytics hooks to avoid web assertion failures.
-    if (!kIsWeb) {
+    await EmulatorConfig.configureEmulatorsIfOptedIn();
+
+    // In emulator mode, Crashlytics is strictly disabled
+    if (!EmulatorConfig.isEmulatorEnabled && !kIsWeb) {
       _crashlyticsEnabled = true;
 
       // Pass all uncaught "fatal" errors from the framework to Crashlytics
@@ -82,9 +93,14 @@ void main() async {
     }
   } catch (e) {
     debugPrint('Failed to initialize Firebase: $e');
-    // If Firebase fails, we can't use Crashlytics to report it, but we should clear the error logic
-    // or maybe show a fallback UI (though runAPP hasn't happened yet).
-    // Printing to console is the best fallback here.
+    // If emulator mode was requested and failed, STOP immediately.
+    // Never silently fall back to running the app against production!
+    if (EmulatorConfig.isEmulatorEnabled) {
+      runApp(EmulatorStartupErrorApp(
+        errorMessage: 'Emulator connection failed:\n$e\n\nApp startup aborted to prevent accidental production connection.',
+      ));
+      return;
+    }
   }
 
   // Load theme before running app so correct theme is applied on first frame
@@ -112,6 +128,11 @@ Future<void> _configureFirestoreDefaults() async {
 
 /// Initialize non-critical services asynchronously after app starts
 Future<void> _initializeServicesAsync() async {
+  if (EmulatorConfig.isEmulatorEnabled) {
+    debugPrint('[EMULATOR] FCM, Crashlytics, and external services are disabled in emulator mode.');
+    return;
+  }
+
   // Small delay to allow UI to stabilize first
   await Future.delayed(const Duration(milliseconds: 500));
 
@@ -136,6 +157,79 @@ Future<void> _initializeServicesAsync() async {
       e,
       stack,
       reason: 'FCMService Initialization',
+    );
+  }
+}
+
+/// Standalone fallback app displayed when emulator startup fails.
+/// Strictly renders an isolated error screen with NO providers, NO network services,
+/// and NO access to production data or shells.
+class EmulatorStartupErrorApp extends StatelessWidget {
+  final String errorMessage;
+
+  const EmulatorStartupErrorApp({
+    super.key,
+    required this.errorMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFF1A1A1A),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.gpp_bad,
+                  color: Colors.redAccent,
+                  size: 64,
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Emulator Startup Halted',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                  ),
+                  child: Text(
+                    errorMessage,
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 14,
+                      fontFamily: 'monospace',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'App startup was halted to prevent accidental connection to production services.',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

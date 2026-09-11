@@ -3,6 +3,7 @@ export {
     confirmAppointmentCheckIn,
     createAppointment,
     deleteAppointment,
+    getDoctorDayAvailability,
     incrementQrScanFailures,
     rescheduleAppointment,
     updateAppointmentStatus,
@@ -65,3 +66,10 @@ export {
     setAdminActiveStatus,
     setAdminPermissions,
 } from './admin';
+export {
+    clearAssistantHistory,
+    confirmAssistantAppointment,
+    getAssistantHistory,
+    sendAssistantMessage,
+} from './assistant';
+

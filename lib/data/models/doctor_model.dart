@@ -205,6 +205,70 @@ class DoctorModel {
       availabilityRequestStatus == 'pending' &&
       pendingAvailabilityRequestId != null &&
       pendingAvailabilityRequestId!.isNotEmpty;
+
+  /// Canonical lowercase weekday names matching backend schedule keys.
+  static const List<String> canonicalWeekdays = [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ];
+
+  /// Returns the day of the week as a lowercase string (e.g. 'monday', 'tuesday').
+  static String dayOfWeekName(DateTime date) {
+    return canonicalWeekdays[date.weekday - 1];
+  }
+
+  /// Whether the doctor can currently accept appointment bookings.
+  bool get canBook => isActive && isAvailable;
+
+  /// Whether the doctor has any active, valid weekly schedule slots configured.
+  /// Strictly checks canonical weekdays only; ignores non-canonical or malformed keys.
+  bool get hasActiveSchedule {
+    if (!canBook) return false;
+    for (final day in canonicalWeekdays) {
+      List<TimeSlot>? slots = weeklySchedule[day];
+      if (slots == null || slots.isEmpty) {
+        for (final entry in weeklySchedule.entries) {
+          if (entry.key.toLowerCase() == day) {
+            slots = entry.value;
+            break;
+          }
+        }
+      }
+      if (slots != null) {
+        for (final slot in slots) {
+          if (slot.isValid) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Returns valid, active weekly schedule time slots for the given [date].
+  /// Never fabricates fallback slots; returns an empty list if doctor is
+  /// unavailable/inactive, has no schedule, or the day has no valid slots.
+  List<TimeSlot> getAvailableSlots(DateTime date) {
+    if (!canBook) return const [];
+
+    final dayName = dayOfWeekName(date);
+    List<TimeSlot>? slots = weeklySchedule[dayName];
+    if (slots == null || slots.isEmpty) {
+      for (final entry in weeklySchedule.entries) {
+        if (entry.key.toLowerCase() == dayName) {
+          slots = entry.value;
+          break;
+        }
+      }
+    }
+
+    if (slots == null || slots.isEmpty) return const [];
+
+    return slots.where((slot) => slot.isValid).toList();
+  }
 }
 
 /// Time slot model for doctor schedules
@@ -238,5 +302,32 @@ class TimeSlot {
   String get display => startTime;
 
   /// Full display with range (for detailed views)
-  String get fullDisplay => '$startTime - $endTime';
+  String get fullDisplay =>
+      endTime.isEmpty ? startTime : '$startTime - $endTime';
+
+  /// Matches canonical 2-digit 24-hour time HH:mm (00:00 - 23:59)
+  /// Group 1: hour (00-23)
+  /// Group 2: minute (00-59)
+  static final RegExp _timeRegex = RegExp(r'^([01]\d|2[0-3]):([0-5]\d)$');
+
+  /// Parse time in canonical 2-digit HH:mm format to minutes from midnight (0..1439), or null if malformed.
+  static int? parseMinutes(String time) {
+    final match = _timeRegex.firstMatch(time);
+    if (match == null) return null;
+    final hour = int.tryParse(match.group(1)!);
+    final minute = int.tryParse(match.group(2)!);
+    if (hour == null || minute == null) return null;
+    return hour * 60 + minute;
+  }
+
+  /// Accepts legacy start-only slots; an explicit end must follow the start.
+  bool get isValid {
+    if (!isAvailable) return false;
+    final startMin = parseMinutes(startTime);
+    if (startMin == null) return false;
+    if (endTime.isEmpty) return true;
+    final endMin = parseMinutes(endTime);
+    if (endMin == null) return false;
+    return endMin > startMin;
+  }
 }

@@ -10,6 +10,34 @@
                 },
                 {
                     "fieldPath": "appointmentDate",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "appointment_slot_locks",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "doctorId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "appointmentDateKey",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "appointments",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "doctorId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "appointmentDate",
                     "order": "DESCENDING"
                 },
                 {

@@ -40,6 +40,24 @@ export function requireSuperAdmin(callerDoc: FirebaseFirestore.DocumentSnapshot)
     }
 }
 
+export const PATIENT_ROLES = ['student', 'staff'] as const;
+export type PatientRole = typeof PATIENT_ROLES[number];
+
+/** Throws if caller is not an active patient account. Returns caller UID and user data. */
+export function requirePatientRole(callerDoc: FirebaseFirestore.DocumentSnapshot): { uid: string; data: FirebaseFirestore.DocumentData } {
+    const data = callerDoc.data();
+    if (!data) {
+        throw new functions.https.HttpsError('not-found', 'Caller user document not found.');
+    }
+    if (data.isActive !== true) {
+        throw new functions.https.HttpsError('permission-denied', 'Your account is inactive.');
+    }
+    if (!PATIENT_ROLES.includes(data.role as PatientRole)) {
+        throw new functions.https.HttpsError('permission-denied', 'Only registered patients can use the appointment assistant.');
+    }
+    return { uid: callerDoc.id, data };
+}
+
 /** Throws if caller (admin) lacks the given permission. SuperAdmin bypasses. */
 export function requirePermission(callerDoc: FirebaseFirestore.DocumentSnapshot, permissionKey: string): void {
     const data = callerDoc.data();

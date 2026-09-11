@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -6,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/models/appointment_model.dart';
+import '../../../data/repositories/appointment_repository.dart';
 import '../../../providers/appointment_provider.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 
@@ -13,77 +13,90 @@ import 'package:uhc/l10n/app_localizations.dart';
 class RescheduleScreen extends StatefulWidget {
   final AppointmentModel appointment;
   final DoctorModel? doctor;
+  final AppointmentRepository? appointmentRepository;
 
-  const RescheduleScreen({super.key, required this.appointment, this.doctor});
+  const RescheduleScreen({
+    super.key,
+    required this.appointment,
+    this.doctor,
+    this.appointmentRepository,
+  });
 
   @override
   State<RescheduleScreen> createState() => _RescheduleScreenState();
 }
 
 class _RescheduleScreenState extends State<RescheduleScreen> {
+  late final AppointmentRepository _appointmentRepo;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   TimeSlot? _selectedTimeSlot;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   final _reasonController = TextEditingController();
   bool _isLoading = false;
-  Set<String> _bookedSlots = {};
+
+  bool _isLoadingAvailability = false;
+  String? _availabilityError;
+  int _availabilityRequestId = 0;
+  Map<String, bool>? _serverAvailability;
 
   @override
   void initState() {
     super.initState();
+    _appointmentRepo = widget.appointmentRepository ?? AppointmentRepository();
     _selectedDay = widget.appointment.appointmentDate;
     _focusedDay = _selectedDay!;
-    _fetchBookedAppointments(_selectedDay!);
+    _fetchAvailability(_selectedDay!);
   }
 
-  Future<void> _fetchBookedAppointments(DateTime date) async {
+  Future<void> _fetchAvailability(DateTime date) async {
     if (widget.doctor == null) return;
 
-    final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+    final requestId = ++_availabilityRequestId;
+    setState(() {
+      _isLoadingAvailability = true;
+      _availabilityError = null;
+    });
 
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('appointments')
-          .where('doctorId', isEqualTo: widget.doctor!.id)
-          .get();
+      final availability = await _appointmentRepo.getDoctorDayAvailability(
+        doctorId: widget.doctor!.id,
+        date: date,
+      );
+      if (!mounted || requestId != _availabilityRequestId) return;
+      if (_selectedDay == null || !isSameDay(_selectedDay!, date)) return;
 
-      if (!mounted) return;
-
-      final bookedSlots = snapshot.docs
-          .where((doc) {
-            final data = doc.data();
-            final status = data['status'] as String? ?? '';
-            if (status != 'pending' && status != 'confirmed') {
-              return false;
-            }
-            if (doc.id == widget.appointment.id) return false;
-
-            final appointmentDate =
-                (data['appointmentDate'] as Timestamp?)?.toDate();
-            if (appointmentDate == null) return false;
-            return (appointmentDate.isAfter(startOfDay) &&
-                    appointmentDate.isBefore(endOfDay)) ||
-                (appointmentDate.year == startOfDay.year &&
-                    appointmentDate.month == startOfDay.month &&
-                    appointmentDate.day == startOfDay.day);
-          })
-          .map((doc) => doc.data()['timeSlot'] as String? ?? '')
-          .where((slot) => slot.isNotEmpty)
-          .toSet();
-
-      if (!mounted) return;
+      final map = <String, bool>{};
+      for (final slot in availability.slots) {
+        map[slot.startTime] = slot.isAvailable;
+        if (slot.timeSlot.isNotEmpty) {
+          map[slot.timeSlot] = slot.isAvailable;
+        }
+      }
 
       setState(() {
-        _bookedSlots = bookedSlots;
-        if (_selectedTimeSlot != null &&
-            _bookedSlots.contains(_selectedTimeSlot!.startTime)) {
-          _selectedTimeSlot = null;
+        _serverAvailability = map;
+        _isLoadingAvailability = false;
+        _availabilityError = null;
+
+        if (_selectedTimeSlot != null) {
+          final isAvail = (map[_selectedTimeSlot!.startTime] ??
+                  map[_selectedTimeSlot!.fullDisplay]) ??
+              false;
+          if (!isAvail) {
+            _selectedTimeSlot = null;
+          }
         }
       });
-    } catch (error) {
-      debugPrint('Error fetching booked slots: $error');
+    } catch (e) {
+      if (!mounted || requestId != _availabilityRequestId) return;
+      debugPrint('Error loading availability for reschedule: $e');
+      setState(() {
+        _serverAvailability = null;
+        _isLoadingAvailability = false;
+        _availabilityError = e.toString();
+        _selectedTimeSlot = null;
+      });
     }
   }
 
@@ -103,29 +116,17 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
     super.dispose();
   }
 
-  String _getDayName(DateTime date) {
-    const days = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ];
-    return days[date.weekday - 1];
-  }
-
   List<TimeSlot> _getAvailableSlots(DateTime date) {
     if (widget.doctor == null) return [];
-    final dayName = _getDayName(date);
-    return widget.doctor!.weeklySchedule[dayName] ?? [];
+    return widget.doctor!.getAvailableSlots(date);
   }
 
   DateTime _getExactAppointmentTime() {
-    final date = widget.appointment.appointmentDate;
+    // Extract the calendar day in clinic time, regardless of device timezone.
+    final date = widget.appointment.appointmentDate.toUtc()
+        .add(const Duration(hours: 3));
     final timeSlot = widget.appointment.timeSlot; // e.g., '14:30 - 15:00'
-    final startTimeStr = timeSlot.split(' - ').first; // '14:30'
+    final startTimeStr = timeSlot.split(' - ').first.trim(); // '14:30'
     final parts = startTimeStr.split(':');
     int hour = 0;
     int minute = 0;
@@ -133,15 +134,16 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       hour = int.tryParse(parts[0]) ?? 0;
       minute = int.tryParse(parts[1]) ?? 0;
     }
-    return DateTime(date.year, date.month, date.day, hour, minute);
+    // Clinic is in Baghdad timezone (UTC+3, no DST)
+    return DateTime.utc(date.year, date.month, date.day, hour, minute)
+        .subtract(const Duration(hours: 3));
   }
 
   bool _canReschedule() {
-    // Check 24-hour policy using UTC to avoid timezone issues
-    final appointmentTime = _getExactAppointmentTime().toUtc();
+    // Check 24-hour policy against canonical UTC appointment time
+    final appointmentTime = _getExactAppointmentTime();
     final now = DateTime.now().toUtc();
-    final hoursUntil = appointmentTime.difference(now).inHours;
-    return hoursUntil >= 24;
+    return appointmentTime.difference(now).inMinutes >= 24 * 60;
   }
 
   @override
@@ -200,9 +202,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                           _selectedDay = selectedDay;
                           _focusedDay = focusedDay;
                           _selectedTimeSlot = null;
-                          _bookedSlots = {};
+                          _serverAvailability = null;
+                          _availabilityError = null;
                         });
-                        _fetchBookedAppointments(selectedDay);
+                        _fetchAvailability(selectedDay);
                       },
                       onFormatChanged: (format) {
                         setState(() {
@@ -234,9 +237,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                       enabledDayPredicate: (day) {
                         final slots = _getAvailableSlots(day);
                         return slots.any(
-                          (slot) =>
-                              slot.isAvailable &&
-                              !_isSlotPast(day, slot.startTime),
+                          (slot) => !_isSlotPast(day, slot.startTime),
                         );
                       },
                     ),
@@ -351,16 +352,70 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
   Widget _buildTimeSlots(bool isDark) {
     final l10n = AppLocalizations.of(context);
+
+    if (_isLoadingAvailability) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 24.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_availabilityError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: AppColors.error,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l10n.somethingWentWrong,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                onPressed: () => _fetchAvailability(_selectedDay!),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(l10n.retry),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final slots = _getAvailableSlots(_selectedDay!);
 
     if (slots.isEmpty) {
+      final hasSchedule = widget.doctor?.hasActiveSchedule ?? false;
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Center(child: Text(l10n.noAvailableSlotsOnThisDay)),
+        child: Center(
+          child: Text(
+            hasSchedule ? l10n.noAvailableSlotsOnThisDay : l10n.noScheduleSet,
+          ),
+        ),
       );
     }
 
@@ -369,8 +424,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       runSpacing: 10,
       children: slots.map((slot) {
         final isPast = _isSlotPast(_selectedDay!, slot.startTime);
-        final isBooked = _bookedSlots.contains(slot.startTime);
-        final isAvailable = slot.isAvailable && !isPast && !isBooked;
+        final serverAvailable = (_serverAvailability?[slot.startTime] ??
+                _serverAvailability?[slot.fullDisplay]) ??
+            false;
+        final isAvailable = slot.isAvailable && !isPast && serverAvailable;
         final isSelected = _selectedTimeSlot == slot;
 
         return GestureDetector(
@@ -472,6 +529,15 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
   Future<void> _confirmReschedule() async {
     final l10n = AppLocalizations.of(context);
+    if (widget.doctor != null && !widget.doctor!.canBook) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.doctorNotAvailableSelectAnother),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
 
     try {

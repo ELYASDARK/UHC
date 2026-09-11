@@ -96,18 +96,7 @@ class _DoctorAppointmentDetailScreenState
   }
 
   /// Full DateTime of the appointment (date + timeSlot parsed)
-  DateTime get _appointmentFullTime {
-    final parts = _appointment.timeSlot.split(':');
-    final hour = int.tryParse(parts[0]) ?? 0;
-    final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
-    return DateTime(
-      _appointment.appointmentDate.year,
-      _appointment.appointmentDate.month,
-      _appointment.appointmentDate.day,
-      hour,
-      minute,
-    );
-  }
+  DateTime get _appointmentFullTime => _appointment.exactAppointmentTime;
 
   bool get _isInConfirmWindow {
     final apptTime = _appointmentFullTime;

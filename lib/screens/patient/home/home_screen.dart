@@ -15,6 +15,7 @@ import '../../../data/repositories/department_repository.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/constants/department_icons.dart';
 import '../appointments/emergency_request_screen.dart';
+import '../assistant/assistant_chat_screen.dart';
 
 /// Home dashboard screen
 class HomeScreen extends StatefulWidget {
@@ -146,10 +147,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 24),
 
-                // Quick booking card
-                _buildQuickBookingCard(context, isDark),
+                // AI Scheduling Assistant card
+                _buildAssistantCard(context, isDark),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 // Emergency Request button
                 _buildEmergencyButton(context, isDark),
@@ -382,64 +383,105 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickBookingCard(BuildContext context, bool isDark) {
+
+  Widget _buildAssistantCard(BuildContext context, bool isDark) {
     final l10n = AppLocalizations.of(context);
     return GradientCard(
-      colors: AppColors.primaryGradient,
-      onTap: widget.onBookNowTap,
+      colors: const [
+        Color(0xFF4F46E5), // Indigo
+        Color(0xFF7C3AED), // Violet
+      ],
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AssistantChatScreen(),
+          ),
+        );
+      },
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.auto_awesome,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            l10n.assistantBadge,
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 Text(
-                  AppLocalizations.of(context).bookAnAppointment,
+                  l10n.assistantTitle,
                   style: GoogleFonts.poppins(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
-                  l10n.findBestDoctorsDash,
+                  l10n.assistantSubtitle,
                   style: GoogleFonts.roboto(
-                    fontSize: 14,
+                    fontSize: 13,
                     color: Colors.white.withValues(alpha: 0.9),
-                    height: 1.4,
+                    height: 1.3,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+                    horizontal: 14,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        child: Text(
-                          l10n.bookAppointmentNow,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        l10n.getStarted,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF4F46E5),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       const Icon(
                         Icons.arrow_forward_rounded,
-                        size: 18,
-                        color: AppColors.primary,
+                        size: 16,
+                        color: Color(0xFF4F46E5),
                       ),
                     ],
                   ),
@@ -447,23 +489,23 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Container(
-            width: 80,
-            height: 80,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Icon(
-              Icons.medical_services_rounded,
-              size: 45,
+              Icons.chat_bubble_outline_rounded,
+              size: 40,
               color: Colors.white,
             ),
           ),
         ],
       ),
-    ).animate(delay: 300.ms).fadeIn(duration: 500.ms).slideY(begin: 0.1);
+    ).animate(delay: 350.ms).fadeIn(duration: 500.ms).slideY(begin: 0.1);
   }
 
   Widget _buildEmergencyButton(BuildContext context, bool isDark) {

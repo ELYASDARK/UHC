@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart'; // Added
 import 'package:image_picker/image_picker.dart'; // Added
+import '../core/config/emulator_config.dart';
 import '../data/models/user_model.dart';
 
 /// Authentication service handling Firebase Auth and Google Sign-In
@@ -91,8 +92,35 @@ class AuthService {
     }
   }
 
+  /// Signs in as the synthetic demo patient during local emulator testing.
+  /// Strictly gated on [EmulatorConfig.isEmulatorEnabled].
+  /// Does not touch Google OAuth or production backends.
+  Future<UserCredential> signInWithEmulatorDemoPatient() async {
+    if (!EmulatorConfig.isEmulatorEnabled) {
+      throw StateError(
+        'signInWithEmulatorDemoPatient is strictly prohibited when USE_FIREBASE_EMULATOR is false.',
+      );
+    }
+
+    try {
+      return await _auth.signInWithEmailAndPassword(
+        email: 'synthetic.patient@demo.uhc.edu',
+        password: 'TestPassword123!',
+      );
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
   /// Sign in with Google
   Future<UserCredential?> signInWithGoogle() async {
+    if (EmulatorConfig.isEmulatorEnabled) {
+      throw const AuthException(
+        code: 'emulator-external-auth-disabled',
+        message: 'External Google Sign-In is disabled in emulator mode. Use local demo patient sign-in.',
+      );
+    }
+
     try {
       UserCredential? userCredential;
 
@@ -684,6 +712,16 @@ class AuthService {
         return e.message ?? 'An error occurred.';
     }
   }
+}
+
+class AuthException implements Exception {
+  final String code;
+  final String message;
+
+  const AuthException({required this.code, required this.message});
+
+  @override
+  String toString() => message;
 }
 
 class _AuthMessageException implements Exception {

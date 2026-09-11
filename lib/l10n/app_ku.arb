@@ -717,5 +717,64 @@
   "noAdminsFound": "No admin accounts found",
   "createFirstAdmin": "Create your first admin account",
   "bootstrapSuperAdmin": "Bootstrap Super Admin",
-  "migrationRunbook": "Migration Runbook"
+  "migrationRunbook": "Migration Runbook",
+
+  "assistantTitle": "یاریدەدەری زیرەکی نۆرەگرتن",
+  "assistantSubtitle": "بە گفتوگۆیەکی ئاسان نۆرەکان بدۆزەرەوە و بییانگرە",
+  "assistantDailyLimitHeading": "یاریدەدەر گەیشتووەتە سنووری ڕۆژانەی ئەمڕۆ.",
+  "assistantSharedLimitExplanation": "ئەمە سنوورێکی هاوبەشی یاریدەدەرە، نەک بڕی تایبەت بە کەسێک. نۆرەگرتنی ئاسایی بەردەستە.",
+  "assistantResetsAt": "لە {time} نوێ دەبێتەوە",
+  "@assistantResetsAt": {
+    "description": "Explains when the assistant limit resets",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "assistantClearChat": "سڕینەوەی گفتوگۆ",
+  "assistantClearChatConfirmTitle": "مێژووی گفتوگۆ بسڕدرێتەوە؟",
+  "assistantClearChatConfirmMessage": "دڵنیایت لە سڕینەوەی مێژووی گفتوگۆکە؟ هەر پێشنیارێکی چالاکی نۆرەش لادەبرێت.",
+  "assistantChatCleared": "مێژووی گفتوگۆکە بە سەرکەوتوویی سڕایەوە.",
+  "assistantRetentionNotice": "مێژووی گفتوگۆ تاوەکو ٧ ڕۆژ هەڵدەگیرێت بۆ هاوکاری لە دیاریکردنی نۆرەکانت.",
+  "assistantPrivacyNotice": "یاریدەدەری نۆرەگرتن هاوکاریت دەکات لە دۆزینەوە و گرتنی نۆرەکان. ڕاوێژ یان دەستنیشانکردنی پزیشکی پێشکەش ناکات. تکایە زانیارییە پزیشکییە هەستیارەکان هاوبەش مەکە.",
+  "assistantClinicTimezone": "کاتی کلینیک (بەغدا، GMT+3)",
+  "assistantSlotsNotReserved": "کاتەکان پارێزراو نین تا پشتڕاست دەکرێنەوە.",
+  "assistantSelectSlot": "دیاریکردنی کات",
+  "assistantConfirmAppointment": "پشتڕاستکردنەوەی نۆرە",
+  "assistantSelectedSlot": "کاتی نۆرەی هەڵبژێردراو",
+  "assistantConfirmNotice": "دەتەوێت ئەم نۆرەیە پشتڕاست بکەیتەوە؟ نۆرەکە وەک چاوەڕوانکراو دەمێنێتەوە تا پشکنینی ئاسایی لە کلینیک.",
+  "assistantNotesOptional": "تێبینی بۆ پزیشک (ئارەزوومەندانە)",
+  "assistantBookingInProgress": "نۆرەکە دادەنرێت...",
+  "assistantStaleOffer": "ئەم کاتە چیتر بەردەست نییە. تکایە کاتێکی تر هەڵبژێرە یان نامەیەکی نوێ بنێرە.",
+  "assistantOfferExpired": "بەسەرچووە",
+  "assistantOfferAvailable": "بەردەستە",
+  "assistantDisabledNotice": "یاریدەدەری زیرەکی نۆرەگرتن لە ئێستادا بەردەست نییە بەپێی ڕێنماییەکان. نۆرەگرتنی ئاسایی بەردەستە.",
+  "assistantUnavailableNotice": "خزمەتگوزاری یاریدەدەر لە ئێستادا بەردەست نییە. نۆرەگرتنی ئاسایی بەردەستە.",
+  "assistantThrottledNotice": "چەندین نامەت بە خێرایی ناردووە. تکایە کەمێک بوەستە پێش ناردنی نامەیەکی تر.",
+  "assistantInputPlaceholder": "داواکاری نۆرەکەت بنووسە (بۆ نموونە: سبەی نۆرەیەک لای پزیشک دابنێ)...",
+  "assistantCharacterLimit": "نامەکە ناتوانێت لە ٥٠٠ پیت زیاتر بێت.",
+  "assistantInitialHelpPrompt": "سڵاو! دەتوانم هاوکاریت بکەم لە دۆزینەوە و دیاریکردنی نۆرە لەگەڵ پزیشکانی مەڵبەندی تەندروستی. پێم بڵێ دەتەوێت لە چ بەشێک، لای چ پزیشکێک یان چ بەروارێک نۆرە بگریت.",
+  "assistantBookDirectly": "نۆرەگرتنی ڕاستەوخۆ",
+  "assistantRetrySending": "دووبارە هەوڵدانەوە",
+  "assistantExpiresInMinutes": "لەماوەی {minutes} خولەکدا بەسەردەچێت",
+  "@assistantExpiresInMinutes": {
+    "description": "Minutes remaining until offer expires",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "assistantBookThisSlot": "گرتنی ئەم کاتە",
+  "assistantErrorUnauthenticated": "تکایە بچۆ ژوورەوە بۆ بەکارهێنانی یاریدەدەری نۆرەگرتن.",
+  "assistantErrorPermissionDenied": "دەسەڵاتت نییە بۆ بەکارهێنانی یاریدەدەری نۆرەگرتن.",
+  "assistantErrorNotFound": "خزمەتگوزاری یاریدەدەر لە ئێستادا ئامادە نەکراوە یان بەردەست نییە.",
+  "assistantInfoScopeTitle": "سنووری کار و تایبەتمەندی",
+  "assistantInfoRetentionTitle": "ڕێسای پاراستنی مێژوو",
+  "assistantInfoTimezoneTitle": "کاتی کلینیک",
+  "assistantInfoTooltip": "زانیاری دەربارەی یاریدەدەر",
+  "assistantClearChatFailed": "سڕینەوەی مێژووی گفتوگۆ لەسەر سێرڤەر سەرکەوتوو نەبوو.",
+  "assistantHistoryLoadFailed": "بارکردنی مێژووی گفتوگۆ سەرکەوتوو نەبوو. هێڵی ئینتەرنێتەکەت بپشکنە.",
+  "assistantBadge": "یاریدەدەری زیرەک"
 }

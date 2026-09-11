@@ -8,24 +8,131 @@ export const ACTIVE_APPOINTMENT_STATUSES = ['pending', 'confirmed'];
 const DOCTOR_AVAILABILITY_TIME_ZONE = 'Asia/Baghdad';
 
 export function appointmentDateKey(appointmentDate: Date): string {
-    const year = appointmentDate.getFullYear();
-    const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
-    const day = String(appointmentDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: DOCTOR_AVAILABILITY_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(appointmentDate);
+}
+
+export function isValidTimeFormat(timeStr: string): boolean {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(timeStr.trim());
+}
+
+export function normalizeTimeComponent(timeStr: string): string {
+    const trimmed = timeStr.trim();
+    const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return trimmed;
+    const hour = Number.parseInt(match[1], 10);
+    const minute = Number.parseInt(match[2], 10);
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return trimmed;
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+export function canonicalSlotStartTime(timeSlot: string): string {
+    const rawStart = timeSlot.split('-')[0].trim();
+    return normalizeTimeComponent(rawStart);
+}
+
+export function timeToMinutes(timeStr: string): number {
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+}
+
+export function parseExplicitSlotRange(timeSlot: string): { startTime: string; endTime: string } | null {
+    const trimmed = timeSlot.trim();
+    if (trimmed.includes('-')) {
+        const parts = trimmed.split('-').map((p) => p.trim());
+        if (parts.length !== 2) return null;
+        const start = normalizeTimeComponent(parts[0]);
+        const end = normalizeTimeComponent(parts[1]);
+        if (!isValidTimeFormat(start) || !isValidTimeFormat(end)) return null;
+        if (timeToMinutes(start) >= timeToMinutes(end)) return null;
+        return { startTime: start, endTime: end };
+    }
+    return null;
+}
+
+export function parseSlotTimeRange(timeSlot: string): { startTime: string; endTime: string } | null {
+    return parseExplicitSlotRange(timeSlot);
+}
+
+export function doSlotsOverlap(slotA: string, slotB: string): boolean {
+    const rangeA = parseExplicitSlotRange(slotA);
+    const rangeB = parseExplicitSlotRange(slotB);
+    if (rangeA && rangeB) {
+        const startA = timeToMinutes(rangeA.startTime);
+        const endA = timeToMinutes(rangeA.endTime);
+        const startB = timeToMinutes(rangeB.startTime);
+        const endB = timeToMinutes(rangeB.endTime);
+        return Math.max(startA, startB) < Math.min(endA, endB);
+    }
+    const startA = canonicalSlotStartTime(slotA);
+    const startB = canonicalSlotStartTime(slotB);
+    if (startA === startB) return true;
+    if (rangeA) {
+        const minStartA = timeToMinutes(rangeA.startTime);
+        const minEndA = timeToMinutes(rangeA.endTime);
+        const minB = timeToMinutes(startB);
+        if (minB >= minStartA && minB < minEndA) return true;
+    }
+    if (rangeB) {
+        const minStartB = timeToMinutes(rangeB.startTime);
+        const minEndB = timeToMinutes(rangeB.endTime);
+        const minA = timeToMinutes(startA);
+        if (minA >= minStartB && minA < minEndB) return true;
+    }
+    return false;
 }
 
 export function slotLockComponent(value: string): string {
     return encodeURIComponent(value.trim());
 }
 
+export function appointmentDayCoordinationRef(
+    doctorId: string,
+    appointmentDate: Date,
+    firestore: FirebaseFirestore.Firestore = db
+): FirebaseFirestore.DocumentReference {
+    const dateKey = appointmentDateKey(appointmentDate);
+    return firestore.collection('appointment_day_coordination').doc(
+        `${slotLockComponent(doctorId)}_${dateKey}`
+    );
+}
+
+export function canonicalAppointmentSlotLockRef(
+    doctorId: string,
+    appointmentDate: Date,
+    timeSlot: string,
+    firestore: FirebaseFirestore.Firestore = db
+): FirebaseFirestore.DocumentReference {
+    const dateKey = appointmentDateKey(appointmentDate);
+    const startTime = canonicalSlotStartTime(timeSlot);
+    return firestore.collection('appointment_slot_locks').doc(
+        `${slotLockComponent(doctorId)}_${dateKey}_${slotLockComponent(startTime)}`
+    );
+}
+
+export function legacyAppointmentSlotLockRef(
+    doctorId: string,
+    appointmentDate: Date,
+    timeSlot: string,
+    firestore: FirebaseFirestore.Firestore = db
+): FirebaseFirestore.DocumentReference {
+    const dateKey = appointmentDateKey(appointmentDate);
+    return firestore.collection('appointment_slot_locks').doc(
+        `${slotLockComponent(doctorId)}_${dateKey}_${slotLockComponent(timeSlot)}`
+    );
+}
+
 export function appointmentSlotLockRef(
     doctorId: string,
     appointmentDate: Date,
-    timeSlot: string
+    timeSlot: string,
+    firestore: FirebaseFirestore.Firestore = db
 ): FirebaseFirestore.DocumentReference {
-    return db.collection('appointment_slot_locks').doc(
-        `${slotLockComponent(doctorId)}_${appointmentDateKey(appointmentDate)}_${slotLockComponent(timeSlot)}`
-    );
+    return canonicalAppointmentSlotLockRef(doctorId, appointmentDate, timeSlot, firestore);
 }
 
 export function firestoreDateToDate(value: unknown): Date | null {
@@ -45,80 +152,126 @@ export async function lockAppointmentSlot(
         appointmentId: string;
         status: string;
         excludeAppointmentId?: string;
+        firestore?: FirebaseFirestore.Firestore;
     }
 ): Promise<FirebaseFirestore.DocumentReference> {
-    const slotRef = appointmentSlotLockRef(params.doctorId, params.appointmentDate, params.timeSlot);
-    const slotLockSnap = await transaction.get(slotRef);
-    const lockedAppointmentId = slotLockSnap.data()?.appointmentId as string | undefined;
-    const lockedStatus = slotLockSnap.data()?.status as string | undefined;
-    if (
-        slotLockSnap.exists &&
-        lockedAppointmentId !== params.excludeAppointmentId &&
-        ACTIVE_APPOINTMENT_STATUSES.includes(lockedStatus || 'pending')
-    ) {
-        throw new functions.https.HttpsError('already-exists', 'This time slot is no longer available.');
+    const firestore = params.firestore || db;
+    const canonicalRef = canonicalAppointmentSlotLockRef(params.doctorId, params.appointmentDate, params.timeSlot, firestore);
+    const legacyRef = legacyAppointmentSlotLockRef(params.doctorId, params.appointmentDate, params.timeSlot, firestore);
+
+    const [canonicalSnap, legacySnap] = await Promise.all([
+        transaction.get(canonicalRef),
+        transaction.get(legacyRef),
+    ]);
+
+    for (const snap of [canonicalSnap, legacySnap]) {
+        if (snap.exists) {
+            const data = snap.data();
+            const lockedAppointmentId = data?.appointmentId as string | undefined;
+            const lockedStatus = data?.status as string | undefined;
+            if (
+                lockedAppointmentId !== params.excludeAppointmentId &&
+                ACTIVE_APPOINTMENT_STATUSES.includes(lockedStatus || 'pending')
+            ) {
+                throw new functions.https.HttpsError('already-exists', 'This time slot is no longer available.');
+            }
+        }
     }
 
-    transaction.set(slotRef, {
+    transaction.set(canonicalRef, {
         appointmentId: params.appointmentId,
         doctorId: params.doctorId,
         appointmentDateKey: appointmentDateKey(params.appointmentDate),
         timeSlot: params.timeSlot,
+        startTime: canonicalSlotStartTime(params.timeSlot),
         status: params.status,
         updatedAt: admin.firestore.Timestamp.now(),
     });
-    return slotRef;
+
+    return canonicalRef;
 }
 
-export function releaseAppointmentSlot(
+export async function releaseAppointmentSlot(
     transaction: FirebaseFirestore.Transaction,
     appointmentId: string,
-    appointmentData: FirebaseFirestore.DocumentData
+    appointmentData: FirebaseFirestore.DocumentData,
+    firestore: FirebaseFirestore.Firestore = db
 ): Promise<void> {
     const appointmentDate = firestoreDateToDate(appointmentData.appointmentDate);
-    if (!appointmentData.doctorId || !appointmentDate || !appointmentData.timeSlot) return Promise.resolve();
-    const slotRef = appointmentSlotLockRef(
+    if (!appointmentData.doctorId || !appointmentDate || !appointmentData.timeSlot) return;
+
+    const canonicalRef = canonicalAppointmentSlotLockRef(
         appointmentData.doctorId,
         appointmentDate,
-        appointmentData.timeSlot
+        appointmentData.timeSlot,
+        firestore
     );
-    return transaction.get(slotRef).then((slotSnap) => {
-        if (!slotSnap.exists || slotSnap.data()?.appointmentId !== appointmentId) return;
-        transaction.delete(slotRef);
-    });
+    const legacyRef = legacyAppointmentSlotLockRef(
+        appointmentData.doctorId,
+        appointmentDate,
+        appointmentData.timeSlot,
+        firestore
+    );
+
+    const [canonicalSnap, legacySnap] = await Promise.all([
+        transaction.get(canonicalRef),
+        transaction.get(legacyRef),
+    ]);
+
+    if (canonicalSnap.exists && canonicalSnap.data()?.appointmentId === appointmentId) {
+        transaction.delete(canonicalRef);
+    }
+    if (legacySnap.exists && legacySnap.data()?.appointmentId === appointmentId) {
+        transaction.delete(legacyRef);
+    }
 }
 
-
 export function parseAppointmentDate(value: string): Date {
+    if (!value || typeof value !== 'string') {
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentDate must be a valid ISO date string.');
+    }
+    const datePart = value.split('T')[0];
+    if (!isValidCalendarDate(datePart)) {
+        throw new functions.https.HttpsError('invalid-argument', 'appointmentDate must be a valid ISO date string with a valid calendar date.');
+    }
     const parsed = new Date(value);
-    if (!value || Number.isNaN(parsed.getTime())) {
+    if (Number.isNaN(parsed.getTime())) {
         throw new functions.https.HttpsError('invalid-argument', 'appointmentDate must be a valid ISO date string.');
     }
     return parsed;
 }
 
+export function isValidCalendarDate(dateStr: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+export function getBaghdadDateString(now = new Date()): string {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: DOCTOR_AVAILABILITY_TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(now);
+}
+
 export function appointmentExactTime(date: Date, timeSlot: string): Date {
-    const startTime = timeSlot.split(' - ')[0] || '00:00';
+    const dateKey = appointmentDateKey(date);
+    return appointmentExactUtcTime(dateKey, timeSlot);
+}
+
+export function appointmentExactUtcTime(dateString: string, timeSlot: string): Date {
+    const startTime = canonicalSlotStartTime(timeSlot);
     const [hourRaw, minuteRaw] = startTime.split(':');
     const hour = Number.parseInt(hourRaw || '0', 10);
     const minute = Number.parseInt(minuteRaw || '0', 10);
-    
-    // Extracted components in UTC to be completely timezone-agnostic.
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth();
-    const day = date.getUTCDate();
-    
-    // Construct local Date inside a UTC representation.
-    const utcDate = new Date(Date.UTC(
-        year, 
-        month, 
-        day, 
-        Number.isNaN(hour) ? 0 : hour, 
-        Number.isNaN(minute) ? 0 : minute
-    ));
-    
-    // Shift from Baghdad (UTC+3) to UTC time by subtracting 3 hours.
-    return new Date(utcDate.getTime() - 3 * 60 * 60 * 1000);
+
+    const [year, month, day] = dateString.split('-').map(Number);
+    // Baghdad is UTC+3. Exactly subtract 3 hours to get UTC instant.
+    const utcMillis = Date.UTC(year, month - 1, day, hour - 3, minute, 0, 0);
+    return new Date(utcMillis);
 }
 
 export function formatDateForNotification(date: Date): string {
@@ -198,3 +351,221 @@ export function baghdadStartOfToday(date = new Date()): Date {
     const parts = availabilityDateParts(date);
     return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, -3, 0, 0, 0));
 }
+
+export const WEEKDAY_NAMES = [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+] as const;
+export type WeekdayName = typeof WEEKDAY_NAMES[number];
+
+export function getWeekdayFromCalendarDate(dateStr: string): WeekdayName {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const utcDate = new Date(Date.UTC(y, m - 1, d));
+    return WEEKDAY_NAMES[utcDate.getUTCDay()];
+}
+
+export function baghdadWeekdayName(date: Date): WeekdayName {
+    const parts = availabilityDateParts(date);
+    const utcDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+    return WEEKDAY_NAMES[utcDate.getUTCDay()];
+}
+
+export interface DoctorScheduleSlot {
+    startTime: string;
+    endTime?: string;
+    isAvailable?: boolean;
+}
+
+export function getDoctorDaySchedule(
+    doctorData: FirebaseFirestore.DocumentData,
+    appointmentDate: Date | string
+): DoctorScheduleSlot[] {
+    const weeklySchedule = doctorData.weeklySchedule as Record<string, unknown> | undefined;
+    if (!weeklySchedule || typeof weeklySchedule !== 'object') {
+        return [];
+    }
+    const day = typeof appointmentDate === 'string'
+        ? getWeekdayFromCalendarDate(appointmentDate)
+        : baghdadWeekdayName(appointmentDate);
+    const slots = weeklySchedule[day];
+    if (!Array.isArray(slots)) {
+        return [];
+    }
+    return slots.map((s: unknown) => {
+        if (!s || typeof s !== 'object') return { startTime: '', isAvailable: false };
+        const record = s as Record<string, unknown>;
+        const startTime = typeof record.startTime === 'string' ? normalizeTimeComponent(record.startTime) : '';
+        const endTime = typeof record.endTime === 'string' ? normalizeTimeComponent(record.endTime) : '';
+        const hasEnd = record.endTime !== undefined && record.endTime !== null && record.endTime !== '';
+        const valid = isValidTimeFormat(startTime) && (!hasEnd ||
+            (isValidTimeFormat(endTime) && timeToMinutes(endTime) > timeToMinutes(startTime)));
+        return { startTime, endTime, isAvailable: valid && record.isAvailable !== false };
+    });
+}
+
+export function matchesTimeSlot(slot: DoctorScheduleSlot, requestedTimeSlot: string): boolean {
+    const normalizedReq = requestedTimeSlot.trim();
+    const explicitRange = parseExplicitSlotRange(normalizedReq);
+    if (explicitRange) {
+        if (slot.startTime !== explicitRange.startTime) return false;
+        if (slot.endTime !== explicitRange.endTime) return false;
+        return true;
+    }
+    const startOnly = canonicalSlotStartTime(normalizedReq);
+    if (slot.startTime === normalizedReq || slot.startTime === startOnly) {
+        return true;
+    }
+    if (slot.endTime) {
+        const fullRange = `${slot.startTime} - ${slot.endTime}`;
+        if (fullRange === normalizedReq) {
+            return true;
+        }
+    }
+    return false;
+}
+
+export function validateDoctorSlotAvailability(
+    doctorData: FirebaseFirestore.DocumentData,
+    appointmentDate: Date | string,
+    timeSlot: string
+): boolean {
+    const daySlots = getDoctorDaySchedule(doctorData, appointmentDate);
+    const matchingSlot = daySlots.find((s) => matchesTimeSlot(s, timeSlot));
+    return !!matchingSlot && matchingSlot.isAvailable !== false;
+}
+
+export interface TrustedSlotRange {
+    startTime: string;
+    endTime: string;
+    canonicalSlot: string;
+}
+
+/**
+ * Resolves trusted schedule duration for a requested slot against doctor's actual weeklySchedule.
+ * Rejects forged range ends if schedule defines endTime and caller passes a different endTime.
+ */
+export function resolveTrustedSlotFromSchedule(
+    doctorData: FirebaseFirestore.DocumentData,
+    appointmentDate: Date | string,
+    requestedSlot: string
+): TrustedSlotRange {
+    const daySlots = getDoctorDaySchedule(doctorData, appointmentDate);
+    const normalizedReq = requestedSlot.trim();
+    const reqStart = canonicalSlotStartTime(normalizedReq);
+    const explicitRange = parseExplicitSlotRange(normalizedReq);
+    if ((normalizedReq.includes('-') && !explicitRange) ||
+        (!normalizedReq.includes('-') && !isValidTimeFormat(normalizeTimeComponent(normalizedReq)))) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid time slot.');
+    }
+
+    const matchingScheduleSlot = daySlots.find((s) => {
+        if (!s.startTime || s.isAvailable === false) return false;
+        if (s.startTime === reqStart) return true;
+        return matchesTimeSlot(s, normalizedReq);
+    });
+
+    if (!matchingScheduleSlot || matchingScheduleSlot.isAvailable === false) {
+        throw new functions.https.HttpsError(
+            'failed-precondition',
+            'Selected time slot is not part of doctor\'s active schedule.'
+        );
+    }
+
+    const schedStart = matchingScheduleSlot.startTime;
+    const schedEnd = matchingScheduleSlot.endTime;
+
+    if (explicitRange) {
+        if (explicitRange.startTime !== schedStart) {
+            throw new functions.https.HttpsError('failed-precondition', 'Slot start time does not match doctor schedule.');
+        }
+        if (schedEnd && explicitRange.endTime !== schedEnd) {
+            throw new functions.https.HttpsError('invalid-argument', 'Invalid slot duration: end time does not match doctor schedule.');
+        }
+    }
+
+    const resolvedEnd = schedEnd || (explicitRange ? explicitRange.endTime : '');
+    const canonicalSlot = resolvedEnd ? `${schedStart} - ${resolvedEnd}` : schedStart;
+
+    return {
+        startTime: schedStart,
+        endTime: resolvedEnd,
+        canonicalSlot,
+    };
+}
+
+/**
+ * Resolves the effective time range for an existing stored appointment.
+ * If stored appointment has an explicit range (e.g. "09:00 - 10:00"), uses it.
+ * If start-only (legacy appointment stored with "09:00"), conservatively resolves duration
+ * using doctor's actual schedule for that day.
+ * Never silently assumes 30 minutes.
+ */
+export function resolveExistingAppointmentRange(
+    appt: FirebaseFirestore.DocumentData,
+    doctorData?: FirebaseFirestore.DocumentData,
+    appointmentDate?: Date | string
+): { startTime: string; endTime?: string } {
+    const rawSlot = typeof appt.timeSlot === 'string' ? appt.timeSlot.trim() : '';
+    const explicit = parseExplicitSlotRange(rawSlot);
+    if (explicit) {
+        return explicit;
+    }
+    const start = canonicalSlotStartTime(rawSlot);
+    if (doctorData && appointmentDate) {
+        const daySlots = getDoctorDaySchedule(doctorData, appointmentDate);
+        const match = daySlots.find((s) => s.startTime === start);
+        if (match && match.endTime) {
+            return { startTime: start, endTime: match.endTime };
+        }
+    }
+    return { startTime: start };
+}
+
+/**
+ * Checks if an existing appointment overlaps with a proposed slot range.
+ * Conservatively handles legacy start-only entries using actual doctor schedule.
+ */
+export function doesAppointmentOverlapSlot(
+    existingAppt: FirebaseFirestore.DocumentData,
+    proposedSlotRange: string | { startTime: string; endTime?: string },
+    doctorData?: FirebaseFirestore.DocumentData,
+    appointmentDate?: Date | string
+): boolean {
+    const rawProp = typeof proposedSlotRange === 'string'
+        ? (parseExplicitSlotRange(proposedSlotRange) || { startTime: canonicalSlotStartTime(proposedSlotRange) })
+        : { ...proposedSlotRange };
+    const propRange: { startTime: string; endTime?: string } = { ...rawProp };
+    if (!propRange.endTime && doctorData && appointmentDate) {
+        const daySlots = getDoctorDaySchedule(doctorData, appointmentDate);
+        const match = daySlots.find((s) => s.startTime === propRange.startTime);
+        if (match && match.endTime) {
+            propRange.endTime = match.endTime;
+        }
+    }
+    const existingRange = resolveExistingAppointmentRange(existingAppt, doctorData, appointmentDate);
+    const propStartMin = timeToMinutes(propRange.startTime);
+    const propEndMin = propRange.endTime ? timeToMinutes(propRange.endTime) : propStartMin;
+    const existStartMin = timeToMinutes(existingRange.startTime);
+
+    if (existingRange.endTime) {
+        const existEndMin = timeToMinutes(existingRange.endTime);
+        if (propRange.endTime) {
+            return Math.max(propStartMin, existStartMin) < Math.min(propEndMin, existEndMin);
+        }
+        return propStartMin >= existStartMin && propStartMin < existEndMin;
+    }
+
+    if (existStartMin === propStartMin) return true;
+
+    if (propRange.endTime && existStartMin > propStartMin && existStartMin < propEndMin) {
+        return true;
+    }
+
+    return false;
+}
+

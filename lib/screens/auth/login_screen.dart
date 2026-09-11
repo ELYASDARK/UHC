@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../core/widgets/responsive_layout.dart';
+import '../../core/config/emulator_config.dart';
 import '../../providers/auth_provider.dart';
 
 /// Login screen
@@ -77,6 +78,23 @@ class _LoginScreenState extends State<LoginScreen> {
         _isGoogleLoading = false;
       });
     }
+
+    if (success && mounted) {
+      widget.onLoginSuccess();
+    } else if (mounted && authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleEmulatorDemoSignIn() async {
+    FocusScope.of(context).unfocus();
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signInWithEmulatorDemoPatient();
 
     if (success && mounted) {
       widget.onLoginSuccess();
@@ -246,14 +264,54 @@ class _LoginScreenState extends State<LoginScreen> {
               // Google sign in
               SocialButton(
                 text: l10n.signInWithGoogle,
-                // Use a placeholder or asset if we have it
                 iconPath: 'assets/icons/google.png',
-                onPressed: _handleGoogleSignIn,
+                onPressed: EmulatorConfig.isEmulatorEnabled
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'External Google Sign-In is disabled in emulator mode. Use local demo patient sign-in below.',
+                            ),
+                          ),
+                        );
+                      }
+                    : _handleGoogleSignIn,
                 isLoading: _isGoogleLoading,
               )
                   .animate(delay: 700.ms)
                   .fadeIn(duration: 400.ms)
                   .slideY(begin: 0.2),
+
+              if (EmulatorConfig.isEmulatorEnabled) ...[
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'LOCAL EMULATOR MODE (demo-uhc-test)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.developer_mode, size: 18),
+                        label: const Text('Sign In as Demo Patient (No OAuth)'),
+                        onPressed: _handleEmulatorDemoSignIn,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 32),
             ],

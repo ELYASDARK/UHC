@@ -27,6 +27,7 @@ Healthcare Appointment & Management Platform
 - [Getting Started](#getting-started)
 - [Firebase Configuration](#firebase-configuration)
 - [Cloud Functions](#cloud-functions)
+- [AI Appointment Assistant](#ai-appointment-assistant)
 - [User Roles & Permissions](#user-roles--permissions)
 - [Super Admin Bootstrap](#super-admin-bootstrap)
 - [Building for Production](#building-for-production)
@@ -40,12 +41,13 @@ Healthcare Appointment & Management Platform
 
 ## Overview
 
-UHC is a Flutter application for university health centers. Students and staff can book medical appointments. Doctors manage appointments, view schedules, and record QR-verified check-ins. Admins handle daily operations, while Super Admins manage roles, permissions, Super Admin slots, and audit logs. Firebase provides the backend.
+UHC is a Flutter application for university health centers. Students and staff can book medical appointments directly or via an AI-powered appointment scheduling assistant. Doctors manage appointments, view schedules, and record QR-verified check-ins. Admins handle daily operations, while Super Admins manage roles, permissions, Super Admin slots, and audit logs. Firebase provides the backend.
 
 ### At a glance
 
 | Area | Support |
 |---|---|
+| **AI Assistant** | Natural language appointment discovery and booking in English, Arabic, and Kurdish Sorani with Baghdad time slot matching, privacy boundaries, and quota protection |
 | **Multilingual** | English, Arabic, and Kurdish resources with RTL layouts; admin and Super Admin screens currently use English/LTR |
 | **Data access** | Cursor-paginated Firestore queries, scheduled push delivery, parallel fetching, and composite indexes |
 | **Access control** | Role-based access control with server-side Cloud Functions for privileged operations |
@@ -61,6 +63,7 @@ UHC is a Flutter application for university health centers. Students and staff c
 
 - **Authentication**. Email/password, Google Sign-In, and password recovery. Accounts must link Google before accessing protected backend services.
 - **Appointment Booking**. Browse by department or doctor, pick available time slots, and confirm bookings; unavailable or inactive doctors are locked in the UI and rejected by the backend
+- **AI Appointment Assistant**. Natural language scheduling assistant powered by Gemini 3.5 Flash Lite; supports English, Arabic, and Kurdish Sorani, extracts structured scheduling intents, presents expiring offers from real doctor schedules, and requires affirmative confirmation
 - **Appointment Management**. View upcoming/past appointments, reschedule, or cancel with reason tracking
 - **Medical Documents**. Upload and organize lab results, prescriptions, and imaging reports
 - **Push Notifications**. FCM push, local mobile reminders, and in-app notification center with visibility-safe scheduled alerts
@@ -139,7 +142,8 @@ UHC is a Flutter application for university health centers. Students and staff c
 | **Database** | Cloud Firestore | Real-time NoSQL document database |
 | **File Storage** | Firebase Storage | Medical document & image hosting |
 | **Messaging** | Firebase Cloud Messaging | Push notifications |
-| **Server Logic** | Firebase Cloud Functions (TypeScript) | Privileged admin operations |
+| **Server Logic** | Firebase Cloud Functions (TypeScript) | Privileged admin operations & AI assistant pipeline |
+| **AI & NLP** | Google Gemini (gemini-3.5-flash-lite) | Interprets appointment requests on the server |
 | **Local Storage** | SharedPreferences | User preferences & theme persistence |
 | **Notifications** | flutter_local_notifications | Scheduled local reminders |
 | **UI Framework** | Material Design 3, Google Fonts | App styling and typography |
@@ -165,14 +169,16 @@ flowchart TB
     storage[Firebase Storage]
     auth[Firebase Authentication]
     functions[Cloud Functions]
+    gemini["Google Gemini API<br/>(Structured Intent)"]
     firestore[(Cloud Firestore)]
     push["Firebase Cloud<br/>Messaging"]
 
     data -->|File access| storage
     data -->|"Sign-in and<br/>account linking"| auth
-    data -->|"Appointment and<br/>account operations"| functions
+    data -->|"Appointment and<br/>assistant operations"| functions
     data -->|"Permitted<br/>reads and writes"| firestore
     functions --->|"Auth checks and<br/>account updates"| auth
+    functions -->|"Scheduling request<br/>interpretation"| gemini
     functions -->|"Validated<br/>writes"| firestore
     functions -->|"Push<br/>delivery"| push
     push -->|Device notifications| screens
@@ -197,17 +203,18 @@ uhc/
 │   ├── providers/                  # Provider state management
 │   ├── screens/
 │   │   ├── auth/                   # Login, Google linking, password setup and recovery
-│   │   ├── patient/                # Booking, appointments, documents, profile
+│   │   ├── patient/                # Booking, appointments, AI assistant, documents, profile
 │   │   ├── doctor/                 # Appointments, schedule view, profile, QR scanner
 │   │   ├── admin/                  # Operations, analytics, reports
 │   │   ├── super_admin/            # Governance, permissions, audit logs
 │   │   └── shared/                 # Notifications and account settings
-│   ├── services/                   # Auth, messaging, reminders, callable wrappers
+│   ├── services/                   # Auth, messaging, assistant callables, reminders
 │   └── utils/                      # File saving and platform helpers
 ├── functions/src/
 │   ├── index.ts                    # Public function exports
 │   ├── firebase.ts                 # Firebase Admin initialization
 │   ├── appointments.ts             # Appointment lifecycle
+│   ├── assistant/                  # Gemini client, intent parsing, schedule matcher, quota
 │   ├── doctors.ts                  # Doctor accounts, profiles, schedules
 │   ├── users.ts                    # Student/staff accounts and setup
 │   ├── departments.ts              # Department operations
@@ -293,9 +300,30 @@ Follow the [Firebase setup guide](docs/FIREBASE_SETUP.md) for project selection,
 
 ## Cloud Functions
 
-Cloud Functions handle appointment operations, account management, availability requests, notifications, and Super Admin governance. Protected operations require an active account with a linked Google provider and the relevant permissions.
+Cloud Functions handle appointment operations, the AI Appointment Assistant, account management, availability requests, notifications, and Super Admin governance. Protected operations require an active account with a linked Google provider and the relevant permissions.
 
 See the [Cloud Functions reference](docs/CLOUD_FUNCTIONS.md) for the full function list, access requirements, and Google-linking troubleshooting.
+
+---
+
+## AI Appointment Assistant
+
+Patients can ask for an appointment in English, Arabic, or Kurdish Sorani. The backend uses Gemini `gemini-3.5-flash-lite` to extract the doctor, department, date, and time preferences. It then checks Firestore schedules and existing bookings in Baghdad time.
+
+- **Booking offers:** Up to six available slots, each valid for ten minutes. The patient selects a slot and confirms it before the backend creates the appointment. Slot locks and retry receipts protect against conflicting or duplicate bookings.
+- **Conversation history:** Up to 20 messages with seven-day retention. Resuming a conversation rechecks its offers; expired offers from the last successful search can be replaced without another Gemini call.
+- **Usage limits:** The app defaults to 500 requests per day and 15 per minute across the project, plus ten per minute per user. These are application limits, not a promise of Google's free allowance. When the daily limit is reached, patients can use manual booking or wait until the displayed reset time at midnight Pacific Time.
+- **Scheduling scope:** The model extracts scheduling intent. Replies come from application templates, and medical questions receive an out-of-scope response. It does not provide an assessment or diagnosis.
+
+### Configuration and data sent to Gemini
+
+The API key stays in Firebase Secret Manager. Live requests require both `AI_ASSISTANT_ENABLED=true` and `AI_PRIVACY_RELEASE_GATE_ACCEPTED=true`; the code defaults to disabled.
+
+Gemini receives the patient's message (up to 500 characters), up to four recent messages truncated to 200 characters each, and doctor/department catalog details. The app does not attach patient account records or medical documents. **Free-text messages are not automatically redacted** and can contain personal information entered by the patient. Review the provider's data terms before enabling live use.
+
+An optional local synthetic mode exercises booking with fixed responses and no Gemini calls. It requires emulator setup; it does not measure the model's response quality.
+
+See [assistant configuration](docs/FIREBASE_SETUP.md#ai-assistant-configuration--privacy-gate), [optional emulator setup](docs/FIREBASE_SETUP.md#controlled-local-offline-synthetic-testing), and the [callable API reference](docs/CLOUD_FUNCTIONS.md#ai-appointment-assistant).
 
 ---
 
@@ -367,6 +395,7 @@ flutter build web --release
 | `lib/core/constants/app_strings.dart` | App-wide string constants |
 | `lib/core/constants/app_assets.dart` | Asset path references |
 | `lib/core/theme/` | Material 3 light & dark theme definitions |
+| `functions/src/assistant/config.ts` | AI Assistant configuration, models, quota caps, and timezone rules |
 | `l10n.yaml` | Localization generation config |
 | `firestore.rules` | Firestore security rules |
 | `firestore.indexes.json` | Composite index definitions |
