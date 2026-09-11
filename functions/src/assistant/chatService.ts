@@ -160,6 +160,9 @@ export async function reserveAssistantTurn(
             lastClientRequestId: params.clientRequestId || null,
             lastClientRequestHash: messageHash,
             lastResult: null, // Reset previous completed result on new reservation
+            expiresAt: admin.firestore.Timestamp.fromMillis(
+                now.getTime() + ASSISTANT_CONFIG.CHAT_RETENTION_DAYS * 86400000
+            ),
             messages: updatedMessages,
             updatedAt: timestampNow,
         };
@@ -266,6 +269,9 @@ export async function commitAssistantTurn(
             offers: updatedOffers,
             searchPreferences: params.searchPreferences !== undefined ? params.searchPreferences : currentDoc.searchPreferences,
             lastResult: finalResult,
+            expiresAt: admin.firestore.Timestamp.fromMillis(
+                now.getTime() + ASSISTANT_CONFIG.CHAT_RETENTION_DAYS * 86400000
+            ),
             resetAt: params.resetAt || null,
             updatedAt: timestampNow,
         };

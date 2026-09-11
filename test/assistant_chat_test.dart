@@ -37,6 +37,9 @@ class FakeAssistantFunctionsService implements AssistantFunctionsService {
   ConfirmAssistantAppointmentResult? confirmResult;
   Exception? confirmException;
 
+  bool clearResult = true;
+  Exception? clearException;
+  Exception? historyException;
   int clearHistoryCallCount = 0;
   int getHistoryCallCount = 0;
   int sendMessageCallCount = 0;
@@ -53,6 +56,7 @@ class FakeAssistantFunctionsService implements AssistantFunctionsService {
   @override
   Future<GetAssistantHistoryResult> getHistory() async {
     getHistoryCallCount++;
+    if (historyException != null) throw historyException!;
     if (historyCompleter != null) {
       return historyCompleter!.future;
     }
@@ -62,7 +66,8 @@ class FakeAssistantFunctionsService implements AssistantFunctionsService {
   @override
   Future<bool> clearHistory() async {
     clearHistoryCallCount++;
-    return true;
+    if (clearException != null) throw clearException!;
+    return clearResult;
   }
 
   @override
@@ -347,6 +352,57 @@ void main() {
   });
 
   group('AssistantChatProvider Isolation and Lifecycle Tests', () {
+    test('PR5 retained offers stay attached only to the original ready reply', () async {
+      final service = FakeAssistantFunctionsService();
+      final provider = AssistantChatProvider(patientId: 'patient_A', functionsService: service);
+      final offer = AssistantOffer(offerId: 'prior', doctorId: 'doc', doctorName: 'Doctor', department: 'dentistry', appointmentDate: '2026-09-16', timeSlot: '09:00 - 09:30', expiresAt: DateTime.now().add(const Duration(minutes: 10)), isAvailable: true);
+      service.sendResult = SendAssistantMessageResult(success: true, status: AssistantMessageStatus.ready, message: 'Slots', replyLanguage: 'en', offers: [offer], revision: 2);
+      await provider.sendMessage('Slots please', localeCode: 'en');
+      final original = provider.messages.last;
+      for (final status in [AssistantMessageStatus.clarify, AssistantMessageStatus.outOfScope]) {
+        service.sendResult = SendAssistantMessageResult(success: true, status: status, message: 'Unrelated reply', replyLanguage: 'en', offers: [offer], revision: 3);
+        await provider.sendMessage('Another question', localeCode: 'en');
+        expect(provider.messages.last.offerIds, isEmpty);
+        expect(provider.getOffersForMessage(original).single.offerId, 'prior');
+      }
+      provider.dispose();
+    });
+
+    test('PR5 failed clear preserves history and draft even when reloading fails', () async {
+      for (final throws in [false, true]) {
+        final service = FakeAssistantFunctionsService();
+        final message = AssistantChatMessage(id: 'saved', sender: 'patient', text: 'Saved conversation', status: AssistantMessageStatus.ready, createdAt: DateTime.now());
+        service.historyResult = GetAssistantHistoryResult(success: true, messages: [message], offers: const [], revision: 3);
+        final provider = AssistantChatProvider(patientId: 'patient_A', functionsService: service);
+        await provider.initialize();
+        provider.setDraft('Unsent text');
+        service.clearResult = false;
+        if (throws) service.clearException = Exception('offline');
+        service.historyException = Exception('offline');
+        expect(await provider.clearChat(), isFalse);
+        expect(provider.messages.single.text, 'Saved conversation');
+        expect(provider.unsentDraft, 'Unsent text');
+        expect(provider.errorMessage, contains('Failed to clear'));
+        expect(provider.isClearing, isFalse);
+        provider.dispose();
+      }
+    });
+
+    testWidgets('PR5 daily reset unlocks an open conversation without deleting history', (tester) async {
+      final service = FakeAssistantFunctionsService();
+      final message = AssistantChatMessage(id: 'saved', sender: 'patient', text: 'Keep history', status: AssistantMessageStatus.ready, createdAt: DateTime.now());
+      service.historyResult = GetAssistantHistoryResult(success: true, messages: [message], offers: const [], revision: 3, status: AssistantMessageStatus.dailyLimit, resetAt: DateTime.now().add(const Duration(milliseconds: 100)));
+      final provider = AssistantChatProvider(patientId: 'patient_A', functionsService: service);
+      await provider.initialize();
+      expect(provider.isDailyLimit, isTrue);
+      service.historyResult = GetAssistantHistoryResult(success: true, messages: [message], offers: const [], revision: 3, status: AssistantMessageStatus.ready);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(provider.isDailyLimit, isFalse);
+      expect(provider.resetAt, isNull);
+      expect(provider.messages.single.text, 'Keep history');
+      provider.dispose();
+    });
+
     test('Failed send preserves clientRequestId across retries of same draft text', () async {
       final fakeService = FakeAssistantFunctionsService();
       fakeService.sendException = const AssistantFunctionException(
@@ -494,7 +550,7 @@ void main() {
 
     test('Daily quota error parses resetAt UTC correctly without wiping past history', () async {
       final fakeService = FakeAssistantFunctionsService();
-      final resetTime = DateTime.utc(2026, 9, 10, 7, 0, 0);
+      final resetTime = DateTime.now().toUtc().add(const Duration(hours: 1));
 
       fakeService.sendResult = SendAssistantMessageResult(
         success: true,
@@ -951,7 +1007,7 @@ void main() {
 
     testWidgets('Daily quota displays exact required English heading and converted reset time', (tester) async {
       final fakeService = FakeAssistantFunctionsService();
-      final resetTime = DateTime.utc(2026, 9, 10, 7, 0, 0);
+      final resetTime = DateTime.now().toUtc().add(const Duration(hours: 1));
       fakeService.historyResult = GetAssistantHistoryResult(
         success: true,
         messages: const [],

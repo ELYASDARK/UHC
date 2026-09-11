@@ -1712,3 +1712,85 @@ test('12.6 Invalid synthetic configuration fails closed before touching Auth, Fi
     }
 });
 
+
+
+test('PR5 expired daily-limit history unlocks while current exhaustion stays blocked', async (t) => {
+    await withFrozenTime(FROZEN_NOW, async () => {
+        const { mockDb, store } = createMockFirestore();
+        t.mock.method(db, 'collection', mockDb.collection);
+        t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: [{ providerId: 'google.com' }] }));
+        store.get('users').set('reset_patient', { isActive: true, role: 'student' });
+        const resetAt = new Date(FROZEN_NOW.getTime() - 3600000).toISOString();
+        const chat = createInitialChatDoc('reset_patient', FROZEN_NOW);
+        chat.lastResult = { success: true, status: 'daily_limit', reasonCode: 'upstream_daily_limit_reached', message: 'Limit', replyLanguage: 'en', offers: [], resetAt, revision: 1 };
+        chat.resetAt = resetAt;
+        store.get('assistant_chats').set('reset_patient', chat);
+        const request = { auth: { uid: 'reset_patient' }, data: {} };
+        const resumed = await getAssistantHistory.run(request);
+        assert.equal(resumed.status, 'ready');
+        assert.equal(resumed.resetAt, null);
+        assert.equal(resumed.reasonCode, null);
+        await mockDb.collection('assistant_project_quota').doc(getPacificDateKey(FROZEN_NOW)).set({ isDailyExhausted: true });
+        const blocked = await getAssistantHistory.run(request);
+        assert.equal(blocked.status, 'daily_limit');
+        assert.ok(Date.parse(blocked.resetAt) > FROZEN_NOW.getTime());
+    });
+});
+
+test('PR5 new activity extends chat TTL without retaining expired messages', async () => {
+    const { mockDb, store } = createMockFirestore();
+    const old = new Date(FROZEN_NOW.getTime() - 6 * 86400000);
+    const chat = createInitialChatDoc('ttl_patient', old);
+    chat.messages = [{ id: 'expired', sender: 'patient', text: 'Old', status: 'ready', createdAt: new Date(FROZEN_NOW.getTime() - 8 * 86400000).toISOString() }];
+    store.get('assistant_chats').set('ttl_patient', chat);
+    const reserved = await reserveAssistantTurn(mockDb, { patientId: 'ttl_patient', userMessage: 'New', clientRequestId: 'ttl_new', now: FROZEN_NOW });
+    const active = (await getPatientChatDoc(mockDb, 'ttl_patient', FROZEN_NOW)).doc;
+    assert.equal(active.expiresAt.toMillis(), FROZEN_NOW.getTime() + 7 * 86400000);
+    assert.equal(active.messages.some(m => m.id === 'expired'), false);
+    const completedAt = new Date(FROZEN_NOW.getTime() + 10000);
+    await commitAssistantTurn(mockDb, { patientId: 'ttl_patient', generationId: reserved.generationId, reservedRevision: reserved.reservedRevision, turnId: reserved.turnId, assistantMessage: 'Which day?', status: 'clarify', replyLanguage: 'en', offers: [], now: completedAt });
+    const completed = (await getPatientChatDoc(mockDb, 'ttl_patient', completedAt)).doc;
+    assert.equal(completed.expiresAt.toMillis(), completedAt.getTime() + 7 * 86400000);
+});
+
+test('PR5 invalid schedule and requested ranges cannot become bookable slots', () => {
+    const { resolveTrustedSlotFromSchedule } = require('../lib/shared/appointmentHelpers');
+    const invalid = [
+        { startTime: '09:00', endTime: '08:00' },
+        { startTime: '09:00', endTime: '09:00' },
+        { startTime: '09:00', endTime: 'bad' },
+        { startTime: '25:00', endTime: '26:00' },
+        { startTime: '09:00 - garbage', endTime: '10:00' },
+        { startTime: '09:00', endTime: 123 },
+    ];
+    for (const slot of invalid) {
+        const doctor = { weeklySchedule: { thursday: [slot] } };
+        assert.equal(getDoctorDaySchedule(doctor, '2026-09-10')[0].isAvailable, false);
+        assert.equal(validateDoctorSlotAvailability(doctor, '2026-09-10', '09:00'), false);
+        assert.throws(() => resolveTrustedSlotFromSchedule(doctor, '2026-09-10', '09:00'));
+    }
+    const valid = { weeklySchedule: { thursday: [{ startTime: '9:00', endTime: '10:00' }] } };
+    assert.equal(resolveTrustedSlotFromSchedule(valid, '2026-09-10', '09:00').canonicalSlot, '09:00 - 10:00');
+    for (const request of ['09:00 - bad', '09:00 - 08:00', '09:00 - 10:00 - 11:00']) {
+        assert.throws(() => resolveTrustedSlotFromSchedule(valid, '2026-09-10', request), e => e.code === 'invalid-argument');
+    }
+    assert.equal(getDoctorDaySchedule({ weeklySchedule: { thursday: [{ startTime: '09:00' }] } }, '2026-09-10')[0].isAvailable, true);
+});
+
+test('PR5 availability requires an active Google-linked caller', async (t) => {
+    const { getDoctorDayAvailability } = require('../lib/appointments');
+    const { mockDb, store } = createMockFirestore();
+    t.mock.method(db, 'collection', mockDb.collection);
+    let providers = [{ providerId: 'google.com' }];
+    t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: providers }));
+    const request = { auth: { uid: 'availability_patient' }, data: {} };
+    await assert.rejects(getDoctorDayAvailability.run(request), e => e.code === 'not-found');
+    store.get('users').set('availability_patient', { isActive: false, role: 'student' });
+    await assert.rejects(getDoctorDayAvailability.run(request), e => e.code === 'permission-denied');
+    store.get('users').set('availability_patient', { isActive: true, role: 'student' });
+    providers = [{ providerId: 'password' }];
+    await assert.rejects(getDoctorDayAvailability.run(request), e => e.code === 'failed-precondition');
+    providers = [{ providerId: 'google.com' }];
+    await assert.rejects(getDoctorDayAvailability.run(request), e => e.code === 'invalid-argument');
+});

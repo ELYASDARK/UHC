@@ -1018,7 +1018,8 @@ export const getDoctorDayAvailability = functions.https.onCall(
     async (
         request: functions.https.CallableRequest<GetDoctorDayAvailabilityData>
     ): Promise<GetDoctorDayAvailabilityResult> => {
-        requireAuth(request);
+        const callerUid = requireAuth(request);
+        await getCallerUserDoc(callerUid);
         const data = request.data || {};
         const doctorId = typeof data.doctorId === 'string' ? data.doctorId.trim() : '';
         const dateStr = typeof data.date === 'string' && data.date.trim()

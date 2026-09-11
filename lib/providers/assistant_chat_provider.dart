@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../data/models/assistant_chat_model.dart';
@@ -24,6 +25,7 @@ class AssistantChatProvider extends ChangeNotifier {
   AssistantMessageStatus _currentStatus = AssistantMessageStatus.ready;
   String? _reasonCode;
   DateTime? _resetAt;
+  Timer? _quotaResetTimer;
   String? _errorMessage;
   String? _unsentDraft;
   int _revision = 0;
@@ -95,6 +97,7 @@ class AssistantChatProvider extends ChangeNotifier {
 
     if (_patientId == sanitizedId) return;
 
+    _quotaResetTimer?.cancel();
     _patientId = sanitizedId;
     _generation++;
     _messages = [];
@@ -144,9 +147,7 @@ class AssistantChatProvider extends ChangeNotifier {
       _offersById = {for (final o in history.offers) o.offerId: o};
       _revision = history.revision;
       _resetAt = history.resetAt;
-      if (history.status != null) {
-        _currentStatus = history.status!;
-      }
+      _currentStatus = history.status ?? AssistantMessageStatus.ready;
     } on AssistantFunctionException catch (e) {
       if (_isDisposed || currentGen != _generation) return;
       _errorMessage = e.message;
@@ -159,6 +160,7 @@ class AssistantChatProvider extends ChangeNotifier {
     } finally {
       if (!_isDisposed && currentGen == _generation) {
         _isLoading = false;
+        _scheduleQuotaReset();
         notifyListeners();
         if (_refreshPending) {
           _refreshPending = false;
@@ -194,9 +196,7 @@ class AssistantChatProvider extends ChangeNotifier {
         _offersById = {for (final o in history.offers) o.offerId: o};
         _revision = history.revision;
         _resetAt = history.resetAt;
-        if (history.status != null) {
-          _currentStatus = history.status!;
-        }
+        _currentStatus = history.status ?? AssistantMessageStatus.ready;
       }
     } on AssistantFunctionException catch (e) {
       if (_isDisposed || currentGen != _generation) return;
@@ -213,6 +213,7 @@ class AssistantChatProvider extends ChangeNotifier {
     } finally {
       if (!_isDisposed && currentGen == _generation) {
         _isRefreshing = false;
+        _scheduleQuotaReset();
         notifyListeners();
       }
     }
@@ -301,7 +302,9 @@ class AssistantChatProvider extends ChangeNotifier {
           text: result.message,
           status: result.status,
           reasonCode: result.reasonCode,
-          offerIds: result.offers.map((o) => o.offerId).toList(),
+          offerIds: result.status == AssistantMessageStatus.ready
+              ? result.offers.map((o) => o.offerId).toList()
+              : const [],
           createdAt: DateTime.now(),
         );
 
@@ -365,6 +368,7 @@ class AssistantChatProvider extends ChangeNotifier {
     } finally {
       if (!_isDisposed && currentGen == _generation) {
         _isSending = false;
+        _scheduleQuotaReset();
         notifyListeners();
         if (_refreshPending) {
           _refreshPending = false;
@@ -459,57 +463,76 @@ class AssistantChatProvider extends ChangeNotifier {
     }
   }
 
-  /// Clears the caller's chat history and resets local generation immediately.
-  /// Late network arrivals with the old generation are discarded.
+  /// Invalidates old callbacks while keeping visible history until clear succeeds.
   Future<bool> clearChat() async {
     if (_patientId == null || _patientId!.isEmpty || _isClearing || _isDisposed) return false;
     _isClearing = true;
-
-    // Immediately increment generation to invalidate any in-flight requests
+    _quotaResetTimer?.cancel();
     _generation++;
     final currentGen = _generation;
-
-    // Explicitly reset busy flags so provider is not permanently locked
     _isSending = false;
     _isLoading = false;
     _isConfirming = false;
     _isRefreshing = false;
     _confirmingOfferId = null;
     _refreshPending = false;
-    _activeClientRequestId = null;
-    _lastSentDraft = null;
-
-    // Reset local state immediately for instant UI feedback
-    _messages = [];
-    _offersById = {};
-    _currentStatus = AssistantMessageStatus.ready;
-    _reasonCode = null;
     _errorMessage = null;
-    _unsentDraft = null;
-    _activeBookingIdempotencyKey = null;
-    _activeBookingOfferId = null;
     notifyListeners();
 
+    var cleared = false;
     try {
-      final success = await _functionsService.clearHistory();
-      if (!success && !_isDisposed && currentGen == _generation) {
-        _errorMessage = 'Failed to clear chat on server.';
-        notifyListeners();
-      }
-      return success;
-    } catch (e) {
-      debugPrint('Error clearing chat history on server: $e');
-      if (!_isDisposed && currentGen == _generation) {
-        _errorMessage = 'Failed to clear chat on server.';
-        notifyListeners();
-      }
-      return false;
-    } finally {
-      if (!_isDisposed && currentGen == _generation) {
-        _isClearing = false;
-        notifyListeners();
-      }
+      cleared = await _functionsService.clearHistory();
+    } catch (_) {
+      // A failed response does not prove that the server deleted the conversation.
     }
+    if (_isDisposed || currentGen != _generation) return false;
+    _isClearing = false;
+
+    if (cleared) {
+      _messages = [];
+      _offersById = {};
+      _currentStatus = AssistantMessageStatus.ready;
+      _reasonCode = null;
+      _resetAt = null;
+      _revision = 0;
+      _unsentDraft = null;
+      _activeClientRequestId = null;
+      _lastSentDraft = null;
+      _activeBookingIdempotencyKey = null;
+      _activeBookingOfferId = null;
+    } else {
+      _messages = _messages.where((message) => !message.isPending).toList();
+      await refreshHistory(force: true);
+      if (_isDisposed || currentGen != _generation) return false;
+      _errorMessage = 'Failed to clear chat on server.';
+    }
+    _scheduleQuotaReset();
+    notifyListeners();
+    return cleared;
+  }
+
+  void _scheduleQuotaReset() {
+    _quotaResetTimer?.cancel();
+    final reset = _resetAt;
+    if (!isDailyLimit || reset == null || _isDisposed) return;
+    final delay = reset.difference(DateTime.now());
+    // A stale server timestamp must not create an immediate refresh loop.
+    if (delay <= Duration.zero) {
+      _currentStatus = AssistantMessageStatus.ready;
+      _reasonCode = null;
+      _resetAt = null;
+      _errorMessage = null;
+      return;
+    }
+    _quotaResetTimer = Timer(delay, () {
+      if (_isDisposed || _isClearing) return;
+      _currentStatus = AssistantMessageStatus.ready;
+      _reasonCode = null;
+      _resetAt = null;
+      _errorMessage = null;
+      notifyListeners();
+      unawaited(refreshHistory(force: true));
+    });
   }
 
   /// Updates draft text (e.g. while editing).
@@ -525,6 +548,7 @@ class AssistantChatProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _quotaResetTimer?.cancel();
     _isDisposed = true;
     _generation++;
     super.dispose();

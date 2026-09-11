@@ -452,6 +452,13 @@ export const getAssistantHistory = functions.https.onCall(
         let reasonCode = chatDoc.lastResult?.reasonCode || null;
         let resetAt = chatDoc.resetAt || null;
 
+        if (!isProjectDailyExhausted && status === 'daily_limit' &&
+            resetAt && Date.parse(resetAt) <= now.getTime()) {
+            status = 'ready';
+            reasonCode = null;
+            resetAt = null;
+        }
+
         if (isProjectDailyExhausted) {
             status = 'daily_limit';
             reasonCode = projectQuotaData?.isDailyExhausted === true

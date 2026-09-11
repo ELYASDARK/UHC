@@ -392,11 +392,12 @@ export function getDoctorDaySchedule(
     return slots.map((s: unknown) => {
         if (!s || typeof s !== 'object') return { startTime: '', isAvailable: false };
         const record = s as Record<string, unknown>;
-        return {
-            startTime: typeof record.startTime === 'string' ? canonicalSlotStartTime(record.startTime) : '',
-            endTime: typeof record.endTime === 'string' ? normalizeTimeComponent(record.endTime) : '',
-            isAvailable: record.isAvailable !== false,
-        };
+        const startTime = typeof record.startTime === 'string' ? normalizeTimeComponent(record.startTime) : '';
+        const endTime = typeof record.endTime === 'string' ? normalizeTimeComponent(record.endTime) : '';
+        const hasEnd = record.endTime !== undefined && record.endTime !== null && record.endTime !== '';
+        const valid = isValidTimeFormat(startTime) && (!hasEnd ||
+            (isValidTimeFormat(endTime) && timeToMinutes(endTime) > timeToMinutes(startTime)));
+        return { startTime, endTime, isAvailable: valid && record.isAvailable !== false };
     });
 }
 
@@ -444,6 +445,10 @@ export function resolveTrustedSlotFromSchedule(
     const normalizedReq = requestedSlot.trim();
     const reqStart = canonicalSlotStartTime(normalizedReq);
     const explicitRange = parseExplicitSlotRange(normalizedReq);
+    if ((normalizedReq.includes('-') && !explicitRange) ||
+        (!normalizedReq.includes('-') && !isValidTimeFormat(normalizeTimeComponent(normalizedReq)))) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid time slot.');
+    }
 
     const matchingScheduleSlot = daySlots.find((s) => {
         if (!s.startTime || s.isAvailable === false) return false;
