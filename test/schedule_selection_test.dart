@@ -657,6 +657,73 @@ void main() {
 
   group('DoctorScheduleScreen error UI and date-race widget tests', () {
     testWidgets(
+        'reschedule calendar enables only days with future clinic slots',
+        (tester) async {
+      final today = DateTime.utc(2026, 9, 14);
+      final nextMonday = today.add(const Duration(days: 7));
+      for (final scenario in [
+        (utcNow: '2026-09-14T05:59:00Z', starts: ['09:00'], enabled: true),
+        (utcNow: '2026-09-14T06:00:00Z', starts: ['09:00'], enabled: false),
+        (utcNow: '2026-09-14T06:01:00Z', starts: ['09:00'], enabled: false),
+        (
+          utcNow: '2026-09-14T06:01:00Z',
+          starts: ['09:00', '10:00'],
+          enabled: true
+        ),
+      ]) {
+        final now = DateTime.parse(scenario.utcNow);
+        final doctor = createTestDoctor(weeklySchedule: {
+          'monday': [
+            for (final start in scenario.starts)
+              TimeSlot(startTime: start, endTime: '')
+          ],
+        });
+        final appointment = AppointmentModel(
+          id: 'reschedule-calendar',
+          patientId: 'patient',
+          patientName: 'Patient',
+          patientEmail: 'patient@example.test',
+          doctorId: doctor.id,
+          doctorName: doctor.name,
+          department: doctor.departmentId,
+          appointmentDate: nextMonday,
+          timeSlot: '09:00',
+          createdAt: now,
+          updatedAt: now,
+        );
+        await tester.pumpWidget(createTestApp(
+            child: RescheduleScreen(
+          key: UniqueKey(),
+          appointment: appointment,
+          doctor: doctor,
+          captureNow: now,
+          appointmentRepository: TestAppointmentRepository(
+            availabilityHandler: (doctorId, date) async =>
+                DoctorDayAvailability(
+              success: true,
+              doctorId: doctorId,
+              appointmentDate: AppointmentRepository.formatClinicDate(date),
+              doctorName: doctor.name,
+              department: doctor.departmentId,
+              slots: const [],
+            ),
+          ),
+        )));
+        await tester.pumpAndSettle();
+        final day = find.descendant(
+            of: find.byType(TableCalendar), matching: find.text('14'));
+        await tester.ensureVisible(day);
+        await tester.tap(day);
+        await tester.pumpAndSettle();
+        final calendar =
+            tester.widget<TableCalendar>(find.byType(TableCalendar));
+        expect(calendar.selectedDayPredicate!(today), scenario.enabled,
+            reason: '${scenario.utcNow}, slots: ${scenario.starts}');
+        expect(calendar.enabledDayPredicate!(nextMonday), isTrue);
+      }
+    });
+
+    testWidgets(
         'rescheduling retries selected-day availability without retaining a failed result',
         (tester) async {
       final today = DateTime.now();

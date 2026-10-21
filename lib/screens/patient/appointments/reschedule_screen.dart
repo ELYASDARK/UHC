@@ -15,12 +15,14 @@ class RescheduleScreen extends StatefulWidget {
   final AppointmentModel appointment;
   final DoctorModel? doctor;
   final AppointmentRepository? appointmentRepository;
+  final DateTime? captureNow;
 
   const RescheduleScreen({
     super.key,
     required this.appointment,
     this.doctor,
     this.appointmentRepository,
+    this.captureNow,
   });
 
   @override
@@ -29,12 +31,14 @@ class RescheduleScreen extends StatefulWidget {
 
 class _RescheduleScreenState extends State<RescheduleScreen> {
   late final DoctorDayAvailabilityProvider _availability;
-  DateTime _focusedDay = DateTime.now();
+  late DateTime _focusedDay;
   DateTime? _selectedDay;
   TimeSlot? _selectedTimeSlot;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   final _reasonController = TextEditingController();
   bool _isLoading = false;
+
+  DateTime get _now => widget.captureNow ?? DateTime.now();
 
   @override
   void initState() {
@@ -100,7 +104,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   bool _canReschedule() {
     // Check 24-hour policy against canonical UTC appointment time
     final appointmentTime = _getExactAppointmentTime();
-    final now = DateTime.now().toUtc();
+    final now = _now.toUtc();
     return appointmentTime.difference(now).inMinutes >= 24 * 60;
   }
 
@@ -149,8 +153,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                       ],
                     ),
                     child: TableCalendar(
-                      firstDay: DateTime.now(),
-                      lastDay: DateTime.now().add(const Duration(days: 60)),
+                      firstDay: _now,
+                      lastDay: _now.add(const Duration(days: 60)),
                       focusedDay: _focusedDay,
                       calendarFormat: _calendarFormat,
                       selectedDayPredicate: (day) =>
@@ -191,8 +195,15 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                         titleCentered: true,
                       ),
                       enabledDayPredicate: (day) {
-                        final slots = _getAvailableSlots(day);
-                        return slots.isNotEmpty;
+                        final clinicMidnight =
+                            DateTime.utc(day.year, day.month, day.day)
+                                .subtract(const Duration(hours: 3));
+                        return _getAvailableSlots(day).any((slot) =>
+                            clinicMidnight
+                                .add(Duration(
+                                    minutes:
+                                        TimeSlot.parseMinutes(slot.startTime)!))
+                                .isAfter(_now.toUtc()));
                       },
                     ),
                   ),

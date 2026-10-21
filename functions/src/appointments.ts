@@ -25,7 +25,7 @@ import {
 } from './notifications/core';
 
 import { CreateAppointmentData, consumeAssistantOffer, prepareBookingRequest, resolveBookingRequest } from './appointments/bookingRequest';
-import { readDoctorSlotReservation, writeDoctorSlotReservation } from './appointments/slotReservation';
+import { readBookingDoctor, readDoctorSlotReservation, writeDoctorSlotReservation } from './appointments/slotReservation';
 export { CreateAppointmentData } from './appointments/bookingRequest';
 export { getDoctorDayAvailability, GetDoctorDayAvailabilityData, GetDoctorDayAvailabilityResult, AvailableSlotInfo } from './appointments/doctorDayAvailability';
 
@@ -174,7 +174,12 @@ export async function createAppointmentCore(
         }
 
         const resolved = await resolveBookingRequest(transaction, db, { booking, patientId: callerUid, now: now.toDate() });
-        const reservation = resolved.doctorId ? await readDoctorSlotReservation(transaction, {
+        const emergencyDoctor = resolved.type === 'emergency' && resolved.doctorId
+            ? await readBookingDoctor(transaction, {
+                firestore: db, doctorId: resolved.doctorId, fallbackDoctorName: resolved.doctorName,
+            }) : null;
+        // Emergency requests have no scheduled slot to reserve, even with a preferred doctor.
+        const reservation = resolved.type !== 'emergency' && resolved.doctorId ? await readDoctorSlotReservation(transaction, {
             firestore: db,
             doctorId: resolved.doctorId,
             appointmentId: ref.id,
@@ -185,12 +190,13 @@ export async function createAppointmentCore(
         if (!reservation && resolved.type !== 'emergency') {
             throw new functions.https.HttpsError('invalid-argument', 'doctorId is required for non-emergency appointments.');
         }
+        const bookingDoctor = reservation || emergencyDoctor;
         const resolvedDoctorId = resolved.doctorId;
-        const resolvedDoctorName = reservation?.doctorName || resolved.doctorName;
-        const resolvedDepartment = reservation?.department || resolved.department;
+        const resolvedDoctorName = bookingDoctor?.doctorName || resolved.doctorName;
+        const resolvedDepartment = bookingDoctor?.department || resolved.department;
         const resolvedDate = resolved.appointmentDate;
         const finalCanonicalSlot = reservation?.slot.canonicalSlot || resolved.timeSlot;
-        const doctorUserId = reservation?.doctorUserId;
+        const doctorUserId = bookingDoctor?.doctorUserId;
 
         // Offer, receipt, access and booking writes share the transaction with the slot reservation.
         if (reservation) writeDoctorSlotReservation(transaction, reservation, { appointmentId: ref.id, status: 'pending', now });

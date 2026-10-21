@@ -83,17 +83,18 @@ function prepareDirectBooking(callerUid: string, request: CreateAppointmentData)
     if (typeof request.timeSlot !== 'string' || !request.timeSlot.trim() || request.timeSlot.trim().length > 64) {
         throw new functions.https.HttpsError('invalid-argument', 'timeSlot must be 1 to 64 characters.');
     }
-    if (request.doctorId !== undefined && request.doctorId !== null &&
-        (typeof request.doctorId !== 'string' || !request.doctorId.trim() || request.doctorId.trim().length > 128)) {
+    const type = request.type || 'regularCheckup';
+    if (!APPOINTMENT_TYPES.includes(type)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Invalid appointment type.');
+    }
+    const doctorId = type === 'emergency' && request.doctorId === '' ? undefined : request.doctorId;
+    if (doctorId !== undefined && doctorId !== null &&
+        (typeof doctorId !== 'string' || !doctorId.trim() || doctorId.trim().length > 128)) {
         throw new functions.https.HttpsError('invalid-argument', 'doctorId must be a string up to 128 characters.');
     }
     if (request.bookingReference !== undefined && request.bookingReference !== null &&
         (typeof request.bookingReference !== 'string' || request.bookingReference.trim().length > 64)) {
         throw new functions.https.HttpsError('invalid-argument', 'bookingReference must be 64 characters or fewer.');
-    }
-    const type = request.type || 'regularCheckup';
-    if (!APPOINTMENT_TYPES.includes(type)) {
-        throw new functions.https.HttpsError('invalid-argument', 'Invalid appointment type.');
     }
     if (typeof request.notes === 'string' && request.notes.length > 1000) {
         throw new functions.https.HttpsError('invalid-argument', 'notes must be 1000 characters or fewer.');
@@ -106,7 +107,7 @@ function prepareDirectBooking(callerUid: string, request: CreateAppointmentData)
         : (typeof request.bookingReference === 'string' && request.bookingReference.trim()
             ? `bref_${request.bookingReference.trim().toUpperCase()}` : undefined);
     return {
-        kind: 'direct', doctorId: request.doctorId, department: request.department,
+        kind: 'direct', doctorId, department: request.department,
         appointmentDate: request.appointmentDate, timeSlot: request.timeSlot, type,
         notes: typeof request.notes === 'string' ? request.notes.trim() : null,
         idempotencyDocId: key ? `${callerUid}_${encodeURIComponent(key)}` : undefined,
@@ -125,8 +126,9 @@ export async function resolveBookingRequest(
     if (booking.kind === 'assistant') {
         return resolveAssistantOffer(transaction, firestore, { booking, patientId, now });
     }
-    const appointmentDate = parseAppointmentDate(booking.appointmentDate);
-    if (appointmentExactTime(appointmentDate, booking.timeSlot).getTime() <= Date.now()) {
+    const isEmergency = booking.type === 'emergency';
+    const appointmentDate = isEmergency ? now : parseAppointmentDate(booking.appointmentDate);
+    if (!isEmergency && appointmentExactTime(appointmentDate, booking.timeSlot).getTime() <= now.getTime()) {
         throw new functions.https.HttpsError('failed-precondition', 'Appointment time must be in the future.');
     }
     return {
@@ -134,7 +136,7 @@ export async function resolveBookingRequest(
         doctorName: 'Any Available',
         department: booking.department,
         appointmentDate,
-        timeSlot: booking.timeSlot,
+        timeSlot: isEmergency ? '00:00 - Emergency' : booking.timeSlot,
         type: booking.type,
         notes: booking.notes,
     };

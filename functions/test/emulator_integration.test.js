@@ -442,6 +442,46 @@ function createEmulatorToken(uid) {
 // ---------------------------------------------------------------------------
 // 1. Competing same-start slot booking (concurrency test)
 // ---------------------------------------------------------------------------
+for (const preferredDoctor of [false, true]) {
+    test(`emergency request ${preferredDoctor ? 'with a preferred doctor' : 'without a doctor'} persists without reserving a scheduled slot`, async () => {
+        await clearEmulatorData();
+        const patientId = 'emergency_patient';
+        const doctorId = 'emergency_doctor';
+        await seedPatientUser(patientId);
+        await seedDoctorAndDepartment(doctorId, 'cardiology');
+        await db.collection('doctors').doc(doctorId).update({
+            weeklySchedule: {}, userId: 'emergency_doctor_user',
+        });
+        const data = {
+            patientId, doctorId: preferredDoctor ? doctorId : '',
+            doctorName: 'Untrusted client name', department: 'cardiology',
+            appointmentDate: new Date().toISOString(), timeSlot: '00:00 - Emergency',
+            type: 'emergency', idempotencyKey: 'emergency_request',
+        };
+        const beforeRequest = Date.now();
+        const result = await createAppointmentCore(patientId, { fullName: 'Patient' }, data);
+        assert.equal(result.success, true);
+        const appointment = (await db.collection('appointments').doc(result.appointmentId).get()).data();
+        assert.equal(appointment.type, 'emergency');
+        assert.equal(appointment.status, 'pending');
+        assert.equal(appointment.timeSlot, '00:00 - Emergency');
+        assert.ok(appointment.appointmentDate.toMillis() >= beforeRequest);
+        assert.ok(appointment.appointmentDate.toMillis() <= Date.now());
+        assert.equal(appointment.doctorId, preferredDoctor ? doctorId : '');
+        assert.equal(appointment.doctorName, preferredDoctor ? 'Dr. Heart Specialist' : 'Any Available');
+        assert.equal((await db.collection('appointment_slot_locks').get()).size, 0);
+        assert.equal((await db.collection('appointment_day_coordination').get()).size, 0);
+        if (preferredDoctor) {
+            assert.equal((await db.collection('doctor_patient_access').doc('emergency_doctor_user')
+                .collection('patients').doc(patientId).get()).data().appointmentId, result.appointmentId);
+        }
+        const retry = await createAppointmentCore(patientId, { fullName: 'Patient' }, data);
+        assert.equal(retry.appointmentId, result.appointmentId);
+        assert.equal(retry.isExisting, true);
+        assert.equal((await db.collection('appointments').get()).size, 1);
+    });
+}
+
 test('Scenario 1: Two concurrent same-start booking requests yield exactly ONE appointment and ONE lock in real Firestore', async () => {
     await clearEmulatorData();
     await seedDoctorAndDepartment('doc_c1', 'cardiology');

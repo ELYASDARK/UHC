@@ -24,6 +24,35 @@ export interface DoctorSlotReservation {
     previousLocks: FirebaseFirestore.DocumentSnapshot[];
 }
 
+export async function readBookingDoctor(
+    transaction: FirebaseFirestore.Transaction,
+    request: {
+        firestore: FirebaseFirestore.Firestore;
+        doctorId: string;
+        fallbackDoctorName: string;
+    }
+) {
+    const { firestore, doctorId } = request;
+    const doctorDoc = await transaction.get(firestore.collection('doctors').doc(doctorId));
+    const doctor = doctorDoc.data();
+    if (!doctorDoc.exists || doctor?.isActive !== true || doctor?.isAvailable !== true) {
+        throw new functions.https.HttpsError('failed-precondition', 'Selected doctor is unavailable.');
+    }
+    const department = doctor.department as string | undefined;
+    if (!department) throw new functions.https.HttpsError('failed-precondition', 'Doctor has no assigned department.');
+    const departmentDocs = await transaction.get(firestore.collection('departments')
+        .where('key', '==', department).where('isActive', '==', true).limit(1));
+    if (departmentDocs.empty) {
+        throw new functions.https.HttpsError('failed-precondition', 'Selected doctor department is inactive.');
+    }
+    return {
+        doctor,
+        doctorName: typeof doctor.name === 'string' && doctor.name.trim() ? doctor.name.trim() : request.fallbackDoctorName,
+        doctorUserId: doctor.userId as string | undefined,
+        department: department.trim(),
+    };
+}
+
 export async function readDoctorSlotReservation(
     transaction: FirebaseFirestore.Transaction,
     request: {
@@ -37,19 +66,7 @@ export async function readDoctorSlotReservation(
     }
 ): Promise<DoctorSlotReservation> {
     const { firestore, doctorId, appointmentId, appointmentDate, timeSlot } = request;
-    const doctorDoc = await transaction.get(firestore.collection('doctors').doc(doctorId));
-    const doctor = doctorDoc.data();
-    if (!doctorDoc.exists || doctor?.isActive !== true || doctor?.isAvailable !== true) {
-        throw new functions.https.HttpsError('failed-precondition', 'Selected doctor is unavailable.');
-    }
-    const department = doctor.department as string | undefined;
-    if (!department) throw new functions.https.HttpsError('failed-precondition', 'Doctor has no assigned department.');
-    const departmentDocs = await transaction.get(firestore.collection('departments')
-        .where('key', '==', department).where('isActive', '==', true).limit(1));
-    if (departmentDocs.empty) {
-        throw new functions.https.HttpsError('failed-precondition', 'Selected doctor department is inactive.');
-    }
-
+    const { doctor, doctorName, doctorUserId, department } = await readBookingDoctor(transaction, request);
     const slot = resolveTrustedSlotFromSchedule(doctor, appointmentDate, timeSlot);
     const dateKey = appointmentDateKey(appointmentDate);
     const coordinationRef = appointmentDayCoordinationRef(doctorId, appointmentDate, firestore);
@@ -79,9 +96,9 @@ export async function readDoctorSlotReservation(
     }
     return {
         doctorId,
-        doctorName: typeof doctor.name === 'string' && doctor.name.trim() ? doctor.name.trim() : request.fallbackDoctorName,
-        doctorUserId: doctor.userId as string | undefined,
-        department: department.trim() || department,
+        doctorName,
+        doctorUserId,
+        department,
         dateKey,
         slot,
         coordinationRef,
