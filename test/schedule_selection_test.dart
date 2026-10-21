@@ -68,12 +68,10 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
-  // Monday, September 14, 2026 at 08:00
-  final mondayDate = DateTime(2026, 9, 14, 8, 0);
-  // Tuesday, September 15, 2026 at 08:00
-  final tuesdayDate = DateTime(2026, 9, 15, 8, 0);
-  // Friday, September 18, 2026 at 08:00
-  final fridayDate = DateTime(2026, 9, 18, 8, 0);
+  // 08:00 in Baghdad, independent of the host timezone, including UTC CI runners.
+  final mondayDate = DateTime.parse('2026-09-14T08:00:00+03:00');
+  final tuesdayDate = DateTime.parse('2026-09-15T08:00:00+03:00');
+  final fridayDate = DateTime.parse('2026-09-18T08:00:00+03:00');
 
   group('TimeSlot parser and validation unit tests', () {
     test('canonical 2-digit HH:mm format parses correctly without RangeError',
