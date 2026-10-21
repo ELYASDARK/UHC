@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import '../data/models/appointment_model.dart';
 import '../data/repositories/appointment_repository.dart';
@@ -8,7 +9,7 @@ import '../data/repositories/doctor_repository.dart';
 
 /// Provider for managing appointments state
 class AppointmentProvider extends ChangeNotifier {
-  final AppointmentRepository _appointmentRepo = AppointmentRepository();
+  final AppointmentRepository _appointmentRepo;
   final DoctorRepository _doctorRepo = DoctorRepository();
 
   List<AppointmentModel> _upcomingAppointments = [];
@@ -16,7 +17,11 @@ class AppointmentProvider extends ChangeNotifier {
   AppointmentModel? _selectedAppointment;
   bool _isLoading = false;
   String? _error;
+  String? _bookingFailureCode;
   Map<String, String?> _doctorPhotos = {};
+
+  AppointmentProvider({AppointmentRepository? appointmentRepository})
+      : _appointmentRepo = appointmentRepository ?? AppointmentRepository();
 
   // Getters
   List<AppointmentModel> get upcomingAppointments => _upcomingAppointments;
@@ -24,6 +29,7 @@ class AppointmentProvider extends ChangeNotifier {
   AppointmentModel? get selectedAppointment => _selectedAppointment;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get bookingFailureCode => _bookingFailureCode;
   int get upcomingCount => _upcomingAppointments.length;
   Map<String, String?> get doctorPhotos => _doctorPhotos;
 
@@ -96,12 +102,13 @@ class AppointmentProvider extends ChangeNotifier {
     }
   }
 
-  /// Book a new appointment
+  /// Returns a receipt, or null with a display-safe error on booking failure.
   Future<AppointmentBookingResult?> bookAppointment(
     AppointmentModel appointment,
   ) async {
     _isLoading = true;
     _error = null;
+    _bookingFailureCode = null;
     notifyListeners();
 
     try {
@@ -114,8 +121,14 @@ class AppointmentProvider extends ChangeNotifier {
       _error = null;
       unawaited(_runPostBookingTasks(appointment, bookingResult.appointmentId));
       return bookingResult;
-    } catch (e) {
-      _error = e.toString();
+    } on FirebaseFunctionsException catch (e) {
+      _bookingFailureCode = e.code;
+      _error = e.code == 'already-exists'
+          ? 'This time slot was just booked. Please choose another time.'
+          : 'Unable to complete your booking. Please try again.';
+      return null;
+    } catch (_) {
+      _error = 'Unable to complete your booking. Please try again.';
       return null;
     } finally {
       _isLoading = false;

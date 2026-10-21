@@ -222,6 +222,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingFailed => 'Booking Failed';
 
   @override
+  String get bookingSlotUnavailable =>
+      'This time slot was just booked. Please choose another time.';
+
+  @override
   String get appointmentBooked => 'Appointment booked successfully';
 
   @override

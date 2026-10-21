@@ -396,6 +396,7 @@ export const sendAssistantMessage = functions.https.onCall(
  * WITHOUT invoking Gemini. Resumes prior preferences if offers have expired.
  */
 export const getAssistantHistory = functions.https.onCall(
+    { secrets: ['GEMINI_API_KEY'] },
     async (
         request: functions.https.CallableRequest<unknown>
     ): Promise<GetAssistantHistoryResult> => {
@@ -458,12 +459,11 @@ export const getAssistantHistory = functions.https.onCall(
         }));
 
         const pacificDateKey = getPacificDateKey(now);
-        const [projectQuotaSnap, refreshed, chatDocResult] = await Promise.all([
+        const [projectQuotaSnap, refreshed] = await Promise.all([
             db.collection('assistant_project_quota').doc(pacificDateKey).get(),
             refreshPatientChatHistory(db, callerUid, departments, doctors, now),
-            getPatientChatDoc(db, callerUid, now),
         ]);
-        const chatDoc = chatDocResult.doc;
+        const chatDoc = refreshed;
         const projectQuotaData = projectQuotaSnap.data();
         const isProjectDailyExhausted =
             projectQuotaData?.isDailyExhausted === true ||

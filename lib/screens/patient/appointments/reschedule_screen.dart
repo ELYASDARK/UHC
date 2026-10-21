@@ -6,6 +6,7 @@ import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/repositories/appointment_repository.dart';
+import '../../../providers/doctor_day_availability_provider.dart';
 import '../../../providers/appointment_provider.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 
@@ -27,7 +28,7 @@ class RescheduleScreen extends StatefulWidget {
 }
 
 class _RescheduleScreenState extends State<RescheduleScreen> {
-  late final AppointmentRepository _appointmentRepo;
+  late final DoctorDayAvailabilityProvider _availability;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   TimeSlot? _selectedTimeSlot;
@@ -35,15 +36,12 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   final _reasonController = TextEditingController();
   bool _isLoading = false;
 
-  bool _isLoadingAvailability = false;
-  String? _availabilityError;
-  int _availabilityRequestId = 0;
-  Map<String, bool>? _serverAvailability;
-
   @override
   void initState() {
     super.initState();
-    _appointmentRepo = widget.appointmentRepository ?? AppointmentRepository();
+    _availability = DoctorDayAvailabilityProvider(
+      widget.appointmentRepository ?? AppointmentRepository(),
+    )..addListener(_availabilityChanged);
     _selectedDay = widget.appointment.appointmentDate;
     _focusedDay = _selectedDay!;
     _fetchAvailability(_selectedDay!);
@@ -51,67 +49,26 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
   Future<void> _fetchAvailability(DateTime date) async {
     if (widget.doctor == null) return;
-
-    final requestId = ++_availabilityRequestId;
-    setState(() {
-      _isLoadingAvailability = true;
-      _availabilityError = null;
-    });
-
-    try {
-      final availability = await _appointmentRepo.getDoctorDayAvailability(
-        doctorId: widget.doctor!.id,
-        date: date,
-      );
-      if (!mounted || requestId != _availabilityRequestId) return;
-      if (_selectedDay == null || !isSameDay(_selectedDay!, date)) return;
-
-      final map = <String, bool>{};
-      for (final slot in availability.slots) {
-        map[slot.startTime] = slot.isAvailable;
-        if (slot.timeSlot.isNotEmpty) {
-          map[slot.timeSlot] = slot.isAvailable;
-        }
-      }
-
-      setState(() {
-        _serverAvailability = map;
-        _isLoadingAvailability = false;
-        _availabilityError = null;
-
-        if (_selectedTimeSlot != null) {
-          final isAvail = (map[_selectedTimeSlot!.startTime] ??
-                  map[_selectedTimeSlot!.fullDisplay]) ??
-              false;
-          if (!isAvail) {
-            _selectedTimeSlot = null;
-          }
-        }
-      });
-    } catch (e) {
-      if (!mounted || requestId != _availabilityRequestId) return;
-      debugPrint('Error loading availability for reschedule: $e');
-      setState(() {
-        _serverAvailability = null;
-        _isLoadingAvailability = false;
-        _availabilityError = e.toString();
-        _selectedTimeSlot = null;
-      });
-    }
+    await _availability.load(
+      doctorId: widget.doctor!.id,
+      date: date,
+    );
   }
 
-  bool _isSlotPast(DateTime date, String startTime) {
-    if (!isSameDay(date, DateTime.now())) return false;
-    final parts = startTime.split(':');
-    if (parts.length != 2) return false;
-    final hour = int.tryParse(parts[0]) ?? 0;
-    final minute = int.tryParse(parts[1]) ?? 0;
-    final slotTime = DateTime(date.year, date.month, date.day, hour, minute);
-    return slotTime.isBefore(DateTime.now());
+  void _availabilityChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (_selectedTimeSlot != null &&
+          !_availability.isLoading &&
+          !_availability.isAvailable(_selectedTimeSlot!)) {
+        _selectedTimeSlot = null;
+      }
+    });
   }
 
   @override
   void dispose() {
+    _availability.dispose();
     _reasonController.dispose();
     super.dispose();
   }
@@ -123,7 +80,8 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
   DateTime _getExactAppointmentTime() {
     // Extract the calendar day in clinic time, regardless of device timezone.
-    final date = widget.appointment.appointmentDate.toUtc()
+    final date = widget.appointment.appointmentDate
+        .toUtc()
         .add(const Duration(hours: 3));
     final timeSlot = widget.appointment.timeSlot; // e.g., '14:30 - 15:00'
     final startTimeStr = timeSlot.split(' - ').first.trim(); // '14:30'
@@ -202,8 +160,6 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                           _selectedDay = selectedDay;
                           _focusedDay = focusedDay;
                           _selectedTimeSlot = null;
-                          _serverAvailability = null;
-                          _availabilityError = null;
                         });
                         _fetchAvailability(selectedDay);
                       },
@@ -236,9 +192,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                       ),
                       enabledDayPredicate: (day) {
                         final slots = _getAvailableSlots(day);
-                        return slots.any(
-                          (slot) => !_isSlotPast(day, slot.startTime),
-                        );
+                        return slots.isNotEmpty;
                       },
                     ),
                   ),
@@ -283,6 +237,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
                     child: ElevatedButton(
                       onPressed: _selectedDay != null &&
                               _selectedTimeSlot != null &&
+                              !_availability.isLoading &&
                               !_isLoading
                           ? _confirmReschedule
                           : null,
@@ -353,7 +308,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   Widget _buildTimeSlots(bool isDark) {
     final l10n = AppLocalizations.of(context);
 
-    if (_isLoadingAvailability) {
+    if (_availability.isLoading) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 24.0),
@@ -362,7 +317,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       );
     }
 
-    if (_availabilityError != null) {
+    if (_availability.errorMessage != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20.0),
@@ -423,11 +378,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       spacing: 10,
       runSpacing: 10,
       children: slots.map((slot) {
-        final isPast = _isSlotPast(_selectedDay!, slot.startTime);
-        final serverAvailable = (_serverAvailability?[slot.startTime] ??
-                _serverAvailability?[slot.fullDisplay]) ??
-            false;
-        final isAvailable = slot.isAvailable && !isPast && serverAvailable;
+        final isAvailable = _availability.isAvailable(slot);
         final isSelected = _selectedTimeSlot == slot;
 
         return GestureDetector(

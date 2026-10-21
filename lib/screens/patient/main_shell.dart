@@ -123,13 +123,15 @@ class _MainShellState extends State<MainShell> {
                 },
                 onNotificationsTap: () => _onTabTapped(3),
                 onBookNowTap: () => _onTabTapped(1),
-                onDepartmentsTap: () {
-                  Navigator.push(
+                onDepartmentsTap: () async {
+                  final departmentKey = await Navigator.push<String>(
                     context,
                     MaterialPageRoute(
                       builder: (_) => const DepartmentBrowsingScreen(),
                     ),
                   );
+                  if (!mounted || departmentKey == null) return;
+                  _onDepartmentTapped(departmentKey);
                 },
                 onDepartmentTap: _onDepartmentTapped,
                 captureDepartmentsError: widget.captureHomeDepartmentsError,

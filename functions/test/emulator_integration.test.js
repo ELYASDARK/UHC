@@ -93,7 +93,7 @@ async function loadAndAssertRules(rulesPath) {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(body),
                 },
-                timeout: 5000,
+                timeout: 30000,
             },
             (res) => {
                 let data = '';
@@ -144,7 +144,13 @@ async function ensureEmulatorRunning() {
         '--port', String(EMULATOR_PORT),
         '--project_id', PROJECT_ID,
         '--rules', rulesPath,
-    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+
+    let startupFailure = null;
+    let lastStderr = '';
+    emulatorProcess.stderr.on('data', (chunk) => {
+        lastStderr = (lastStderr + chunk.toString()).slice(-8192);
+    });
 
     emulatorProcess.stdout.on('data', (d) => {
         const str = d.toString();
@@ -154,10 +160,15 @@ async function ensureEmulatorRunning() {
     });
 
     emulatorProcess.on('error', (err) => {
-        console.error('[EMULATOR] Process error:', err);
+        startupFailure = err;
+    });
+    emulatorProcess.on('exit', (code, signal) => {
+        startupFailure = startupFailure || new Error(`Firestore emulator exited during startup (code ${code}, signal ${signal}).`);
     });
 
-    for (let i = 0; i < 30; i++) {
+    const startupDeadline = Date.now() + 60000;
+    while (Date.now() < startupDeadline) {
+        if (startupFailure) throw new Error(`${startupFailure.message}\n${lastStderr}`);
         if (await checkEmulatorHealth()) {
             console.log('[TEST] Connected to Firestore emulator!');
             await loadAndAssertRules(rulesPath);
@@ -165,14 +176,16 @@ async function ensureEmulatorRunning() {
         }
         await new Promise((r) => setTimeout(r, 500));
     }
-    throw new Error('Failed to start Firestore emulator within 15 seconds.');
+    throw new Error(`Failed to start local Firestore emulator on ${EMULATOR_HOST}:${EMULATOR_PORT} within 60 seconds.\n${lastStderr}`);
 }
 
 function checkEmulatorHealth() {
     return new Promise((resolve) => {
-        const req = http.get(`http://${EMULATOR_HOST}:${EMULATOR_PORT}/`, (res) => {
+        const req = http.get(`http://${EMULATOR_HOST}:${EMULATOR_PORT}/`, { timeout: 1000 }, (res) => {
+            res.resume();
             resolve(res.statusCode === 200);
         });
+        req.on('timeout', () => { req.destroy(); resolve(false); });
         req.on('error', () => resolve(false));
     });
 }
@@ -274,8 +287,42 @@ after(async () => {
     }
 });
 
-// Import backend modules AFTER emulator host env is set
-const { auth, db, admin } = require('../lib/firebase');
+const grpc = require('@grpc/grpc-js');
+const { Firestore } = require('firebase-admin/firestore');
+let abortNextQuery = false;
+function interceptQuery(options, nextCall) {
+    const call = nextCall(options);
+    if (!abortNextQuery || options.method_definition.path !== '/google.firestore.v1.Firestore/RunQuery') {
+        return call;
+    }
+    abortNextQuery = false;
+    return new grpc.InterceptingCall(call, {
+        start(metadata, listener, next) {
+            next(metadata, listener);
+            call.cancelWithStatus(grpc.status.ABORTED, 'Injected transaction read contention');
+        },
+        sendMessage() {}, halfClose() {},
+    });
+}
+const settings = Firestore.prototype.settings;
+// Decorate public SDK settings only to inject a transport error in one test.
+Firestore.prototype.settings = function (options) {
+    return settings.call(this, {
+        ...options,
+        'grpc.callInvocationTransformer': (properties) => ({
+            ...properties,
+            callOptions: { ...properties.callOptions, interceptors: [interceptQuery] },
+        }),
+    });
+};
+// Import backend modules AFTER emulator host env is set.
+let backend;
+try {
+    backend = require('../lib/firebase');
+} finally {
+    Firestore.prototype.settings = settings;
+}
+const { auth, db, admin } = backend;
 
 // Mock auth.getUser so getCallerUserDoc succeeds for seeded test users without network
 auth.getUser = async (uid) => {
@@ -290,7 +337,9 @@ const {
     createAppointmentCore,
     rescheduleAppointment,
     cancelAppointment,
+    confirmAppointmentCheckIn,
     updateAppointmentStatus,
+    getDoctorDayAvailability,
 } = require('../lib/appointments');
 const {
     reserveAssistantTurn,
@@ -306,7 +355,10 @@ const {
 } = require('../lib/assistant/index');
 const {
     canonicalAppointmentSlotLockRef,
+    legacyAppointmentSlotLockRef,
+    parseAppointmentDate,
 } = require('../lib/shared/appointmentHelpers');
+const { matchScheduleAndGenerateOffers } = require('../lib/assistant/scheduleMatcher');
 const {
     getPacificDateKey,
 } = require('../lib/assistant/quota');
@@ -513,7 +565,17 @@ test('Scenario 3: Overlapping different starts (09:00-10:00 vs 09:30-10:00) seri
 
     assert.equal(fulfilled.length, 1, 'Exactly one of overlapping bookings must succeed');
     assert.equal(rejected.length, 1, 'The other overlapping booking must be rejected');
-    assert.ok(rejected[0].reason.message.includes('booked') || rejected[0].reason.code === 'already-exists');
+    assert.equal(
+        rejected[0].reason.code, 'already-exists',
+        `Expected a booking conflict, received: ${String(rejected[0].reason)}`
+    );
+    const appointments = await db.collection('appointments').where('doctorId', '==', 'doc_overlap').get();
+    const locks = await db.collection('appointment_slot_locks').get();
+    assert.equal(appointments.size, 1);
+    assert.equal(appointments.docs[0].id, fulfilled[0].value.appointmentId);
+    assert.equal(locks.size, 1);
+    assert.equal(locks.docs[0].data().appointmentId, appointments.docs[0].id);
+    assert.equal(locks.docs[0].data().status, 'pending');
 });
 
 // ---------------------------------------------------------------------------
@@ -868,11 +930,27 @@ test('Scenario 10: Concurrent chat clear during refresh CAS prevents offer resur
     const departments = [{ key: 'cardiology', name: 'Cardiology' }];
     const doctors = [{ id: 'doc_cas', data: (await db.collection('doctors').doc('doc_cas').get()).data() }];
 
-    // Clear chat concurrently
-    await clearPatientChat(db, patientId);
-
-    // Now call refreshPatientChatHistory: must return empty state without resurrecting offers
-    const refreshed = await refreshPatientChatHistory(db, patientId, departments, doctors, new Date());
+    let resumeRefresh;
+    let reachedCommit;
+    const paused = new Promise((resolve) => { reachedCommit = resolve; });
+    const resume = new Promise((resolve) => { resumeRefresh = resolve; });
+    const refreshDb = {
+        collection: db.collection.bind(db),
+        getAll: db.getAll.bind(db),
+        runTransaction: async (callback) => {
+            reachedCommit();
+            await resume;
+            return db.runTransaction(callback);
+        },
+    };
+    const pendingRefresh = refreshPatientChatHistory(refreshDb, patientId, departments, doctors, new Date());
+    await Promise.race([paused, pendingRefresh.then(() => { throw new Error('Refresh completed before the controlled clear.'); })]);
+    try {
+        await clearPatientChat(db, patientId);
+    } finally {
+        resumeRefresh();
+    }
+    const refreshed = await pendingRefresh;
     assert.deepEqual(refreshed.messages, []);
     assert.deepEqual(refreshed.offers, []);
 });
@@ -880,7 +958,9 @@ test('Scenario 10: Concurrent chat clear during refresh CAS prevents offer resur
 // ---------------------------------------------------------------------------
 // 11. Gate disabled returns disabled without DB write & daily quota recovery on history reload
 // ---------------------------------------------------------------------------
-test('Scenario 11: Gate disabled returns disabled without DB writes; daily quota exhaustion reflects on history reload', async () => {
+test('Scenario 11: Gate disabled returns disabled without DB writes; daily quota exhaustion reflects on history reload', async (t) => {
+    const originalEnv = { ...process.env };
+    t.after(() => { process.env = originalEnv; });
     await clearEmulatorData();
     const patientId = 'patient_gate_test';
     await seedPatientUser(patientId);
@@ -902,6 +982,9 @@ test('Scenario 11: Gate disabled returns disabled without DB writes; daily quota
     assert.equal(chatDoc.exists, false);
 
     // 2. Project daily quota exhaustion recovery on history reload
+    process.env.AI_ASSISTANT_ENABLED = 'true';
+    process.env.AI_PRIVACY_RELEASE_GATE_ACCEPTED = 'true';
+    process.env.GEMINI_API_KEY = 'test_key';
     const now = new Date();
     const pacificDateKey = getPacificDateKey(now);
 
@@ -925,6 +1008,58 @@ test('Scenario 11: Gate disabled returns disabled without DB writes; daily quota
 // ---------------------------------------------------------------------------
 // 12. Firestore Security Rules deny cross-user and direct client writes
 // ---------------------------------------------------------------------------
+for (const lockShape of [
+    { name: 'complete metadata', canonicalMetadata: true, legacyMetadata: true },
+    { name: 'canonical lock without metadata', canonicalMetadata: false, legacyMetadata: true },
+    { name: 'legacy lock without metadata', canonicalMetadata: true, legacyMetadata: false },
+]) {
+    test(`doctor-day availability, matching and refresh agree with ${lockShape.name}`, async () => {
+        await clearEmulatorData();
+        const patientId = 'availability_patient';
+        const doctorId = 'availability_doctor';
+        await seedPatientUser(patientId);
+        await seedDoctorAndDepartment(doctorId, 'cardiology');
+        const departments = [{ key: 'cardiology', name: 'Cardiology' }];
+        const doctors = [{ id: doctorId, data: (await db.collection('doctors').doc(doctorId).get()).data() }];
+        const intent = { intent: 'book_appointment', doctorId, preferredDate: upcomingMonday.dateKey, replyLanguage: 'en' };
+        const initial = await matchScheduleAndGenerateOffers(db, intent, departments, doctors, new Date());
+        assert.equal(initial.offers.length, 4);
+        await db.collection('assistant_chats').doc(patientId).set({
+            patientId, generationId: 'availability_generation', revision: 2,
+            messages: [], offers: initial.offers, searchPreferences: null,
+            expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 86400000),
+        });
+        const appointmentDate = parseAppointmentDate(upcomingMonday.dateKey);
+        const lockFields = { doctorId, appointmentDateKey: upcomingMonday.dateKey, status: 'pending' };
+        await Promise.all([
+            canonicalAppointmentSlotLockRef(doctorId, appointmentDate, '09:00 - 09:30', db)
+                .set({ appointmentId: 'canonical_occupant', status: 'pending', ...(lockShape.canonicalMetadata
+                    ? { ...lockFields, timeSlot: '09:00 - 09:30', startTime: '09:00' } : {}) }),
+            legacyAppointmentSlotLockRef(doctorId, appointmentDate, '09:30 - 10:00', db)
+                .set({ appointmentId: 'legacy_occupant', status: 'pending', ...(lockShape.legacyMetadata
+                    ? { ...lockFields, timeSlot: '09:30 - 10:00' } : {}) }),
+            canonicalAppointmentSlotLockRef(doctorId, appointmentDate, '11:00 - 11:30', db)
+                .set({ appointmentId: 'cancelled_occupant', status: 'cancelled' }),
+            db.collection('appointments').doc('overlapping_occupant').set({
+                doctorId, status: 'confirmed', appointmentDate: admin.firestore.Timestamp.fromDate(appointmentDate), timeSlot: '10:00 - 10:30',
+            }),
+        ]);
+        const [ordinary, matched, refreshed] = await Promise.all([
+            getDoctorDayAvailability.run({ auth: { uid: patientId }, data: { doctorId, date: upcomingMonday.dateKey } }),
+            matchScheduleAndGenerateOffers(db, intent, departments, doctors, new Date()),
+            refreshPatientChatHistory(db, patientId, departments, doctors, new Date()),
+        ]);
+        assert.deepEqual(ordinary.slots.map((slot) => slot.isAvailable), [false, false, false, true]);
+        assert.deepEqual(matched.offers.map((offer) => offer.timeSlot), ['11:00 - 11:30']);
+        assert.deepEqual(refreshed.offers.map((offer) => offer.isAvailable), ordinary.slots.map((slot) => slot.isAvailable));
+        for (const timeSlot of ['09:00 - 09:30', '09:30 - 10:00']) {
+            await assert.rejects(createAppointmentCore(patientId, { fullName: 'Patient' }, {
+                patientId, doctorId, department: 'cardiology', appointmentDate: upcomingMonday.dateKey, timeSlot,
+            }), (error) => error.code === 'already-exists');
+        }
+    });
+}
+
 test('Scenario 12: Firestore security rules deny direct client reads/writes on internal collections and cross-user chats', async () => {
     const rawRestRequest = (method, path, body = null, userUid = null) => {
         return new Promise((resolve) => {
@@ -1114,4 +1249,222 @@ test('Scenario 13: updateAppointmentStatus rejects reactivating cancelled appoin
     // - Lock for 09:00 MUST still NOT exist (preserve unowned locks)
     const lock1After = await db.collection('appointment_slot_locks').doc(lockRef1.id).get();
     assert.equal(lock1After.exists, false);
+});
+
+
+async function seedCheckInBooking() {
+    await clearEmulatorData();
+    await seedPatientUser('checkin_patient');
+    await seedPatientUser('checkin_doctor', 'doctor');
+    const doctorId = 'checkin_doctor_profile';
+    await db.collection('doctors').doc(doctorId).set({
+        userId: 'checkin_doctor', isActive: true,
+    });
+    const now = new Date();
+    const dateKey = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Baghdad', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(now);
+    const clinicNow = new Date(now.getTime() + 3 * 3600000);
+    const timeSlot = [clinicNow.getUTCHours(), clinicNow.getUTCMinutes()]
+        .map((part) => String(part).padStart(2, '0')).join(':');
+    const appointmentDate = new Date(dateKey + 'T00:00:00Z');
+    const ref = db.collection('appointments').doc('checkin_appointment');
+    await ref.set({
+        patientId: 'checkin_patient', doctorId, doctorName: 'Local Doctor',
+        appointmentDate: admin.firestore.Timestamp.fromDate(appointmentDate),
+        timeSlot, status: 'pending', qrCode: 'checkin-qr', isCheckedIn: false,
+    });
+    const lock = canonicalAppointmentSlotLockRef(doctorId, appointmentDate, timeSlot, db);
+    await lock.set({ appointmentId: ref.id, status: 'pending', doctorId, appointmentDateKey: dateKey, timeSlot });
+    return { ref, lock, request: { auth: { uid: 'checkin_doctor' }, data: { appointmentId: ref.id, qrCode: 'checkin-qr' } } };
+}
+
+test('check-in commits confirmed appointment and owned lock together; cancelled appointment stays terminal', async () => {
+    const { ref, lock, request } = await seedCheckInBooking();
+    assert.equal((await confirmAppointmentCheckIn.run(request)).success, true);
+    const checkedIn = (await ref.get()).data();
+    assert.equal(checkedIn.status, 'confirmed');
+    assert.equal(checkedIn.isCheckedIn, true);
+    const confirmedLock = (await lock.get()).data();
+    assert.equal(confirmedLock.appointmentId, ref.id);
+    assert.equal(confirmedLock.status, 'confirmed');
+
+    await cancelAppointment.run({ auth: { uid: 'checkin_patient' }, data: { appointmentId: ref.id } });
+    await assert.rejects(confirmAppointmentCheckIn.run(request), (error) => error.code === 'failed-precondition');
+    assert.equal((await ref.get()).data().status, 'cancelled');
+    assert.equal((await lock.get()).exists, false);
+});
+
+test('concurrent check-in and cancellation cannot leave a confirmed appointment without its lock', async () => {
+    const { ref, lock, request } = await seedCheckInBooking();
+    const [checkIn, cancellation] = await Promise.allSettled([
+        confirmAppointmentCheckIn.run(request),
+        cancelAppointment.run({ auth: { uid: 'checkin_patient' }, data: { appointmentId: ref.id } }),
+    ]);
+    assert.equal(cancellation.status, 'fulfilled', String(cancellation.reason));
+    if (checkIn.status === 'rejected') {
+        assert.equal(checkIn.reason.code, 'failed-precondition', String(checkIn.reason));
+    }
+    assert.equal((await ref.get()).data().status, 'cancelled');
+    assert.equal((await lock.get()).exists, false);
+});
+
+test('history refresh leaves active turn revision owned until commit, then regenerates offers normally', async () => {
+    await clearEmulatorData();
+    const patientId = 'refresh_during_turn';
+    const doctorId = 'refresh_turn_doctor';
+    await seedDoctorAndDepartment(doctorId, 'cardiology');
+    const preferences = { departmentKey: 'cardiology', doctorId, preferredDate: upcomingMonday.dateKey };
+    const expiredOffer = {
+        offerId: 'expired_before_turn', doctorId, doctorName: 'Local Doctor',
+        department: 'cardiology', appointmentDate: upcomingMonday.dateKey, timeSlot: '09:00 - 09:30',
+        expiresAt: new Date(Date.now() - 60000).toISOString(), isAvailable: true,
+    };
+    const chatRef = db.collection('assistant_chats').doc(patientId);
+    await chatRef.set({
+        patientId, generationId: 'refresh_generation', revision: 1,
+        messages: [], offers: [expiredOffer], searchPreferences: preferences,
+        createdAt: admin.firestore.Timestamp.now(),
+        updatedAt: admin.firestore.Timestamp.now(),
+        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 86400000),
+    });
+    const doctors = [{ id: doctorId, data: (await db.collection('doctors').doc(doctorId).get()).data() }];
+    const departments = [{ key: 'cardiology', name: 'Cardiology' }];
+    const turn = await reserveAssistantTurn(db, {
+        patientId, userMessage: 'Find another appointment', clientRequestId: 'active-refresh-turn',
+    });
+    const refreshed = await refreshPatientChatHistory(db, patientId, departments, doctors);
+    assert.equal(refreshed.revision, turn.reservedRevision);
+    assert.equal(refreshed.inFlightTurnId, turn.turnId);
+    assert.equal(refreshed.offers[0].isAvailable, false);
+    assert.equal((await chatRef.get()).data().revision, turn.reservedRevision);
+    const result = await commitAssistantTurn(db, {
+        patientId, generationId: turn.generationId, turnId: turn.turnId,
+        reservedRevision: turn.reservedRevision, assistantMessage: 'Generated reply',
+        status: 'ready', replyLanguage: 'en', offers: [expiredOffer], searchPreferences: preferences,
+    });
+    assert.equal(result.committed, true);
+    assert.equal((await chatRef.get()).data().messages.at(-1).text, 'Generated reply');
+    const afterCommit = await refreshPatientChatHistory(db, patientId, departments, doctors);
+    assert.ok(afterCommit.revision > result.result.revision);
+    assert.ok(afterCommit.offers.some((offer) => offer.isAvailable));
+
+    const supersededTurn = await reserveAssistantTurn(db, {
+        patientId, userMessage: 'A turn to clear', clientRequestId: 'clear-after-refresh',
+    });
+    await refreshPatientChatHistory(db, patientId, departments, doctors);
+    await clearPatientChat(db, patientId);
+    const late = await commitAssistantTurn(db, {
+        patientId, generationId: supersededTurn.generationId, turnId: supersededTurn.turnId,
+        reservedRevision: supersededTurn.reservedRevision, assistantMessage: 'Discard me',
+        status: 'ready', replyLanguage: 'en', offers: [],
+    });
+    assert.equal(late.committed, false);
+    assert.deepEqual((await chatRef.get()).data().messages, []);
+});
+
+
+test('check-in retry re-reads cancellation after its pending snapshot is rolled back',
+    { timeout: 30000 }, async (t) => {
+        const { ref, lock, request } = await seedCheckInBooking();
+        const runTransaction = db.runTransaction.bind(db);
+        const events = [];
+        let attempt = 0;
+        let cancellation;
+
+        // Decorate the real SDK boundary; all reads, rollback, retry and commits
+        // still run against the emulator. Cancellation uses the restored SDK.
+        const intercepted = t.mock.method(db, 'runTransaction', (update, options) => {
+            intercepted.mock.restore();
+            return runTransaction(async (transaction) => {
+                attempt++;
+                if (attempt === 1) {
+                    const get = transaction.get.bind(transaction);
+                    t.mock.method(transaction, 'get', async (...args) => {
+                        const snapshot = await get(...args);
+                        if (args[0].path === ref.path) {
+                            events.push('check-in-read-' + snapshot.data().status);
+                        }
+                        return snapshot;
+                    });
+                    await update(transaction);
+                    assert.deepEqual(events, ['check-in-read-pending']);
+                    events.push('cancellation-started');
+                    cancellation = cancelAppointment.run({
+                        auth: { uid: 'checkin_patient' },
+                        data: { appointmentId: ref.id },
+                    }).then((result) => {
+                        events.push('cancellation-committed');
+                        return result;
+                    });
+                    // Observe it below, after rollback; avoid an unhandled
+                    // rejection while the SDK performs retry backoff.
+                    cancellation.catch(() => {});
+                    throw Object.assign(new Error('Injected stale check-in attempt'), { code: 10 }); // ABORTED
+                }
+                // The SDK starts a transaction lazily on its first read.
+                // Do not await cancellation while holding that read's lock.
+                await cancellation;
+                assert.equal((await ref.get()).data().status, 'cancelled');
+                assert.equal((await lock.get()).exists, false);
+                events.push('check-in-retry');
+                return update(transaction);
+            }, options);
+        });
+
+        try {
+            await assert.rejects(confirmAppointmentCheckIn.run(request),
+                (error) => error.code === 'failed-precondition');
+            assert.equal((await cancellation).success, true);
+            assert.equal(attempt, 2);
+            assert.deepEqual(events, [
+                'check-in-read-pending', 'cancellation-started',
+                'cancellation-committed', 'check-in-retry', 'check-in-read-cancelled',
+            ]);
+            const appointment = (await ref.get()).data();
+            assert.equal(appointment.status, 'cancelled');
+            assert.equal(appointment.isCheckedIn, false);
+            assert.equal(appointment.checkedInAt, undefined);
+            assert.equal((await lock.get()).exists, false);
+            const ownedLocks = await db.collection('appointment_slot_locks')
+                .where('appointmentId', '==', ref.id).get();
+            assert.equal(ownedLocks.empty, true);
+        } finally {
+            if (cancellation) await cancellation.catch(() => {});
+        }
+    });
+
+test('aborted transactional query restarts the transaction instead of replaying its closed ID', async () => {
+    await clearEmulatorData();
+    const ref = db.collection('retry_fixture').doc('counter');
+    await ref.set({ value: 0 });
+    let attempts = 0;
+    abortNextQuery = true;
+    try {
+        await db.runTransaction(async (transaction) => {
+            attempts++;
+            const snapshot = await transaction.get(ref);
+            await transaction.get(db.collection('retry_fixture').where('value', '==', 0));
+            transaction.update(ref, { value: snapshot.data().value + 1 });
+        });
+        assert.equal(abortNextQuery, false, 'The initial transactional query must encounter the injected abort');
+        assert.equal(attempts, 2, 'ABORTED must restart the entire transaction, not just its query RPC');
+        assert.equal((await ref.get()).data().value, 1, 'Only the successful attempt may commit');
+    } finally {
+        abortNextQuery = false;
+    }
+});
+
+test('cancellation before check-in leaves the pending visit unchecked and unreserved', async () => {
+    const { ref, lock, request } = await seedCheckInBooking();
+    await cancelAppointment.run({
+        auth: { uid: 'checkin_patient' }, data: { appointmentId: ref.id },
+    });
+    await assert.rejects(confirmAppointmentCheckIn.run(request),
+        (error) => error.code === 'failed-precondition');
+    const appointment = (await ref.get()).data();
+    assert.equal(appointment.status, 'cancelled');
+    assert.equal(appointment.isCheckedIn, false);
+    assert.equal(appointment.checkedInAt, undefined);
+    assert.equal((await lock.get()).exists, false);
 });

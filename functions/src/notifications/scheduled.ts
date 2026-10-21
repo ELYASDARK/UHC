@@ -1,7 +1,8 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 
-import { admin, db } from '../firebase';
+import { db } from '../firebase';
 import {
     appointmentExactTime,
     availabilityDateParts,
@@ -25,7 +26,7 @@ export const deliverScheduledNotifications = onSchedule(
         retryCount: 0,
     },
     async () => {
-        const now = admin.firestore.Timestamp.now();
+        const now = Timestamp.now();
         
         // Query 1: FCM scheduled notifications
         const fcmSnap = await db.collection('notifications')
@@ -77,7 +78,7 @@ export const deliverScheduledNotifications = onSchedule(
             inAppSnap.docs.forEach((doc) => {
                 batch.update(doc.ref, {
                     isVisible: true,
-                    visibleAt: admin.firestore.Timestamp.now(),
+                    visibleAt: Timestamp.now(),
                 });
             });
             await batch.commit();
@@ -108,7 +109,7 @@ export const resyncUserNotificationSchedules = functions.https.onCall(
         const settings = await getUserNotificationSettings(targetUid);
 
         // Find future active appointments for the user
-        const now = admin.firestore.Timestamp.now();
+        const now = Timestamp.now();
         const appointmentsSnap = await db.collection('appointments')
             .where('patientId', '==', targetUid)
             .where('status', 'in', ['pending', 'confirmed'])
@@ -263,8 +264,8 @@ export const sendDoctorDailyReports = onSchedule(
                 const appointmentsSnap = await db.collection('appointments')
                     .where('doctorId', '==', doc.id)
                     .where('status', 'in', ['pending', 'confirmed'])
-                    .where('appointmentDate', '>=', admin.firestore.Timestamp.fromDate(tomorrowStart))
-                    .where('appointmentDate', '<', admin.firestore.Timestamp.fromDate(tomorrowEnd))
+                    .where('appointmentDate', '>=', Timestamp.fromDate(tomorrowStart))
+                    .where('appointmentDate', '<', Timestamp.fromDate(tomorrowEnd))
                     .get();
 
                 const appointmentCount = appointmentsSnap.size;

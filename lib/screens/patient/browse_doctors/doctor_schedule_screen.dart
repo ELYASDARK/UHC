@@ -8,6 +8,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/repositories/appointment_repository.dart';
+import '../../../providers/doctor_day_availability_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../booking/booking_screen.dart';
 import '../appointments/emergency_request_screen.dart';
@@ -34,7 +35,7 @@ class DoctorScheduleScreen extends StatefulWidget {
 
 class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
     with WidgetsBindingObserver {
-  late final AppointmentRepository _appointmentRepo;
+  late final DoctorDayAvailabilityProvider _availability;
 
   late DoctorModel _doctor;
   StreamSubscription<DocumentSnapshot>? _doctorSubscription;
@@ -42,17 +43,15 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
   late DateTime _focusedDay;
   late DateTime _selectedDay;
   List<String> _bookedSlots = [];
-  bool _isLoading = false;
-  String? _availabilityError;
-  int _availabilityRequestId = 0;
-  Map<String, bool>? _serverAvailability;
 
   DateTime get _now => widget.captureNow ?? DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _appointmentRepo = widget.appointmentRepository ?? AppointmentRepository();
+    _availability = DoctorDayAvailabilityProvider(
+      widget.appointmentRepository ?? AppointmentRepository(),
+    )..addListener(_availabilityChanged);
     WidgetsBinding.instance.addObserver(this);
     _doctor = widget.doctor;
     _selectedDay = widget.initialDate ?? _now;
@@ -93,56 +92,18 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _availability.dispose();
     _doctorSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _loadAvailability(DateTime date) async {
-    if (widget.captureBookedSlots != null) {
-      _bookedSlots = List<String>.from(widget.captureBookedSlots!);
-      _isLoading = false;
-      _availabilityError = null;
-      if (mounted) setState(() {});
-      return;
-    }
+    if (widget.captureBookedSlots != null) return;
+    await _availability.load(doctorId: _doctor.id, date: date);
+  }
 
-    if (!mounted) return;
-    final requestId = ++_availabilityRequestId;
-    setState(() {
-      _isLoading = true;
-      _availabilityError = null;
-    });
-
-    try {
-      final availability = await _appointmentRepo.getDoctorDayAvailability(
-        doctorId: _doctor.id,
-        date: date,
-      );
-      if (!mounted || requestId != _availabilityRequestId) return;
-      if (!isSameDay(_selectedDay, date)) return;
-
-      final map = <String, bool>{};
-      for (final slot in availability.slots) {
-        map[slot.startTime] = slot.isAvailable;
-        if (slot.timeSlot.isNotEmpty) {
-          map[slot.timeSlot] = slot.isAvailable;
-        }
-      }
-
-      setState(() {
-        _serverAvailability = map;
-        _isLoading = false;
-        _availabilityError = null;
-      });
-    } catch (e) {
-      if (!mounted || requestId != _availabilityRequestId) return;
-      debugPrint('Error loading doctor availability: $e');
-      setState(() {
-        _serverAvailability = null;
-        _isLoading = false;
-        _availabilityError = e.toString();
-      });
-    }
+  void _availabilityChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
@@ -150,9 +111,6 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
       setState(() {
         _selectedDay = selectedDay;
         _focusedDay = focusedDay;
-        if (widget.captureBookedSlots == null) {
-          _serverAvailability = null;
-        }
       });
       if (widget.captureBookedSlots == null) {
         _loadAvailability(selectedDay);
@@ -327,9 +285,10 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
 
           // Time Slots
           Expanded(
-            child: _isLoading
+            child: _availability.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _availabilityError != null && widget.captureBookedSlots == null
+                : _availability.errorMessage != null &&
+                        widget.captureBookedSlots == null
                     ? _buildErrorMessage()
                     : availableSlots.isEmpty
                         ? _buildNoSlotsMessage()
@@ -454,10 +413,8 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
               _bookedSlots.contains(slot.startTime);
           isAvailable = slot.isAvailable && !isBooked && !isPast;
         } else {
-          final serverAvail = _serverAvailability?[slot.startTime] ??
-              _serverAvailability?[slot.fullDisplay];
-          isBooked = serverAvail == false && !isPast && slot.isAvailable;
-          isAvailable = slot.isAvailable && (serverAvail == true) && !isPast;
+          isAvailable = _availability.isAvailable(slot);
+          isBooked = !isAvailable && !isPast && slot.isAvailable;
         }
 
         return Semantics(
@@ -490,68 +447,71 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
               borderRadius: BorderRadius.circular(16),
               clipBehavior: Clip.hardEdge,
               child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 8,
-              ),
-              leading: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isAvailable
-                      ? AppColors.success.withValues(alpha: 0.1)
-                      : Colors.grey.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
                 ),
-                child: Icon(
-                  isAvailable ? Icons.access_time_rounded : Icons.block_rounded,
-                  color: isAvailable ? AppColors.success : Colors.grey,
+                leading: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isAvailable
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : Colors.grey.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isAvailable
+                        ? Icons.access_time_rounded
+                        : Icons.block_rounded,
+                    color: isAvailable ? AppColors.success : Colors.grey,
+                  ),
                 ),
-              ),
-              title: Text(
-                slot.fullDisplay,
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600,
-                  color: isAvailable
-                      ? null
-                      : (isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight),
-                  decoration: !isAvailable ? TextDecoration.lineThrough : null,
+                title: Text(
+                  slot.fullDisplay,
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    color: isAvailable
+                        ? null
+                        : (isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight),
+                    decoration:
+                        !isAvailable ? TextDecoration.lineThrough : null,
+                  ),
                 ),
-              ),
-              subtitle: Text(
-                isBooked
-                    ? l10n.alreadyBooked
-                    : isPast
-                        ? l10n.timeHasPassed
-                        : !slot.isAvailable
-                            ? l10n.notAvailable
-                            : l10n.availableForBooking,
-                style: GoogleFonts.roboto(
-                  color: isAvailable ? AppColors.success : Colors.grey,
-                  fontSize: 12,
+                subtitle: Text(
+                  isBooked
+                      ? l10n.alreadyBooked
+                      : isPast
+                          ? l10n.timeHasPassed
+                          : !slot.isAvailable
+                              ? l10n.notAvailable
+                              : l10n.availableForBooking,
+                  style: GoogleFonts.roboto(
+                    color: isAvailable ? AppColors.success : Colors.grey,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-              trailing: isAvailable
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        l10n.book,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                trailing: isAvailable
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                      ),
-                    )
-                  : const Icon(Icons.block, color: Colors.grey, size: 20),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          l10n.book,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      )
+                    : const Icon(Icons.block, color: Colors.grey, size: 20),
                 onTap: isAvailable ? () => _onSlotTap(slot) : null,
               ),
             ),
@@ -562,17 +522,15 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
   }
 
   bool _isSlotPast(DateTime date, String startTime) {
-    if (!isSameDay(date, _now)) return false;
-
     // Parse start time (e.g., "09:00")
     final parts = startTime.split(':');
     if (parts.length != 2) return false;
 
     final hour = int.tryParse(parts[0]) ?? 0;
     final minute = int.tryParse(parts[1]) ?? 0;
-    final slotTime = DateTime(date.year, date.month, date.day, hour, minute);
-
-    return slotTime.isBefore(_now);
+    final slotTime = DateTime.utc(date.year, date.month, date.day, hour, minute)
+        .subtract(const Duration(hours: 3));
+    return !slotTime.isAfter(_now.toUtc());
   }
 
   void _onSlotTap(TimeSlot slot) {

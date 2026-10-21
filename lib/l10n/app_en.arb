@@ -71,6 +71,7 @@
   "confirmBooking": "Confirm Booking",
   "bookingConfirmed": "Booking Confirmed",
   "bookingFailed": "Booking Failed",
+  "bookingSlotUnavailable": "This time slot was just booked. Please choose another time.",
   "appointmentBooked": "Appointment booked successfully",
   "confirmDetails": "Confirm Details",
   "bookAnAppointment": "Book an Appointment",

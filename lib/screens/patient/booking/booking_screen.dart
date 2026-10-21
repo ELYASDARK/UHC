@@ -4,20 +4,21 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:lottie/lottie.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/repositories/appointment_repository.dart';
+import '../../../providers/doctor_day_availability_provider.dart';
 import '../../../providers/appointment_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/utils/locale_utils.dart';
 import '../../../core/widgets/responsive_layout.dart';
 
-import '../main_shell.dart';
+import 'booking_success_screen.dart';
+
+export 'booking_success_screen.dart';
 
 /// Main booking screen with calendar and time selection
 class BookingScreen extends StatefulWidget {
@@ -39,7 +40,7 @@ class BookingScreen extends StatefulWidget {
 }
 
 class _BookingScreenState extends State<BookingScreen> {
-  late final AppointmentRepository _appointmentRepo;
+  late final DoctorDayAvailabilityProvider _availability;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -53,16 +54,12 @@ class _BookingScreenState extends State<BookingScreen> {
   late DoctorModel _doctor;
   StreamSubscription<DocumentSnapshot>? _doctorSubscription;
 
-  // Server availability state
-  bool _isLoadingAvailability = false;
-  String? _availabilityError;
-  int _availabilityRequestId = 0;
-  Map<String, bool>? _serverAvailability;
-
   @override
   void initState() {
     super.initState();
-    _appointmentRepo = widget.appointmentRepository ?? AppointmentRepository();
+    _availability = DoctorDayAvailabilityProvider(
+      widget.appointmentRepository ?? AppointmentRepository(),
+    )..addListener(_availabilityChanged);
     _doctor = widget.doctor;
     _subscribeToDoctor();
 
@@ -118,57 +115,27 @@ class _BookingScreenState extends State<BookingScreen> {
 
   /// Fetch availability for the selected date via trusted callable
   Future<void> _fetchAvailability(DateTime date) async {
-    final requestId = ++_availabilityRequestId;
+    await _availability.load(
+      doctorId: _doctor.id,
+      date: date,
+    );
+  }
+
+  void _availabilityChanged() {
+    if (!mounted) return;
     setState(() {
-      _isLoadingAvailability = true;
-      _availabilityError = null;
-    });
-
-    try {
-      final availability = await _appointmentRepo.getDoctorDayAvailability(
-        doctorId: _doctor.id,
-        date: date,
-      );
-      if (!mounted || requestId != _availabilityRequestId) return;
-      if (_selectedDay == null || !isSameDay(_selectedDay!, date)) return;
-
-      final map = <String, bool>{};
-      for (final slot in availability.slots) {
-        map[slot.startTime] = slot.isAvailable;
-        if (slot.timeSlot.isNotEmpty) {
-          map[slot.timeSlot] = slot.isAvailable;
-        }
-      }
-
-      setState(() {
-        _serverAvailability = map;
-        _isLoadingAvailability = false;
-        _availabilityError = null;
-
-        // Reset selected time slot if it's no longer available
-        if (_selectedTimeSlot != null) {
-          final isAvail = (map[_selectedTimeSlot!.startTime] ??
-                  map[_selectedTimeSlot!.fullDisplay]) ??
-              false;
-          if (!isAvail) {
-            _selectedTimeSlot = null;
-          }
-        }
-      });
-    } catch (e) {
-      if (!mounted || requestId != _availabilityRequestId) return;
-      debugPrint('Error fetching availability: $e');
-      setState(() {
-        _serverAvailability = null;
-        _isLoadingAvailability = false;
-        _availabilityError = e.toString();
+      if (_selectedTimeSlot != null &&
+          !_availability.isLoading &&
+          !_availability.isAvailable(_selectedTimeSlot!)) {
         _selectedTimeSlot = null;
-      });
-    }
+        if (!_isLoading && _currentStep > 1) _currentStep = 1;
+      }
+    });
   }
 
   @override
   void dispose() {
+    _availability.dispose();
     _notesController.dispose();
     _doctorSubscription?.cancel();
     super.dispose();
@@ -176,16 +143,6 @@ class _BookingScreenState extends State<BookingScreen> {
 
   List<TimeSlot> _getAvailableSlots(DateTime date) {
     return _doctor.getAvailableSlots(date);
-  }
-
-  bool _isSlotPast(DateTime date, String startTime) {
-    if (!isSameDay(date, DateTime.now())) return false;
-    final parts = startTime.split(':');
-    if (parts.length != 2) return false;
-    final hour = int.tryParse(parts[0]) ?? 0;
-    final minute = int.tryParse(parts[1]) ?? 0;
-    final slotTime = DateTime(date.year, date.month, date.day, hour, minute);
-    return slotTime.isBefore(DateTime.now());
   }
 
   bool get _doctorCanBook => _doctor.canBook;
@@ -216,7 +173,9 @@ class _BookingScreenState extends State<BookingScreen> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : details.onStepContinue,
+                          onPressed: _isLoading || _availability.isLoading
+                              ? null
+                              : details.onStepContinue,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -415,8 +374,6 @@ class _BookingScreenState extends State<BookingScreen> {
                 _selectedDay = selectedDay;
                 _focusedDay = focusedDay;
                 _selectedTimeSlot = null;
-                _serverAvailability = null;
-                _availabilityError = null;
               });
               _fetchAvailability(selectedDay);
             },
@@ -496,7 +453,7 @@ class _BookingScreenState extends State<BookingScreen> {
       return Center(child: Text(l10n.pleaseSelectDateFirst));
     }
 
-    if (_isLoadingAvailability) {
+    if (_availability.isLoading) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 32.0),
@@ -505,7 +462,7 @@ class _BookingScreenState extends State<BookingScreen> {
       );
     }
 
-    if (_availabilityError != null) {
+    if (_availability.errorMessage != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
@@ -576,11 +533,7 @@ class _BookingScreenState extends State<BookingScreen> {
           spacing: 10,
           runSpacing: 10,
           children: slots.map((slot) {
-            final isPast = _isSlotPast(_selectedDay!, slot.startTime);
-            final serverAvailable = (_serverAvailability?[slot.startTime] ??
-                    _serverAvailability?[slot.fullDisplay]) ??
-                false;
-            final isAvailable = slot.isAvailable && !isPast && serverAvailable;
+            final isAvailable = _availability.isAvailable(slot);
             final isSelected = _selectedTimeSlot?.startTime == slot.startTime;
 
             return GestureDetector(
@@ -863,11 +816,14 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   void _showError(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
+        showCloseIcon: true,
+        closeIconColor: Colors.white,
       ),
     );
   }
@@ -882,16 +838,17 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _submitBooking() async {
-    if (_isLoading) return;
+    if (_isLoading || _availability.isLoading) return;
     if (!_doctorCanBook) {
       _showError(_doctorUnavailableMessage);
       return;
     }
-    if (_selectedDay == null || _selectedTimeSlot == null) {
+    final selectedDay = _selectedDay;
+    final selectedTimeSlot = _selectedTimeSlot;
+    if (selectedDay == null || selectedTimeSlot == null) {
       return;
     }
-    final currentAvailable = _getAvailableSlots(_selectedDay!);
-    if (!currentAvailable.any((s) => s.startTime == _selectedTimeSlot!.startTime)) {
+    if (!_availability.isAvailable(selectedTimeSlot)) {
       _showError(AppLocalizations.of(context).noAvailableSlotsOnThisDay);
       return;
     }
@@ -921,8 +878,8 @@ class _BookingScreenState extends State<BookingScreen> {
         doctorId: _doctor.id,
         doctorName: _doctor.name,
         department: _doctor.department.name,
-        appointmentDate: _selectedDay!,
-        timeSlot: _selectedTimeSlot!.display,
+        appointmentDate: selectedDay,
+        timeSlot: selectedTimeSlot.display,
         type: _appointmentType,
         status: AppointmentStatus.pending,
         notes: _notesController.text.isEmpty ? null : _notesController.text,
@@ -941,18 +898,29 @@ class _BookingScreenState extends State<BookingScreen> {
             builder: (_) => BookingSuccessScreen(
               appointmentId: bookingResult.appointmentId,
               qrCode: bookingResult.qrCode,
-              bookingReference: bookingReference,
-              doctorName: _doctor.name,
-              date: _selectedDay!,
-              timeSlot: _selectedTimeSlot!.display,
+              bookingReference: bookingResult.bookingReference,
+              doctorName: appointment.doctorName,
+              date: appointment.appointmentDate,
+              timeSlot: appointment.timeSlot,
             ),
           ),
         );
       } else if (mounted) {
-        _showError(
-          appointmentProvider.error ??
-              AppLocalizations.of(context).bookingFailed,
-        );
+        final l10n = AppLocalizations.of(context);
+        if (appointmentProvider.bookingFailureCode == 'already-exists') {
+          setState(() {
+            _selectedTimeSlot = null;
+            _currentStep = 1;
+          });
+          _showError(l10n.bookingSlotUnavailable);
+          await _fetchAvailability(selectedDay);
+        } else {
+          _showError(switch (appointmentProvider.bookingFailureCode) {
+            'unauthenticated' => l10n.sessionExpired,
+            'unavailable' || 'deadline-exceeded' => l10n.connectionError,
+            _ => l10n.bookingFailed,
+          });
+        }
       }
     } finally {
       if (mounted) {
@@ -980,317 +948,5 @@ class _BookingScreenState extends State<BookingScreen> {
       case AppointmentType.consultation:
         return l10n.consultation;
     }
-  }
-}
-
-/// Booking success screen with QR code
-class BookingSuccessScreen extends StatelessWidget {
-  final String appointmentId;
-  final String? qrCode;
-  final String? bookingReference;
-  final String doctorName;
-  final DateTime date;
-  final String timeSlot;
-
-  const BookingSuccessScreen({
-    super.key,
-    required this.appointmentId,
-    this.qrCode,
-    this.bookingReference,
-    required this.doctorName,
-    required this.date,
-    required this.timeSlot,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final l10n = AppLocalizations.of(context);
-    final isWide = UhcResponsive.isWide(context);
-
-    return Scaffold(
-      body: ResponsivePage(
-        safeArea: true,
-        maxWidth: isWide ? 980 : 640,
-        bottomPadding: isWide ? 32 : 100,
-        child: Column(
-          children: [
-            SizedBox(height: isWide ? 16 : 40),
-
-            // Success animation
-            SizedBox(
-              height: 180,
-              child: Lottie.asset(
-                'assets/animations/success.json',
-                repeat: false,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_circle,
-                      size: 80,
-                      color: AppColors.success,
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            Text(
-              '${l10n.bookingConfirmed}!',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.success,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.appointmentScheduledSuccessfully,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Appointment Card
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.surfaceDark : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child:
-                  _buildConfirmationCardContent(context, isWide, isDark, l10n),
-            ),
-            SizedBox(height: isWide ? 24 : 32),
-
-            // Buttons
-            _buildActionButtons(context, isWide, l10n),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildConfirmationCardContent(
-    BuildContext context,
-    bool isWide,
-    bool isDark,
-    AppLocalizations l10n,
-  ) {
-    if (!isWide) {
-      return Column(
-        children: [
-          _buildQrPanel(isDark, l10n),
-          const SizedBox(height: 20),
-          const Divider(),
-          const SizedBox(height: 20),
-          _buildDetailsPanel(context, l10n),
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(child: _buildQrPanel(isDark, l10n)),
-        const SizedBox(width: 28),
-        SizedBox(
-          height: 220,
-          child: VerticalDivider(
-            color: isDark ? Colors.white12 : Colors.black12,
-          ),
-        ),
-        const SizedBox(width: 28),
-        Expanded(child: _buildDetailsPanel(context, l10n)),
-      ],
-    );
-  }
-
-  Widget _buildQrPanel(bool isDark, AppLocalizations l10n) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: QrImageView(
-            data: qrCode ?? bookingReference ?? appointmentId,
-            version: QrVersions.auto,
-            size: 180,
-            backgroundColor: Colors.white,
-            errorCorrectionLevel: QrErrorCorrectLevel.M,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          l10n.showQRCodeAtCheckIn,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textSecondaryLight,
-            fontSize: 13,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDetailsPanel(BuildContext context, AppLocalizations l10n) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildDetailRow(context, Icons.person, l10n.doctor, 'Dr. $doctorName'),
-        const SizedBox(height: 14),
-        _buildDetailRow(
-          context,
-          Icons.calendar_month,
-          l10n.date,
-          _formatDate(date, l10n),
-        ),
-        const SizedBox(height: 14),
-        _buildDetailRow(context, Icons.access_time, l10n.time, timeSlot),
-        const SizedBox(height: 14),
-        _buildDetailRow(
-          context,
-          Icons.confirmation_number,
-          l10n.bookingId,
-          bookingReference ?? appointmentId.substring(0, 8).toUpperCase(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButtons(
-    BuildContext context,
-    bool isWide,
-    AppLocalizations l10n,
-  ) {
-    final homeButton = ElevatedButton(
-      onPressed: () {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainShell(initialIndex: 0)),
-          (route) => false,
-        );
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: Text(l10n.backToHome),
-    );
-
-    final appointmentsButton = OutlinedButton(
-      onPressed: () {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainShell(initialIndex: 2)),
-          (route) => false,
-        );
-      },
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: Text(l10n.viewMyAppointments),
-    );
-
-    if (isWide) {
-      return Row(
-        children: [
-          Expanded(child: appointmentsButton),
-          const SizedBox(width: 16),
-          Expanded(child: homeButton),
-        ],
-      );
-    }
-
-    return Column(
-      children: [
-        SizedBox(width: double.infinity, child: homeButton),
-        const SizedBox(height: 12),
-        SizedBox(width: double.infinity, child: appointmentsButton),
-      ],
-    );
-  }
-
-  Widget _buildDetailRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-  ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.primary, size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                  fontSize: 12,
-                ),
-              ),
-              Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  String _formatDate(DateTime date, AppLocalizations l10n) {
-    final weekdays = [
-      l10n.monday,
-      l10n.tuesday,
-      l10n.wednesday,
-      l10n.thursday,
-      l10n.friday,
-      l10n.saturday,
-      l10n.sunday,
-    ];
-    final months = [
-      l10n.january,
-      l10n.february,
-      l10n.march,
-      l10n.april,
-      l10n.may,
-      l10n.june,
-      l10n.july,
-      l10n.august,
-      l10n.september,
-      l10n.october,
-      l10n.november,
-      l10n.december,
-    ];
-    return '${weekdays[date.weekday - 1]}, ${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }

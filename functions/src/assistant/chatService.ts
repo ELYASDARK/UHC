@@ -1,15 +1,8 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import { createHash, randomUUID } from 'crypto';
 import * as functions from 'firebase-functions';
-import { admin } from '../firebase';
-import {
-    ACTIVE_APPOINTMENT_STATUSES,
-    appointmentExactUtcTime,
-    canonicalAppointmentSlotLockRef,
-    doesAppointmentOverlapSlot,
-    legacyAppointmentSlotLockRef,
-    parseAppointmentDate,
-    validateDoctorSlotAvailability,
-} from '../shared/appointmentHelpers';
+import { appointmentExactUtcTime, matchesTimeSlot } from '../shared/appointmentHelpers';
+import { AvailableSlotInfo, loadDoctorDayAvailability } from '../appointments/doctorDayAvailability';
 import { ASSISTANT_CONFIG } from './config';
 import { DepartmentCandidate, DoctorCandidate, matchScheduleAndGenerateOffers } from './scheduleMatcher';
 import {
@@ -33,8 +26,8 @@ export function pruneExpiredMessages(
 }
 
 export function createInitialChatDoc(patientId: string, now = new Date()): AssistantChatDocument {
-    const timestampNow = admin.firestore.Timestamp.fromDate(now);
-    const expiresAt = admin.firestore.Timestamp.fromDate(
+    const timestampNow = Timestamp.fromDate(now);
+    const expiresAt = Timestamp.fromDate(
         new Date(now.getTime() + ASSISTANT_CONFIG.CHAT_RETENTION_DAYS * 24 * 60 * 60 * 1000)
     );
 
@@ -151,7 +144,7 @@ export async function reserveAssistantTurn(
         };
 
         const updatedMessages = [...prunedMessages, userMsg].slice(-ASSISTANT_CONFIG.MAX_CHAT_MESSAGES);
-        const timestampNow = admin.firestore.Timestamp.fromDate(now);
+        const timestampNow = Timestamp.fromDate(now);
 
         const updatedDoc: AssistantChatDocument = {
             ...doc,
@@ -160,7 +153,7 @@ export async function reserveAssistantTurn(
             lastClientRequestId: params.clientRequestId || null,
             lastClientRequestHash: messageHash,
             lastResult: null, // Reset previous completed result on new reservation
-            expiresAt: admin.firestore.Timestamp.fromMillis(
+            expiresAt: Timestamp.fromMillis(
                 now.getTime() + ASSISTANT_CONFIG.CHAT_RETENTION_DAYS * 86400000
             ),
             messages: updatedMessages,
@@ -263,7 +256,7 @@ export async function commitAssistantTurn(
             revision: newRevision,
         };
 
-        const timestampNow = admin.firestore.Timestamp.fromDate(now);
+        const timestampNow = Timestamp.fromDate(now);
 
         const updatedDoc: AssistantChatDocument = {
             ...currentDoc,
@@ -273,7 +266,7 @@ export async function commitAssistantTurn(
             offers: updatedOffers,
             searchPreferences: params.searchPreferences !== undefined ? params.searchPreferences : currentDoc.searchPreferences,
             lastResult: finalResult,
-            expiresAt: admin.firestore.Timestamp.fromMillis(
+            expiresAt: Timestamp.fromMillis(
                 now.getTime() + ASSISTANT_CONFIG.CHAT_RETENTION_DAYS * 86400000
             ),
             resetAt: params.resetAt || null,
@@ -311,7 +304,7 @@ export async function releaseAssistantTurn(
         if (currentDoc.inFlightTurnId === turnId) {
             transaction.update(chatRef, {
                 inFlightTurnId: null,
-                updatedAt: admin.firestore.Timestamp.now(),
+                updatedAt: Timestamp.now(),
             });
         }
     });
@@ -334,8 +327,8 @@ export async function clearPatientChat(
         const currentRevision = snap.exists ? (snap.data()?.revision || 0) : 0;
         const nextRevision = currentRevision + 1;
 
-        const timestampNow = admin.firestore.Timestamp.fromDate(now);
-        const expiresAt = admin.firestore.Timestamp.fromDate(
+        const timestampNow = Timestamp.fromDate(now);
+        const expiresAt = Timestamp.fromDate(
             new Date(now.getTime() + ASSISTANT_CONFIG.CHAT_RETENTION_DAYS * 24 * 60 * 60 * 1000)
         );
 
@@ -412,105 +405,42 @@ export async function refreshPatientChatHistory(
     departments: DepartmentCandidate[],
     doctors: DoctorCandidate[],
     now = new Date()
-): Promise<{ messages: AssistantChatMessage[]; offers: AssistantOffer[]; revision: number }> {
+): Promise<AssistantChatDocument> {
     const { doc: chatDoc, exists } = await getPatientChatDoc(db, patientId, now);
     if (!exists) {
-        return { messages: [], offers: [], revision: 1 };
+        return chatDoc;
     }
 
     const activeDeptKeys = new Set(departments.map((d) => d.key));
 
     const existingOffers = chatDoc.offers || [];
-    const refreshedOffers: AssistantOffer[] = [];
-
-    for (const offer of existingOffers) {
-        const expiresAtMs = new Date(offer.expiresAt).getTime();
-        if (Number.isNaN(expiresAtMs) || expiresAtMs <= now.getTime()) {
-            refreshedOffers.push({ ...offer, isAvailable: false });
-            continue;
+    const availabilityByDay = new Map<string, Promise<AvailableSlotInfo[]>>();
+    const refreshedOffers = await Promise.all(existingOffers.map(async (offer) => {
+        const expiresAt = Date.parse(offer.expiresAt);
+        if (!Number.isFinite(expiresAt) || expiresAt <= now.getTime() ||
+            appointmentExactUtcTime(offer.appointmentDate, offer.timeSlot).getTime() <= now.getTime()) {
+            return { ...offer, isAvailable: false };
         }
-
-        const exactUtc = appointmentExactUtcTime(offer.appointmentDate, offer.timeSlot);
-        if (exactUtc.getTime() <= now.getTime()) {
-            refreshedOffers.push({ ...offer, isAvailable: false });
-            continue;
-        }
-
         try {
-            const doctorDoc = await db.collection('doctors').doc(offer.doctorId).get();
-            const doctorData = doctorDoc.data();
-            if (!doctorDoc.exists || doctorData?.isActive !== true || doctorData?.isAvailable !== true) {
-                refreshedOffers.push({ ...offer, isAvailable: false });
-                continue;
+            const dayKey = `${offer.doctorId}:${offer.appointmentDate}`;
+            let availability = availabilityByDay.get(dayKey);
+            if (!availability) {
+                availability = loadOfferDayAvailability(db, offer, activeDeptKeys, now);
+                availabilityByDay.set(dayKey, availability);
             }
-
-            const doctorDept = (doctorData.department as string) || offer.department;
-            if (!doctorDept || !activeDeptKeys.has(doctorDept)) {
-                refreshedOffers.push({ ...offer, isAvailable: false });
-                continue;
-            }
-
-            const appointmentDate = parseAppointmentDate(offer.appointmentDate);
-            const isScheduleValid = validateDoctorSlotAvailability(doctorData, appointmentDate, offer.timeSlot);
-            if (!isScheduleValid) {
-                refreshedOffers.push({ ...offer, isAvailable: false });
-                continue;
-            }
-
-            const [y, m, d] = offer.appointmentDate.split('-').map(Number);
-            const startOfDayUtc = Date.UTC(y, m - 1, d, -3, 0, 0, 0);
-            const endOfDayUtc = Date.UTC(y, m - 1, d, 20, 59, 59, 999);
-            const startOfDay = admin.firestore.Timestamp.fromMillis(startOfDayUtc);
-            const endOfDay = admin.firestore.Timestamp.fromMillis(endOfDayUtc);
-
-            const canonicalSlotRef = canonicalAppointmentSlotLockRef(offer.doctorId, appointmentDate, offer.timeSlot, db);
-            const legacySlotRef = legacyAppointmentSlotLockRef(offer.doctorId, appointmentDate, offer.timeSlot, db);
-            const [canonicalSnap, legacySnap, apptsSnap] = await Promise.all([
-                canonicalSlotRef.get(),
-                legacySlotRef.get(),
-                db.collection('appointments')
-                    .where('doctorId', '==', offer.doctorId)
-                    .where('appointmentDate', '>=', startOfDay)
-                    .where('appointmentDate', '<=', endOfDay)
-                    .get(),
-            ]);
-
-            let isLocked = false;
-            for (const snap of [canonicalSnap, legacySnap]) {
-                if (snap.exists) {
-                    const lockStatus = snap.data()?.status as string | undefined;
-                    if (ACTIVE_APPOINTMENT_STATUSES.includes(lockStatus || 'pending')) {
-                        isLocked = true;
-                        break;
-                    }
-                }
-            }
-            if (isLocked) {
-                refreshedOffers.push({ ...offer, isAvailable: false });
-                continue;
-            }
-
-            const hasConflict = apptsSnap.docs.some((doc) => {
-                const appt = doc.data();
-                return (
-                    ACTIVE_APPOINTMENT_STATUSES.includes(appt.status) &&
-                    doesAppointmentOverlapSlot(appt, offer.timeSlot, doctorData, offer.appointmentDate)
-                );
-            });
-            if (hasConflict) {
-                refreshedOffers.push({ ...offer, isAvailable: false });
-                continue;
-            }
-
-            refreshedOffers.push({ ...offer, isAvailable: true });
+            const slots = await availability;
+            return { ...offer, isAvailable: slots.some((slot) => slot.isAvailable && matchesTimeSlot(slot, offer.timeSlot)) };
         } catch {
-            refreshedOffers.push({ ...offer, isAvailable: false });
+            // Existing offers fail closed if their current availability cannot be read.
+            return { ...offer, isAvailable: false };
         }
-    }
+    }));
 
     // If all existing offers are expired and preferences exist, revalidate fresh offers
     const allExpired = refreshedOffers.every((o) => !o.isAvailable);
-    if (allExpired && existingOffers.length > 0 &&
+    // An unfinished turn owns this revision until it commits or is superseded.
+    // Refresh can report availability, but must not replace its reserved history.
+    if (!chatDoc.inFlightTurnId && allExpired && existingOffers.length > 0 &&
         (!chatDoc.lastResult || chatDoc.lastResult.status === 'ready') && chatDoc.searchPreferences) {
         const pref = chatDoc.searchPreferences;
         const freshMatch = await matchScheduleAndGenerateOffers(
@@ -532,65 +462,50 @@ export async function refreshPatientChatHistory(
 
         if (freshMatch.offers.length > 0) {
             const chatRef = db.collection('assistant_chats').doc(patientId);
-            let casUpdated = false;
-            let updatedRevision = chatDoc.revision;
-            let updatedMessages = chatDoc.messages;
-
-            await db.runTransaction(async (tx) => {
+            const refreshedChat = await db.runTransaction(async (tx): Promise<AssistantChatDocument | null> => {
                 const curSnap = await tx.get(chatRef);
-                if (!curSnap.exists) return;
-                const cur = curSnap.data() as AssistantChatDocument;
-                if (cur.generationId !== chatDoc.generationId || cur.revision !== chatDoc.revision) {
-                    return;
+                if (!curSnap.exists) return null;
+                const current = curSnap.data() as AssistantChatDocument;
+                if (current.generationId !== chatDoc.generationId || current.revision !== chatDoc.revision ||
+                    current.inFlightTurnId) return null;
+                const freshOfferIds = freshMatch.offers.map((offer) => offer.offerId);
+                const messages = [...(current.messages || [])];
+                const lastIndex = messages.length - 1;
+                if (lastIndex >= 0 && messages[lastIndex].sender === 'assistant') {
+                    messages[lastIndex] = { ...messages[lastIndex], offerIds: freshOfferIds };
                 }
-                updatedRevision = (cur.revision || 1) + 1;
-                const freshOfferIds = freshMatch.offers.map((o) => o.offerId);
-                const currentMessages = [...(cur.messages || [])];
-                if (currentMessages.length > 0) {
-                    const lastIdx = currentMessages.length - 1;
-                    if (currentMessages[lastIdx].sender === 'assistant') {
-                        currentMessages[lastIdx] = {
-                            ...currentMessages[lastIdx],
-                            offerIds: freshOfferIds,
-                        };
-                    }
-                }
-                updatedMessages = currentMessages;
-
+                const refreshedDoc: AssistantChatDocument = {
+                    ...current,
+                    offers: freshMatch.offers,
+                    messages,
+                    revision: (current.revision || 1) + 1,
+                    updatedAt: Timestamp.fromDate(now),
+                };
                 tx.update(chatRef, {
-                    offers: freshMatch.offers,
-                    messages: updatedMessages,
-                    revision: updatedRevision,
-                    updatedAt: admin.firestore.Timestamp.fromDate(now),
+                    offers: refreshedDoc.offers,
+                    messages: refreshedDoc.messages,
+                    revision: refreshedDoc.revision,
+                    updatedAt: refreshedDoc.updatedAt,
                 });
-                casUpdated = true;
+                return refreshedDoc;
             });
-
-            if (casUpdated) {
-                return {
-                    messages: updatedMessages,
-                    offers: freshMatch.offers,
-                    revision: updatedRevision,
-                };
-            } else {
-                // Concurrent modification occurred (e.g. clear or new turn); perform authoritative re-read
-                const latestSnap = await chatRef.get();
-                if (!latestSnap.exists) {
-                    return { messages: [], offers: [], revision: 1 };
-                }
-                const latestDoc = latestSnap.data() as AssistantChatDocument;
-                return {
-                    messages: pruneExpiredMessages(latestDoc.messages || [], now),
-                    offers: latestDoc.offers || [],
-                    revision: latestDoc.revision || 1,
-                };
-            }
+            // A retry returns only its own snapshot; abandoned attempts cannot resurrect cleared offers.
+            return refreshedChat || (await getPatientChatDoc(db, patientId, now)).doc;
         }
     }
 
-    return {
-        messages: chatDoc.messages,
-        offers: refreshedOffers,
-        revision: chatDoc.revision,
-    };
+    return { ...chatDoc, offers: refreshedOffers };
+}
+
+async function loadOfferDayAvailability(
+    firestore: FirebaseFirestore.Firestore,
+    offer: AssistantOffer,
+    activeDepartments: Set<string>,
+    now: Date
+): Promise<AvailableSlotInfo[]> {
+    const doctorDoc = await firestore.collection('doctors').doc(offer.doctorId).get();
+    const doctor = doctorDoc.data();
+    if (!doctorDoc.exists || doctor?.isActive !== true || doctor?.isAvailable !== true ||
+        !activeDepartments.has(doctor.department || offer.department)) return [];
+    return loadDoctorDayAvailability(firestore, { doctorId: offer.doctorId, doctor, dateKey: offer.appointmentDate, now });
 }

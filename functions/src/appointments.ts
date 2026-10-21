@@ -1,27 +1,20 @@
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 
-import { admin, db } from './firebase';
+import { db } from './firebase';
 import {
     ACTIVE_APPOINTMENT_STATUSES,
     APPOINTMENT_STATUSES,
-    APPOINTMENT_TYPES,
     appointmentDateKey,
-    appointmentDayCoordinationRef,
     appointmentExactTime,
     appointmentExactUtcTime,
     canMutateAppointment,
-    canonicalAppointmentSlotLockRef,
-    canonicalSlotStartTime,
-    doesAppointmentOverlapSlot,
     firestoreDateToDate,
     formatDateForNotification,
-    getDoctorDaySchedule,
-    legacyAppointmentSlotLockRef,
     lockAppointmentSlot,
     parseAppointmentDate,
     releaseAppointmentSlot,
-    resolveTrustedSlotFromSchedule,
 } from './shared/appointmentHelpers';
 import { getCallerUserDoc, requireAuth } from './shared/auth';
 import {
@@ -31,23 +24,13 @@ import {
     deleteAppointmentNotifications,
 } from './notifications/core';
 
+import { CreateAppointmentData, consumeAssistantOffer, prepareBookingRequest, resolveBookingRequest } from './appointments/bookingRequest';
+import { readDoctorSlotReservation, writeDoctorSlotReservation } from './appointments/slotReservation';
+export { CreateAppointmentData } from './appointments/bookingRequest';
+export { getDoctorDayAvailability, GetDoctorDayAvailabilityData, GetDoctorDayAvailabilityResult, AvailableSlotInfo } from './appointments/doctorDayAvailability';
+
 interface AppointmentMutationData {
     appointmentId: string;
-}
-
-export interface CreateAppointmentData {
-    bookingReference?: string;
-    patientId: string;
-    doctorId?: string;
-    doctorName?: string;
-    department?: string;
-    appointmentDate?: string;
-    timeSlot?: string;
-    type?: string;
-    notes?: string | null;
-    idempotencyKey?: string;
-    offerId?: string;
-    confirmed?: boolean;
 }
 
 export interface CreateAppointmentResult {
@@ -92,7 +75,7 @@ function assertFutureAppointmentTime(appointmentDate: Date, timeSlot: string): v
     }
 }
 
-function assertConfirmWindow(appointmentData: FirebaseFirestore.DocumentData): void {
+function validateCheckInWindow(appointmentData: FirebaseFirestore.DocumentData): Date {
     const appointmentDate = firestoreDateToDate(appointmentData.appointmentDate);
     if (!appointmentDate || typeof appointmentData.timeSlot !== 'string') {
         throw new functions.https.HttpsError('failed-precondition', 'Appointment time is unavailable.');
@@ -107,6 +90,7 @@ function assertConfirmWindow(appointmentData: FirebaseFirestore.DocumentData): v
             'Appointment can only be confirmed during the QR check-in window.'
         );
     }
+    return appointmentDate;
 }
 
 async function handlePostBookingNotifications(params: {
@@ -143,7 +127,7 @@ async function handlePostBookingNotifications(params: {
         try {
             await db.collection('appointments').doc(params.appointmentId).update({
                 notificationDeliveryError: true,
-                notificationDeliveryErrorAt: admin.firestore.Timestamp.now(),
+                notificationDeliveryErrorAt: Timestamp.now(),
             });
         } catch {
             // Non-blocking
@@ -156,97 +140,22 @@ export async function createAppointmentCore(
     callerData: FirebaseFirestore.DocumentData,
     data: CreateAppointmentData
 ): Promise<CreateAppointmentResult> {
-    if (data.patientId !== callerUid) {
-        throw new functions.https.HttpsError('permission-denied', 'You can only create appointments for yourself.');
-    }
-
-    const isAssistant = typeof data.offerId === 'string' && data.offerId.trim().length > 0;
-    if (isAssistant && data.confirmed !== true) {
-        throw new functions.https.HttpsError('invalid-argument', 'confirmed must be explicitly true.');
-    }
-
-    const offerId = isAssistant ? data.offerId!.trim() : undefined;
-    const now = admin.firestore.Timestamp.now();
-    const nowJs = now.toDate();
-
-    let idempotencyDocId: string | undefined;
-    let payloadHash: string;
-
-    if (isAssistant) {
-        if (typeof offerId !== 'string' || !offerId.trim() || offerId.trim().length > 128) {
-            throw new functions.https.HttpsError('invalid-argument', 'offerId must be a non-empty string up to 128 characters.');
-        }
-        if (data.confirmed !== true) {
-            throw new functions.https.HttpsError('invalid-argument', 'confirmed must be explicitly true.');
-        }
-        if (data.notes !== undefined && data.notes !== null) {
-            if (typeof data.notes !== 'string' || data.notes.length > 1000) {
-                throw new functions.https.HttpsError('invalid-argument', 'notes must be 1000 characters or fewer.');
-            }
-        }
-        idempotencyDocId = 'asst_confirm_' + createHash('sha256').update(`${callerUid}:${offerId}`).digest('hex');
-        payloadHash = createHash('sha256').update(`${callerUid}:${offerId}`).digest('hex');
-    } else {
-        if (!data.department || !data.appointmentDate || !data.timeSlot) {
-            throw new functions.https.HttpsError('invalid-argument', 'Missing required appointment fields.');
-        }
-        if (typeof data.department !== 'string' || !data.department.trim() || data.department.trim().length > 128) {
-            throw new functions.https.HttpsError('invalid-argument', 'department must be 1 to 128 characters.');
-        }
-        if (typeof data.appointmentDate !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(data.appointmentDate.trim()) || data.appointmentDate.trim().length > 32) {
-            throw new functions.https.HttpsError('invalid-argument', 'appointmentDate must be a valid date string.');
-        }
-        if (typeof data.timeSlot !== 'string' || !data.timeSlot.trim() || data.timeSlot.trim().length > 64) {
-            throw new functions.https.HttpsError('invalid-argument', 'timeSlot must be 1 to 64 characters.');
-        }
-        if (data.doctorId !== undefined && data.doctorId !== null) {
-            if (typeof data.doctorId !== 'string' || !data.doctorId.trim() || data.doctorId.trim().length > 128) {
-                throw new functions.https.HttpsError('invalid-argument', 'doctorId must be a string up to 128 characters.');
-            }
-        }
-        if (data.bookingReference !== undefined && data.bookingReference !== null) {
-            if (typeof data.bookingReference !== 'string' || data.bookingReference.trim().length > 64) {
-                throw new functions.https.HttpsError('invalid-argument', 'bookingReference must be 64 characters or fewer.');
-            }
-        }
-        const type = data.type || 'regularCheckup';
-        if (!APPOINTMENT_TYPES.includes(type)) {
-            throw new functions.https.HttpsError('invalid-argument', 'Invalid appointment type.');
-        }
-        if (typeof data.notes === 'string' && data.notes.length > 1000) {
-            throw new functions.https.HttpsError('invalid-argument', 'notes must be 1000 characters or fewer.');
-        }
-        if (typeof data.idempotencyKey === 'string' && data.idempotencyKey.trim().length > 128) {
-            throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be 128 characters or fewer.');
-        }
-
-        const normalizedIdempotencyKey = typeof data.idempotencyKey === 'string' && data.idempotencyKey.trim()
-            ? data.idempotencyKey.trim()
-            : (typeof data.bookingReference === 'string' && data.bookingReference.trim()
-                ? `bref_${data.bookingReference.trim().toUpperCase()}`
-                : undefined);
-
-        if (normalizedIdempotencyKey) {
-            idempotencyDocId = `${callerUid}_${encodeURIComponent(normalizedIdempotencyKey)}`;
-        }
-
-        payloadHash = createHash('sha256')
-            .update(`${callerUid}:${data.doctorId || ''}:${data.department}:${data.appointmentDate}:${data.timeSlot}:${type}:${data.notes || ''}`)
-            .digest('hex');
-    }
+    const booking = prepareBookingRequest(callerUid, data);
+    const { idempotencyDocId, payloadHash } = booking;
+    const now = Timestamp.now();
 
     const ref = db.collection('appointments').doc();
     const bookingReference = (data.bookingReference || ref.id.substring(0, 8)).toUpperCase();
     const qrCode = `UHC_APPOINTMENT:${ref.id}:${randomUUID()}`;
 
     const txResult = await db.runTransaction(async (transaction) => {
-        // 1. Existing receipt lookup PRECEDES all checks for lost-response retry
+        // Lost-response retries must resolve before reading a consumed offer or checking current availability.
         if (idempotencyDocId) {
             const idempotencyRef = db.collection('appointment_idempotency').doc(idempotencyDocId);
             const idempotencySnap = await transaction.get(idempotencyRef);
             if (idempotencySnap.exists) {
                 const existing = idempotencySnap.data()!;
-                if (!isAssistant && existing.payloadHash && existing.payloadHash !== payloadHash) {
+                if (booking.kind === 'direct' && existing.payloadHash && existing.payloadHash !== payloadHash) {
                     throw new functions.https.HttpsError(
                         'already-exists',
                         'Idempotency key has already been used with a different request payload.'
@@ -264,185 +173,27 @@ export async function createAppointmentCore(
             }
         }
 
-        // 2. Resolve booking inputs
-        let resolvedDoctorId: string | undefined;
-        let resolvedDoctorName = 'Any Available';
-        let resolvedDepartment = isAssistant ? '' : data.department!;
-        let resolvedDate: Date;
-        let resolvedSlotStr: string;
-        let resolvedType = isAssistant ? 'regularCheckup' : (data.type || 'regularCheckup');
-        let resolvedNotes = typeof data.notes === 'string' ? data.notes.trim() : null;
-        let chatRef: FirebaseFirestore.DocumentReference | null = null;
-        let remainingOffers: any[] | null = null;
-        let chatDoc: FirebaseFirestore.DocumentData | undefined;
-
-        if (isAssistant) {
-            chatRef = db.collection('assistant_chats').doc(callerUid);
-            const chatSnap = await transaction.get(chatRef);
-            if (!chatSnap.exists) {
-                throw new functions.https.HttpsError('not-found', 'Appointment offer not found or has been cleared.');
-            }
-            chatDoc = chatSnap.data();
-
-            const chatExpiresAtMs = chatDoc?.expiresAt?.toMillis ? chatDoc.expiresAt.toMillis() : 0;
-            if (chatExpiresAtMs > 0 && chatExpiresAtMs <= nowJs.getTime()) {
-                throw new functions.https.HttpsError(
-                    'failed-precondition',
-                    'Chat session has expired. Please request a new appointment.'
-                );
-            }
-
-            const offers = (chatDoc?.offers || []) as any[];
-            const matchedOffer = offers.find((o: any) => o.offerId === offerId);
-            if (!matchedOffer) {
-                throw new functions.https.HttpsError('not-found', 'Appointment offer not found or has been cleared.');
-            }
-
-            if (matchedOffer.isAvailable === false) {
-                throw new functions.https.HttpsError(
-                    'failed-precondition',
-                    'This appointment offer is no longer available.'
-                );
-            }
-
-            const expiresAtMs = new Date(matchedOffer.expiresAt).getTime();
-            if (Number.isNaN(expiresAtMs) || expiresAtMs <= nowJs.getTime()) {
-                throw new functions.https.HttpsError(
-                    'failed-precondition',
-                    'This appointment offer has expired. Please request a new appointment.'
-                );
-            }
-
-            const exactUtc = appointmentExactUtcTime(matchedOffer.appointmentDate, matchedOffer.timeSlot);
-            if (exactUtc.getTime() <= nowJs.getTime()) {
-                throw new functions.https.HttpsError(
-                    'failed-precondition',
-                    'This appointment slot is in the past.'
-                );
-            }
-
-            resolvedDoctorId = matchedOffer.doctorId;
-            resolvedDoctorName = matchedOffer.doctorName || 'Doctor';
-            resolvedDepartment = matchedOffer.department;
-            resolvedDate = parseAppointmentDate(matchedOffer.appointmentDate);
-            resolvedSlotStr = matchedOffer.timeSlot;
-            remainingOffers = offers.filter((o: any) => o.offerId !== offerId);
-        } else {
-            resolvedDoctorId = data.doctorId;
-            resolvedDate = parseAppointmentDate(data.appointmentDate!);
-            assertFutureAppointmentTime(resolvedDate, data.timeSlot!);
-            resolvedSlotStr = data.timeSlot!;
-        }
-
-        let doctorUserId: string | undefined;
-        let finalCanonicalSlot = resolvedSlotStr;
-        let trustedSlotStart = canonicalSlotStartTime(resolvedSlotStr);
-        let coordinationRef: FirebaseFirestore.DocumentReference | null = null;
-        let canonicalSlotRef: FirebaseFirestore.DocumentReference | null = null;
-
-        if (resolvedDoctorId) {
-            const doctorRef = db.collection('doctors').doc(resolvedDoctorId);
-            const doctorDoc = await transaction.get(doctorRef);
-            const doctorData = doctorDoc.data();
-            if (!doctorDoc.exists || doctorData?.isActive !== true || doctorData?.isAvailable !== true) {
-                throw new functions.https.HttpsError('failed-precondition', 'Selected doctor is unavailable.');
-            }
-
-            // Require doctor to have an assigned active department (no fallback to caller department)
-            const doctorDeptKey = doctorData.department as string | undefined;
-            if (!doctorDeptKey) {
-                throw new functions.https.HttpsError('failed-precondition', 'Doctor has no assigned department.');
-            }
-            const deptQuery = db.collection('departments')
-                .where('key', '==', doctorDeptKey)
-                .where('isActive', '==', true)
-                .limit(1);
-            const deptSnap = await transaction.get(deptQuery);
-            if (deptSnap.empty) {
-                throw new functions.https.HttpsError('failed-precondition', 'Selected doctor department is inactive.');
-            }
-            resolvedDepartment = doctorDeptKey;
-
-            // Resolve trusted schedule duration and reject forged range ends
-            const trustedSlot = resolveTrustedSlotFromSchedule(doctorData, resolvedDate, resolvedSlotStr);
-            finalCanonicalSlot = trustedSlot.canonicalSlot;
-            trustedSlotStart = trustedSlot.startTime;
-
-            // Day coordination record serializes overlapping appointments with different start times
-            coordinationRef = appointmentDayCoordinationRef(resolvedDoctorId, resolvedDate, db);
-            await transaction.get(coordinationRef);
-
-            // Check canonical slot lock AND legacy slot lock
-            canonicalSlotRef = canonicalAppointmentSlotLockRef(resolvedDoctorId, resolvedDate, finalCanonicalSlot, db);
-            const legacySlotRef = legacyAppointmentSlotLockRef(resolvedDoctorId, resolvedDate, finalCanonicalSlot, db);
-            const [canonicalSnap, legacySnap] = await Promise.all([
-                transaction.get(canonicalSlotRef),
-                transaction.get(legacySlotRef),
-            ]);
-
-            for (const snap of [canonicalSnap, legacySnap]) {
-                if (snap.exists) {
-                    const lockStatus = snap.data()?.status as string | undefined;
-                    if (ACTIVE_APPOINTMENT_STATUSES.includes(lockStatus || 'pending')) {
-                        throw new functions.https.HttpsError('already-exists', 'This time slot is no longer available.');
-                    }
-                }
-            }
-
-            // Check active appointments on that day for schedule overlap
-            const dateKey = appointmentDateKey(resolvedDate);
-            const [year, month, day] = dateKey.split('-').map(Number);
-            const startOfDayUtc = Date.UTC(year, month - 1, day, -3, 0, 0, 0);
-            const endOfDayUtc = Date.UTC(year, month - 1, day, 20, 59, 59, 999);
-            const startOfDay = admin.firestore.Timestamp.fromMillis(startOfDayUtc);
-            const endOfDay = admin.firestore.Timestamp.fromMillis(endOfDayUtc);
-
-            const appointmentsQuery = db.collection('appointments')
-                .where('doctorId', '==', resolvedDoctorId)
-                .where('appointmentDate', '>=', startOfDay)
-                .where('appointmentDate', '<=', endOfDay);
-            const appointmentsSnap = await transaction.get(appointmentsQuery);
-
-            for (const apptDoc of appointmentsSnap.docs) {
-                const appt = apptDoc.data();
-                if (ACTIVE_APPOINTMENT_STATUSES.includes(appt.status) && apptDoc.id !== ref.id) {
-                    if (doesAppointmentOverlapSlot(appt, trustedSlot, doctorData, resolvedDate)) {
-                        throw new functions.https.HttpsError('already-exists', 'This time slot is no longer available.');
-                    }
-                }
-            }
-
-            doctorUserId = doctorData.userId as string | undefined;
-            resolvedDoctorName = typeof doctorData.name === 'string' && doctorData.name.trim()
-                ? doctorData.name.trim()
-                : resolvedDoctorName;
-            resolvedDepartment = typeof doctorData.department === 'string' && doctorData.department.trim()
-                ? doctorData.department.trim()
-                : resolvedDepartment;
-        } else if (resolvedType !== 'emergency') {
+        const resolved = await resolveBookingRequest(transaction, db, { booking, patientId: callerUid, now: now.toDate() });
+        const reservation = resolved.doctorId ? await readDoctorSlotReservation(transaction, {
+            firestore: db,
+            doctorId: resolved.doctorId,
+            appointmentId: ref.id,
+            appointmentDate: resolved.appointmentDate,
+            timeSlot: resolved.timeSlot,
+            fallbackDoctorName: resolved.doctorName,
+        }) : null;
+        if (!reservation && resolved.type !== 'emergency') {
             throw new functions.https.HttpsError('invalid-argument', 'doctorId is required for non-emergency appointments.');
         }
+        const resolvedDoctorId = resolved.doctorId;
+        const resolvedDoctorName = reservation?.doctorName || resolved.doctorName;
+        const resolvedDepartment = reservation?.department || resolved.department;
+        const resolvedDate = resolved.appointmentDate;
+        const finalCanonicalSlot = reservation?.slot.canonicalSlot || resolved.timeSlot;
+        const doctorUserId = reservation?.doctorUserId;
 
-        // --- WRITES (All reads precede writes) ---
-        if (coordinationRef && resolvedDoctorId) {
-            transaction.set(coordinationRef, {
-                doctorId: resolvedDoctorId,
-                dateKey: appointmentDateKey(resolvedDate),
-                updatedAt: now,
-            }, { merge: true });
-        }
-
-        if (canonicalSlotRef && resolvedDoctorId) {
-            transaction.set(canonicalSlotRef, {
-                appointmentId: ref.id,
-                doctorId: resolvedDoctorId,
-                appointmentDateKey: appointmentDateKey(resolvedDate),
-                timeSlot: finalCanonicalSlot,
-                startTime: trustedSlotStart,
-                status: 'pending',
-                updatedAt: now,
-            });
-        }
+        // Offer, receipt, access and booking writes share the transaction with the slot reservation.
+        if (reservation) writeDoctorSlotReservation(transaction, reservation, { appointmentId: ref.id, status: 'pending', now });
 
         transaction.set(ref, {
             id: ref.id,
@@ -453,11 +204,11 @@ export async function createAppointmentCore(
             doctorId: resolvedDoctorId || '',
             doctorName: resolvedDoctorName,
             department: resolvedDepartment,
-            appointmentDate: admin.firestore.Timestamp.fromDate(resolvedDate),
+            appointmentDate: Timestamp.fromDate(resolvedDate),
             timeSlot: finalCanonicalSlot,
-            type: resolvedType,
+            type: resolved.type,
             status: 'pending',
-            notes: resolvedNotes,
+            notes: resolved.notes,
             medicalNotes: null,
             qrCode,
             isCheckedIn: false,
@@ -498,24 +249,7 @@ export async function createAppointmentCore(
             }, { merge: true });
         }
 
-        if (chatRef && remainingOffers !== null) {
-            const chatMessages = ((chatDoc?.messages as any[]) || []);
-            const updatedMessages = chatMessages.map((msg: any) => {
-                if (Array.isArray(msg.offerIds)) {
-                    return {
-                        ...msg,
-                        offerIds: msg.offerIds.filter((id: string) => id !== offerId),
-                    };
-                }
-                return msg;
-            });
-            transaction.update(chatRef, {
-                offers: remainingOffers,
-                messages: updatedMessages,
-                revision: (chatDoc?.revision || 1) + 1,
-                updatedAt: now,
-            });
-        }
+        if (resolved.offerConsumption) consumeAssistantOffer(transaction, resolved.offerConsumption, now);
 
         return {
             isExisting: false,
@@ -587,8 +321,6 @@ export const rescheduleAppointment = functions.https.onCall(
         const parsedDate = parseAppointmentDate(appointmentDate);
         assertFutureAppointmentTime(parsedDate, timeSlot);
 
-        let resolvedNewSlot = timeSlot;
-
         await db.runTransaction(async (transaction) => {
             const transactionSnap = await transaction.get(ref);
             if (!transactionSnap.exists) {
@@ -618,109 +350,23 @@ export const rescheduleAppointment = functions.https.onCall(
                 throw new functions.https.HttpsError('failed-precondition', 'Appointment has no assigned doctor.');
             }
 
-            const doctorRef = db.collection('doctors').doc(doctorId);
-            const doctorDoc = await transaction.get(doctorRef);
-            const doctorData = doctorDoc.data();
-            if (!doctorDoc.exists || doctorData?.isActive !== true || doctorData?.isAvailable !== true) {
-                throw new functions.https.HttpsError('failed-precondition', 'Doctor is unavailable.');
-            }
-
-            const doctorDeptKey = doctorData.department as string;
-            const deptQuery = db.collection('departments').where('key', '==', doctorDeptKey).where('isActive', '==', true).limit(1);
-            const deptSnap = await transaction.get(deptQuery);
-            if (deptSnap.empty) {
-                throw new functions.https.HttpsError('failed-precondition', 'Doctor department is inactive.');
-            }
-
-            const trustedSlot = resolveTrustedSlotFromSchedule(doctorData, parsedDate, timeSlot);
-            resolvedNewSlot = trustedSlot.canonicalSlot;
-
-            const coordinationRef = appointmentDayCoordinationRef(doctorId, parsedDate, db);
-            await transaction.get(coordinationRef);
-
-            const currentDate = firestoreDateToDate(currentAppointment.appointmentDate);
-            let currentSlotRef: FirebaseFirestore.DocumentReference | null = null;
-            let currentLegacySlotRef: FirebaseFirestore.DocumentReference | null = null;
-            let currentSlotSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-            let currentLegacySnap: FirebaseFirestore.DocumentSnapshot | null = null;
-
-            if (currentDate && currentAppointment.timeSlot) {
-                currentSlotRef = canonicalAppointmentSlotLockRef(doctorId, currentDate, currentAppointment.timeSlot, db);
-                currentLegacySlotRef = legacyAppointmentSlotLockRef(doctorId, currentDate, currentAppointment.timeSlot, db);
-                [currentSlotSnap, currentLegacySnap] = await Promise.all([
-                    transaction.get(currentSlotRef),
-                    transaction.get(currentLegacySlotRef),
-                ]);
-            }
-
-            const newSlotRef = canonicalAppointmentSlotLockRef(doctorId, parsedDate, resolvedNewSlot, db);
-            const newLegacySlotRef = legacyAppointmentSlotLockRef(doctorId, parsedDate, resolvedNewSlot, db);
-            const [newSlotSnap, newLegacySnap] = await Promise.all([
-                transaction.get(newSlotRef),
-                transaction.get(newLegacySlotRef),
-            ]);
-
-            for (const s of [newSlotSnap, newLegacySnap]) {
-                if (s.exists && s.data()?.appointmentId !== appointmentId && ACTIVE_APPOINTMENT_STATUSES.includes(s.data()?.status || 'pending')) {
-                    throw new functions.https.HttpsError('already-exists', 'This time slot is no longer available.');
-                }
-            }
-
-            const dateKey = appointmentDateKey(parsedDate);
-            const [year, month, day] = dateKey.split('-').map(Number);
-            const startOfDayUtc = Date.UTC(year, month - 1, day, -3, 0, 0, 0);
-            const endOfDayUtc = Date.UTC(year, month - 1, day, 20, 59, 59, 999);
-            const startOfDay = admin.firestore.Timestamp.fromMillis(startOfDayUtc);
-            const endOfDay = admin.firestore.Timestamp.fromMillis(endOfDayUtc);
-
-            const appointmentsQuery = db.collection('appointments')
-                .where('doctorId', '==', doctorId)
-                .where('appointmentDate', '>=', startOfDay)
-                .where('appointmentDate', '<=', endOfDay);
-            const appointmentsSnap = await transaction.get(appointmentsQuery);
-
-            for (const apptDoc of appointmentsSnap.docs) {
-                const appt = apptDoc.data();
-                if (ACTIVE_APPOINTMENT_STATUSES.includes(appt.status) && apptDoc.id !== appointmentId) {
-                    if (doesAppointmentOverlapSlot(appt, trustedSlot, doctorData, parsedDate)) {
-                        throw new functions.https.HttpsError('already-exists', 'This time slot is no longer available.');
-                    }
-                }
-            }
-
-            // --- WRITES (All reads precede writes) ---
-            transaction.set(coordinationRef, {
+            const reservation = await readDoctorSlotReservation(transaction, {
+                firestore: db,
                 doctorId,
-                dateKey,
-                updatedAt: admin.firestore.Timestamp.now(),
-            }, { merge: true });
-
-            if (currentSlotRef && currentSlotSnap?.exists && currentSlotSnap.data()?.appointmentId === appointmentId) {
-                if (currentSlotRef.path !== newSlotRef.path) {
-                    transaction.delete(currentSlotRef);
-                }
-            }
-            if (currentLegacySlotRef && currentLegacySnap?.exists && currentLegacySnap.data()?.appointmentId === appointmentId) {
-                if (currentLegacySlotRef.path !== newSlotRef.path) {
-                    transaction.delete(currentLegacySlotRef);
-                }
-            }
-
-            transaction.set(newSlotRef, {
                 appointmentId,
-                doctorId,
-                appointmentDateKey: dateKey,
-                timeSlot: resolvedNewSlot,
-                startTime: trustedSlot.startTime,
-                status: currentAppointment.status,
-                updatedAt: admin.firestore.Timestamp.now(),
+                appointmentDate: parsedDate,
+                timeSlot,
+                fallbackDoctorName: currentAppointment.doctorName || 'Doctor',
+                previousAppointment: currentAppointment,
             });
+            const now = Timestamp.now();
+            writeDoctorSlotReservation(transaction, reservation, { appointmentId, status: currentAppointment.status, now });
 
             transaction.update(ref, {
-                appointmentDate: admin.firestore.Timestamp.fromDate(parsedDate),
-                timeSlot: resolvedNewSlot,
+                appointmentDate: Timestamp.fromDate(parsedDate),
+                timeSlot: reservation.slot.canonicalSlot,
                 rescheduleReason: reason || null,
-                updatedAt: admin.firestore.Timestamp.now(),
+                updatedAt: Timestamp.now(),
                 statusUpdatedBy: callerUid,
             });
         });
@@ -773,7 +419,7 @@ export const cancelAppointment = functions.https.onCall(
                 status: 'cancelled',
                 cancelReason: reason || null,
                 statusUpdatedBy: statusUpdatedBy || callerUid,
-                updatedAt: admin.firestore.Timestamp.now(),
+                updatedAt: Timestamp.now(),
             });
         });
         await deleteAppointmentNotifications(appointmentId);
@@ -880,7 +526,7 @@ export const updateAppointmentStatus = functions.https.onCall(
             transaction.update(ref, {
                 status,
                 statusUpdatedBy: statusUpdatedBy || callerUid,
-                updatedAt: admin.firestore.Timestamp.now(),
+                updatedAt: Timestamp.now(),
             });
         });
         if (previousStatus !== status) {
@@ -907,30 +553,41 @@ export const confirmAppointmentCheckIn = functions.https.onCall(
         }
 
         const ref = db.collection('appointments').doc(appointmentId);
-        const snap = await ref.get();
-        if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Appointment not found.');
-        const appointment = snap.data()!;
-        if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowDoctor: true })) {
-            throw new functions.https.HttpsError('permission-denied', 'You cannot confirm this appointment.');
-        }
-        if (appointment.status !== 'pending') {
-            throw new functions.https.HttpsError('failed-precondition', 'Only pending appointments can be confirmed.');
-        }
-        if (appointment.qrCode !== qrCode.trim()) {
-            throw new functions.https.HttpsError('permission-denied', 'QR code does not match this appointment.');
-        }
-        assertConfirmWindow(appointment);
-
-        await ref.update({
-            status: 'confirmed',
-            isCheckedIn: true,
-            checkedInAt: admin.firestore.Timestamp.now(),
-            statusUpdatedBy: callerUid,
-            updatedAt: admin.firestore.Timestamp.now(),
+        const confirmedAppointment = await db.runTransaction(async (transaction) => {
+            const snap = await transaction.get(ref);
+            if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Appointment not found.');
+            const appointment = snap.data()!;
+            if (!await canMutateAppointment(callerUid, callerDoc, appointment, { allowDoctor: true })) {
+                throw new functions.https.HttpsError('permission-denied', 'You cannot confirm this appointment.');
+            }
+            if (appointment.status !== 'pending') {
+                throw new functions.https.HttpsError('failed-precondition', 'Only pending appointments can be confirmed.');
+            }
+            if (appointment.qrCode !== qrCode.trim()) {
+                throw new functions.https.HttpsError('permission-denied', 'QR code does not match this appointment.');
+            }
+            const appointmentDate = validateCheckInWindow(appointment);
+            await lockAppointmentSlot(transaction, {
+                doctorId: appointment.doctorId,
+                appointmentDate,
+                timeSlot: appointment.timeSlot,
+                appointmentId,
+                excludeAppointmentId: appointmentId,
+                status: 'confirmed',
+            });
+            const changes = {
+                status: 'confirmed',
+                isCheckedIn: true,
+                checkedInAt: Timestamp.now(),
+                statusUpdatedBy: callerUid,
+                updatedAt: Timestamp.now(),
+            };
+            transaction.update(ref, changes);
+            return { ...appointment, ...changes };
         });
         await createAppointmentStatusNotification({
             appointmentId,
-            appointment: { ...appointment, status: 'confirmed' },
+            appointment: confirmedAppointment,
             status: 'confirmed',
         });
         return { success: true };
@@ -954,8 +611,8 @@ export const updateMedicalNotes = functions.https.onCall(
         }
         await ref.update({
             medicalNotes: notes,
-            medicalNotesUpdatedAt: admin.firestore.Timestamp.now(),
-            updatedAt: admin.firestore.Timestamp.now(),
+            medicalNotesUpdatedAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
         });
         return { success: true };
     }
@@ -974,8 +631,8 @@ export const incrementQrScanFailures = functions.https.onCall(
             throw new functions.https.HttpsError('permission-denied', 'You cannot update QR failures for this appointment.');
         }
         await ref.update({
-            qrScanFailures: admin.firestore.FieldValue.increment(1),
-            updatedAt: admin.firestore.Timestamp.now(),
+            qrScanFailures: FieldValue.increment(1),
+            updatedAt: Timestamp.now(),
         });
         return { success: true };
     }
@@ -1005,173 +662,3 @@ export const deleteAppointment = functions.https.onCall(
         return { success: true };
     }
 );
-
-export interface GetDoctorDayAvailabilityData {
-    doctorId?: string;
-    date?: string;
-    appointmentDate?: string;
-}
-
-export interface AvailableSlotInfo {
-    timeSlot: string;
-    startTime: string;
-    endTime: string;
-    isAvailable: boolean;
-}
-
-export interface GetDoctorDayAvailabilityResult {
-    success: true;
-    doctorId: string;
-    appointmentDate: string;
-    doctorName: string;
-    department: string;
-    slots: AvailableSlotInfo[];
-}
-
-export const getDoctorDayAvailability = functions.https.onCall(
-    async (
-        request: functions.https.CallableRequest<GetDoctorDayAvailabilityData>
-    ): Promise<GetDoctorDayAvailabilityResult> => {
-        const callerUid = requireAuth(request);
-        await getCallerUserDoc(callerUid);
-        const data = request.data || {};
-        const doctorId = typeof data.doctorId === 'string' ? data.doctorId.trim() : '';
-        const dateStr = typeof data.date === 'string' && data.date.trim()
-            ? data.date.trim()
-            : (typeof data.appointmentDate === 'string' && data.appointmentDate.trim()
-                ? data.appointmentDate.trim()
-                : '');
-
-        if (!doctorId || !dateStr) {
-            throw new functions.https.HttpsError('invalid-argument', 'doctorId and date (YYYY-MM-DD) are required.');
-        }
-
-        const now = new Date();
-        const parsedDate = parseAppointmentDate(dateStr);
-        const dateKey = appointmentDateKey(parsedDate);
-
-        const doctorDoc = await db.collection('doctors').doc(doctorId).get();
-        if (!doctorDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Doctor not found.');
-        }
-        const doctorData = doctorDoc.data()!;
-        if (doctorData.isActive !== true || doctorData.isAvailable !== true) {
-            throw new functions.https.HttpsError('failed-precondition', 'Doctor is currently unavailable.');
-        }
-
-        const deptKey = doctorData.department as string | undefined;
-        if (!deptKey) {
-            throw new functions.https.HttpsError('failed-precondition', 'Doctor has no assigned department.');
-        }
-        const deptQuery = db.collection('departments').where('key', '==', deptKey).where('isActive', '==', true).limit(1);
-        const deptSnap = await deptQuery.get();
-        if (deptSnap.empty) {
-            throw new functions.https.HttpsError('failed-precondition', 'Doctor\'s department is not active.');
-        }
-
-        const daySlots = getDoctorDaySchedule(doctorData, dateKey);
-        const doctorName = typeof doctorData.name === 'string' && doctorData.name.trim() ? doctorData.name.trim() : 'Doctor';
-
-        if (daySlots.length === 0) {
-            return {
-                success: true,
-                doctorId,
-                appointmentDate: dateKey,
-                doctorName,
-                department: deptKey,
-                slots: [],
-            };
-        }
-
-        const [year, month, day] = dateKey.split('-').map(Number);
-        const startOfDayUtc = Date.UTC(year, month - 1, day, -3, 0, 0, 0);
-        const endOfDayUtc = Date.UTC(year, month - 1, day, 20, 59, 59, 999);
-        const startOfDay = admin.firestore.Timestamp.fromMillis(startOfDayUtc);
-        const endOfDay = admin.firestore.Timestamp.fromMillis(endOfDayUtc);
-
-        const [apptsSnap, locksSnap] = await Promise.all([
-            db.collection('appointments')
-                .where('doctorId', '==', doctorId)
-                .where('appointmentDate', '>=', startOfDay)
-                .where('appointmentDate', '<=', endOfDay)
-                .get(),
-            db.collection('appointment_slot_locks')
-                .where('doctorId', '==', doctorId)
-                .where('appointmentDateKey', '==', dateKey)
-                .get(),
-        ]);
-
-        const activeAppointments = apptsSnap.docs
-            .map((d) => d.data())
-            .filter((a) => ACTIVE_APPOINTMENT_STATUSES.includes(a.status));
-
-        const activeLocks = locksSnap.docs
-            .map((d) => d.data())
-            .filter((l) => ACTIVE_APPOINTMENT_STATUSES.includes(l.status || 'pending'));
-
-        const slots: AvailableSlotInfo[] = daySlots.map((slot) => {
-            if (!slot.startTime || slot.isAvailable === false) {
-                return {
-                    timeSlot: slot.startTime,
-                    startTime: slot.startTime,
-                    endTime: slot.endTime || '',
-                    isAvailable: false,
-                };
-            }
-
-            const slotRange = slot.endTime ? `${slot.startTime} - ${slot.endTime}` : slot.startTime;
-
-            const exactUtc = appointmentExactUtcTime(dateKey, slot.startTime);
-            if (exactUtc.getTime() <= now.getTime()) {
-                return {
-                    timeSlot: slotRange,
-                    startTime: slot.startTime,
-                    endTime: slot.endTime || '',
-                    isAvailable: false,
-                };
-            }
-
-            const isLocked = activeLocks.some((l) => {
-                const lockStart = canonicalSlotStartTime(l.startTime || l.timeSlot || '');
-                return lockStart === slot.startTime || l.timeSlot === slotRange;
-            });
-            if (isLocked) {
-                return {
-                    timeSlot: slotRange,
-                    startTime: slot.startTime,
-                    endTime: slot.endTime || '',
-                    isAvailable: false,
-                };
-            }
-
-            const hasConflict = activeAppointments.some((appt) => {
-                return doesAppointmentOverlapSlot(appt, { startTime: slot.startTime, endTime: slot.endTime }, doctorData, dateKey);
-            });
-            if (hasConflict) {
-                return {
-                    timeSlot: slotRange,
-                    startTime: slot.startTime,
-                    endTime: slot.endTime || '',
-                    isAvailable: false,
-                };
-            }
-
-            return {
-                timeSlot: slotRange,
-                startTime: slot.startTime,
-                endTime: slot.endTime || '',
-                isAvailable: true,
-            };
-        });
-
-        return {
-            success: true,
-            doctorId,
-            appointmentDate: dateKey,
-            doctorName,
-            department: deptKey,
-            slots,
-        };
-    }
-);
-

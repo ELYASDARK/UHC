@@ -6,6 +6,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../core/notifications/notification_preferences.dart';
 import '../data/models/appointment_model.dart';
 import 'local_notification_service.dart';
+import 'firebase_callable.dart';
 
 class NotificationSchedulingCoordinator {
   static final NotificationSchedulingCoordinator _instance =
@@ -124,13 +125,11 @@ class NotificationSchedulingCoordinator {
     try {
       debugPrint(
           '[NotificationSchedulingCoordinator] Calling resyncUserNotificationSchedules for $userId');
-      final callable =
-          _functions.httpsCallable('resyncUserNotificationSchedules');
-      final response = await callable.call<Map<String, dynamic>>({
-        'userId': userId,
-      });
-
-      final data = response.data;
+      final data = Map<String, dynamic>.from(await invokeFirebaseCallable(
+        _functions,
+        'resyncUserNotificationSchedules',
+        {'userId': userId},
+      ));
       final bool localScheduleRequired = data['localScheduleRequired'] ?? false;
       final appointments = data['appointments'] as List<dynamic>? ?? [];
 

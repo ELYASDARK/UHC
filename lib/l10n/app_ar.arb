@@ -71,6 +71,7 @@
   "confirmBooking": "تأكيد الحجز",
   "bookingConfirmed": "تم تأكيد الحجز",
   "bookingFailed": "فشل الحجز",
+  "bookingSlotUnavailable": "تم حجز هذا الموعد للتو. يرجى اختيار وقت آخر.",
   "appointmentBooked": "تم حجز الموعد بنجاح",
   "confirmDetails": "تأكيد التفاصيل",
   "bookAnAppointment": "حجز موعد",

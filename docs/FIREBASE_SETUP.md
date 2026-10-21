@@ -329,21 +329,57 @@ if ($LASTEXITCODE -ne 0) {
 cd ..
 ```
 
-##### 4. Launch the Flutter Web Application
+##### 4. Launch the Flutter Application
 In the second terminal, run the Flutter app targeting Chrome with the emulator flag. The app automatically selects synthetic `FirebaseOptions` for `demo-uhc-test` before initializing Firebase, without requiring any manual edit of `lib/firebase_options.dart`:
 
 ```powershell
 flutter run -d chrome --dart-define=USE_FIREBASE_EMULATOR=true
 ```
 
+For Android, select an emulator from `flutter devices` and launch the debug app:
+
+```powershell
+flutter run -d emulator-5554 --debug --dart-define=USE_FIREBASE_EMULATOR=true
+```
+
+The demo API key is `fake-emulator-api-key-demo-only`. It is a placeholder,
+not a credential for a live Firebase project. Keep it unchanged. Android's
+native callable SDK requests an Instance ID token even when Functions points
+at an emulator, which rejects this synthetic key. In explicitly opted-in Android
+emulator mode, appointment operations, the assistant, and notification resync use the
+[callable HTTP protocol](https://firebase.google.com/docs/functions/callable-reference)
+through `lib/services/firebase_callable.dart`. Requests carry the local Auth
+emulator ID token to the validated local `demo-uhc-test` Functions endpoint;
+they do not need an API key or Instance ID token. Other configurations use the
+Firebase callable SDK. The debug manifest permits the local HTTP connection and
+lets Dart initialize the demo Firebase app before native services can initialize
+the bundled live configuration.
+
+Functions runtime code imports `Timestamp` and `FieldValue` directly from
+`firebase-admin/firestore`. The Functions emulator binds the legacy
+`admin.firestore` function and can omit its static members; accessing them through
+that namespace caused history and notification requests to fail with `INTERNAL`.
+
+For UI automation with Dart MCP's `flutter_driver_command`, use the debug test
+entry point instead:
+
+```powershell
+flutter run -d emulator-5554 --debug --target=test_driver/assistant_booking_app.dart --dart-define=USE_FIREBASE_EMULATOR=true --print-dtd
+```
+
+Connect Dart MCP to the printed Dart Tooling Daemon URI. The entry point enables
+the Flutter driver extension and starts the same application. It refuses to start
+unless both debug mode and `USE_FIREBASE_EMULATOR=true` are active. Release builds
+use the normal `lib/main.dart` entry point.
+
 ##### 5. Sign In and Test the Appointment Assistant
-1. When the login screen loads in Chrome, note the blue **LOCAL EMULATOR MODE (demo-uhc-test)** banner.
+1. When the login screen loads, note the blue **LOCAL EMULATOR MODE (demo-uhc-test)** banner.
 2. Click **Sign In as Demo Patient (No OAuth)** (authenticates directly with email `synthetic.patient@demo.uhc.edu` / `TestPassword123!` against the local Auth emulator; external OAuth is disabled in emulator mode).
 3. On the Patient Home screen (first tab in bottom navigation bar), locate the **AI Health Assistant** / **AI Booking Assistant** card (`_buildAssistantCard` in `lib/screens/patient/home/home_screen.dart`, rendered as a gradient banner with robot icon). Note: This is an entry card on the Home screen, not a separate bottom navigation tab. Click the card to open the assistant.
 4. Type the documented synthetic phrase:
    > "I want an appointment with Dr. Noor in dermatology on Tuesday"
 5. The assistant returns real expiring schedule offers for Dr. Noor on Tuesday.
-6. Click **Confirm Appointment** on an offer card.
-7. The appointment is booked with a canonical slot lock and booking reference (`UHC-...`), all entirely offline and local!
+6. Click **Book This Slot**, review the confirmation sheet, then click **Confirm Appointment**.
+7. Verify the **Booking Confirmed!** receipt, QR code, and booking reference. The appointment and canonical slot lock are saved in the local Firestore emulator.
 
 

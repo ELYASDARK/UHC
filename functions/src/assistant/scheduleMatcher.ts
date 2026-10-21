@@ -1,10 +1,6 @@
 import { randomUUID } from 'crypto';
-import { admin } from '../firebase';
+import { loadDoctorDayAvailability } from '../appointments/doctorDayAvailability';
 import {
-    ACTIVE_APPOINTMENT_STATUSES,
-    appointmentExactUtcTime,
-    canonicalSlotStartTime,
-    doesAppointmentOverlapSlot,
     getBaghdadDateString,
     getDoctorDaySchedule,
     isValidCalendarDate,
@@ -198,11 +194,6 @@ export async function matchScheduleAndGenerateOffers(
     }
 
     const targetDate = intent.preferredDate!;
-    const [targetYear, targetMonth, targetDay] = targetDate.split('-').map(Number);
-    const startOfDayUtc = Date.UTC(targetYear, targetMonth - 1, targetDay, -3, 0, 0, 0);
-    const endOfDayUtc = Date.UTC(targetYear, targetMonth - 1, targetDay, 20, 59, 59, 999);
-    const startOfDay = admin.firestore.Timestamp.fromMillis(startOfDayUtc);
-    const endOfDay = admin.firestore.Timestamp.fromMillis(endOfDayUtc);
 
     const deptMap = new Map<string, string>();
     for (const d of departments) {
@@ -222,35 +213,18 @@ export async function matchScheduleAndGenerateOffers(
 
         const batch = eligibleDoctors.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.all(
-            batch.map(async ({ doctor, daySlots }) => {
-                const [appointmentsSnap, locksSnap] = await Promise.all([
-                    db.collection('appointments')
-                        .where('doctorId', '==', doctor.id)
-                        .where('appointmentDate', '>=', startOfDay)
-                        .where('appointmentDate', '<=', endOfDay)
-                        .get(),
-                    db.collection('appointment_slot_locks')
-                        .where('doctorId', '==', doctor.id)
-                        .where('appointmentDateKey', '==', targetDate)
-                        .get(),
-                ]);
-
-                const activeAppointments = appointmentsSnap.docs
-                    .map((d) => d.data())
-                    .filter((appt) => ACTIVE_APPOINTMENT_STATUSES.includes(appt.status));
-
-                const activeLocks = locksSnap.docs
-                    .map((d) => d.data())
-                    .filter((lock) => ACTIVE_APPOINTMENT_STATUSES.includes(lock.status || 'pending'));
-
-                return { doctor, daySlots, activeAppointments, activeLocks };
+            batch.map(async ({ doctor }) => {
+                const availability = await loadDoctorDayAvailability(db, {
+                    doctorId: doctor.id, doctor: doctor.data, dateKey: targetDate, now,
+                });
+                return { doctor, availability };
             })
         );
 
-        for (const { doctor, daySlots, activeAppointments, activeLocks } of batchResults) {
+        for (const { doctor, availability } of batchResults) {
             if (offers.length >= ASSISTANT_CONFIG.MAX_ACTIVE_OFFERS) break;
 
-            for (const slot of daySlots) {
+            for (const slot of availability) {
                 if (offers.length >= ASSISTANT_CONFIG.MAX_ACTIVE_OFFERS) break;
                 if (slot.isAvailable === false || !slot.startTime) continue;
 
@@ -262,27 +236,6 @@ export async function matchScheduleAndGenerateOffers(
                     continue;
                 }
 
-                // Verify not in past
-                const exactUtc = appointmentExactUtcTime(targetDate, slot.startTime);
-                if (exactUtc.getTime() <= now.getTime()) {
-                    continue;
-                }
-
-                const slotRange = `${slot.startTime}${slot.endTime ? ' - ' + slot.endTime : ''}`;
-
-                // Check locks (both canonical start-time lock and legacy lock)
-                const isLocked = activeLocks.some((l) => {
-                    const lockStart = canonicalSlotStartTime(l.startTime || l.timeSlot || '');
-                    return lockStart === slot.startTime || l.timeSlot === slotRange;
-                });
-                if (isLocked) continue;
-
-                // Check active appointments using trusted schedule duration
-                const hasConflict = activeAppointments.some((appt) => {
-                    return doesAppointmentOverlapSlot(appt, slot, doctor.data, targetDate);
-                });
-                if (hasConflict) continue;
-
                 offers.push({
                     offerId: randomUUID(),
                     doctorId: doctor.id,
@@ -292,7 +245,7 @@ export async function matchScheduleAndGenerateOffers(
                     department: doctor.data.department || 'generalMedicine',
                     departmentName: deptMap.get(doctor.data.department) || doctor.data.department,
                     appointmentDate: targetDate,
-                    timeSlot: slotRange,
+                    timeSlot: slot.timeSlot,
                     expiresAt,
                     isAvailable: true,
                 });

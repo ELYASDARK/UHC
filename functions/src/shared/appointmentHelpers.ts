@@ -1,6 +1,7 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
 
-import { admin, db } from '../firebase';
+import { db } from '../firebase';
 
 export const APPOINTMENT_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled', 'noShow'];
 export const APPOINTMENT_TYPES = ['regularCheckup', 'followUp', 'consultation', 'emergency'];
@@ -159,10 +160,7 @@ export async function lockAppointmentSlot(
     const canonicalRef = canonicalAppointmentSlotLockRef(params.doctorId, params.appointmentDate, params.timeSlot, firestore);
     const legacyRef = legacyAppointmentSlotLockRef(params.doctorId, params.appointmentDate, params.timeSlot, firestore);
 
-    const [canonicalSnap, legacySnap] = await Promise.all([
-        transaction.get(canonicalRef),
-        transaction.get(legacyRef),
-    ]);
+    const [canonicalSnap, legacySnap] = await transaction.getAll(canonicalRef, legacyRef);
 
     for (const snap of [canonicalSnap, legacySnap]) {
         if (snap.exists) {
@@ -185,7 +183,7 @@ export async function lockAppointmentSlot(
         timeSlot: params.timeSlot,
         startTime: canonicalSlotStartTime(params.timeSlot),
         status: params.status,
-        updatedAt: admin.firestore.Timestamp.now(),
+        updatedAt: Timestamp.now(),
     });
 
     return canonicalRef;
@@ -213,10 +211,7 @@ export async function releaseAppointmentSlot(
         firestore
     );
 
-    const [canonicalSnap, legacySnap] = await Promise.all([
-        transaction.get(canonicalRef),
-        transaction.get(legacyRef),
-    ]);
+    const [canonicalSnap, legacySnap] = await transaction.getAll(canonicalRef, legacyRef);
 
     if (canonicalSnap.exists && canonicalSnap.data()?.appointmentId === appointmentId) {
         transaction.delete(canonicalRef);

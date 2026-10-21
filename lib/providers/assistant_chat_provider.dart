@@ -26,7 +26,7 @@ class AssistantChatProvider extends ChangeNotifier {
   String? _reasonCode;
   DateTime? _resetAt;
   Timer? _quotaResetTimer;
-  String? _errorMessage;
+  AssistantFunctionException? _failure;
   String? _unsentDraft;
   int _revision = 0;
 
@@ -39,15 +39,15 @@ class AssistantChatProvider extends ChangeNotifier {
   int _generation = 0;
   bool _isDisposed = false;
 
-  // Booking idempotency key preserved across network retries to prevent double booking.
-  String? _activeBookingIdempotencyKey;
-  String? _activeBookingOfferId;
+  // Keep receipt recovery independent from server-owned bookable offers.
+  ({AssistantOffer offer, String idempotencyKey})? _pendingBooking;
 
   AssistantChatProvider({
     String? patientId,
     AssistantFunctionsService? functionsService,
   })  : _patientId = patientId,
-        _functionsService = functionsService ?? FirebaseAssistantFunctionsService();
+        _functionsService =
+            functionsService ?? FirebaseAssistantFunctionsService();
 
   // Getters
   String? get patientId => _patientId;
@@ -63,16 +63,36 @@ class AssistantChatProvider extends ChangeNotifier {
   AssistantMessageStatus get currentStatus => _currentStatus;
   String? get reasonCode => _reasonCode;
   DateTime? get resetAt => _resetAt;
-  String? get errorMessage => _errorMessage;
+  String? get errorMessage => _failure?.message;
+  AssistantFailureKind? get failureKind => _failure?.kind;
+  bool get canRetryHistory =>
+      _failure?.operation == AssistantFunctionOperation.history;
+
+  bool get _hasActivePatient =>
+      !_isDisposed && _patientId != null && _patientId!.isNotEmpty;
+  bool get _canStartMutation =>
+      _hasActivePatient &&
+      !_isLoading &&
+      !_isSending &&
+      !_isConfirming &&
+      !_isClearing &&
+      !_isRefreshing;
+  bool get canSendMessage => _canStartMutation && !isDailyLimit && !isDisabled;
+  bool canConfirmOffer(AssistantOffer offer) =>
+      _canStartMutation &&
+      !_refreshPending &&
+      (_pendingBooking == null || activeBookingOfferId == offer.offerId);
   String? get unsentDraft => _unsentDraft;
   int get revision => _revision;
   bool get isDisposed => _isDisposed;
-  String? get activeBookingOfferId => _activeBookingOfferId;
+  String? get activeBookingOfferId => _pendingBooking?.offer.offerId;
+  AssistantOffer? get pendingBookingOffer => _pendingBooking?.offer;
 
   bool get isDailyLimit => _currentStatus == AssistantMessageStatus.dailyLimit;
   bool get isThrottled => _currentStatus == AssistantMessageStatus.throttled;
   bool get isDisabled => _currentStatus == AssistantMessageStatus.disabled;
-  bool get isUnavailable => _currentStatus == AssistantMessageStatus.unavailable;
+  bool get isUnavailable =>
+      _currentStatus == AssistantMessageStatus.unavailable;
 
   /// Retrieves an offer by ID from cached session offers.
   AssistantOffer? getOfferById(String offerId) => _offersById[offerId];
@@ -109,14 +129,13 @@ class AssistantChatProvider extends ChangeNotifier {
     _isRefreshing = false;
     _refreshPending = false;
     _confirmingOfferId = null;
-    _activeBookingIdempotencyKey = null;
-    _activeBookingOfferId = null;
+    _pendingBooking = null;
     _activeClientRequestId = null;
     _lastSentDraft = null;
     _currentStatus = AssistantMessageStatus.ready;
     _reasonCode = null;
     _resetAt = null;
-    _errorMessage = null;
+    _failure = null;
     _unsentDraft = null;
     _revision = 0;
 
@@ -127,131 +146,94 @@ class AssistantChatProvider extends ChangeNotifier {
     }
   }
 
-  /// Initial load of server-owned chat history.
-  Future<void> initialize() async {
-    if (_patientId == null || _patientId!.isEmpty || _isLoading || _isClearing || _isDisposed) return;
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+  Future<void> initialize() => _loadHistory(initialLoad: true);
 
-    final currentGen = _generation;
+  /// Refreshing an expired confirmation can run before confirmation finishes.
+  Future<void> refreshHistory({bool force = false}) =>
+      _loadHistory(initialLoad: false, duringConfirmation: force);
 
-    try {
-      final history = await _functionsService.getHistory();
-      if (_isDisposed || currentGen != _generation) return;
-
-      _messages = history.messages;
-      if (_messages.length > 20) {
-        _messages = _messages.sublist(_messages.length - 20);
-      }
-      _offersById = {for (final o in history.offers) o.offerId: o};
-      _revision = history.revision;
-      _resetAt = history.resetAt;
-      _currentStatus = history.status ?? AssistantMessageStatus.ready;
-      _errorMessage = null;
-      _reasonCode = history.reasonCode;
-    } on AssistantFunctionException catch (e) {
-      if (_isDisposed || currentGen != _generation) return;
-      _errorMessage = e.message;
-      if (e.status != null) {
-        _currentStatus = e.status!;
-      } else if (e.isDailyLimit) {
-        _currentStatus = AssistantMessageStatus.dailyLimit;
-      } else if (e.isThrottled) {
-        _currentStatus = AssistantMessageStatus.throttled;
-      } else if (e.isUnavailable) {
-        _currentStatus = AssistantMessageStatus.unavailable;
-      }
-      _reasonCode = e.reasonCode ?? e.code;
-      _resetAt = e.resetAt;
-    } catch (e) {
-      if (_isDisposed || currentGen != _generation) return;
-      _errorMessage = e.toString();
-    } finally {
-      if (!_isDisposed && currentGen == _generation) {
-        _isLoading = false;
-        _scheduleQuotaReset();
-        notifyListeners();
-        if (_refreshPending) {
-          _refreshPending = false;
-          refreshHistory();
-        }
-      }
-    }
-  }
-
-  /// Refreshes availability of offers on open/resume without invoking AI.
-  Future<void> refreshHistory({bool force = false}) async {
-    if (_patientId == null || _patientId!.isEmpty || _isDisposed || _isClearing) return;
-    if (_isSending || (_isConfirming && !force) || _isLoading) {
+  Future<void> _loadHistory({
+    required bool initialLoad,
+    bool duringConfirmation = false,
+  }) async {
+    if (!_hasActivePatient || _isClearing) return;
+    if (_isLoading) return;
+    if (_isSending || (_isConfirming && !duringConfirmation)) {
       _refreshPending = true;
       return;
     }
     if (_isRefreshing) return;
-
-    _isRefreshing = true;
+    _isLoading = initialLoad;
+    _isRefreshing = !initialLoad;
+    _failure = null;
     notifyListeners();
-
     final currentGen = _generation;
-
     try {
       final history = await _functionsService.getHistory();
       if (_isDisposed || currentGen != _generation) return;
-
-      if (history.revision >= _revision || force) {
-        _messages = history.messages;
-        if (_messages.length > 20) {
-          _messages = _messages.sublist(_messages.length - 20);
-        }
-        _offersById = {for (final o in history.offers) o.offerId: o};
-        _revision = history.revision;
-        _resetAt = history.resetAt;
-        _currentStatus = history.status ?? AssistantMessageStatus.ready;
-        _errorMessage = null;
-        _reasonCode = history.reasonCode;
-      }
-    } on AssistantFunctionException catch (e) {
+      _commitHistory(history);
+    } on AssistantFunctionException catch (failure) {
       if (_isDisposed || currentGen != _generation) return;
-      _errorMessage = e.message;
-      if (e.status != null) {
-        _currentStatus = e.status!;
-      } else if (e.isDailyLimit) {
-        _currentStatus = AssistantMessageStatus.dailyLimit;
-      } else if (e.isThrottled) {
-        _currentStatus = AssistantMessageStatus.throttled;
-      } else if (e.isUnavailable) {
-        _currentStatus = AssistantMessageStatus.unavailable;
-      }
-      _reasonCode = e.reasonCode ?? e.code;
-      _resetAt = e.resetAt;
-      debugPrint('Failed to refresh assistant history: $e');
-    } catch (e) {
+      _recordFailure(failure);
+    } catch (failure) {
       if (_isDisposed || currentGen != _generation) return;
-      _errorMessage = e.toString();
-      _reasonCode = 'history_load_failed';
-      debugPrint('Failed to refresh assistant history: $e');
+      _recordFailure(AssistantFunctionException(
+        code: 'unknown',
+        message: failure.toString(),
+        operation: AssistantFunctionOperation.history,
+      ));
     } finally {
       if (!_isDisposed && currentGen == _generation) {
+        _isLoading = false;
         _isRefreshing = false;
         _scheduleQuotaReset();
         notifyListeners();
+        _refreshIfPending();
       }
     }
+  }
+
+  void _commitHistory(GetAssistantHistoryResult history) {
+    if (history.revision < _revision) return;
+    _messages = history.messages.length > 20
+        ? history.messages.sublist(history.messages.length - 20)
+        : history.messages;
+    _offersById = {for (final offer in history.offers) offer.offerId: offer};
+    _revision = history.revision;
+    _resetAt = history.resetAt;
+    _currentStatus = history.status ?? AssistantMessageStatus.ready;
+    _failure = null;
+    _reasonCode = history.reasonCode;
+  }
+
+  void _recordFailure(AssistantFunctionException failure) {
+    _failure = failure;
+    _currentStatus = failure.failureStatus ?? _currentStatus;
+    _reasonCode = failure.reasonCode ?? failure.code;
+    _resetAt = failure.resetAt;
+  }
+
+  void _refreshIfPending() {
+    if (!_refreshPending) return;
+    _refreshPending = false;
+    unawaited(refreshHistory());
   }
 
   /// Sends a message in the selected locale with clientRequestId deduplication.
   Future<bool> sendMessage(String text, {required String localeCode}) async {
     final cleanText = text.trim();
     if (cleanText.isEmpty || cleanText.length > 500) {
-      _errorMessage = 'Message cannot exceed 500 characters.';
+      _failure = const AssistantFunctionException(
+          code: 'invalid-argument',
+          message: 'Message cannot exceed 500 characters.');
       notifyListeners();
       return false;
     }
 
-    if (_patientId == null || _patientId!.isEmpty || _isSending || _isClearing || _isDisposed || _isRefreshing) return false;
+    if (!canSendMessage) return false;
 
     _isSending = true;
-    _errorMessage = null;
+    _failure = null;
     _unsentDraft = cleanText; // Retain draft in case of failure
 
     final currentGen = _generation;
@@ -273,6 +255,7 @@ class AssistantChatProvider extends ChangeNotifier {
       isPending: true,
     );
 
+    final previousMessages = _messages;
     _messages = [..._messages, optimisticMsg];
     if (_messages.length > 20) {
       _messages = _messages.sublist(_messages.length - 20);
@@ -293,10 +276,20 @@ class AssistantChatProvider extends ChangeNotifier {
               result.status == AssistantMessageStatus.clarify ||
               result.status == AssistantMessageStatus.outOfScope);
 
+      if (isAccepted && result.revision <= _revision) {
+        // A retry can acknowledge a turn already loaded by history. Its cached
+        // result must not replace newer offers or append that turn a second time.
+        _messages = previousMessages;
+        _unsentDraft = null;
+        _activeClientRequestId = null;
+        _lastSentDraft = null;
+        return true;
+      }
+
       _currentStatus = result.status;
       _reasonCode = result.reasonCode;
       _resetAt = result.resetAt;
-      _revision = result.revision;
+      if (result.revision > _revision) _revision = result.revision;
 
       if (isAccepted) {
         _unsentDraft = null; // Cleared on confirmed transmission
@@ -342,7 +335,16 @@ class AssistantChatProvider extends ChangeNotifier {
         // Preserve recoverable draft on rejection or quota limit
         _unsentDraft = cleanText;
         _activeClientRequestId = null;
-        _errorMessage = result.message.isNotEmpty ? result.message : 'Request could not be processed.';
+        _failure = AssistantFunctionException(
+          code: result.reasonCode ?? 'rejected',
+          message: result.message.isNotEmpty
+              ? result.message
+              : 'Request could not be processed.',
+          status: result.status,
+          reasonCode: result.reasonCode,
+          resetAt: result.resetAt,
+          operation: AssistantFunctionOperation.sendMessage,
+        );
 
         // Remove optimistic message so fictional confirmed message is not created
         _messages = _messages.where((m) => m.id != optimisticMsg.id).toList();
@@ -371,18 +373,7 @@ class AssistantChatProvider extends ChangeNotifier {
 
       _unsentDraft = cleanText;
       // Retain _activeClientRequestId so retrying this draft reuses the clientRequestId
-      _errorMessage = e.message;
-      if (e.status != null) {
-        _currentStatus = e.status!;
-      } else if (e.isDailyLimit) {
-        _currentStatus = AssistantMessageStatus.dailyLimit;
-      } else if (e.isThrottled) {
-        _currentStatus = AssistantMessageStatus.throttled;
-      } else if (e.isUnavailable) {
-        _currentStatus = AssistantMessageStatus.unavailable;
-      }
-      _reasonCode = e.reasonCode ?? e.code;
-      _resetAt = e.resetAt;
+      _recordFailure(e);
 
       _messages = _messages.where((m) => m.id != optimisticMsg.id).toList();
       return false;
@@ -390,7 +381,10 @@ class AssistantChatProvider extends ChangeNotifier {
       if (_isDisposed || currentGen != _generation) return false;
       _unsentDraft = cleanText;
       // Retain _activeClientRequestId so retrying this draft reuses the clientRequestId
-      _errorMessage = e.toString();
+      _recordFailure(AssistantFunctionException(
+        code: 'unknown',
+        message: e.toString(),
+      ));
       _messages = _messages.where((m) => m.id != optimisticMsg.id).toList();
       return false;
     } finally {
@@ -398,10 +392,7 @@ class AssistantChatProvider extends ChangeNotifier {
         _isSending = false;
         _scheduleQuotaReset();
         notifyListeners();
-        if (_refreshPending) {
-          _refreshPending = false;
-          refreshHistory();
-        }
+        _refreshIfPending();
       }
     }
   }
@@ -412,32 +403,40 @@ class AssistantChatProvider extends ChangeNotifier {
     AssistantOffer offer, {
     String? notes,
   }) async {
-    if (_patientId == null || _patientId!.isEmpty || _isConfirming || _isClearing || _isDisposed) return null;
+    if (!canConfirmOffer(offer)) return null;
 
-    final isRetry = _activeBookingOfferId == offer.offerId;
+    final isRetry = activeBookingOfferId == offer.offerId;
     // Backend checks appointment_idempotency before checking offer expiry.
     // If not a retry, check bookable locally before calling server.
     if (!isRetry && !offer.isBookable(DateTime.now())) {
       _offersById[offer.offerId] = offer.copyWith(isAvailable: false);
       notifyListeners();
+      final currentGen = _generation;
       await refreshHistory();
-      _errorMessage = 'This appointment slot is no longer available.';
-      _reasonCode = 'offer_expired';
+      if (_isDisposed || currentGen != _generation) return null;
+      _recordFailure(const AssistantFunctionException(
+        code: 'failed-precondition',
+        message: 'This appointment slot is no longer available.',
+        reasonCode: 'offer_expired',
+      ));
       notifyListeners();
       return null;
     }
 
     _isConfirming = true;
     _confirmingOfferId = offer.offerId;
-    _errorMessage = null;
+    _failure = null;
     notifyListeners();
 
     final currentGen = _generation;
 
     // Maintain or generate idempotency identity
-    if (_activeBookingOfferId != offer.offerId || _activeBookingIdempotencyKey == null) {
-      _activeBookingOfferId = offer.offerId;
-      _activeBookingIdempotencyKey = 'asst_confirm_${_patientId ?? 'patient'}_${offer.offerId}';
+    if (!isRetry) {
+      _pendingBooking = (
+        offer: offer,
+        idempotencyKey:
+            'asst_confirm_${_patientId ?? 'patient'}_${offer.offerId}',
+      );
     }
 
     try {
@@ -445,61 +444,63 @@ class AssistantChatProvider extends ChangeNotifier {
         offerId: offer.offerId,
         confirmed: true,
         notes: notes,
-        idempotencyKey: _activeBookingIdempotencyKey,
+        idempotencyKey: _pendingBooking!.idempotencyKey,
       );
 
       if (_isDisposed || currentGen != _generation) return null;
 
       // Strict receipt validation: success == true, appointmentId.isNotEmpty, bookingReference.isNotEmpty
       if (!result.success || !result.isValid) {
-        _errorMessage = 'Failed to confirm appointment.';
+        _failure = const AssistantFunctionException(
+            code: 'unknown', message: 'Failed to confirm appointment.');
         notifyListeners();
         return null;
       }
 
       // Affirmative booking success: clear idempotency key and mark offer consumed
-      _activeBookingIdempotencyKey = null;
-      _activeBookingOfferId = null;
+      _pendingBooking = null;
       _offersById.remove(offer.offerId);
 
       return result;
     } on AssistantFunctionException catch (e) {
       if (_isDisposed || currentGen != _generation) return null;
-      _errorMessage = e.message;
-      _reasonCode = e.reasonCode ?? e.code;
+      _recordFailure(e);
 
-      if (e.isOfferExpiredOrTaken) {
+      if (e.isOfferExpiredOrTaken || e.isNotFound) {
         // Slot taken or expired: reset idempotency key, mark unavailable and refresh
-        _activeBookingIdempotencyKey = null;
-        _activeBookingOfferId = null;
+        _pendingBooking = null;
         _offersById[offer.offerId] = offer.copyWith(isAvailable: false);
         await refreshHistory(force: true);
         if (_isDisposed || currentGen != _generation) return null;
-        _errorMessage = e.message;
-        _reasonCode = e.reasonCode ?? e.code;
+        _recordFailure(e);
       }
-      // For network errors, preserve _activeBookingIdempotencyKey for retry!
+      // Uncertain failures retain the same offer and receipt identity for retry.
       return null;
     } catch (e) {
       if (_isDisposed || currentGen != _generation) return null;
-      _errorMessage = e.toString();
+      _recordFailure(AssistantFunctionException(
+        code: 'unknown',
+        message: e.toString(),
+      ));
       return null;
     } finally {
       if (!_isDisposed && currentGen == _generation) {
         _isConfirming = false;
         _confirmingOfferId = null;
         notifyListeners();
-        if (_refreshPending) {
-          _refreshPending = false;
-          refreshHistory();
-        }
+        _refreshIfPending();
       }
     }
   }
 
   /// Invalidates old callbacks while keeping visible history until clear succeeds.
   Future<bool> clearChat() async {
-    if (_patientId == null || _patientId!.isEmpty || _isClearing || _isDisposed) return false;
+    if (_patientId == null ||
+        _patientId!.isEmpty ||
+        _isClearing ||
+        _isDisposed) {
+      return false;
+    }
     _isClearing = true;
     _quotaResetTimer?.cancel();
     _generation++;
@@ -510,14 +511,21 @@ class AssistantChatProvider extends ChangeNotifier {
     _isRefreshing = false;
     _confirmingOfferId = null;
     _refreshPending = false;
-    _errorMessage = null;
+    _failure = null;
     notifyListeners();
 
     var cleared = false;
+    AssistantFunctionException? clearFailure;
     try {
       cleared = await _functionsService.clearHistory();
-    } catch (_) {
-      // A failed response does not prove that the server deleted the conversation.
+    } on AssistantFunctionException catch (failure) {
+      clearFailure = failure;
+    } catch (failure) {
+      clearFailure = AssistantFunctionException(
+        code: 'unknown',
+        message: AssistantFunctionOperation.clearHistory.failureMessage,
+        operation: AssistantFunctionOperation.clearHistory,
+      );
     }
     if (_isDisposed || currentGen != _generation) return false;
     _isClearing = false;
@@ -532,13 +540,17 @@ class AssistantChatProvider extends ChangeNotifier {
       _unsentDraft = null;
       _activeClientRequestId = null;
       _lastSentDraft = null;
-      _activeBookingIdempotencyKey = null;
-      _activeBookingOfferId = null;
+      _pendingBooking = null;
     } else {
       _messages = _messages.where((message) => !message.isPending).toList();
       await refreshHistory(force: true);
       if (_isDisposed || currentGen != _generation) return false;
-      _errorMessage = 'Failed to clear chat on server.';
+      _recordFailure(clearFailure ??
+          const AssistantFunctionException(
+            code: 'unknown',
+            message: 'Failed to clear chat on server.',
+            operation: AssistantFunctionOperation.clearHistory,
+          ));
     }
     _scheduleQuotaReset();
     notifyListeners();
@@ -555,7 +567,7 @@ class AssistantChatProvider extends ChangeNotifier {
       _currentStatus = AssistantMessageStatus.ready;
       _reasonCode = null;
       _resetAt = null;
-      _errorMessage = null;
+      _failure = null;
       return;
     }
     _quotaResetTimer = Timer(delay, () {
@@ -563,7 +575,7 @@ class AssistantChatProvider extends ChangeNotifier {
       _currentStatus = AssistantMessageStatus.ready;
       _reasonCode = null;
       _resetAt = null;
-      _errorMessage = null;
+      _failure = null;
       notifyListeners();
       unawaited(refreshHistory(force: true));
     });
@@ -576,7 +588,7 @@ class AssistantChatProvider extends ChangeNotifier {
 
   /// Clears any transient error message.
   void clearErrorMessage() {
-    _errorMessage = null;
+    _failure = null;
     notifyListeners();
   }
 

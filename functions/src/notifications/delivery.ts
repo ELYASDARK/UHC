@@ -1,3 +1,4 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import * as functions from 'firebase-functions';
 
 import { admin, db, messaging } from '../firebase';
@@ -129,9 +130,9 @@ function normalizeUserDeviceToken(
         timeZone: typeof data.timeZone === 'string' ? data.timeZone : null,
         appVersion: typeof data.appVersion === 'string' ? data.appVersion : null,
         deviceId: typeof data.deviceId === 'string' ? data.deviceId : null,
-        createdAt: data.createdAt || admin.firestore.Timestamp.now(),
-        updatedAt: data.updatedAt || admin.firestore.Timestamp.now(),
-        lastSeenAt: data.lastSeenAt || admin.firestore.Timestamp.now(),
+        createdAt: data.createdAt || Timestamp.now(),
+        updatedAt: data.updatedAt || Timestamp.now(),
+        lastSeenAt: data.lastSeenAt || Timestamp.now(),
     };
 }
 
@@ -205,11 +206,11 @@ export async function deliverNotificationPush(
             console.log(`No FCM token found for user ${userId}, skipping push.`);
             await snap.ref.update({
                 isDelivered: true,
-                deliveredAt: admin.firestore.Timestamp.now(),
+                deliveredAt: Timestamp.now(),
                 pushStatus: 'skipped_no_token',
-                pushAttemptedAt: admin.firestore.Timestamp.now(),
+                pushAttemptedAt: Timestamp.now(),
                 isVisible: true,
-                visibleAt: admin.firestore.Timestamp.now(),
+                visibleAt: Timestamp.now(),
                 deliveredTokenCount: 0,
                 skippedTokenCount: 0,
                 failedTokenCount: 0,
@@ -224,11 +225,11 @@ export async function deliverNotificationPush(
             console.log(`No push-eligible token found for user ${userId}, skipping push.`);
             await snap.ref.update({
                 isDelivered: true,
-                deliveredAt: admin.firestore.Timestamp.now(),
+                deliveredAt: Timestamp.now(),
                 pushStatus: 'skipped_no_eligible_token',
-                pushAttemptedAt: admin.firestore.Timestamp.now(),
+                pushAttemptedAt: Timestamp.now(),
                 isVisible: true,
-                visibleAt: admin.firestore.Timestamp.now(),
+                visibleAt: Timestamp.now(),
                 deliveredTokenCount: 0,
                 skippedTokenCount: skippedTokens.length,
                 failedTokenCount: 0,
@@ -309,10 +310,10 @@ export async function deliverNotificationPush(
         if (allFailedRetryable && attempts < MAX_PUSH_DELIVERY_ATTEMPTS) {
             await snap.ref.update({
                 isDelivered: false,
-                scheduledFor: admin.firestore.Timestamp.now(),
+                scheduledFor: Timestamp.now(),
                 deliveryAttempts: attempts,
                 pushStatus: 'retryable_error',
-                pushAttemptedAt: admin.firestore.Timestamp.now(),
+                pushAttemptedAt: Timestamp.now(),
                 deliveredTokenCount: 0,
                 skippedTokenCount: skippedTokens.length,
                 failedTokenCount: failureCount,
@@ -326,12 +327,12 @@ export async function deliverNotificationPush(
 
         await snap.ref.update({
             isDelivered: true,
-            deliveredAt: admin.firestore.Timestamp.now(),
+            deliveredAt: Timestamp.now(),
             deliveryAttempts: attempts,
             pushStatus: finalStatus,
-            pushAttemptedAt: admin.firestore.Timestamp.now(),
+            pushAttemptedAt: Timestamp.now(),
             isVisible: true,
-            visibleAt: admin.firestore.Timestamp.now(),
+            visibleAt: Timestamp.now(),
             deliveredTokenCount: successCount,
             skippedTokenCount: skippedTokens.length,
             failedTokenCount: failureCount,
@@ -354,10 +355,10 @@ export async function deliverNotificationPush(
         if (!terminal && attempts < MAX_PUSH_DELIVERY_ATTEMPTS) {
             await snap.ref.update({
                 isDelivered: false,
-                scheduledFor: admin.firestore.Timestamp.now(),
+                scheduledFor: Timestamp.now(),
                 deliveryAttempts: attempts,
                 pushStatus: 'retryable_error',
-                pushAttemptedAt: admin.firestore.Timestamp.now(),
+                pushAttemptedAt: Timestamp.now(),
                 pushErrorCode: code || 'unknown',
                 pushErrorMessage: errorMessage(error).slice(0, 240),
             });
@@ -366,14 +367,14 @@ export async function deliverNotificationPush(
 
         await snap.ref.update({
             isDelivered: true,
-            deliveredAt: admin.firestore.Timestamp.now(),
+            deliveredAt: Timestamp.now(),
             deliveryAttempts: attempts,
             pushStatus: terminal ? 'failed_terminal' : 'failed_retry_exhausted',
-            pushAttemptedAt: admin.firestore.Timestamp.now(),
+            pushAttemptedAt: Timestamp.now(),
             pushErrorCode: code || 'unknown',
             pushErrorMessage: errorMessage(error).slice(0, 240),
             isVisible: true,
-            visibleAt: admin.firestore.Timestamp.now(),
+            visibleAt: Timestamp.now(),
         });
     }
 }

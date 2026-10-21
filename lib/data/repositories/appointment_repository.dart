@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
+import '../../services/firebase_callable.dart';
 import '../models/appointment_model.dart';
 
 /// Result returned by the trusted appointment creation callable.
@@ -103,13 +104,13 @@ class AppointmentRepository {
     required DateTime date,
   }) async {
     final dateStr = formatClinicDate(date);
-    final callable = _functions.httpsCallable('getDoctorDayAvailability');
-    final result = await callable.call({
+    final result =
+        await invokeFirebaseCallable(_functions, 'getDoctorDayAvailability', {
       'doctorId': doctorId,
       'date': dateStr,
     });
     return DoctorDayAvailability.fromMap(
-      Map<String, dynamic>.from(result.data as Map),
+      Map<String, dynamic>.from(result as Map),
     );
   }
 
@@ -299,8 +300,8 @@ class AppointmentRepository {
   Future<AppointmentBookingResult> createAppointment(
     AppointmentModel appointment,
   ) async {
-    final callable = _functions.httpsCallable('createAppointment');
-    final result = await callable.call<Map<String, dynamic>>({
+    final result =
+        await invokeFirebaseCallable(_functions, 'createAppointment', {
       'bookingReference': appointment.bookingReference,
       'patientId': appointment.patientId,
       'doctorId': appointment.doctorId,
@@ -312,16 +313,16 @@ class AppointmentRepository {
       'notes': appointment.notes,
     });
     return AppointmentBookingResult(
-      appointmentId: result.data['appointmentId'] as String,
-      bookingReference: result.data['bookingReference'] as String,
-      qrCode: result.data['qrCode'] as String?,
+      appointmentId: result['appointmentId'] as String,
+      bookingReference: result['bookingReference'] as String,
+      qrCode: result['qrCode'] as String?,
     );
   }
 
   /// Delete appointment permanently
   Future<void> deleteAppointment(String appointmentId) async {
-    final callable = _functions.httpsCallable('deleteAppointment');
-    await callable.call<void>({'appointmentId': appointmentId});
+    await invokeFirebaseCallable(
+        _functions, 'deleteAppointment', {'appointmentId': appointmentId});
   }
 
   /// Delete all appointments for a user (useful for testing cleanup)
@@ -347,8 +348,7 @@ class AppointmentRepository {
     AppointmentStatus status, {
     String? statusUpdatedBy,
   }) async {
-    final callable = _functions.httpsCallable('updateAppointmentStatus');
-    await callable.call<void>({
+    await invokeFirebaseCallable(_functions, 'updateAppointmentStatus', {
       'appointmentId': appointmentId,
       'status': status.name,
       'statusUpdatedBy': statusUpdatedBy,
@@ -360,8 +360,7 @@ class AppointmentRepository {
     String appointmentId,
     String qrCode,
   ) async {
-    final callable = _functions.httpsCallable('confirmAppointmentCheckIn');
-    await callable.call<void>({
+    await invokeFirebaseCallable(_functions, 'confirmAppointmentCheckIn', {
       'appointmentId': appointmentId,
       'qrCode': qrCode,
     });
@@ -373,8 +372,7 @@ class AppointmentRepository {
     String reason, {
     String? statusUpdatedBy,
   }) async {
-    final callable = _functions.httpsCallable('cancelAppointment');
-    await callable.call<void>({
+    await invokeFirebaseCallable(_functions, 'cancelAppointment', {
       'appointmentId': appointmentId,
       'reason': reason,
       'statusUpdatedBy': statusUpdatedBy,
@@ -388,8 +386,7 @@ class AppointmentRepository {
     String newTimeSlot,
     String? reason,
   ) async {
-    final callable = _functions.httpsCallable('rescheduleAppointment');
-    await callable.call<void>({
+    await invokeFirebaseCallable(_functions, 'rescheduleAppointment', {
       'appointmentId': appointmentId,
       'appointmentDate': newDate.toIso8601String(),
       'timeSlot': newTimeSlot,
@@ -403,8 +400,7 @@ class AppointmentRepository {
     String? notes,
     String? statusUpdatedBy,
   }) async {
-    final callable = _functions.httpsCallable('updateAppointmentStatus');
-    await callable.call<void>({
+    await invokeFirebaseCallable(_functions, 'updateAppointmentStatus', {
       'appointmentId': appointmentId,
       'status': AppointmentStatus.completed.name,
       'statusUpdatedBy': statusUpdatedBy,
@@ -561,8 +557,7 @@ class AppointmentRepository {
     String appointmentId,
     String notes,
   ) async {
-    final callable = _functions.httpsCallable('updateMedicalNotes');
-    await callable.call<void>({
+    await invokeFirebaseCallable(_functions, 'updateMedicalNotes', {
       'appointmentId': appointmentId,
       'notes': notes,
     });
@@ -592,7 +587,7 @@ class AppointmentRepository {
 
   /// Atomically increment the QR scan failure counter
   Future<void> incrementQrScanFailures(String appointmentId) async {
-    final callable = _functions.httpsCallable('incrementQrScanFailures');
-    await callable.call<void>({'appointmentId': appointmentId});
+    await invokeFirebaseCallable(_functions, 'incrementQrScanFailures',
+        {'appointmentId': appointmentId});
   }
 }
