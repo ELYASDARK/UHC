@@ -482,6 +482,39 @@ for (const preferredDoctor of [false, true]) {
     });
 }
 
+test('scheduled emergency booking preserves its selected date and reserves its doctor slot', async () => {
+    await clearEmulatorData();
+    const patientId = 'scheduled_emergency_patient';
+    const doctorId = 'scheduled_emergency_doctor';
+    await seedPatientUser(patientId);
+    await seedDoctorAndDepartment(doctorId, 'cardiology');
+    const data = {
+        patientId, doctorId, department: 'cardiology',
+        appointmentDate: upcomingMonday.isoAt('09:00'),
+        timeSlot: '09:00 - 09:30', type: 'emergency',
+        idempotencyKey: 'scheduled_emergency',
+    };
+    const result = await createAppointmentCore(patientId, { fullName: 'Patient' }, data);
+    const appointment = (await db.collection('appointments').doc(result.appointmentId).get()).data();
+    assert.equal(appointment.appointmentDate.toDate().toISOString(), new Date(data.appointmentDate).toISOString());
+    assert.equal(appointment.timeSlot, data.timeSlot);
+    assert.equal(appointment.type, 'emergency');
+    const lock = await canonicalAppointmentSlotLockRef(doctorId, parseAppointmentDate(data.appointmentDate), data.timeSlot, db).get();
+    assert.equal(lock.data().appointmentId, result.appointmentId);
+    await assert.rejects(createAppointmentCore('competing_patient', { fullName: 'Other' }, {
+        ...data, patientId: 'competing_patient', type: 'regularCheckup', idempotencyKey: 'competing',
+    }), (error) => error.code === 'already-exists');
+    const retry = await createAppointmentCore(patientId, { fullName: 'Patient' }, data);
+    assert.equal(retry.appointmentId, result.appointmentId);
+    assert.equal(retry.isExisting, true);
+    await assert.rejects(createAppointmentCore(patientId, { fullName: 'Patient' }, {
+        ...data, appointmentDate: '2020-01-01', idempotencyKey: 'past_emergency',
+    }), (error) => error.code === 'failed-precondition');
+    await assert.rejects(createAppointmentCore(patientId, { fullName: 'Patient' }, {
+        ...data, doctorId: undefined, idempotencyKey: 'missing_doctor_emergency',
+    }), (error) => error.code === 'invalid-argument');
+});
+
 test('Scenario 1: Two concurrent same-start booking requests yield exactly ONE appointment and ONE lock in real Firestore', async () => {
     await clearEmulatorData();
     await seedDoctorAndDepartment('doc_c1', 'cardiology');

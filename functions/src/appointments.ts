@@ -24,7 +24,7 @@ import {
     deleteAppointmentNotifications,
 } from './notifications/core';
 
-import { CreateAppointmentData, consumeAssistantOffer, prepareBookingRequest, resolveBookingRequest } from './appointments/bookingRequest';
+import { CreateAppointmentData, consumeAssistantOffer, isUnscheduledEmergencyRequest, prepareBookingRequest, resolveBookingRequest } from './appointments/bookingRequest';
 import { readBookingDoctor, readDoctorSlotReservation, writeDoctorSlotReservation } from './appointments/slotReservation';
 export { CreateAppointmentData } from './appointments/bookingRequest';
 export { getDoctorDayAvailability, GetDoctorDayAvailabilityData, GetDoctorDayAvailabilityResult, AvailableSlotInfo } from './appointments/doctorDayAvailability';
@@ -174,12 +174,13 @@ export async function createAppointmentCore(
         }
 
         const resolved = await resolveBookingRequest(transaction, db, { booking, patientId: callerUid, now: now.toDate() });
-        const emergencyDoctor = resolved.type === 'emergency' && resolved.doctorId
+        const isEmergencyRequest = isUnscheduledEmergencyRequest(resolved);
+        const emergencyDoctor = isEmergencyRequest && resolved.doctorId
             ? await readBookingDoctor(transaction, {
                 firestore: db, doctorId: resolved.doctorId, fallbackDoctorName: resolved.doctorName,
             }) : null;
         // Emergency requests have no scheduled slot to reserve, even with a preferred doctor.
-        const reservation = resolved.type !== 'emergency' && resolved.doctorId ? await readDoctorSlotReservation(transaction, {
+        const reservation = !isEmergencyRequest && resolved.doctorId ? await readDoctorSlotReservation(transaction, {
             firestore: db,
             doctorId: resolved.doctorId,
             appointmentId: ref.id,
@@ -187,8 +188,8 @@ export async function createAppointmentCore(
             timeSlot: resolved.timeSlot,
             fallbackDoctorName: resolved.doctorName,
         }) : null;
-        if (!reservation && resolved.type !== 'emergency') {
-            throw new functions.https.HttpsError('invalid-argument', 'doctorId is required for non-emergency appointments.');
+        if (!reservation && !isEmergencyRequest) {
+            throw new functions.https.HttpsError('invalid-argument', 'doctorId is required for scheduled appointments.');
         }
         const bookingDoctor = reservation || emergencyDoctor;
         const resolvedDoctorId = resolved.doctorId;

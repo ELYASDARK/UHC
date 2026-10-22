@@ -47,6 +47,11 @@ export interface ResolvedBookingRequest {
     offerConsumption?: AssistantOfferConsumption;
 }
 
+export function isUnscheduledEmergencyRequest(booking: { type: string; timeSlot: string }): boolean {
+    // The dedicated request screen uses this marker; the normal booking screen supplies a real slot.
+    return booking.type === 'emergency' && booking.timeSlot === '00:00 - Emergency';
+}
+
 export function prepareBookingRequest(callerUid: string, request: CreateAppointmentData): PreparedBookingRequest {
     if (request.patientId !== callerUid) {
         throw new functions.https.HttpsError('permission-denied', 'You can only create appointments for yourself.');
@@ -126,9 +131,9 @@ export async function resolveBookingRequest(
     if (booking.kind === 'assistant') {
         return resolveAssistantOffer(transaction, firestore, { booking, patientId, now });
     }
-    const isEmergency = booking.type === 'emergency';
-    const appointmentDate = isEmergency ? now : parseAppointmentDate(booking.appointmentDate);
-    if (!isEmergency && appointmentExactTime(appointmentDate, booking.timeSlot).getTime() <= now.getTime()) {
+    const isEmergencyRequest = isUnscheduledEmergencyRequest(booking);
+    const appointmentDate = isEmergencyRequest ? now : parseAppointmentDate(booking.appointmentDate);
+    if (!isEmergencyRequest && appointmentExactTime(appointmentDate, booking.timeSlot).getTime() <= now.getTime()) {
         throw new functions.https.HttpsError('failed-precondition', 'Appointment time must be in the future.');
     }
     return {
@@ -136,7 +141,7 @@ export async function resolveBookingRequest(
         doctorName: 'Any Available',
         department: booking.department,
         appointmentDate,
-        timeSlot: isEmergency ? '00:00 - Emergency' : booking.timeSlot,
+        timeSlot: booking.timeSlot,
         type: booking.type,
         notes: booking.notes,
     };
