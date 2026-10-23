@@ -1,4 +1,5 @@
-import { admin, db } from '../firebase';
+import { Timestamp } from 'firebase-admin/firestore';
+import { db } from '../firebase';
 import {
     appointmentExactTime,
     firestoreDateToDate,
@@ -187,7 +188,7 @@ export async function getUserNotificationSettings(uid: string): Promise<Notifica
 
     await db.collection('users').doc(uid).update({
         notificationSettings: migratedSettings,
-        updatedAt: admin.firestore.Timestamp.now(),
+        updatedAt: Timestamp.now(),
     });
 
     return migratedSettings;
@@ -222,9 +223,9 @@ export function trustedNotificationPayload(id: string, params: {
         type: params.type,
         data: params.data || null,
         isRead: false,
-        createdAt: admin.firestore.Timestamp.now(),
+        createdAt: Timestamp.now(),
         appointmentId: params.appointmentId || null,
-        scheduledFor: scheduledTime ? admin.firestore.Timestamp.fromDate(scheduledTime) : null,
+        scheduledFor: scheduledTime ? Timestamp.fromDate(scheduledTime) : null,
         reminderType: params.reminderType || null,
 
         createdByBackend: true,
@@ -234,7 +235,7 @@ export function trustedNotificationPayload(id: string, params: {
         isDelivered: params.isDelivered !== undefined ? params.isDelivered : (deliveryChannel === 'inAppOnly'),
 
         isVisible,
-        visibleAt: isVisible ? admin.firestore.Timestamp.now() : null,
+        visibleAt: isVisible ? Timestamp.now() : null,
         deliveredAt: null,
         pushAttemptedAt: null,
         deliveryAttempts: 0,

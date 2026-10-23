@@ -232,6 +232,11 @@ The following indexes must be deployed via `firestore.indexes.json`:
    - `doctorId` ASC + `appointmentDateKey` ASC (Collection scope; supports date lock lookups)
 
 ### Assistant Release Gate, Secret Manager & Privacy Architecture
+
+Both `sendAssistantMessage` and `getAssistantHistory` declare the existing
+`GEMINI_API_KEY` secret binding. History checks the same readiness gate as sends,
+but never calls Gemini or consumes generation quota.
+
 1. **Server-Side Model Enforcement**:
    - The AI Assistant is locked exclusively to `gemini-3.5-flash-lite` on the server.
    - Clients never select models or communicate directly with Gemini.

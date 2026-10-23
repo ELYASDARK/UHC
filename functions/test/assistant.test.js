@@ -6,6 +6,8 @@ process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
 
 // Import compiled libraries
 const { auth, db, admin } = require('../lib/firebase');
+const { Timestamp } = require('firebase-admin/firestore');
+const { getUserNotificationSettings, trustedNotificationPayload } = require('../lib/notifications/core');
 const { requirePatientRole } = require('../lib/shared/auth');
 const {
     APPOINTMENT_STATUSES,
@@ -201,6 +203,7 @@ function createMockFirestore() {
     function makeDocRef(colName, docId) {
         return {
             id: docId,
+            path: `${colName}/${docId}`,
             collectionName: colName,
             get: async () => {
                 const col = getCol(colName);
@@ -208,6 +211,7 @@ function createMockFirestore() {
                 const data = exists ? clone(col.get(docId)) : undefined;
                 return {
                     id: docId,
+                    ref: makeDocRef(colName, docId),
                     exists,
                     data: () => data,
                 };
@@ -304,11 +308,13 @@ function createMockFirestore() {
                 },
             };
         },
+        getAll: async (...refs) => Promise.all(refs.map((ref) => ref.get())),
         runTransaction: async (updateFn) => {
             const txStore = new Map();
             const txDeletes = new Set();
 
             const transaction = {
+                getAll: async (...refs) => Promise.all(refs.map((ref) => transaction.get(ref))),
                 get: async (refOrQuery) => {
                     if (refOrQuery && typeof refOrQuery.get === 'function' && !refOrQuery.collectionName) {
                         return refOrQuery.get();
@@ -370,6 +376,32 @@ function createMockFirestore() {
 // ---------------------------------------------------------------------------
 // 1. Patient-Only Authorization Tests
 // ---------------------------------------------------------------------------
+test('emulator-bound Admin namespace permits assistant and notification timestamp writes', async (t) => {
+    const firestoreNamespace = admin.firestore;
+    // Firebase CLI binds this getter, which drops the namespace's static classes.
+    t.mock.getter(admin, 'firestore', () => firestoreNamespace.bind(admin));
+    const { mockDb, store } = createMockFirestore();
+    t.mock.method(db, 'collection', mockDb.collection);
+    store.get('users').set('patient_namespace', { role: 'student' });
+
+    const chat = createInitialChatDoc('patient_namespace', FROZEN_NOW);
+    assert.ok(chat.createdAt instanceof Timestamp);
+    assert.equal(chat.createdAt.toMillis(), FROZEN_NOW.getTime());
+
+    const settings = await getUserNotificationSettings('patient_namespace');
+    assert.equal(settings.version, 2);
+    assert.ok(store.get('users').get('patient_namespace').updatedAt instanceof Timestamp);
+    const notification = trustedNotificationPayload('notification_namespace', {
+        userId: 'patient_namespace',
+        title: 'Appointment confirmed',
+        body: 'Your local appointment is booked.',
+        type: 'appointmentStatus',
+        scheduledFor: FROZEN_NOW,
+    });
+    assert.ok(notification.createdAt instanceof Timestamp);
+    assert.equal(notification.scheduledFor.toMillis(), FROZEN_NOW.getTime());
+});
+
 test('Patient-only authorization: rejects inactive callers, unauthenticated requests, and non-patient roles', () => {
     // Inactive user
     assert.throws(() => {
@@ -526,6 +558,7 @@ test('createAppointmentCore enforces active appointment overlap check and SHA-25
         const { mockDb, store } = createMockFirestore();
         t.mock.method(db, 'collection', mockDb.collection);
         t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(db, 'getAll', mockDb.getAll);
 
         // Setup department and doctor
         store.get('departments').set('dept_gm', {
@@ -632,6 +665,7 @@ test('createAppointmentCore ensures post-commit notification failure does not ro
             return mockDb.collection(colName);
         });
         t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(db, 'getAll', mockDb.getAll);
 
         store.get('departments').set('dept_gm', {
             key: 'generalMedicine',
@@ -1009,7 +1043,7 @@ test('Turn reservation protects against in-flight race conditions and concurrent
     assert.equal(lateCommit.committed, false); // Blocked! Does not resurrect cleared chat
 
     // Verified history is empty
-    const historyDoc = await getPatientChatDoc(mockDb, patientId);
+    const historyDoc = await getPatientChatDoc(mockDb, patientId, FROZEN_NOW);
     assert.deepEqual(historyDoc.doc.messages, []);
 
     // 5. Explicit release of in-flight turn clears inFlightTurnId without waiting for 90s lease timeout
@@ -1020,17 +1054,17 @@ test('Turn reservation protects against in-flight race conditions and concurrent
         now: FROZEN_NOW,
     });
     assert.ok(res2.turnId);
-    const docBeforeRelease = (await getPatientChatDoc(mockDb, patientId)).doc;
+    const docBeforeRelease = (await getPatientChatDoc(mockDb, patientId, FROZEN_NOW)).doc;
     assert.equal(docBeforeRelease.inFlightTurnId, res2.turnId);
 
     // Stale/old turn release attempt does NOT unlock the active newer turn
     await releaseAssistantTurn(mockDb, patientId, res1.turnId);
-    const docAfterStaleRelease = (await getPatientChatDoc(mockDb, patientId)).doc;
+    const docAfterStaleRelease = (await getPatientChatDoc(mockDb, patientId, FROZEN_NOW)).doc;
     assert.equal(docAfterStaleRelease.inFlightTurnId, res2.turnId);
 
     // Matching active turn release clears inFlightTurnId
     await releaseAssistantTurn(mockDb, patientId, res2.turnId);
-    const docAfterRelease = (await getPatientChatDoc(mockDb, patientId)).doc;
+    const docAfterRelease = (await getPatientChatDoc(mockDb, patientId, FROZEN_NOW)).doc;
     assert.equal(docAfterRelease.inFlightTurnId, null);
 });
 
@@ -1098,12 +1132,90 @@ test('refreshPatientChatHistory re-matches doctor availability using saved prefe
 // ---------------------------------------------------------------------------
 // 11. End-to-End Assistant Callables (send, history, clear, confirm)
 // ---------------------------------------------------------------------------
+test('refresh retry after concurrent clear returns the cleared snapshot, never an abandoned attempt', async () => {
+    const { mockDb, store } = createMockFirestore();
+    const patientId = 'refresh_retry_clear';
+    const departments = [{ key: 'pediatrics', name: 'Pediatrics' }];
+    const doctors = [{ id: 'retry_doctor', data: {
+        name: 'Dr. Child', department: 'pediatrics', isActive: true, isAvailable: true,
+        weeklySchedule: { monday: [{ startTime: '09:00', endTime: '09:30', isAvailable: true }] },
+    } }];
+    const chat = createInitialChatDoc(patientId, FROZEN_NOW);
+    chat.messages = [{ id: 'old', sender: 'assistant', text: 'Old offer', status: 'ready', createdAt: FROZEN_NOW.toISOString() }];
+    chat.offers = [{ offerId: 'expired', doctorId: 'retry_doctor', doctorName: 'Dr. Child', department: 'pediatrics',
+        appointmentDate: '2026-09-14', timeSlot: '09:00 - 09:30', expiresAt: new Date(FROZEN_NOW.getTime() - 1).toISOString(), isAvailable: true }];
+    chat.searchPreferences = { doctorId: 'retry_doctor', preferredDate: '2026-09-14' };
+    store.get('assistant_chats').set(patientId, chat);
+    const retryDb = {
+        collection: mockDb.collection,
+        getAll: mockDb.getAll,
+        runTransaction: async (callback) => {
+            // Firestore may discard a staged attempt and rerun the callback after another write wins.
+            await callback({ get: (ref) => ref.get(), update: () => {} });
+            await clearPatientChat(mockDb, patientId, FROZEN_NOW);
+            return mockDb.runTransaction(callback);
+        },
+    };
+    const refreshed = await refreshPatientChatHistory(retryDb, patientId, departments, doctors, FROZEN_NOW);
+    const cleared = (await getPatientChatDoc(mockDb, patientId, FROZEN_NOW)).doc;
+    assert.deepEqual(refreshed.messages, []);
+    assert.deepEqual(refreshed.offers, []);
+    assert.equal(refreshed.generationId, cleared.generationId);
+    assert.equal(refreshed.revision, cleared.revision);
+});
+
+test('history status and reset belong to the same revision as its messages during a concurrent change', async (t) => {
+    const originalEnv = { ...process.env };
+    process.env.AI_ASSISTANT_ENABLED = 'true';
+    process.env.AI_PRIVACY_RELEASE_GATE_ACCEPTED = 'true';
+    process.env.GEMINI_API_KEY = 'test_key';
+    try {
+        await withFrozenTime(FROZEN_NOW, async () => {
+            const { mockDb, store } = createMockFirestore();
+            const patientId = 'history_snapshot';
+            store.get('users').set(patientId, { isActive: true, role: 'student' });
+            const chat = createInitialChatDoc(patientId, FROZEN_NOW);
+            chat.revision = 2;
+            chat.messages = [{ id: 'limited', sender: 'assistant', text: 'Daily limit', status: 'daily_limit', createdAt: FROZEN_NOW.toISOString() }];
+            chat.resetAt = new Date(FROZEN_NOW.getTime() + 3600000).toISOString();
+            chat.lastResult = { status: 'daily_limit', reasonCode: 'upstream_daily_limit_reached', resetAt: chat.resetAt };
+            store.get('assistant_chats').set(patientId, chat);
+            let changed = false;
+            t.mock.method(db, 'collection', (name) => {
+                const collection = mockDb.collection(name);
+                if (name !== 'assistant_chats') return collection;
+                return { ...collection, doc: (id) => {
+                    const ref = collection.doc(id);
+                    return { ...ref, get: async () => {
+                        const snapshot = await ref.get();
+                        if (!changed) {
+                            changed = true;
+                            store.get(name).set(id, { ...chat, revision: 3, messages: [], lastResult: null, resetAt: null });
+                        }
+                        return snapshot;
+                    } };
+                } };
+            });
+            t.mock.method(auth, 'getUser', async (uid) => ({ uid, providerData: [{ providerId: 'google.com' }] }));
+            const history = await getAssistantHistory.run({ auth: { uid: patientId }, data: {} });
+            assert.equal(history.revision, 2);
+            assert.equal(history.messages[0].text, 'Daily limit');
+            assert.equal(history.status, 'daily_limit');
+            assert.equal(history.reasonCode, 'upstream_daily_limit_reached');
+            assert.equal(history.resetAt, chat.resetAt);
+        });
+    } finally {
+        process.env = originalEnv;
+    }
+});
+
 test('Assistant Callables End-to-End: disabled gate, Gemini fetch interpretation, explicit confirmation & idempotency', async (t) => {
     await withFrozenTime(FROZEN_NOW, async () => {
         const { mockDb, store } = createMockFirestore();
 
         t.mock.method(db, 'collection', mockDb.collection);
         t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(db, 'getAll', mockDb.getAll);
 
         const authUsers = new Set(['pat_e2e_1']);
         t.mock.method(auth, 'getUser', async (uid) => {
@@ -1241,6 +1353,7 @@ test('12.1 Disabled sends never call transport: assistant_disabled returned with
         const { mockDb, store } = createMockFirestore();
         t.mock.method(db, 'collection', mockDb.collection);
         t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(db, 'getAll', mockDb.getAll);
 
         t.mock.method(auth, 'getUser', async (uid) => ({
             uid,
@@ -1561,6 +1674,7 @@ test('12.5 Synthetic fixture flow & ordinary fallback: deterministic scheduling,
         const { mockDb, store } = createMockFirestore();
         t.mock.method(db, 'collection', mockDb.collection);
         t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(db, 'getAll', mockDb.getAll);
 
         t.mock.method(auth, 'getUser', async (uid) => ({
             uid,
@@ -1731,6 +1845,7 @@ test('PR5 expired daily-limit history unlocks while current exhaustion stays blo
             const { mockDb, store } = createMockFirestore();
             t.mock.method(db, 'collection', mockDb.collection);
             t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+            t.mock.method(db, 'getAll', mockDb.getAll);
             t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: [{ providerId: 'google.com' }] }));
             store.get('users').set('reset_patient', { isActive: true, role: 'student' });
             const resetAt = new Date(FROZEN_NOW.getTime() - 3600000).toISOString();
@@ -1748,6 +1863,32 @@ test('PR5 expired daily-limit history unlocks while current exhaustion stays blo
             assert.equal(blocked.status, 'daily_limit');
             assert.ok(Date.parse(blocked.resetAt) > FROZEN_NOW.getTime());
         });
+    } finally {
+        process.env = origEnv;
+    }
+});
+
+test('live history has the Gemini secret binding and remains usable without consuming quota', async (t) => {
+    assert.deepEqual(getAssistantHistory.__endpoint.secretEnvironmentVariables,
+        sendAssistantMessage.__endpoint.secretEnvironmentVariables);
+    assert.ok(getAssistantHistory.__endpoint.secretEnvironmentVariables.some(s => s.key === 'GEMINI_API_KEY'));
+    const origEnv = { ...process.env };
+    process.env.AI_ASSISTANT_ENABLED = 'true';
+    process.env.AI_PRIVACY_RELEASE_GATE_ACCEPTED = 'true';
+    process.env.GEMINI_API_KEY = 'local-test-key';
+    delete process.env.AI_OFFLINE_SYNTHETIC_TESTING;
+    try {
+        const { mockDb, store } = createMockFirestore();
+        t.mock.method(db, 'collection', mockDb.collection);
+        t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(db, 'getAll', mockDb.getAll);
+        t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: [{ providerId: 'google.com' }] }));
+        t.mock.method(global, 'fetch', async () => { throw new Error('History must not invoke Gemini'); });
+        store.get('users').set('live_patient', { isActive: true, role: 'student' });
+        const result = await getAssistantHistory.run({ auth: { uid: 'live_patient' }, data: {} });
+        assert.equal(result.status, 'ready');
+        assert.equal(result.reasonCode, null);
+        assert.equal(store.get('assistant_project_quota').size, 0);
     } finally {
         process.env = origEnv;
     }
@@ -1914,6 +2055,7 @@ test('patient rescheduling enforces 24-hour notice for both student and staff ac
         const { mockDb, store } = createMockFirestore();
         t.mock.method(db, 'collection', mockDb.collection);
         t.mock.method(db, 'runTransaction', mockDb.runTransaction);
+        t.mock.method(db, 'getAll', mockDb.getAll);
         t.mock.method(auth, 'getUser', async uid => ({ uid, providerData: [{ providerId: 'google.com' }] }));
         for (const role of ['student', 'staff']) {
             await mockDb.collection('users').doc(role).set({ role, isActive: true });

@@ -13,33 +13,10 @@ import 'package:uhc/data/models/doctor_model.dart';
 import 'package:uhc/data/repositories/appointment_repository.dart';
 import 'package:uhc/l10n/app_localizations.dart';
 import 'package:uhc/l10n/kurdish_material_localizations.dart';
+import 'package:uhc/screens/patient/appointments/reschedule_screen.dart';
 import 'package:uhc/screens/patient/booking/booking_screen.dart';
 import 'package:uhc/screens/patient/browse_doctors/doctor_schedule_screen.dart';
-
-class TestAppointmentRepository extends AppointmentRepository {
-  Future<DoctorDayAvailability> Function(String doctorId, DateTime date)?
-      availabilityHandler;
-
-  TestAppointmentRepository({this.availabilityHandler});
-
-  @override
-  Future<DoctorDayAvailability> getDoctorDayAvailability({
-    required String doctorId,
-    required DateTime date,
-  }) async {
-    if (availabilityHandler != null) {
-      return availabilityHandler!(doctorId, date);
-    }
-    return DoctorDayAvailability(
-      success: true,
-      doctorId: doctorId,
-      appointmentDate: AppointmentRepository.formatClinicDate(date),
-      doctorName: 'Sarah Al-Mansoor',
-      department: 'generalMedicine',
-      slots: const [],
-    );
-  }
-}
+import 'support/test_appointment_repository.dart';
 
 DoctorModel createTestDoctor({
   String id = 'doctor-123',
@@ -91,15 +68,14 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
-  // Monday, September 14, 2026 at 08:00
-  final mondayDate = DateTime(2026, 9, 14, 8, 0);
-  // Tuesday, September 15, 2026 at 08:00
-  final tuesdayDate = DateTime(2026, 9, 15, 8, 0);
-  // Friday, September 18, 2026 at 08:00
-  final fridayDate = DateTime(2026, 9, 18, 8, 0);
+  // 08:00 in Baghdad, independent of the host timezone, including UTC CI runners.
+  final mondayDate = DateTime.parse('2026-09-14T08:00:00+03:00');
+  final tuesdayDate = DateTime.parse('2026-09-15T08:00:00+03:00');
+  final fridayDate = DateTime.parse('2026-09-18T08:00:00+03:00');
 
   group('TimeSlot parser and validation unit tests', () {
-    test('canonical 2-digit HH:mm format parses correctly without RangeError', () {
+    test('canonical 2-digit HH:mm format parses correctly without RangeError',
+        () {
       expect(TimeSlot.parseMinutes('00:00'), equals(0));
       expect(TimeSlot.parseMinutes('09:00'), equals(540));
       expect(TimeSlot.parseMinutes('09:30'), equals(570));
@@ -131,12 +107,15 @@ void main() {
       expect(TimeSlot.parseMinutes('09:00:00'), isNull);
     });
 
-    test('TimeSlot.isValid requires available, valid times, and positive duration', () {
+    test(
+        'TimeSlot.isValid requires available, valid times, and positive duration',
+        () {
       final validSlot = TimeSlot(startTime: '09:00', endTime: '09:30');
       expect(validSlot.isValid, isTrue);
 
       // Unavailable slot
-      final unavailableSlot = TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: false);
+      final unavailableSlot =
+          TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: false);
       expect(unavailableSlot.isValid, isFalse);
 
       // End time before start time
@@ -167,27 +146,39 @@ void main() {
   });
 
   group('DoctorModel shared schedule selector unit tests', () {
-    test('canonical weekdays list contains exact 7 lowercase days in order', () {
-      expect(DoctorModel.canonicalWeekdays, equals([
-        'monday',
-        'tuesday',
-        'wednesday',
-        'thursday',
-        'friday',
-        'saturday',
-        'sunday',
-      ]));
+    test('canonical weekdays list contains exact 7 lowercase days in order',
+        () {
+      expect(
+          DoctorModel.canonicalWeekdays,
+          equals([
+            'monday',
+            'tuesday',
+            'wednesday',
+            'thursday',
+            'friday',
+            'saturday',
+            'sunday',
+          ]));
 
-      expect(DoctorModel.dayOfWeekName(DateTime(2026, 9, 14)), equals('monday'));
-      expect(DoctorModel.dayOfWeekName(DateTime(2026, 9, 15)), equals('tuesday'));
-      expect(DoctorModel.dayOfWeekName(DateTime(2026, 9, 16)), equals('wednesday'));
-      expect(DoctorModel.dayOfWeekName(DateTime(2026, 9, 17)), equals('thursday'));
-      expect(DoctorModel.dayOfWeekName(DateTime(2026, 9, 18)), equals('friday'));
-      expect(DoctorModel.dayOfWeekName(DateTime(2026, 9, 19)), equals('saturday'));
-      expect(DoctorModel.dayOfWeekName(DateTime(2026, 9, 20)), equals('sunday'));
+      expect(
+          DoctorModel.dayOfWeekName(DateTime(2026, 9, 14)), equals('monday'));
+      expect(
+          DoctorModel.dayOfWeekName(DateTime(2026, 9, 15)), equals('tuesday'));
+      expect(DoctorModel.dayOfWeekName(DateTime(2026, 9, 16)),
+          equals('wednesday'));
+      expect(
+          DoctorModel.dayOfWeekName(DateTime(2026, 9, 17)), equals('thursday'));
+      expect(
+          DoctorModel.dayOfWeekName(DateTime(2026, 9, 18)), equals('friday'));
+      expect(
+          DoctorModel.dayOfWeekName(DateTime(2026, 9, 19)), equals('saturday'));
+      expect(
+          DoctorModel.dayOfWeekName(DateTime(2026, 9, 20)), equals('sunday'));
     });
 
-    test('non-canonical keys in weeklySchedule are ignored by hasActiveSchedule', () {
+    test(
+        'non-canonical keys in weeklySchedule are ignored by hasActiveSchedule',
+        () {
       final validSlot = TimeSlot(startTime: '09:00', endTime: '09:30');
       final doctorWithInvalidKeys = createTestDoctor(
         weeklySchedule: {
@@ -201,7 +192,9 @@ void main() {
       expect(doctorWithInvalidKeys.getAvailableSlots(mondayDate), isEmpty);
     });
 
-    test('empty schedule offers no slots and never fabricates weekday fallbacks', () {
+    test(
+        'empty schedule offers no slots and never fabricates weekday fallbacks',
+        () {
       final doctorEmptyMap = createTestDoctor(weeklySchedule: const {});
       final doctorEmptyDays = createTestDoctor(
         weeklySchedule: const {
@@ -226,7 +219,9 @@ void main() {
       expect(doctorEmptyDays.getAvailableSlots(fridayDate), isEmpty);
     });
 
-    test('missing weekday offers no slots while configured weekdays are preserved', () {
+    test(
+        'missing weekday offers no slots while configured weekdays are preserved',
+        () {
       final mondaySlot = TimeSlot(startTime: '09:00', endTime: '09:30');
       final doctor = createTestDoctor(
         weeklySchedule: {
@@ -248,7 +243,9 @@ void main() {
       expect(doctor.getAvailableSlots(fridayDate), isEmpty);
     });
 
-    test('unavailable doctor (isActive: false or isAvailable: false) offers no slots', () {
+    test(
+        'unavailable doctor (isActive: false or isAvailable: false) offers no slots',
+        () {
       final validSlots = [
         TimeSlot(startTime: '09:00', endTime: '09:30'),
         TimeSlot(startTime: '10:00', endTime: '10:30'),
@@ -276,16 +273,42 @@ void main() {
 
     test('disabled and malformed slots are filtered out', () {
       final slots = [
-        TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: false), // disabled
-        TimeSlot(startTime: 'invalid', endTime: '10:00', isAvailable: true), // malformed start
-        TimeSlot(startTime: '25:00', endTime: '26:00', isAvailable: true), // out of range hour
-        TimeSlot(startTime: '09:00', endTime: '25:00', isAvailable: true), // out of range end
-        TimeSlot(startTime: '10:00', endTime: '09:00', isAvailable: true), // end before start
-        TimeSlot(startTime: '10:00', endTime: '10:00', isAvailable: true), // zero duration
-        TimeSlot(startTime: '10:00', endTime: 'bad_end', isAvailable: true), // malformed end
-        TimeSlot(startTime: '', endTime: '11:00', isAvailable: true), // empty start
-        TimeSlot(startTime: '10:00', endTime: '', isAvailable: true), // legacy start-only slot
-        TimeSlot(startTime: '11:00', endTime: '11:30', isAvailable: true), // VALID
+        TimeSlot(
+            startTime: '09:00',
+            endTime: '09:30',
+            isAvailable: false), // disabled
+        TimeSlot(
+            startTime: 'invalid',
+            endTime: '10:00',
+            isAvailable: true), // malformed start
+        TimeSlot(
+            startTime: '25:00',
+            endTime: '26:00',
+            isAvailable: true), // out of range hour
+        TimeSlot(
+            startTime: '09:00',
+            endTime: '25:00',
+            isAvailable: true), // out of range end
+        TimeSlot(
+            startTime: '10:00',
+            endTime: '09:00',
+            isAvailable: true), // end before start
+        TimeSlot(
+            startTime: '10:00',
+            endTime: '10:00',
+            isAvailable: true), // zero duration
+        TimeSlot(
+            startTime: '10:00',
+            endTime: 'bad_end',
+            isAvailable: true), // malformed end
+        TimeSlot(
+            startTime: '', endTime: '11:00', isAvailable: true), // empty start
+        TimeSlot(
+            startTime: '10:00',
+            endTime: '',
+            isAvailable: true), // legacy start-only slot
+        TimeSlot(
+            startTime: '11:00', endTime: '11:30', isAvailable: true), // VALID
       ];
 
       // Test individual slot isValid flags
@@ -309,7 +332,8 @@ void main() {
           ['10:00', '11:00 - 11:30']);
     });
 
-    test('day containing only disabled/malformed slots is treated as empty', () {
+    test('day containing only disabled/malformed slots is treated as empty',
+        () {
       final invalidSlots = [
         TimeSlot(startTime: '09:00', endTime: '09:30', isAvailable: false),
         TimeSlot(startTime: '10:00', endTime: '08:00', isAvailable: true),
@@ -350,7 +374,8 @@ void main() {
   });
 
   group('DoctorScheduleScreen deterministic user behavior widget tests', () {
-    testWidgets('displays localized noScheduleSet when doctor has no schedule', (tester) async {
+    testWidgets('displays localized noScheduleSet when doctor has no schedule',
+        (tester) async {
       final doctor = createTestDoctor(weeklySchedule: const {});
 
       await tester.pumpWidget(
@@ -378,7 +403,9 @@ void main() {
       expect(find.text('Book'), findsNothing);
     });
 
-    testWidgets('displays localized noAvailableSlotsOnThisDay when day has no slots but doctor has schedule', (tester) async {
+    testWidgets(
+        'displays localized noAvailableSlotsOnThisDay when day has no slots but doctor has schedule',
+        (tester) async {
       final doctor = createTestDoctor(
         weeklySchedule: {
           'monday': [TimeSlot(startTime: '09:00', endTime: '09:30')],
@@ -403,7 +430,8 @@ void main() {
       expect(find.text('No schedule set'), findsNothing);
     });
 
-    testWidgets('displays valid active slots and allows booking confirmation', (tester) async {
+    testWidgets('displays valid active slots and allows booking confirmation',
+        (tester) async {
       final doctor = createTestDoctor(
         weeklySchedule: {
           'monday': [
@@ -444,7 +472,9 @@ void main() {
       expect(find.text('09:00 - 09:30'), findsWidgets);
     });
 
-    testWidgets('arabic and kurdish localization renders appropriate no-schedule messages', (tester) async {
+    testWidgets(
+        'arabic and kurdish localization renders appropriate no-schedule messages',
+        (tester) async {
       final doctorNoSchedule = createTestDoctor(weeklySchedule: const {});
       final doctorMondayOnly = createTestDoctor(
         weeklySchedule: {
@@ -519,7 +549,9 @@ void main() {
   });
 
   group('AppointmentModel exactAppointmentTime parsing tests', () {
-    test('exactAppointmentTime parses minute correctly from range 09:30 - 10:00', () {
+    test(
+        'exactAppointmentTime parses minute correctly from range 09:30 - 10:00',
+        () {
       final appt = AppointmentModel(
         id: 'appt-1',
         patientId: 'pat-1',
@@ -546,14 +578,25 @@ void main() {
   });
 
   group('AppointmentRepository formatClinicDate and availability models', () {
-    test('formatClinicDate formats clinic calendar date YYYY-MM-DD without timezone shifting', () {
-      expect(AppointmentRepository.formatClinicDate(DateTime(2026, 9, 14)), equals('2026-09-14'));
-      expect(AppointmentRepository.formatClinicDate(DateTime(2026, 1, 5)), equals('2026-01-05'));
-      expect(AppointmentRepository.formatClinicDate(DateTime(2026, 12, 31, 23, 59, 59)), equals('2026-12-31'));
-      expect(AppointmentRepository.formatClinicDate(DateTime(2026, 4, 1, 0, 0, 0)), equals('2026-04-01'));
+    test(
+        'formatClinicDate formats clinic calendar date YYYY-MM-DD without timezone shifting',
+        () {
+      expect(AppointmentRepository.formatClinicDate(DateTime(2026, 9, 14)),
+          equals('2026-09-14'));
+      expect(AppointmentRepository.formatClinicDate(DateTime(2026, 1, 5)),
+          equals('2026-01-05'));
+      expect(
+          AppointmentRepository.formatClinicDate(
+              DateTime(2026, 12, 31, 23, 59, 59)),
+          equals('2026-12-31'));
+      expect(
+          AppointmentRepository.formatClinicDate(DateTime(2026, 4, 1, 0, 0, 0)),
+          equals('2026-04-01'));
     });
 
-    test('DoctorDayAvailability and DoctorDaySlot parse backend callable response correctly', () {
+    test(
+        'DoctorDayAvailability and DoctorDaySlot parse backend callable response correctly',
+        () {
       final map = {
         'success': true,
         'doctorId': 'doctor-123',
@@ -613,7 +656,141 @@ void main() {
   });
 
   group('DoctorScheduleScreen error UI and date-race widget tests', () {
-    testWidgets('shows localized error and retry button on failure and recovers after retry', (tester) async {
+    testWidgets(
+        'reschedule calendar enables only days with future clinic slots',
+        (tester) async {
+      final today = DateTime.utc(2026, 9, 14);
+      final nextMonday = today.add(const Duration(days: 7));
+      for (final scenario in [
+        (utcNow: '2026-09-14T05:59:00Z', starts: ['09:00'], enabled: true),
+        (utcNow: '2026-09-14T06:00:00Z', starts: ['09:00'], enabled: false),
+        (utcNow: '2026-09-14T06:01:00Z', starts: ['09:00'], enabled: false),
+        (
+          utcNow: '2026-09-14T06:01:00Z',
+          starts: ['09:00', '10:00'],
+          enabled: true
+        ),
+      ]) {
+        final now = DateTime.parse(scenario.utcNow);
+        final doctor = createTestDoctor(weeklySchedule: {
+          'monday': [
+            for (final start in scenario.starts)
+              TimeSlot(startTime: start, endTime: '')
+          ],
+        });
+        final appointment = AppointmentModel(
+          id: 'reschedule-calendar',
+          patientId: 'patient',
+          patientName: 'Patient',
+          patientEmail: 'patient@example.test',
+          doctorId: doctor.id,
+          doctorName: doctor.name,
+          department: doctor.departmentId,
+          appointmentDate: nextMonday,
+          timeSlot: '09:00',
+          createdAt: now,
+          updatedAt: now,
+        );
+        await tester.pumpWidget(createTestApp(
+            child: RescheduleScreen(
+          key: UniqueKey(),
+          appointment: appointment,
+          doctor: doctor,
+          captureNow: now,
+          appointmentRepository: TestAppointmentRepository(
+            availabilityHandler: (doctorId, date) async =>
+                DoctorDayAvailability(
+              success: true,
+              doctorId: doctorId,
+              appointmentDate: AppointmentRepository.formatClinicDate(date),
+              doctorName: doctor.name,
+              department: doctor.departmentId,
+              slots: const [],
+            ),
+          ),
+        )));
+        await tester.pumpAndSettle();
+        final day = find.descendant(
+            of: find.byType(TableCalendar), matching: find.text('14'));
+        await tester.ensureVisible(day);
+        await tester.tap(day);
+        await tester.pumpAndSettle();
+        final calendar =
+            tester.widget<TableCalendar>(find.byType(TableCalendar));
+        expect(calendar.selectedDayPredicate!(today), scenario.enabled,
+            reason: '${scenario.utcNow}, slots: ${scenario.starts}');
+        expect(calendar.enabledDayPredicate!(nextMonday), isTrue);
+      }
+    });
+
+    testWidgets(
+        'rescheduling retries selected-day availability without retaining a failed result',
+        (tester) async {
+      final today = DateTime.now();
+      final daysUntilMonday = (DateTime.monday - today.weekday + 7) % 7 + 7;
+      final bookingDate = DateTime(
+        today.year,
+        today.month,
+        today.day + daysUntilMonday,
+      );
+      final doctor = createTestDoctor(weeklySchedule: {
+        'monday': [TimeSlot(startTime: '09:00', endTime: '09:30')],
+      });
+      var failRequest = true;
+      final repo = TestAppointmentRepository(
+        availabilityHandler: (doctorId, date) async {
+          if (failRequest) throw Exception('Unavailable while offline');
+          return DoctorDayAvailability(
+            success: true,
+            doctorId: doctorId,
+            appointmentDate: AppointmentRepository.formatClinicDate(date),
+            doctorName: doctor.name,
+            department: doctor.departmentId,
+            slots: const [
+              DoctorDaySlot(
+                timeSlot: '09:00 - 09:30',
+                startTime: '09:00',
+                endTime: '09:30',
+                isAvailable: true,
+              ),
+            ],
+          );
+        },
+      );
+      final appointment = AppointmentModel(
+        id: 'existing-appointment',
+        patientId: 'patient',
+        patientName: 'Test Patient',
+        patientEmail: 'patient@example.test',
+        doctorId: doctor.id,
+        doctorName: doctor.name,
+        department: doctor.departmentId,
+        appointmentDate: bookingDate,
+        timeSlot: '10:00 - 10:30',
+        createdAt: today,
+        updatedAt: today,
+      );
+      await tester.pumpWidget(createTestApp(
+        child: RescheduleScreen(
+          appointment: appointment,
+          doctor: doctor,
+          appointmentRepository: repo,
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Something went wrong'), findsOneWidget);
+
+      failRequest = false;
+      await tester.ensureVisible(find.text('Retry'));
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(find.text('Something went wrong'), findsNothing);
+      expect(find.text('09:00'), findsOneWidget);
+    });
+
+    testWidgets(
+        'shows localized error and retry button on failure and recovers after retry',
+        (tester) async {
       final doctor = createTestDoctor(
         weeklySchedule: {
           'monday': [TimeSlot(startTime: '09:00', endTime: '09:30')],
@@ -677,7 +854,9 @@ void main() {
       expect(find.text('Book'), findsOneWidget);
     });
 
-    testWidgets('guards against date-race and discards out-of-order availability responses', (tester) async {
+    testWidgets(
+        'guards against date-race and discards out-of-order availability responses',
+        (tester) async {
       final doctor = createTestDoctor(
         weeklySchedule: {
           'monday': [TimeSlot(startTime: '09:00', endTime: '09:30')],
@@ -763,7 +942,16 @@ void main() {
       expect(find.text('09:00 - 09:30'), findsNothing);
     });
 
-    testWidgets('BookingScreen shows error and retry button on availability failure and recovers', (tester) async {
+    testWidgets(
+        'BookingScreen shows error and retry button on availability failure and recovers',
+        (tester) async {
+      final today = DateTime.now();
+      final daysUntilMonday = (DateTime.monday - today.weekday + 7) % 7 + 7;
+      final bookingDate = DateTime(
+        today.year,
+        today.month,
+        today.day + daysUntilMonday,
+      );
       final doctor = createTestDoctor(
         weeklySchedule: {
           'monday': [TimeSlot(startTime: '09:00', endTime: '09:30')],
@@ -798,7 +986,7 @@ void main() {
         createTestApp(
           child: BookingScreen(
             doctor: doctor,
-            initialDate: mondayDate,
+            initialDate: bookingDate,
             appointmentRepository: repo,
           ),
         ),

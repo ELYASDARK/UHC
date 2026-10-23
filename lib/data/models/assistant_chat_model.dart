@@ -1,5 +1,18 @@
 import 'package:flutter/foundation.dart';
 
+enum AssistantFailureKind {
+  historyLoad,
+  unauthenticated,
+  permissionDenied,
+  notFound,
+  dailyLimit,
+  throttled,
+  disabled,
+  unavailable,
+  staleOffer,
+  unknown,
+}
+
 /// Status of an assistant turn or message from the backend.
 enum AssistantMessageStatus {
   ready,
@@ -239,8 +252,11 @@ class AssistantChatMessage {
     }
 
     return AssistantChatMessage(
-      id: (json['id'] as String?)?.trim() ?? 'msg_${DateTime.now().millisecondsSinceEpoch}',
-      sender: (json['sender'] as String?)?.trim() == 'assistant' ? 'assistant' : 'patient',
+      id: (json['id'] as String?)?.trim() ??
+          'msg_${DateTime.now().millisecondsSinceEpoch}',
+      sender: (json['sender'] as String?)?.trim() == 'assistant'
+          ? 'assistant'
+          : 'patient',
       text: (json['text'] as String?) ?? '',
       status: AssistantMessageStatus.fromString(json['status'] as String?),
       reasonCode: json['reasonCode'] as String?,
@@ -302,7 +318,8 @@ class SendAssistantMessageResult {
     if (rawOffers is List) {
       for (final o in rawOffers) {
         if (o is Map) {
-          parsedOffers.add(AssistantOffer.fromJson(Map<String, dynamic>.from(o)));
+          parsedOffers
+              .add(AssistantOffer.fromJson(Map<String, dynamic>.from(o)));
         }
       }
     }
@@ -354,7 +371,8 @@ class GetAssistantHistoryResult {
 
     AssistantMessageStatus? parsedStatus;
     if (json['status'] != null) {
-      parsedStatus = AssistantMessageStatus.fromString(json['status'] as String?);
+      parsedStatus =
+          AssistantMessageStatus.fromString(json['status'] as String?);
     }
 
     final rawMessages = json['messages'];
@@ -362,7 +380,8 @@ class GetAssistantHistoryResult {
     if (rawMessages is List) {
       for (final m in rawMessages) {
         if (m is Map) {
-          parsedMessages.add(AssistantChatMessage.fromJson(Map<String, dynamic>.from(m)));
+          parsedMessages
+              .add(AssistantChatMessage.fromJson(Map<String, dynamic>.from(m)));
         }
       }
     }
@@ -372,7 +391,8 @@ class GetAssistantHistoryResult {
     if (rawOffers is List) {
       for (final o in rawOffers) {
         if (o is Map) {
-          parsedOffers.add(AssistantOffer.fromJson(Map<String, dynamic>.from(o)));
+          parsedOffers
+              .add(AssistantOffer.fromJson(Map<String, dynamic>.from(o)));
         }
       }
     }
@@ -405,13 +425,17 @@ class ConfirmAssistantAppointmentResult {
     this.qrCode,
   });
 
-  bool get isValid => success && appointmentId.isNotEmpty && bookingReference.isNotEmpty;
+  bool get isValid =>
+      success && appointmentId.isNotEmpty && bookingReference.isNotEmpty;
 
-  factory ConfirmAssistantAppointmentResult.fromJson(Map<String, dynamic> json) {
+  factory ConfirmAssistantAppointmentResult.fromJson(
+      Map<String, dynamic> json) {
     final rawSuccess = json['success'] == true;
     final appointmentId = (json['appointmentId'] as String?)?.trim() ?? '';
-    final bookingReference = (json['bookingReference'] as String?)?.trim() ?? '';
-    final isValidReceipt = rawSuccess && appointmentId.isNotEmpty && bookingReference.isNotEmpty;
+    final bookingReference =
+        (json['bookingReference'] as String?)?.trim() ?? '';
+    final isValidReceipt =
+        rawSuccess && appointmentId.isNotEmpty && bookingReference.isNotEmpty;
 
     return ConfirmAssistantAppointmentResult(
       success: isValidReceipt,

@@ -142,7 +142,8 @@ class MockAuthProvider extends ChangeNotifier implements AuthProvider {
   UserModel? get user => _mockUser;
 
   @override
-  AuthState get state => _mockUser != null ? AuthState.authenticated : AuthState.unauthenticated;
+  AuthState get state =>
+      _mockUser != null ? AuthState.authenticated : AuthState.unauthenticated;
 
   @override
   bool get isAuthenticated => _mockUser != null;
@@ -215,20 +216,34 @@ void main() {
   });
 
   group('Assistant Models Unit Tests', () {
-    test('AssistantMessageStatus parses all standard backend statuses and handles unknown gracefully', () {
-      expect(AssistantMessageStatus.fromString('ready'), AssistantMessageStatus.ready);
-      expect(AssistantMessageStatus.fromString('clarify'), AssistantMessageStatus.clarify);
-      expect(AssistantMessageStatus.fromString('out_of_scope'), AssistantMessageStatus.outOfScope);
-      expect(AssistantMessageStatus.fromString('daily_limit'), AssistantMessageStatus.dailyLimit);
-      expect(AssistantMessageStatus.fromString('throttled'), AssistantMessageStatus.throttled);
-      expect(AssistantMessageStatus.fromString('unavailable'), AssistantMessageStatus.unavailable);
-      expect(AssistantMessageStatus.fromString('disabled'), AssistantMessageStatus.disabled);
-      expect(AssistantMessageStatus.fromString('cancelled'), AssistantMessageStatus.cancelled);
-      expect(AssistantMessageStatus.fromString('random_invented_value'), AssistantMessageStatus.unknown);
-      expect(AssistantMessageStatus.fromString(null), AssistantMessageStatus.unknown);
+    test(
+        'AssistantMessageStatus parses all standard backend statuses and handles unknown gracefully',
+        () {
+      expect(AssistantMessageStatus.fromString('ready'),
+          AssistantMessageStatus.ready);
+      expect(AssistantMessageStatus.fromString('clarify'),
+          AssistantMessageStatus.clarify);
+      expect(AssistantMessageStatus.fromString('out_of_scope'),
+          AssistantMessageStatus.outOfScope);
+      expect(AssistantMessageStatus.fromString('daily_limit'),
+          AssistantMessageStatus.dailyLimit);
+      expect(AssistantMessageStatus.fromString('throttled'),
+          AssistantMessageStatus.throttled);
+      expect(AssistantMessageStatus.fromString('unavailable'),
+          AssistantMessageStatus.unavailable);
+      expect(AssistantMessageStatus.fromString('disabled'),
+          AssistantMessageStatus.disabled);
+      expect(AssistantMessageStatus.fromString('cancelled'),
+          AssistantMessageStatus.cancelled);
+      expect(AssistantMessageStatus.fromString('random_invented_value'),
+          AssistantMessageStatus.unknown);
+      expect(AssistantMessageStatus.fromString(null),
+          AssistantMessageStatus.unknown);
     });
 
-    test('AssistantOffer parses canonical dates, timeSlots, and handles expiration logic', () {
+    test(
+        'AssistantOffer parses canonical dates, timeSlots, and handles expiration logic',
+        () {
       final now = DateTime.utc(2026, 9, 9, 12, 0, 0);
       final futureOffer = AssistantOffer.fromJson({
         'offerId': 'off_1',
@@ -263,7 +278,9 @@ void main() {
       expect(pastOffer.isBookable(now), isFalse);
     });
 
-    test('AssistantOffer fails closed on missing/malformed expiry, invalid dates, and missing IDs', () {
+    test(
+        'AssistantOffer fails closed on missing/malformed expiry, invalid dates, and missing IDs',
+        () {
       final malformedExpiry = AssistantOffer.fromJson({
         'offerId': 'off_bad_exp',
         'doctorId': 'doc_1',
@@ -306,7 +323,9 @@ void main() {
       expect(blankId.isBookable(), isFalse);
     });
 
-    test('GetAssistantHistoryResult safely parses optional resetAt and status without throwing', () {
+    test(
+        'GetAssistantHistoryResult safely parses optional resetAt and status without throwing',
+        () {
       final payload = {
         'success': true,
         'messages': [
@@ -332,7 +351,8 @@ void main() {
       expect(parsed.status, AssistantMessageStatus.dailyLimit);
     });
 
-    test('ConfirmAssistantAppointmentResult rejects empty/malformed receipts', () {
+    test('ConfirmAssistantAppointmentResult rejects empty/malformed receipts',
+        () {
       final emptyReceipt = ConfirmAssistantAppointmentResult.fromJson({
         'success': true,
         'appointmentId': '',
@@ -352,15 +372,203 @@ void main() {
   });
 
   group('AssistantChatProvider Isolation and Lifecycle Tests', () {
-    test('PR5 retained offers stay attached only to the original ready reply', () async {
+    test('retrying a delivered turn preserves the history snapshot and offers',
+        () async {
+      for (final historyRevision in [2, 3]) {
+        final service = FakeAssistantFunctionsService();
+        final provider = AssistantChatProvider(
+            patientId: 'patient_A', functionsService: service);
+        addTearDown(provider.dispose);
+        service.sendException = const AssistantFunctionException(
+            code: 'deadline-exceeded', message: 'Response lost.');
+        const draft = 'Find a slot';
+        expect(await provider.sendMessage(draft, localeCode: 'en'), isFalse);
+        final originalRequestId = service.lastSentClientRequestId;
+
+        final currentOffer = AssistantOffer(
+          offerId: 'current',
+          doctorId: 'doctor',
+          doctorName: 'Doctor',
+          department: 'dentistry',
+          appointmentDate: '2026-10-22',
+          timeSlot: '14:00 - 14:30',
+          expiresAt: DateTime.now().add(const Duration(minutes: 10)),
+          isAvailable: true,
+        );
+        final savedMessages = List.generate(
+            20,
+            (index) => AssistantChatMessage(
+                  id: 'saved_$index',
+                  sender: index.isEven ? 'patient' : 'assistant',
+                  text: index == 18 ? draft : 'Saved message $index',
+                  offerIds: index == 19 ? ['current'] : const [],
+                  createdAt: DateTime.now(),
+                ));
+        service.historyResult = GetAssistantHistoryResult(
+          success: true,
+          messages: savedMessages,
+          offers: [currentOffer],
+          revision: historyRevision,
+          status: AssistantMessageStatus.ready,
+        );
+        await provider.refreshHistory();
+
+        service.sendException = null;
+        service.sendResult = SendAssistantMessageResult(
+          success: true,
+          status: AssistantMessageStatus.ready,
+          message: 'Cached reply',
+          replyLanguage: 'en',
+          offers: [currentOffer.copyWith(isAvailable: false)],
+          revision: 2,
+        );
+        expect(await provider.sendMessage(draft, localeCode: 'en'), isTrue);
+
+        expect(service.lastSentClientRequestId, originalRequestId);
+        expect(provider.revision, historyRevision);
+        expect(provider.messages.map((message) => message.id),
+            savedMessages.map((message) => message.id));
+        expect(provider.offers.single.isAvailable, isTrue);
+        expect(provider.unsentDraft, isNull);
+        expect(provider.errorMessage, isNull);
+      }
+    });
+
+    test('quota rejection preserves the known revision and recoverable draft',
+        () async {
       final service = FakeAssistantFunctionsService();
-      final provider = AssistantChatProvider(patientId: 'patient_A', functionsService: service);
-      final offer = AssistantOffer(offerId: 'prior', doctorId: 'doc', doctorName: 'Doctor', department: 'dentistry', appointmentDate: '2026-09-16', timeSlot: '09:00 - 09:30', expiresAt: DateTime.now().add(const Duration(minutes: 10)), isAvailable: true);
-      service.sendResult = SendAssistantMessageResult(success: true, status: AssistantMessageStatus.ready, message: 'Slots', replyLanguage: 'en', offers: [offer], revision: 2);
+      final provider = AssistantChatProvider(
+          patientId: 'patient_A', functionsService: service);
+      addTearDown(provider.dispose);
+      service.historyResult = const GetAssistantHistoryResult(
+        success: true,
+        messages: [],
+        offers: [],
+        revision: 5,
+      );
+      await provider.initialize();
+      service.sendResult = SendAssistantMessageResult(
+        success: true,
+        status: AssistantMessageStatus.dailyLimit,
+        reasonCode: 'project_daily_limit',
+        message: 'Daily limit reached.',
+        replyLanguage: 'en',
+        offers: const [],
+        resetAt: DateTime.now().add(const Duration(hours: 1)),
+        revision: 0,
+      );
+
+      expect(
+          await provider.sendMessage('Find a slot', localeCode: 'en'), isFalse);
+      expect(provider.revision, 5);
+      expect(provider.unsentDraft, 'Find a slot');
+      expect(provider.isDailyLimit, isTrue);
+      expect(provider.messages.single.text, 'Daily limit reached.');
+    });
+
+    test('initial history load blocks sending without discarding the draft',
+        () async {
+      final fake = FakeAssistantFunctionsService();
+      final history = Completer<GetAssistantHistoryResult>();
+      fake.historyCompleter = history;
+      final provider =
+          AssistantChatProvider(patientId: 'patient_A', functionsService: fake);
+      addTearDown(provider.dispose);
+      provider.setDraft('Find a slot');
+
+      final initialization = provider.initialize();
+      expect(provider.canSendMessage, isFalse);
+      expect(
+          await provider.sendMessage('Find a slot', localeCode: 'en'), isFalse);
+      expect(provider.unsentDraft, 'Find a slot');
+      expect(fake.sendMessageCallCount, 0);
+
+      history.complete(const GetAssistantHistoryResult(
+        success: true,
+        messages: [],
+        offers: [],
+        revision: 1,
+      ));
+      await initialization;
+      expect(provider.canSendMessage, isTrue);
+      expect(
+          await provider.sendMessage('Find a slot', localeCode: 'en'), isTrue);
+      expect(provider.messages.map((message) => message.text),
+          contains('Find a slot'));
+      expect(provider.revision, 2);
+    });
+
+    test(
+        'initialization during sending preserves the optimistic message and ignores stale queued history',
+        () async {
+      final fake = FakeAssistantFunctionsService();
+      final response = Completer<SendAssistantMessageResult>();
+      fake.sendCompleter = response;
+      fake.historyResult = const GetAssistantHistoryResult(
+        success: true,
+        messages: [],
+        offers: [],
+        revision: 1,
+      );
+      final provider =
+          AssistantChatProvider(patientId: 'patient_A', functionsService: fake);
+      addTearDown(provider.dispose);
+
+      final sending = provider.sendMessage('Find a slot', localeCode: 'en');
+      await provider.initialize();
+      expect(provider.messages.single.text, 'Find a slot');
+      expect(provider.messages.single.isPending, isTrue);
+      expect(fake.getHistoryCallCount, 0);
+
+      response.complete(const SendAssistantMessageResult(
+        success: true,
+        status: AssistantMessageStatus.ready,
+        message: 'Matching slots found.',
+        replyLanguage: 'en',
+        offers: [],
+        revision: 2,
+      ));
+      expect(await sending, isTrue);
+      await Future<void>.delayed(Duration.zero);
+      expect(provider.revision, 2);
+      expect(provider.messages.map((message) => message.text),
+          ['Find a slot', 'Matching slots found.']);
+    });
+
+    test('PR5 retained offers stay attached only to the original ready reply',
+        () async {
+      final service = FakeAssistantFunctionsService();
+      final provider = AssistantChatProvider(
+          patientId: 'patient_A', functionsService: service);
+      final offer = AssistantOffer(
+          offerId: 'prior',
+          doctorId: 'doc',
+          doctorName: 'Doctor',
+          department: 'dentistry',
+          appointmentDate: '2026-09-16',
+          timeSlot: '09:00 - 09:30',
+          expiresAt: DateTime.now().add(const Duration(minutes: 10)),
+          isAvailable: true);
+      service.sendResult = SendAssistantMessageResult(
+          success: true,
+          status: AssistantMessageStatus.ready,
+          message: 'Slots',
+          replyLanguage: 'en',
+          offers: [offer],
+          revision: 2);
       await provider.sendMessage('Slots please', localeCode: 'en');
       final original = provider.messages.last;
-      for (final status in [AssistantMessageStatus.clarify, AssistantMessageStatus.outOfScope]) {
-        service.sendResult = SendAssistantMessageResult(success: true, status: status, message: 'Unrelated reply', replyLanguage: 'en', offers: [offer], revision: 3);
+      for (final status in [
+        AssistantMessageStatus.clarify,
+        AssistantMessageStatus.outOfScope
+      ]) {
+        service.sendResult = SendAssistantMessageResult(
+            success: true,
+            status: status,
+            message: 'Unrelated reply',
+            replyLanguage: 'en',
+            offers: [offer],
+            revision: 3);
         await provider.sendMessage('Another question', localeCode: 'en');
         expect(provider.messages.last.offerIds, isEmpty);
         expect(provider.getOffersForMessage(original).single.offerId, 'prior');
@@ -368,12 +576,21 @@ void main() {
       provider.dispose();
     });
 
-    test('PR5 failed clear preserves history and draft even when reloading fails', () async {
+    test(
+        'PR5 failed clear preserves history and draft even when reloading fails',
+        () async {
       for (final throws in [false, true]) {
         final service = FakeAssistantFunctionsService();
-        final message = AssistantChatMessage(id: 'saved', sender: 'patient', text: 'Saved conversation', status: AssistantMessageStatus.ready, createdAt: DateTime.now());
-        service.historyResult = GetAssistantHistoryResult(success: true, messages: [message], offers: const [], revision: 3);
-        final provider = AssistantChatProvider(patientId: 'patient_A', functionsService: service);
+        final message = AssistantChatMessage(
+            id: 'saved',
+            sender: 'patient',
+            text: 'Saved conversation',
+            status: AssistantMessageStatus.ready,
+            createdAt: DateTime.now());
+        service.historyResult = GetAssistantHistoryResult(
+            success: true, messages: [message], offers: const [], revision: 3);
+        final provider = AssistantChatProvider(
+            patientId: 'patient_A', functionsService: service);
         await provider.initialize();
         provider.setDraft('Unsent text');
         service.clearResult = false;
@@ -388,14 +605,33 @@ void main() {
       }
     });
 
-    testWidgets('PR5 daily reset unlocks an open conversation without deleting history', (tester) async {
+    testWidgets(
+        'PR5 daily reset unlocks an open conversation without deleting history',
+        (tester) async {
       final service = FakeAssistantFunctionsService();
-      final message = AssistantChatMessage(id: 'saved', sender: 'patient', text: 'Keep history', status: AssistantMessageStatus.ready, createdAt: DateTime.now());
-      service.historyResult = GetAssistantHistoryResult(success: true, messages: [message], offers: const [], revision: 3, status: AssistantMessageStatus.dailyLimit, resetAt: DateTime.now().add(const Duration(milliseconds: 100)));
-      final provider = AssistantChatProvider(patientId: 'patient_A', functionsService: service);
+      final message = AssistantChatMessage(
+          id: 'saved',
+          sender: 'patient',
+          text: 'Keep history',
+          status: AssistantMessageStatus.ready,
+          createdAt: DateTime.now());
+      service.historyResult = GetAssistantHistoryResult(
+          success: true,
+          messages: [message],
+          offers: const [],
+          revision: 3,
+          status: AssistantMessageStatus.dailyLimit,
+          resetAt: DateTime.now().add(const Duration(milliseconds: 100)));
+      final provider = AssistantChatProvider(
+          patientId: 'patient_A', functionsService: service);
       await provider.initialize();
       expect(provider.isDailyLimit, isTrue);
-      service.historyResult = GetAssistantHistoryResult(success: true, messages: [message], offers: const [], revision: 3, status: AssistantMessageStatus.ready);
+      service.historyResult = GetAssistantHistoryResult(
+          success: true,
+          messages: [message],
+          offers: const [],
+          revision: 3,
+          status: AssistantMessageStatus.ready);
       await tester.pump(const Duration(milliseconds: 200));
       expect(provider.isDailyLimit, isFalse);
       expect(provider.resetAt, isNull);
@@ -403,7 +639,9 @@ void main() {
       provider.dispose();
     });
 
-    test('Failed send preserves clientRequestId across retries of same draft text', () async {
+    test(
+        'Failed send preserves clientRequestId across retries of same draft text',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       fakeService.sendException = const AssistantFunctionException(
         code: 'deadline-exceeded',
@@ -416,7 +654,8 @@ void main() {
       );
 
       // First attempt fails with network error
-      final success1 = await provider.sendMessage('Book cardiologist tomorrow', localeCode: 'en');
+      final success1 = await provider.sendMessage('Book cardiologist tomorrow',
+          localeCode: 'en');
       expect(success1, isFalse);
       expect(provider.unsentDraft, 'Book cardiologist tomorrow');
       final firstRequestId = fakeService.lastSentClientRequestId;
@@ -433,7 +672,8 @@ void main() {
         revision: 2,
       );
 
-      final success2 = await provider.sendMessage('Book cardiologist tomorrow', localeCode: 'en');
+      final success2 = await provider.sendMessage('Book cardiologist tomorrow',
+          localeCode: 'en');
       expect(success2, isTrue);
       // Client request ID MUST be identical to the first attempt so backend deduplicates
       expect(fakeService.lastSentClientRequestId, firstRequestId);
@@ -443,7 +683,8 @@ void main() {
       provider.dispose();
     });
 
-    test('Clear chat prevents in-flight async turn from repopulating chat', () async {
+    test('Clear chat prevents in-flight async turn from repopulating chat',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final completer = Completer<SendAssistantMessageResult>();
       fakeService.sendCompleter = completer;
@@ -454,7 +695,8 @@ void main() {
       );
 
       // 1. Trigger in-flight send
-      final sendFuture = provider.sendMessage('Book appointment', localeCode: 'en');
+      final sendFuture =
+          provider.sendMessage('Book appointment', localeCode: 'en');
       expect(provider.isSending, isTrue);
       expect(provider.messages.length, 1);
 
@@ -493,7 +735,8 @@ void main() {
       provider.dispose();
     });
 
-    test('Dispose isolation discards pending async completion safely', () async {
+    test('Dispose isolation discards pending async completion safely',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final completer = Completer<SendAssistantMessageResult>();
       fakeService.sendCompleter = completer;
@@ -548,7 +791,9 @@ void main() {
       provider.dispose();
     });
 
-    test('Daily quota error parses resetAt UTC correctly without wiping past history', () async {
+    test(
+        'Daily quota error parses resetAt UTC correctly without wiping past history',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final resetTime = DateTime.now().toUtc().add(const Duration(hours: 1));
 
@@ -571,7 +816,8 @@ void main() {
 
       expect(provider.isDailyLimit, isTrue);
       expect(provider.resetAt, resetTime);
-      expect(provider.messages.length, 1); // Assistant limit notice (optimistic draft removed on rejection)
+      expect(provider.messages.length,
+          1); // Assistant limit notice (optimistic draft removed on rejection)
       expect(provider.unsentDraft, 'Check doctor slots');
 
       provider.dispose();
@@ -599,7 +845,8 @@ void main() {
       expect(fakeService.confirmAppointmentCallCount, 0);
 
       // Explicit affirmative call triggers booking
-      final result = await provider.confirmOffer(testOffer, notes: 'First visit');
+      final result =
+          await provider.confirmOffer(testOffer, notes: 'First visit');
       expect(result, isNotNull);
       expect(fakeService.confirmAppointmentCallCount, 1);
       expect(fakeService.lastConfirmedOfferId, 'off_test');
@@ -638,7 +885,8 @@ void main() {
       // Second tap while first is in-flight must be rejected immediately
       final secondTapResult = await provider.confirmOffer(testOffer);
       expect(secondTapResult, isNull);
-      expect(fakeService.confirmAppointmentCallCount, 1); // Still exactly 1 call!
+      expect(
+          fakeService.confirmAppointmentCallCount, 1); // Still exactly 1 call!
 
       completer.complete(const ConfirmAssistantAppointmentResult(
         success: true,
@@ -653,7 +901,8 @@ void main() {
       provider.dispose();
     });
 
-    test('Network failure preserves same idempotency identity across retries', () async {
+    test('Network failure preserves same idempotency identity across retries',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       fakeService.confirmException = const AssistantFunctionException(
         code: 'unavailable',
@@ -701,7 +950,49 @@ void main() {
       provider.dispose();
     });
 
-    test('Attempting to book expired offer rejects and refreshes history', () async {
+    test('uncertain confirmation cannot be replaced by another offer',
+        () async {
+      final service = FakeAssistantFunctionsService()
+        ..confirmException = const AssistantFunctionException(
+            code: 'deadline-exceeded', message: 'Response lost.');
+      final provider = AssistantChatProvider(
+          patientId: 'patient_A', functionsService: service);
+      addTearDown(provider.dispose);
+      final offers = ['A', 'B']
+          .map((id) => AssistantOffer(
+                offerId: id,
+                doctorId: 'doctor',
+                doctorName: 'Doctor',
+                department: 'dermatology',
+                appointmentDate: '2026-10-22',
+                timeSlot: '14:00 - 14:30',
+                expiresAt: DateTime.now().add(const Duration(minutes: 10)),
+                isAvailable: true,
+              ))
+          .toList();
+      expect(await provider.confirmOffer(offers.first), isNull);
+      final retryKey = service.lastConfirmedIdempotencyKey;
+      expect(provider.canConfirmOffer(offers.last), isFalse);
+      expect(await provider.confirmOffer(offers.last), isNull);
+      expect(service.confirmAppointmentCallCount, 1);
+      expect(provider.pendingBookingOffer?.offerId, 'A');
+
+      await provider.refreshHistory(); // Neither consumed offer is returned.
+      expect(provider.pendingBookingOffer?.offerId, 'A');
+      expect(provider.canConfirmOffer(offers.last), isFalse);
+      service.confirmException = null;
+      service.confirmResult = const ConfirmAssistantAppointmentResult(
+          success: true,
+          appointmentId: 'original',
+          bookingReference: 'RECEIPT-A');
+      expect((await provider.confirmOffer(offers.first))?.appointmentId,
+          'original');
+      expect(service.lastConfirmedIdempotencyKey, retryKey);
+      expect(provider.canConfirmOffer(offers.last), isTrue);
+    });
+
+    test('Attempting to book expired offer rejects and refreshes history',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_A',
@@ -721,14 +1012,57 @@ void main() {
 
       final result = await provider.confirmOffer(expiredOffer);
       expect(result, isNull);
-      expect(fakeService.confirmAppointmentCallCount, 0); // No booking request sent
+      expect(fakeService.confirmAppointmentCallCount,
+          0); // No booking request sent
       expect(provider.errorMessage, contains('no longer available'));
       expect(fakeService.getHistoryCallCount, 1); // Refreshed history
 
       provider.dispose();
     });
 
-    test('Account switch (Account A -> Account B) wipes state, increments generation, and ignores delayed responses', () async {
+    test('definitive confirmation failure clears uncertain receipt recovery',
+        () async {
+      for (final failure in [
+        const AssistantFunctionException(
+          code: 'failed-precondition',
+          message: 'Offer expired.',
+          reasonCode: 'offer_expired',
+        ),
+        const AssistantFunctionException(
+          code: 'not-found',
+          message: 'Offer not found.',
+        ),
+      ]) {
+        final service = FakeAssistantFunctionsService();
+        final provider = AssistantChatProvider(
+            patientId: 'patient_A', functionsService: service);
+        addTearDown(provider.dispose);
+        final offer = AssistantOffer(
+          offerId: 'uncertain',
+          doctorId: 'doctor',
+          doctorName: 'Doctor',
+          department: 'dentistry',
+          appointmentDate: '2026-10-22',
+          timeSlot: '14:00 - 14:30',
+          expiresAt: DateTime.now().add(const Duration(minutes: 10)),
+          isAvailable: true,
+        );
+        service.confirmException = const AssistantFunctionException(
+            code: 'deadline-exceeded', message: 'Response lost.');
+        expect(await provider.confirmOffer(offer), isNull);
+        expect(provider.pendingBookingOffer, isNotNull);
+
+        service.confirmException = failure;
+        expect(await provider.confirmOffer(offer), isNull);
+        expect(provider.pendingBookingOffer, isNull);
+        expect(provider.activeBookingOfferId, isNull);
+        expect(provider.errorMessage, failure.message);
+      }
+    });
+
+    test(
+        'Account switch (Account A -> Account B) wipes state, increments generation, and ignores delayed responses',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final completerA = Completer<SendAssistantMessageResult>();
       fakeService.sendCompleter = completerA;
@@ -739,7 +1073,8 @@ void main() {
       );
 
       // Account A starts an in-flight turn
-      final sendFutureA = provider.sendMessage('Account A message', localeCode: 'en');
+      final sendFutureA =
+          provider.sendMessage('Account A message', localeCode: 'en');
       expect(provider.isSending, isTrue);
       expect(provider.messages.length, 1);
 
@@ -769,7 +1104,9 @@ void main() {
       provider.dispose();
     });
 
-    test('Clear chat explicitly resets busy flags so provider does not lock into permanent busy state', () async {
+    test(
+        'Clear chat explicitly resets busy flags so provider does not lock into permanent busy state',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final completer = Completer<SendAssistantMessageResult>();
       fakeService.sendCompleter = completer;
@@ -780,7 +1117,8 @@ void main() {
       );
 
       // In-flight message
-      final sendFuture = provider.sendMessage('Booking request', localeCode: 'en');
+      final sendFuture =
+          provider.sendMessage('Booking request', localeCode: 'en');
       expect(provider.isSending, isTrue);
 
       // User triggers clearChat while send is in-flight
@@ -810,7 +1148,9 @@ void main() {
       provider.dispose();
     });
 
-    test('Booking retry recovers receipt even if local offer expired or slot marked unavailable', () async {
+    test(
+        'Booking retry recovers receipt even if local offer expired or slot marked unavailable',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       // First attempt times out
       fakeService.confirmException = const AssistantFunctionException(
@@ -863,7 +1203,9 @@ void main() {
       provider.dispose();
     });
 
-    test('Strict receipt validation rejects missing bookingReference or empty appointmentId', () async {
+    test(
+        'Strict receipt validation rejects missing bookingReference or empty appointmentId',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_A',
@@ -915,7 +1257,8 @@ void main() {
       provider.dispose();
     });
 
-    test('CAS revision check and bounded message history in refreshHistory', () async {
+    test('CAS revision check and bounded message history in refreshHistory',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_A',
@@ -950,6 +1293,10 @@ void main() {
       expect(provider.revision, 5);
       expect(provider.messages, isEmpty);
 
+      await provider.refreshHistory(force: true);
+      expect(provider.revision, 5);
+      expect(provider.messages, isEmpty);
+
       // Newer history with 25 messages arrives -> bounded to 20
       final twentyFiveMessages = List.generate(
         25,
@@ -978,7 +1325,42 @@ void main() {
   });
 
   group('AssistantChatScreen Widget Tests', () {
-    testWidgets('Renders empty state with privacy notice and standard booking fallback', (tester) async {
+    for (final reason in ['assistant_disabled', 'assistant_unconfigured']) {
+      testWidgets('Disabled assistant does not claim a daily limit: $reason',
+          (tester) async {
+        final service = FakeAssistantFunctionsService()
+          ..historyResult = GetAssistantHistoryResult(
+            success: true,
+            messages: const [],
+            offers: const [],
+            revision: 1,
+            status: AssistantMessageStatus.disabled,
+            reasonCode: reason,
+          );
+        final provider = AssistantChatProvider(
+          patientId: 'test_patient_1',
+          functionsService: service,
+        );
+        await tester.pumpWidget(createAssistantTestApp(
+          child: AssistantChatScreen(provider: provider),
+        ));
+        await tester.pumpAndSettle();
+        final input = tester.widget<TextField>(find.byType(TextField));
+        expect(input.enabled, isFalse);
+        expect(input.decoration!.hintText, contains('temporarily unavailable'));
+        expect(find.text('The assistant has reached today’s limit.'),
+            findsNothing);
+        if (reason == 'assistant_unconfigured') {
+          expect(find.textContaining('unavailable by policy'), findsNothing);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        provider.dispose();
+      });
+    }
+
+    testWidgets(
+        'Renders empty state with privacy notice and standard booking fallback',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_123',
@@ -995,8 +1377,10 @@ void main() {
       // Heading & disclaimers
       expect(find.text('AI Scheduling Assistant'), findsWidgets);
       expect(find.byIcon(Icons.auto_awesome), findsOneWidget);
-      expect(find.textContaining('Clinic Time (Baghdad, GMT+3)'), findsOneWidget);
-      expect(find.textContaining('does not provide medical advice'), findsOneWidget);
+      expect(
+          find.textContaining('Clinic Time (Baghdad, GMT+3)'), findsOneWidget);
+      expect(find.textContaining('does not provide medical advice'),
+          findsOneWidget);
       expect(find.text('Book an Appointment'), findsWidgets);
 
       // Character counter initialized to 0/500
@@ -1005,7 +1389,9 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Daily quota displays exact required English heading and converted reset time', (tester) async {
+    testWidgets(
+        'Daily quota displays exact required English heading and converted reset time',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final resetTime = DateTime.now().toUtc().add(const Duration(hours: 1));
       fakeService.historyResult = GetAssistantHistoryResult(
@@ -1030,17 +1416,21 @@ void main() {
       await tester.pumpAndSettle();
 
       // EXACT required English heading check
-      expect(find.text('The assistant has reached today’s limit.'), findsWidgets);
-      expect(find.textContaining('This is a shared assistant limit'), findsOneWidget);
+      expect(
+          find.text('The assistant has reached today’s limit.'), findsWidgets);
+      expect(find.textContaining('This is a shared assistant limit'),
+          findsOneWidget);
       expect(find.textContaining('Resets at'), findsOneWidget);
 
       // Visible button to standard booking
-      expect(find.widgetWithText(ElevatedButton, 'Book an Appointment'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Book an Appointment'),
+          findsOneWidget);
 
       provider.dispose();
     });
 
-    testWidgets('Renders properly in Arabic locale with RTL text direction', (tester) async {
+    testWidgets('Renders properly in Arabic locale with RTL text direction',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_ar',
@@ -1066,7 +1456,9 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Renders properly in Kurdish Sorani locale with RTL text direction', (tester) async {
+    testWidgets(
+        'Renders properly in Kurdish Sorani locale with RTL text direction',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_ku',
@@ -1092,7 +1484,8 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Renders cleanly in dark theme without rendering overflow', (tester) async {
+    testWidgets('Renders cleanly in dark theme without rendering overflow',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_dark',
@@ -1113,7 +1506,9 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Character count tracks text length and Send button enables only when valid', (tester) async {
+    testWidgets(
+        'Character count tracks text length and Send button enables only when valid',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_input',
@@ -1138,7 +1533,9 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Affirmative confirmation modal: Cancel performs no booking, Confirm confirms offer', (tester) async {
+    testWidgets(
+        'Affirmative confirmation modal: Cancel performs no booking, Confirm confirms offer',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final now = DateTime.now();
       final activeOffer = AssistantOffer(
@@ -1182,7 +1579,8 @@ void main() {
 
       // Offer card is rendered
       expect(find.text('Dr. Hiba Al-Nuaimi'), findsOneWidget);
-      final bookSlotButton = find.widgetWithText(ElevatedButton, 'Book This Slot');
+      final bookSlotButton =
+          find.widgetWithText(ElevatedButton, 'Book This Slot');
       expect(bookSlotButton, findsOneWidget);
 
       // 1. Tap Book This Slot -> opens affirmative confirmation modal
@@ -1191,7 +1589,8 @@ void main() {
 
       expect(find.text('Selected Appointment Slot'), findsOneWidget);
       expect(find.text('09:30 - 10:00'), findsWidgets);
-      expect(find.text('Slots are not reserved until confirmed.'), findsOneWidget);
+      expect(
+          find.text('Slots are not reserved until confirmed.'), findsOneWidget);
 
       // 2. Tap Cancel -> closes modal without booking
       final cancelButton = find.widgetWithText(OutlinedButton, 'Cancel');
@@ -1199,13 +1598,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(fakeService.confirmAppointmentCallCount, 0); // NO booking made
-      expect(find.text('Selected Appointment Slot'), findsNothing); // Modal dismissed
+      expect(find.text('Selected Appointment Slot'),
+          findsNothing); // Modal dismissed
 
       // 3. Tap Book This Slot again -> Confirm Appointment
       await tester.tap(bookSlotButton);
       await tester.pumpAndSettle();
 
-      final confirmButton = find.widgetWithText(ElevatedButton, 'Confirm Appointment');
+      final confirmButton =
+          find.widgetWithText(ElevatedButton, 'Confirm Appointment');
       await tester.tap(confirmButton);
       await tester.pumpAndSettle();
 
@@ -1217,7 +1618,9 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Modal dismissal safety: user closes modal before booking completes without error', (tester) async {
+    testWidgets(
+        'Modal dismissal safety: user closes modal before booking completes without error',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final completer = Completer<ConfirmAssistantAppointmentResult>();
       fakeService.confirmCompleter = completer;
@@ -1263,19 +1666,22 @@ void main() {
       await tester.pumpAndSettle();
 
       // Open confirmation modal
-      final bookSlotButton = find.widgetWithText(ElevatedButton, 'Book This Slot');
+      final bookSlotButton =
+          find.widgetWithText(ElevatedButton, 'Book This Slot');
       await tester.tap(bookSlotButton);
       await tester.pumpAndSettle();
 
       // Tap Confirm Appointment to begin in-flight request
-      final confirmButton = find.widgetWithText(ElevatedButton, 'Confirm Appointment');
+      final confirmButton =
+          find.widgetWithText(ElevatedButton, 'Confirm Appointment');
       await tester.tap(confirmButton);
       await tester.pump();
 
       expect(provider.isConfirming, isTrue);
 
       // User dismisses bottom sheet while booking is in-flight
-      final navigator = Navigator.of(tester.element(find.text('Selected Appointment Slot')));
+      final navigator =
+          Navigator.of(tester.element(find.text('Selected Appointment Slot')));
       navigator.pop();
       await tester.pumpAndSettle();
 
@@ -1295,7 +1701,9 @@ void main() {
       provider.dispose();
     });
 
-    test('confirmOffer returns null if provider disposed or generation switched during await', () async {
+    test(
+        'confirmOffer returns null if provider disposed or generation switched during await',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       final completer = Completer<ConfirmAssistantAppointmentResult>();
       fakeService.confirmCompleter = completer;
@@ -1333,7 +1741,9 @@ void main() {
       provider.dispose();
     });
 
-    test('sendMessage preserves recoverable draft and removes optimistic message on quota rejection', () async {
+    test(
+        'sendMessage preserves recoverable draft and removes optimistic message on quota rejection',
+        () async {
       final fakeService = FakeAssistantFunctionsService();
       fakeService.sendResult = const SendAssistantMessageResult(
         success: false,
@@ -1349,7 +1759,8 @@ void main() {
         functionsService: fakeService,
       );
 
-      final success = await provider.sendMessage('Book cardiology', localeCode: 'en');
+      final success =
+          await provider.sendMessage('Book cardiology', localeCode: 'en');
       expect(success, isFalse);
       expect(provider.unsentDraft, 'Book cardiology');
       expect(provider.currentStatus, AssistantMessageStatus.dailyLimit);
@@ -1357,7 +1768,9 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('AssistantChatScreen didChangeDependencies updates active user when AuthProvider notifies', (tester) async {
+    testWidgets(
+        'AssistantChatScreen didChangeDependencies updates active user when AuthProvider notifies',
+        (tester) async {
       final authProvider = MockAuthProvider();
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
@@ -1398,7 +1811,8 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Offer button is disabled when provider isRefreshing', (tester) async {
+    testWidgets('Offer button is disabled when provider isRefreshing',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final activeOffer = AssistantOffer(
         offerId: 'off_refreshing',
@@ -1439,7 +1853,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final bookSlotButton = find.widgetWithText(ElevatedButton, 'Book This Slot');
+      final bookSlotButton =
+          find.widgetWithText(ElevatedButton, 'Book This Slot');
       expect(bookSlotButton, findsOneWidget);
       final elevatedBtnWidget = tester.widget<ElevatedButton>(bookSlotButton);
       expect(elevatedBtnWidget.onPressed, isNotNull);
@@ -1459,7 +1874,119 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Pending retry offer card displays Retry button and allows confirmation click', (tester) async {
+    testWidgets(
+        'lost confirmation response remains recoverable after consumed-offer refresh',
+        (tester) async {
+      final service = FakeAssistantFunctionsService();
+      final offer = AssistantOffer(
+        offerId: 'receipt_recovery',
+        doctorId: 'doctor',
+        doctorName: 'Dr. Noor',
+        department: 'dermatology',
+        appointmentDate: '2026-10-22',
+        timeSlot: '14:00 - 14:30',
+        expiresAt: DateTime.now().add(const Duration(minutes: 10)),
+        isAvailable: true,
+      );
+      final alternativeOffer = AssistantOffer(
+        offerId: 'alternative',
+        doctorId: offer.doctorId,
+        doctorName: offer.doctorName,
+        department: offer.department,
+        appointmentDate: offer.appointmentDate,
+        timeSlot: '15:00 - 15:30',
+        expiresAt: offer.expiresAt,
+        isAvailable: true,
+      );
+      final reply = AssistantChatMessage(
+        id: 'reply',
+        sender: 'assistant',
+        text: 'An appointment is available.',
+        offerIds: [offer.offerId, alternativeOffer.offerId],
+        createdAt: DateTime.now(),
+      );
+      service.historyResult = GetAssistantHistoryResult(
+        success: true,
+        messages: [reply],
+        offers: [offer, alternativeOffer],
+        revision: 1,
+      );
+      service.confirmException = const AssistantFunctionException(
+          code: 'deadline-exceeded', message: 'Response lost.');
+      final provider = AssistantChatProvider(
+          patientId: 'patient_A', functionsService: service);
+      addTearDown(provider.dispose);
+      await tester.pumpWidget(createAssistantTestApp(
+          child: AssistantChatScreen(provider: provider)));
+      await tester.pumpAndSettle();
+
+      await tester
+          .tap(find.widgetWithText(ElevatedButton, 'Book This Slot').first);
+      await tester.pumpAndSettle();
+      await tester
+          .tap(find.widgetWithText(ElevatedButton, 'Confirm Appointment'));
+      await tester.pumpAndSettle();
+      final originalBookingKey = service.lastConfirmedIdempotencyKey;
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<ElevatedButton>(
+                  find.widgetWithText(ElevatedButton, 'Book This Slot'))
+              .onPressed,
+          isNull);
+
+      // The server committed the booking and consumed both the offer and its
+      // message link, but the first response never reached this session.
+      service.historyResult = GetAssistantHistoryResult(
+        success: true,
+        messages: [
+          AssistantChatMessage(
+            id: reply.id,
+            sender: reply.sender,
+            text: reply.text,
+            offerIds: [alternativeOffer.offerId],
+            createdAt: reply.createdAt,
+          ),
+        ],
+        offers: [alternativeOffer],
+        revision: 2,
+      );
+      await provider.refreshHistory();
+      await tester.pumpAndSettle();
+      expect(provider.offers.single.offerId, alternativeOffer.offerId);
+      expect(
+          tester
+              .widget<ElevatedButton>(
+                  find.widgetWithText(ElevatedButton, 'Book This Slot'))
+              .onPressed,
+          isNull);
+      final retry = find.widgetWithText(TextButton, 'Retry');
+      expect(retry, findsOneWidget);
+
+      service.confirmException = null;
+      service.confirmResult = const ConfirmAssistantAppointmentResult(
+        success: true,
+        appointmentId: 'recovered_appointment',
+        bookingReference: 'BK-RECOVERED',
+      );
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      await tester
+          .tap(find.widgetWithText(ElevatedButton, 'Confirm Appointment'));
+      await tester.pumpAndSettle();
+
+      expect(service.confirmAppointmentCallCount, 2);
+      expect(service.lastConfirmedIdempotencyKey, originalBookingKey);
+      expect(find.text('Booking Confirmed!'), findsOneWidget);
+      expect(provider.pendingBookingOffer, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets(
+        'Pending retry offer card displays Retry button and allows confirmation click',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final pastExpiredOffer = AssistantOffer(
         offerId: 'off_retry_expired',
@@ -1518,7 +2045,9 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Tapping outside input unfocuses and preserves typed text, tapping input re-focuses', (tester) async {
+    testWidgets(
+        'Tapping outside input unfocuses and preserves typed text, tapping input re-focuses',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       final provider = AssistantChatProvider(
         patientId: 'patient_focus_test',
@@ -1566,7 +2095,8 @@ void main() {
       provider.dispose();
     });
 
-    testWidgets('Dragging chat message list dismisses input focus', (tester) async {
+    testWidgets('Dragging chat message list dismisses input focus',
+        (tester) async {
       final fakeService = FakeAssistantFunctionsService();
       fakeService.historyResult = GetAssistantHistoryResult(
         success: true,

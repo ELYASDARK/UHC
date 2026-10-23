@@ -8,7 +8,6 @@ import '../../../data/models/department_model.dart';
 import '../../../data/repositories/department_repository.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/constants/department_icons.dart';
-import '../browse_doctors/doctor_list_screen.dart';
 
 enum DepartmentCaptureState { live, empty, error }
 
@@ -82,10 +81,9 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final displayError =
-        widget.captureState == DepartmentCaptureState.error
-            ? AppLocalizations.of(context).connectionError
-            : _error;
+    final displayError = widget.captureState == DepartmentCaptureState.error
+        ? AppLocalizations.of(context).connectionError
+        : _error;
     final breakpoint = UhcResponsive.breakpointOf(context);
     final departmentCardAspectRatio = breakpoint.isWide
         ? 1.05
@@ -213,7 +211,7 @@ class _DepartmentCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _navigateToDepartment(context),
+        onTap: () => Navigator.pop(context, department.departmentKey),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -277,16 +275,6 @@ class _DepartmentCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _navigateToDepartment(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            DoctorListScreen(initialDepartmentKey: department.departmentKey),
       ),
     );
   }

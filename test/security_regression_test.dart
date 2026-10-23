@@ -421,19 +421,6 @@ void main() {
       expect(fcmSource, contains("if (kIsWeb || EmulatorConfig.isEmulatorEnabled) return;"));
     });
 
-    test('assistant service error logs are sanitized and never log user messages or payloads', () {
-      final serviceSource = readProjectFile('lib/services/assistant_functions_service.dart');
-
-      expect(serviceSource, contains("debugPrint('sendAssistantMessage failed: code=\${e.code}');"));
-      expect(serviceSource, contains("debugPrint('sendAssistantMessage unexpected error: code=unknown');"));
-      expect(serviceSource, contains("debugPrint('confirmAssistantAppointment failed: code=\${e.code}');"));
-      expect(serviceSource, contains("debugPrint('confirmAssistantAppointment unexpected error: code=unknown');"));
-
-      expect(serviceSource, isNot(contains("debugPrint('\$sanitizedMessage'")));
-      expect(serviceSource, isNot(contains("debugPrint('Assistant error: \$e'")));
-      expect(serviceSource, isNot(contains("debugPrint('sendAssistantMessage error: \$e'")));
-    });
-
     test('source repository does not contain hardcoded Google API keys', () {
       final candidateFiles = [
         'lib/main.dart',

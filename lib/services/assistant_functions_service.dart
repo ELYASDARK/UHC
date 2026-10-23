@@ -1,14 +1,33 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import '../data/models/assistant_chat_model.dart';
+import 'firebase_callable.dart';
 
-/// Exception thrown by assistant functions service.
+enum AssistantFunctionOperation {
+  sendMessage('sendAssistantMessage', Duration(seconds: 70),
+      'Failed to send message to assistant.'),
+  history('getAssistantHistory', Duration(seconds: 20),
+      'Failed to fetch assistant history.'),
+  clearHistory('clearAssistantHistory', Duration(seconds: 15),
+      'Failed to clear assistant history.'),
+  confirmAppointment('confirmAssistantAppointment', Duration(seconds: 30),
+      'Failed to confirm assistant appointment.');
+
+  const AssistantFunctionOperation(
+      this.callableName, this.timeout, this.failureMessage);
+
+  final String callableName;
+  final Duration timeout;
+  final String failureMessage;
+}
+
 class AssistantFunctionException implements Exception {
   final String code;
   final String message;
   final AssistantMessageStatus? status;
   final String? reasonCode;
   final DateTime? resetAt;
+  final AssistantFunctionOperation? operation;
 
   const AssistantFunctionException({
     required this.code,
@@ -16,31 +35,103 @@ class AssistantFunctionException implements Exception {
     this.status,
     this.reasonCode,
     this.resetAt,
+    this.operation,
   });
 
-  bool get isDailyLimit =>
-      status == AssistantMessageStatus.dailyLimit ||
-      code == 'resource-exhausted' && reasonCode == 'upstream_daily_limit_reached';
+  factory AssistantFunctionException.fromFirebase(
+    FirebaseFunctionsException failure,
+    AssistantFunctionOperation operation,
+  ) {
+    final details = failure.details;
+    final fields = details is Map ? details : const <String, Object?>{};
+    final rawStatus = fields['status'];
+    final rawReason = fields['reasonCode'];
+    final rawReset = fields['resetAt'];
+    return AssistantFunctionException(
+      code: failure.code,
+      message: failure.message ?? operation.failureMessage,
+      status: rawStatus is String
+          ? AssistantMessageStatus.fromString(rawStatus)
+          : null,
+      reasonCode: rawReason is String ? rawReason : null,
+      resetAt: rawReset is String ? DateTime.tryParse(rawReset)?.toUtc() : null,
+      operation: operation,
+    );
+  }
 
-  bool get isThrottled =>
-      status == AssistantMessageStatus.throttled ||
-      code == 'resource-exhausted';
+  AssistantFailureKind get kind {
+    final statusKind = switch (status) {
+      AssistantMessageStatus.dailyLimit => AssistantFailureKind.dailyLimit,
+      AssistantMessageStatus.throttled => AssistantFailureKind.throttled,
+      AssistantMessageStatus.disabled => AssistantFailureKind.disabled,
+      AssistantMessageStatus.unavailable => AssistantFailureKind.unavailable,
+      _ => null,
+    };
+    if (statusKind != null) return statusKind;
+    final reasonKind = switch (reasonCode) {
+      'upstream_daily_limit_reached' ||
+      'local_daily_cap_reached' =>
+        AssistantFailureKind.dailyLimit,
+      'upstream_throttled' ||
+      'user_rate_limited' ||
+      'project_rate_limited' =>
+        AssistantFailureKind.throttled,
+      'assistant_disabled' ||
+      'assistant_unconfigured' ||
+      'synthetic_mismatch_rejected' =>
+        AssistantFailureKind.disabled,
+      'upstream_unavailable' ||
+      'upstream_error' ||
+      'catalog_overflow' ||
+      'schedule_match_error' =>
+        AssistantFailureKind.unavailable,
+      'offer_expired' || 'offer_taken' => AssistantFailureKind.staleOffer,
+      'history_load_failed' => AssistantFailureKind.historyLoad,
+      _ => null,
+    };
+    if (reasonKind != null) return reasonKind;
+    return switch (code) {
+      'unauthenticated' => AssistantFailureKind.unauthenticated,
+      'permission-denied' => AssistantFailureKind.permissionDenied,
+      'not-found' => AssistantFailureKind.notFound,
+      'resource-exhausted' => AssistantFailureKind.throttled,
+      'already-exists' ||
+      'failed-precondition' =>
+        operation == AssistantFunctionOperation.sendMessage
+            ? AssistantFailureKind.throttled
+            : AssistantFailureKind.staleOffer,
+      _ when operation == AssistantFunctionOperation.history =>
+        AssistantFailureKind.historyLoad,
+      'unavailable' ||
+      'deadline-exceeded' ||
+      'internal' ||
+      'unknown' =>
+        AssistantFailureKind.unavailable,
+      _ => AssistantFailureKind.unknown,
+    };
+  }
 
-  bool get isOfferExpiredOrTaken =>
-      code == 'already-exists' || code == 'failed-precondition';
+  AssistantMessageStatus? get failureStatus => switch (kind) {
+        AssistantFailureKind.dailyLimit => AssistantMessageStatus.dailyLimit,
+        AssistantFailureKind.throttled => AssistantMessageStatus.throttled,
+        AssistantFailureKind.disabled => AssistantMessageStatus.disabled,
+        AssistantFailureKind.unavailable => AssistantMessageStatus.unavailable,
+        _ => null,
+      };
 
-  bool get isUnauthenticated => code == 'unauthenticated';
-  bool get isPermissionDenied => code == 'permission-denied';
-  bool get isNotFound => code == 'not-found';
-  bool get isUnavailable =>
-      code == 'unavailable' || code == 'deadline-exceeded';
+  bool get isDailyLimit => kind == AssistantFailureKind.dailyLimit;
+  bool get isThrottled => kind == AssistantFailureKind.throttled;
+  bool get isOfferExpiredOrTaken => kind == AssistantFailureKind.staleOffer;
+  bool get isUnauthenticated => kind == AssistantFailureKind.unauthenticated;
+  bool get isPermissionDenied => kind == AssistantFailureKind.permissionDenied;
+  bool get isNotFound => kind == AssistantFailureKind.notFound;
+  bool get isUnavailable => kind == AssistantFailureKind.unavailable;
 
   @override
-  String toString() => 'AssistantFunctionException(code: $code, message: $message)';
+  String toString() =>
+      'AssistantFunctionException(code: $code, message: $message)';
 }
 
-/// Abstract contract for assistant backend functions communication.
-/// Enables mock and fake boundaries for unit and widget tests without live Firebase.
 abstract class AssistantFunctionsService {
   Future<SendAssistantMessageResult> sendMessage({
     required String message,
@@ -49,7 +140,6 @@ abstract class AssistantFunctionsService {
   });
 
   Future<GetAssistantHistoryResult> getHistory();
-
   Future<bool> clearHistory();
 
   Future<ConfirmAssistantAppointmentResult> confirmAppointment({
@@ -60,7 +150,6 @@ abstract class AssistantFunctionsService {
   });
 }
 
-/// Production implementation using `cloud_functions`.
 class FirebaseAssistantFunctionsService implements AssistantFunctionsService {
   final FirebaseFunctions _functions;
 
@@ -80,99 +169,30 @@ class FirebaseAssistantFunctionsService implements AssistantFunctionsService {
         message: 'Message cannot be empty.',
       );
     }
-
-    try {
-      final callable = _functions.httpsCallable(
-        'sendAssistantMessage',
-        // Leave a five-second margin before the 75-second server deadline.
-        options: HttpsCallableOptions(timeout: const Duration(seconds: 70)),
-      );
-
-      final payload = <String, dynamic>{
+    return _call(
+      AssistantFunctionOperation.sendMessage,
+      {
         'message': sanitizedMessage,
         if (locale != null) 'locale': locale,
         if (clientRequestId != null) 'clientRequestId': clientRequestId,
-      };
-
-      final response = await callable.call<Map<dynamic, dynamic>>(payload);
-      final rawData = Map<String, dynamic>.from(response.data);
-      return SendAssistantMessageResult.fromJson(rawData);
-    } on FirebaseFunctionsException catch (e) {
-      debugPrint('sendAssistantMessage failed: code=${e.code}');
-      final details = e.details is Map ? Map<String, dynamic>.from(e.details as Map) : null;
-      DateTime? resetAt;
-      if (details?['resetAt'] is String) {
-        try {
-          resetAt = DateTime.parse(details!['resetAt'] as String).toUtc();
-        } catch (_) {}
-      }
-
-      throw AssistantFunctionException(
-        code: e.code,
-        message: e.message ?? 'Failed to send message to assistant.',
-        reasonCode: details?['reasonCode'] as String?,
-        resetAt: resetAt,
-      );
-    } catch (e) {
-      debugPrint('sendAssistantMessage unexpected error: code=unknown');
-      throw AssistantFunctionException(
-        code: 'unknown',
-        message: 'Unexpected error calling assistant service.',
-      );
-    }
+      },
+      SendAssistantMessageResult.fromJson,
+    );
   }
 
   @override
-  Future<GetAssistantHistoryResult> getHistory() async {
-    try {
-      final callable = _functions.httpsCallable(
-        'getAssistantHistory',
-        options: HttpsCallableOptions(timeout: const Duration(seconds: 20)),
+  Future<GetAssistantHistoryResult> getHistory() => _call(
+        AssistantFunctionOperation.history,
+        const {},
+        GetAssistantHistoryResult.fromJson,
       );
-
-      final response = await callable.call<Map<dynamic, dynamic>>(<String, dynamic>{});
-      final rawData = Map<String, dynamic>.from(response.data);
-      return GetAssistantHistoryResult.fromJson(rawData);
-    } on FirebaseFunctionsException catch (e) {
-      debugPrint('getAssistantHistory failed: code=${e.code}');
-      throw AssistantFunctionException(
-        code: e.code,
-        message: e.message ?? 'Failed to fetch assistant history.',
-      );
-    } catch (e) {
-      debugPrint('getAssistantHistory unexpected error: code=unknown');
-      throw AssistantFunctionException(
-        code: 'unknown',
-        message: 'Unexpected error calling assistant history service.',
-      );
-    }
-  }
 
   @override
-  Future<bool> clearHistory() async {
-    try {
-      final callable = _functions.httpsCallable(
-        'clearAssistantHistory',
-        options: HttpsCallableOptions(timeout: const Duration(seconds: 15)),
+  Future<bool> clearHistory() => _call(
+        AssistantFunctionOperation.clearHistory,
+        const {},
+        (response) => response['success'] == true,
       );
-
-      final response = await callable.call<Map<dynamic, dynamic>>(<String, dynamic>{});
-      final rawData = Map<String, dynamic>.from(response.data);
-      return rawData['success'] == true;
-    } on FirebaseFunctionsException catch (e) {
-      debugPrint('clearAssistantHistory failed: code=${e.code}');
-      throw AssistantFunctionException(
-        code: e.code,
-        message: e.message ?? 'Failed to clear assistant history.',
-      );
-    } catch (e) {
-      debugPrint('clearAssistantHistory unexpected error: code=unknown');
-      throw AssistantFunctionException(
-        code: 'unknown',
-        message: 'Unexpected error calling clear assistant history service.',
-      );
-    }
-  }
 
   @override
   Future<ConfirmAssistantAppointmentResult> confirmAppointment({
@@ -181,49 +201,57 @@ class FirebaseAssistantFunctionsService implements AssistantFunctionsService {
     String? notes,
     String? idempotencyKey,
   }) async {
-    if (offerId.trim().isEmpty) {
-      throw const AssistantFunctionException(
+    if (offerId.trim().isEmpty || !confirmed) {
+      throw AssistantFunctionException(
         code: 'invalid-argument',
-        message: 'offerId is required.',
+        message: offerId.trim().isEmpty
+            ? 'offerId is required.'
+            : 'confirmed must be explicitly true.',
       );
     }
-
-    if (!confirmed) {
-      throw const AssistantFunctionException(
-        code: 'invalid-argument',
-        message: 'confirmed must be explicitly true.',
-      );
-    }
-
-    try {
-      final callable = _functions.httpsCallable(
-        'confirmAssistantAppointment',
-        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
-      );
-
-      final payload = <String, dynamic>{
+    return _call(
+      AssistantFunctionOperation.confirmAppointment,
+      {
         'offerId': offerId.trim(),
         'confirmed': true,
         if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
         if (idempotencyKey != null && idempotencyKey.trim().isNotEmpty)
           'idempotencyKey': idempotencyKey.trim(),
-      };
+      },
+      ConfirmAssistantAppointmentResult.fromJson,
+    );
+  }
 
-      final response = await callable.call<Map<dynamic, dynamic>>(payload);
-      final rawData = Map<String, dynamic>.from(response.data);
-      return ConfirmAssistantAppointmentResult.fromJson(rawData);
-    } on FirebaseFunctionsException catch (e) {
-      debugPrint('confirmAssistantAppointment failed: code=${e.code}');
-      throw AssistantFunctionException(
-        code: e.code,
-        message: e.message ?? 'Failed to confirm assistant appointment.',
+  Future<T> _call<T>(
+    AssistantFunctionOperation operation,
+    Map<String, Object?> payload,
+    T Function(Map<String, dynamic>) decode,
+  ) async {
+    try {
+      final response = await invokeFirebaseCallable(
+        _functions,
+        operation.callableName,
+        payload,
+        timeout: operation.timeout,
       );
-    } catch (e) {
-      debugPrint('confirmAssistantAppointment unexpected error: code=unknown');
-      throw AssistantFunctionException(
-        code: 'unknown',
-        message: 'Unexpected error calling confirm assistant appointment service.',
-      );
+      return decode(Map<String, dynamic>.from(response as Map));
+    } on FirebaseFunctionsException catch (failure) {
+      debugPrint('${operation.callableName} failed: code=${failure.code}');
+      throw AssistantFunctionException.fromFirebase(failure, operation);
+    } on Exception catch (failure) {
+      throw _unexpectedFailure(operation, failure);
+    } on TypeError catch (failure) {
+      throw _unexpectedFailure(operation, failure);
     }
+  }
+
+  AssistantFunctionException _unexpectedFailure(
+      AssistantFunctionOperation operation, Object failure) {
+    debugPrint('${operation.callableName} failed: ${failure.runtimeType}');
+    return AssistantFunctionException(
+      code: 'unknown',
+      message: operation.failureMessage,
+      operation: operation,
+    );
   }
 }

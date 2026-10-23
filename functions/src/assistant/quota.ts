@@ -1,4 +1,4 @@
-import { admin } from '../firebase';
+import { Timestamp } from 'firebase-admin/firestore';
 import { ASSISTANT_CONFIG } from './config';
 import { getLocalizedMessage } from './localization';
 import { AssistantMessageStatus, AssistantReplyLanguage } from './types';
@@ -194,8 +194,8 @@ export async function checkAssistantAdmission(
         ]);
 
         const userCount = userSnap.data()?.count || 0;
-        const userTtl = admin.firestore.Timestamp.fromMillis(now.getTime() + 2 * 60 * 60 * 1000);
-        const projectTtl = admin.firestore.Timestamp.fromMillis(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const userTtl = Timestamp.fromMillis(now.getTime() + 2 * 60 * 60 * 1000);
+        const projectTtl = Timestamp.fromMillis(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
         // 1. Enforce per-user RPM abuse limit first
         if (userCount >= ASSISTANT_CONFIG.USER_RPM_CAP) {
@@ -306,7 +306,7 @@ export async function markDailyQuotaExhausted(
 ): Promise<void> {
     const pacificDateKey = getPacificDateKey(now);
     const projectQuotaRef = db.collection('assistant_project_quota').doc(pacificDateKey);
-    const projectTtl = admin.firestore.Timestamp.fromMillis(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const projectTtl = Timestamp.fromMillis(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     await projectQuotaRef.set(
         {
             dateKey: pacificDateKey,

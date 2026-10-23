@@ -336,7 +336,9 @@ class UHCApp extends StatelessWidget {
 
 /// Main app navigator handling auth state and navigation flow
 class AppNavigator extends StatefulWidget {
-  const AppNavigator({super.key});
+  final int initialPatientTab;
+
+  const AppNavigator({super.key, this.initialPatientTab = 0});
 
   @override
   State<AppNavigator> createState() => _AppNavigatorState();
@@ -630,7 +632,7 @@ class _AppNavigatorState extends State<AppNavigator> {
             screen = DoctorShell(doctor: _doctorModel!);
           }
         } else {
-          screen = const MainShell();
+          screen = MainShell(initialIndex: widget.initialPatientTab);
         }
       }
     } else {

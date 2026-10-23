@@ -71,6 +71,7 @@
   "confirmBooking": "دڵنیاکردنەوەی نۆرەکردن",
   "bookingConfirmed": "نۆرەکردن پەسەند کرا",
   "bookingFailed": "نۆرەکردن سەرکەوتوو نەبوو",
+  "bookingSlotUnavailable": "ئەم کاتە تازە حجز کرا. تکایە کاتێکی تر هەڵبژێرە.",
   "appointmentBooked": "چاوپێکەوتن بەسەرکەوتوویی نۆرە کرا",
   "confirmDetails": "دڵنیابوون لە وردەکاری",
   "bookAnAppointment": "نۆرەکردنی چاوپێکەوتن",

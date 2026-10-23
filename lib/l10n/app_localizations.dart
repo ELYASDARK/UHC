@@ -520,6 +520,12 @@ abstract class AppLocalizations {
   /// **'Booking Failed'**
   String get bookingFailed;
 
+  /// No description provided for @bookingSlotUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This time slot was just booked. Please choose another time.'**
+  String get bookingSlotUnavailable;
+
   /// No description provided for @appointmentBooked.
   ///
   /// In en, this message translates to:

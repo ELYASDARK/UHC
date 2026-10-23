@@ -222,6 +222,10 @@ class AppLocalizationsKu extends AppLocalizations {
   String get bookingFailed => 'نۆرەکردن سەرکەوتوو نەبوو';
 
   @override
+  String get bookingSlotUnavailable =>
+      'ئەم کاتە تازە حجز کرا. تکایە کاتێکی تر هەڵبژێرە.';
+
+  @override
   String get appointmentBooked => 'چاوپێکەوتن بەسەرکەوتوویی نۆرە کرا';
 
   @override

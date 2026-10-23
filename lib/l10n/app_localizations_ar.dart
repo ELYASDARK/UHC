@@ -222,6 +222,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingFailed => 'فشل الحجز';
 
   @override
+  String get bookingSlotUnavailable =>
+      'تم حجز هذا الموعد للتو. يرجى اختيار وقت آخر.';
+
+  @override
   String get appointmentBooked => 'تم حجز الموعد بنجاح';
 
   @override

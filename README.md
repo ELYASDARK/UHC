@@ -30,6 +30,7 @@ Healthcare Appointment & Management Platform
 - [AI Appointment Assistant](#ai-appointment-assistant)
 - [User Roles & Permissions](#user-roles--permissions)
 - [Super Admin Bootstrap](#super-admin-bootstrap)
+- [Testing](#testing)
 - [Building for Production](#building-for-production)
 - [Configuration Reference](#configuration-reference)
 - [Changelog](#changelog)
@@ -361,15 +362,26 @@ Use manual promotion only when the primary slot is empty. If it is occupied, fol
 
 ---
 
-## Building for Production
+## Testing
 
-From the repository root, run the checks used by CI and compile the backend:
+Run from the repository root:
 
 ```bash
 flutter analyze
 flutter test
-npm --prefix functions run build
+flutter test test/appointment_callable_routing_test.dart --dart-define=USE_FIREBASE_EMULATOR=true
+npm --prefix functions test
+npm --prefix functions run test:emulator
 ```
+
+The Firestore tests require Java 21 and the emulator JAR. They use and reset only
+the local `demo-uhc-test` project. See [emulator setup](docs/FIREBASE_SETUP.md#controlled-local-offline-synthetic-testing).
+
+---
+
+## Building for Production
+
+Run the checks above before compiling release artifacts.
 
 Use your production app identifiers, Firebase project, and signing configuration before creating a release build. The commands below compile release artifacts; they do not configure signing or publish to an app store.
 
