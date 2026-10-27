@@ -1,3 +1,6 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -73,7 +76,9 @@ class _BookingScreenState extends State<BookingScreen> {
       if (widget.initialTimeSlot != null) {
         final availableSlots = _getAvailableSlots(widget.initialDate!);
         final slotStillExists = availableSlots.any(
-          (s) => s.startTime == widget.initialTimeSlot!.startTime,
+          (s) =>
+              s.startTime == widget.initialTimeSlot!.startTime &&
+              s.endTime == widget.initialTimeSlot!.endTime,
         );
         if (slotStillExists) {
           _selectedTimeSlot = widget.initialTimeSlot;
@@ -90,8 +95,12 @@ class _BookingScreenState extends State<BookingScreen> {
         .snapshots()
         .listen((snapshot) {
       if (snapshot.exists && mounted) {
+        final updatedDoctor = DoctorModel.fromFirestore(snapshot);
+        final scheduleChanged = _doctor.canBook != updatedDoctor.canBook ||
+            jsonEncode(_doctor.toFirestore()['weeklySchedule']) !=
+                jsonEncode(updatedDoctor.toFirestore()['weeklySchedule']);
         setState(() {
-          _doctor = DoctorModel.fromFirestore(snapshot);
+          _doctor = updatedDoctor;
           if (!_doctorCanBook) {
             _selectedTimeSlot = null;
           }
@@ -99,25 +108,29 @@ class _BookingScreenState extends State<BookingScreen> {
           if (_selectedDay != null && _selectedTimeSlot != null) {
             final availableSlots = _getAvailableSlots(_selectedDay!);
             final slotStillExists = availableSlots.any(
-              (s) => s.startTime == _selectedTimeSlot!.startTime,
+              (s) =>
+                  s.startTime == _selectedTimeSlot!.startTime &&
+                  s.endTime == _selectedTimeSlot!.endTime,
             );
             if (!slotStillExists) {
               _selectedTimeSlot = null;
             }
           }
         });
-        if (_selectedDay != null) {
-          _fetchAvailability(_selectedDay!);
+        if (scheduleChanged && _selectedDay != null) {
+          _fetchAvailability(_selectedDay!, forceRefresh: true);
         }
       }
     });
   }
 
   /// Fetch availability for the selected date via trusted callable
-  Future<void> _fetchAvailability(DateTime date) async {
+  Future<void> _fetchAvailability(DateTime date,
+      {bool forceRefresh = false}) async {
     await _availability.load(
       doctorId: _doctor.id,
       date: date,
+      forceRefresh: forceRefresh,
     );
   }
 
@@ -147,8 +160,14 @@ class _BookingScreenState extends State<BookingScreen> {
 
   bool get _doctorCanBook => _doctor.canBook;
 
+  bool get _hasTrustedSelection =>
+      _selectedDay != null &&
+      _selectedTimeSlot != null &&
+      _availability.isReadyFor(doctorId: _doctor.id, date: _selectedDay!) &&
+      _availability.isAvailable(_selectedTimeSlot!);
+
   String get _doctorUnavailableMessage =>
-      'This doctor is not available for booking right now.';
+      AppMessages.localizations(context).doctorNotAvailableSelectAnother;
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +192,8 @@ class _BookingScreenState extends State<BookingScreen> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _isLoading || _availability.isLoading
+                          onPressed: _isLoading ||
+                                  (_currentStep > 0 && !_hasTrustedSelection)
                               ? null
                               : details.onStepContinue,
                           style: ElevatedButton.styleFrom(
@@ -208,7 +228,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: details.onStepCancel,
+                            onPressed: _isLoading ? null : details.onStepCancel,
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
@@ -370,6 +390,7 @@ class _BookingScreenState extends State<BookingScreen> {
             calendarFormat: _calendarFormat,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
             onDaySelected: (selectedDay, focusedDay) {
+              if (isSameDay(_selectedDay, selectedDay)) return;
               setState(() {
                 _selectedDay = selectedDay;
                 _focusedDay = focusedDay;
@@ -454,10 +475,17 @@ class _BookingScreenState extends State<BookingScreen> {
     }
 
     if (_availability.isLoading) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 32.0),
-          child: CircularProgressIndicator(),
+          padding: const EdgeInsets.symmetric(vertical: 32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(l10n.loadingAvailability, textAlign: TextAlign.center),
+            ],
+          ),
         ),
       );
     }
@@ -666,7 +694,7 @@ class _BookingScreenState extends State<BookingScreen> {
               CircleAvatar(
                 radius: 30,
                 backgroundImage: _doctor.photoUrl != null
-                    ? NetworkImage(_doctor.photoUrl!)
+                    ? CachedNetworkImageProvider(_doctor.photoUrl!)
                     : null,
                 child: _doctor.photoUrl == null
                     ? const Icon(Icons.person, size: 30)
@@ -780,12 +808,18 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   void _onStepContinue() {
+    if (_isLoading) return;
     if (!_doctorCanBook) {
       _showError(_doctorUnavailableMessage);
       return;
     }
     if (_currentStep == 0) {
       if (_selectedDay == null) {
+        _showError(AppLocalizations.of(context).pleaseSelectDate);
+        return;
+      }
+      final today = DateUtils.dateOnly(DateTime.now());
+      if (DateUtils.dateOnly(_selectedDay!).isBefore(today)) {
         _showError(AppLocalizations.of(context).pleaseSelectDate);
         return;
       }
@@ -798,7 +832,7 @@ class _BookingScreenState extends State<BookingScreen> {
         return;
       }
     }
-    if (_currentStep == 1 && _selectedTimeSlot == null) {
+    if (_currentStep > 0 && !_hasTrustedSelection) {
       _showError(AppLocalizations.of(context).pleaseSelectTime);
       return;
     }
@@ -817,7 +851,8 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+    AppMessages.show(
+      context,
       SnackBar(
         content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: AppColors.error,
@@ -848,7 +883,7 @@ class _BookingScreenState extends State<BookingScreen> {
     if (selectedDay == null || selectedTimeSlot == null) {
       return;
     }
-    if (!_availability.isAvailable(selectedTimeSlot)) {
+    if (!_hasTrustedSelection) {
       _showError(AppLocalizations.of(context).noAvailableSlotsOnThisDay);
       return;
     }

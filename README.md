@@ -247,7 +247,7 @@ uhc/
 |:---|:---|
 | Flutter SDK | A stable release that satisfies both SDK constraints below |
 | Locked SDK constraints | Flutter >=3.38.4 and bundled Dart >=3.11.0, <4.0.0 |
-| Node.js | 22, matching the Functions runtime in `firebase.json` |
+| Node.js | 24, matching the Functions runtime in `firebase.json` |
 | Firebase CLI | 15.19.0, the version used to check the deployment flags below |
 | FlutterFire CLI | Required to generate the Firebase app configuration |
 | Android Studio / Xcode | Android tooling for Android builds; macOS and Xcode for iOS builds |

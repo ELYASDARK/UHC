@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
@@ -158,11 +159,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
   }
 
   void _navigateToStandardBooking() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-          builder: (_) => const AppNavigator(initialPatientTab: 1)),
-      (route) => false,
-    );
+    AppNavigator.returnToPatientTab(context, 1);
   }
 
   Future<void> _confirmClearChat() async {
@@ -195,13 +192,18 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
         if (success) {
           _textController.clear();
           setState(() => _charCount = 0);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.assistantChatCleared)),
+          AppMessages.show(
+            context,
+            SnackBar(
+                content: Text(
+                    AppMessages.localizations(context).assistantChatCleared)),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text(l10n.assistantClearChatFailed),
+              content: Text(
+                  AppMessages.localizations(context).assistantClearChatFailed),
               backgroundColor: AppColors.error,
             ),
           );
@@ -319,13 +321,15 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
 
   Future<void> _handleOfferSelection(AssistantOffer offer) async {
     if (!_provider.canConfirmOffer(offer)) return;
-    final l10n = AppLocalizations.of(context);
     final isRetry = _provider.activeBookingOfferId == offer.offerId;
     if (!isRetry && !offer.isBookable(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(l10n.assistantStaleOffer),
-        backgroundColor: AppColors.warning,
-      ));
+      AppMessages.show(
+          context,
+          SnackBar(
+            content:
+                Text(AppMessages.localizations(context).assistantStaleOffer),
+            backgroundColor: AppColors.warning,
+          ));
       await _provider.refreshHistory();
       return;
     }

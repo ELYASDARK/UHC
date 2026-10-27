@@ -496,6 +496,8 @@ class AppTheme {
 
   // SnackBar Theme
   static SnackBarThemeData get _snackBarTheme => SnackBarThemeData(
+        showCloseIcon: true,
+        closeIconColor: Colors.white,
         behavior: SnackBarBehavior.floating,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -505,6 +507,8 @@ class AppTheme {
       );
 
   static SnackBarThemeData get _snackBarThemeDark => SnackBarThemeData(
+        showCloseIcon: true,
+        closeIconColor: AppColors.textPrimaryLight,
         behavior: SnackBarBehavior.floating,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

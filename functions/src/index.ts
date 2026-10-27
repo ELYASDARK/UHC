@@ -43,6 +43,7 @@ export {
     setDoctorAvailabilityByAdmin,
 } from './doctorAvailability';
 export { onNotificationCreated } from './notifications/delivery';
+export { replaceMedicalDocument, cleanDocumentReplacements, queueMedicalDocumentCleanup } from './documentReplacement';
 export {
     deliverScheduledNotifications,
     resyncUserNotificationSchedules,

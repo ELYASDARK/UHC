@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { Timestamp } from 'firebase-admin/firestore';
 
 import { admin, auth, db } from './firebase';
 import {
@@ -385,6 +386,7 @@ interface SetDoctorActiveStatusData {
  * Cloud Function to activate/deactivate a doctor record.
  */
 export const setDoctorActiveStatus = functions.https.onCall(
+    { region: 'us-central1', maxInstances: 20 },
     async (request: functions.https.CallableRequest<SetDoctorActiveStatusData>) => {
         const data = request.data;
         const callerUid = requireAuth(request);
@@ -399,22 +401,27 @@ export const setDoctorActiveStatus = functions.https.onCall(
         }
 
         const doctorRef = db.collection('doctors').doc(data.doctorId);
-        const doctorSnap = await doctorRef.get();
-        if (!doctorSnap.exists) {
-            throw new functions.https.HttpsError('not-found', 'Doctor not found.');
-        }
-
-        await doctorRef.update({
-            isActive: data.isActive,
-            updatedAt: admin.firestore.Timestamp.now(),
+        const doctorUserId = await db.runTransaction(async transaction => {
+            const doctorSnap = await transaction.get(doctorRef);
+            if (!doctorSnap.exists) {
+                throw new functions.https.HttpsError('not-found', 'Doctor not found.');
+            }
+            const linkedUserId = doctorSnap.data()?.userId;
+            if (typeof linkedUserId !== 'string' || !linkedUserId || linkedUserId.includes('/')) {
+                throw new functions.https.HttpsError('failed-precondition', 'Doctor has no valid linked account.');
+            }
+            const userRef = db.collection('users').doc(linkedUserId);
+            const userSnap = await transaction.get(userRef);
+            if (!userSnap.exists || userSnap.data()?.role !== 'doctor') {
+                throw new functions.https.HttpsError('failed-precondition', 'Linked doctor account is missing or invalid.');
+            }
+            // The directory badge and login gate must commit the same state.
+            const statusUpdate = { isActive: data.isActive, updatedAt: Timestamp.now() };
+            transaction.update(doctorRef, statusUpdate);
+            transaction.update(userRef, statusUpdate);
+            return linkedUserId;
         });
-
-        const doctorUserId = doctorSnap.data()?.userId as string | undefined;
-        if (!data.isActive && doctorUserId) {
-            await db.collection('users').doc(doctorUserId).update({
-                isActive: false,
-                updatedAt: admin.firestore.Timestamp.now(),
-            }).catch(() => { });
+        if (!data.isActive) {
             await revokeSessionsAndClearFcm(doctorUserId);
         }
 
@@ -434,6 +441,7 @@ interface UpdateDoctorScheduleData {
  * Cloud Function to update a doctor's weekly schedule.
  */
 export const updateDoctorSchedule = functions.https.onCall(
+    { region: 'us-central1', maxInstances: 20 },
     async (request: functions.https.CallableRequest<UpdateDoctorScheduleData>) => {
         const data = request.data;
         const callerUid = requireAuth(request);
@@ -455,7 +463,7 @@ export const updateDoctorSchedule = functions.https.onCall(
 
         await doctorRef.update({
             weeklySchedule: data.weeklySchedule,
-            updatedAt: admin.firestore.Timestamp.now(),
+            updatedAt: Timestamp.now(),
         });
 
         return { success: true, message: 'Schedule updated successfully' };

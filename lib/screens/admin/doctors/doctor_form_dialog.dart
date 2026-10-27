@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -9,7 +11,6 @@ import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../services/doctor_functions_service.dart';
 import '../../../services/user_functions_service.dart';
-import 'doctor_schedule_dialog.dart';
 
 const int _minimumPasswordLength = 8;
 const int _doctorPhotoMaxSizeBytes = 5 * 1024 * 1024;
@@ -382,7 +383,8 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
 
       if (bytes.lengthInBytes > _doctorPhotoMaxSizeBytes) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
               content: Row(
                 children: [
@@ -390,7 +392,7 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 5 MB.',
+                      AppMessages.localizations(context).imageTooLargeLimit(5),
                     ),
                   ),
                 ],
@@ -434,9 +436,11 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
           _photoUrlController.text = downloadUrl;
           _isUploading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image uploaded successfully'),
+        AppMessages.show(
+          context,
+          SnackBar(
+            content:
+                Text(AppMessages.localizations(context).imageUploadedSuccess),
             backgroundColor: AppColors.success,
           ),
         );
@@ -444,9 +448,10 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _isUploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error uploading image: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -487,8 +492,8 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                           backgroundImage: _imageBytes != null
                               ? MemoryImage(_imageBytes!)
                               : _photoUrlController.text.isNotEmpty
-                                  ? NetworkImage(_photoUrlController.text)
-                                      as ImageProvider
+                                  ? CachedNetworkImageProvider(
+                                      _photoUrlController.text) as ImageProvider
                                   : null,
                           child: _imageBytes == null &&
                                   _photoUrlController.text.isEmpty
@@ -866,81 +871,6 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
                 ),
 
                 const SizedBox(height: 8),
-
-                if (isEditing) ...[
-                  const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      // Capture context-dependent objects before async gap
-                      final navigator = Navigator.of(context);
-                      final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                      // Fetch fresh schedule data from Firestore
-                      try {
-                        final doc = await _firestore
-                            .collection('doctors')
-                            .doc(widget.id)
-                            .get();
-
-                        Map<String, dynamic>? schedule;
-                        Map<String, dynamic>? deptWorkingHours;
-
-                        if (doc.exists) {
-                          final rawSchedule = doc.data()?['weeklySchedule'];
-                          if (rawSchedule is Map<String, dynamic>) {
-                            schedule = rawSchedule;
-                          } else if (rawSchedule is Map) {
-                            schedule = Map<String, dynamic>.from(rawSchedule);
-                          }
-
-                          // Fetch department working hours
-                          final deptName = doc.data()?['department'] ??
-                              _selectedDepartment.name;
-                          final deptQuery = await _firestore
-                              .collection('departments')
-                              .where('key', isEqualTo: deptName)
-                              .limit(1)
-                              .get();
-                          if (deptQuery.docs.isNotEmpty) {
-                            final rawHours =
-                                deptQuery.docs.first.data()['workingHours'];
-                            if (rawHours is Map<String, dynamic>) {
-                              deptWorkingHours = rawHours;
-                            } else if (rawHours is Map) {
-                              deptWorkingHours =
-                                  Map<String, dynamic>.from(rawHours);
-                            }
-                          }
-                        }
-
-                        if (mounted) {
-                          showDialog(
-                            context: navigator.context,
-                            builder: (dialogContext) => DoctorScheduleDialog(
-                              doctorId: widget.id!,
-                              currentSchedule: schedule,
-                              departmentWorkingHours: deptWorkingHours,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          scaffoldMessenger.showSnackBar(
-                            SnackBar(
-                              content: Text('Error loading schedule: $e'),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.calendar_month),
-                    label: const Text('Manage Schedule'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 44),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -1173,9 +1103,11 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
 
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Doctor updated successfully'),
+          AppMessages.show(
+            context,
+            SnackBar(
+              content:
+                  Text(AppMessages.localizations(context).doctorUpdatedSuccess),
               backgroundColor: AppColors.success,
             ),
           );
@@ -1184,9 +1116,10 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
     } on DoctorFunctionException catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(e.userMessage),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1194,9 +1127,10 @@ class _DoctorFormDialogState extends State<DoctorFormDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );

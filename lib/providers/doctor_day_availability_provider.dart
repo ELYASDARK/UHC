@@ -11,6 +11,8 @@ class DoctorDayAvailabilityProvider extends ChangeNotifier {
   String? _errorMessage;
   int _requestId = 0;
   bool _isDisposed = false;
+  String? _requestKey;
+  Future<void>? _inFlight;
 
   DoctorDayAvailabilityProvider(this._repository);
 
@@ -18,7 +20,9 @@ class DoctorDayAvailabilityProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   bool isAvailable(TimeSlot slot) {
-    if (!slot.isValid || _availability?.success != true) return false;
+    if (_isLoading || !slot.isValid || _availability?.success != true) {
+      return false;
+    }
     return _availability!.slots.any(
       (trustedSlot) =>
           trustedSlot.startTime == slot.startTime &&
@@ -27,27 +31,57 @@ class DoctorDayAvailabilityProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> load({required String doctorId, required DateTime date}) async {
-    if (_isDisposed) return;
+  bool isReadyFor({required String doctorId, required DateTime date}) =>
+      !_isLoading &&
+      _availability?.success == true &&
+      _availability?.doctorId == doctorId &&
+      _availability?.appointmentDate ==
+          AppointmentRepository.formatClinicDate(date);
+
+  Future<void> load({
+    required String doctorId,
+    required DateTime date,
+    bool forceRefresh = false,
+  }) {
+    if (_isDisposed) return Future.value();
+    final key = '$doctorId/${AppointmentRepository.formatClinicDate(date)}';
+    if (!forceRefresh &&
+        _isLoading &&
+        _requestKey == key &&
+        _inFlight != null) {
+      return _inFlight!;
+    }
     final requestId = ++_requestId;
+    _requestKey = key;
     _availability = null;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
+    return _inFlight = _load(doctorId, date, requestId);
+  }
 
+  Future<void> _load(String doctorId, DateTime date, int requestId) async {
     try {
       final availability = await _repository.getDoctorDayAvailability(
         doctorId: doctorId,
         date: date,
       );
       if (_isDisposed || requestId != _requestId) return;
-      _availability = availability;
-    } catch (error) {
+      if (availability.success &&
+          availability.doctorId == doctorId &&
+          availability.appointmentDate ==
+              AppointmentRepository.formatClinicDate(date)) {
+        _availability = availability;
+      } else {
+        _errorMessage = 'availability-unavailable';
+      }
+    } catch (_) {
       if (_isDisposed || requestId != _requestId) return;
       // A failed read leaves every slot unavailable until the patient retries.
-      _errorMessage = error.toString();
+      _errorMessage = 'availability-unavailable';
     }
     _isLoading = false;
+    _inFlight = null;
     notifyListeners();
   }
 

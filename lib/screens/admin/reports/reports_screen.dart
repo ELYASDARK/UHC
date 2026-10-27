@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -410,18 +411,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Report generated successfully'),
+        AppMessages.show(
+          context,
+          SnackBar(
+            content:
+                Text(AppMessages.localizations(context).reportGeneratedSuccess),
             backgroundColor: AppColors.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error generating report: ${e.toString()}'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -447,7 +451,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     while (allDocs.length < maxDocs) {
       final remaining = maxDocs - allDocs.length;
-      Query batchQuery = query.limit(remaining < batchSize ? remaining : batchSize);
+      Query batchQuery =
+          query.limit(remaining < batchSize ? remaining : batchSize);
       if (lastDoc != null) {
         batchQuery = batchQuery.startAfterDocument(lastDoc);
       }

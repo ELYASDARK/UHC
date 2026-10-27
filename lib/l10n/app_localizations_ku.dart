@@ -2165,8 +2165,7 @@ class AppLocalizationsKu extends AppLocalizations {
   String get exportPermissionRequired => 'Export Permission Required';
 
   @override
-  String get noPermissionForAction =>
-      'You do not have permission for this action';
+  String get noPermissionForAction => 'مۆڵەتت نییە بۆ ئەنجامدانی ئەم کردارە';
 
   @override
   String get generateReport => 'Generate Report';
@@ -2387,4 +2386,205 @@ class AppLocalizationsKu extends AppLocalizations {
 
   @override
   String get assistantBadge => 'یاریدەدەری زیرەک';
+
+  @override
+  String get resetZoom => 'گەڕاندنەوەی گەورەکردن';
+
+  @override
+  String get imageNotAvailable => 'وێنە بەردەست نییە';
+
+  @override
+  String get medicalImageLoadError =>
+      'نەتوانرا وێنە باربکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get scheduleLoadFailed =>
+      'نەتوانرا خشتە باربکرێت. دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get loadingAvailability => 'پشکنینی کاتە بەردەستەکان...';
+
+  @override
+  String get requestFailed =>
+      'نەتوانرا داواکارییەکە تەواوبکرێت. دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get requestNetworkError =>
+      'پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get requestConflict =>
+      'ئەم زانیارییانە گۆڕاون. نوێی بکەرەوە و دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get requestLimitReached => 'هەوڵەکان زۆرن. دواتر دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get requestInvalid =>
+      'زانیارییە نووسراوەکان بپشکنە و دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get requestNotFound =>
+      'ئەم بڕگەیە چیتر بەردەست نییە. نوێی بکەرەوە و دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get authInvalidCredentials =>
+      'ئیمەیڵ یان تێپەڕەوشە هەڵەیە. دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get authEmailUsed => 'ئەم ئیمەیڵە پێشتر تۆمارکراوە.';
+
+  @override
+  String get authAccountDisabled =>
+      'ئەم هەژمارە ناچالاک کراوە. پەیوەندی بە پشتگیرییەوە بکە.';
+
+  @override
+  String get operationCompleted => 'بە سەرکەوتوویی تەواو بوو';
+
+  @override
+  String get logoutFailed => 'نەتوانرا بچیتە دەرەوە. دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get notesSaved => 'تێبینییەکان پاشەکەوت کران';
+
+  @override
+  String get googleAccountLinked => 'هەژماری گووگڵ بەسترایەوە';
+
+  @override
+  String get googleAccountUnlinked => 'بەستەری هەژماری گووگڵ لابرا';
+
+  @override
+  String get availabilityRequestSent =>
+      'داواکاری نێردرا. تا پەسەندکردنی بەڕێوەبەر بەردەست دەمێنیتەوە.';
+
+  @override
+  String imageTooLargeLimit(int limit) {
+    return 'وێنە زۆر گەورەیە. زۆرترین قەبارە $limit مێگابایتە.';
+  }
+
+  @override
+  String get couldNotOpenMaps => 'نەتوانرا نەخشە بکرێتەوە';
+
+  @override
+  String get couldNotOpenDirections => 'نەتوانرا ڕێنیشاندەر بکرێتەوە';
+
+  @override
+  String get couldNotMakeCall => 'نەتوانرا پەیوەندی بکرێت';
+
+  @override
+  String get couldNotOpenEmail => 'نەتوانرا ئیمەیڵ بکرێتەوە';
+
+  @override
+  String get openingEmailClient => 'کردنەوەی ئیمەیڵ...';
+
+  @override
+  String get openingDialer => 'کردنەوەی تەلەفۆن...';
+
+  @override
+  String get departmentUpdatedSuccess => 'بەش بە سەرکەوتوویی نوێکرایەوە';
+
+  @override
+  String get departmentCreatedSuccess => 'بەش بە سەرکەوتوویی دروستکرا';
+
+  @override
+  String get departmentActivatedMessage => 'بەش چالاک کرا';
+
+  @override
+  String get departmentDeactivatedMessage => 'بەش ناچالاک کرا';
+
+  @override
+  String get departmentDeletedSuccess => 'بەش بە سەرکەوتوویی سڕایەوە';
+
+  @override
+  String get imageUploadedSuccess => 'وێنە بە سەرکەوتوویی بارکرا';
+
+  @override
+  String get doctorUpdatedSuccess => 'پزیشک بە سەرکەوتوویی نوێکرایەوە';
+
+  @override
+  String get doctorDeletedSuccess => 'پزیشک بە سەرکەوتوویی سڕایەوە';
+
+  @override
+  String get doctorActivatedMessage => 'پزیشک چالاک کرا';
+
+  @override
+  String get doctorDeactivatedMessage => 'پزیشک ناچالاک کرا';
+
+  @override
+  String get doctorAvailableMessage => 'پزیشک بەردەست کرا';
+
+  @override
+  String get doctorUnavailableMessage => 'پزیشک نابەردەست کرا';
+
+  @override
+  String get scheduleSavedSuccess => 'خشتە بە سەرکەوتوویی پاشەکەوت کرا';
+
+  @override
+  String get reportGeneratedSuccess => 'ڕاپۆرت بە سەرکەوتوویی دروستکرا';
+
+  @override
+  String get userUpdatedSuccess => 'بەکارهێنەر بە سەرکەوتوویی نوێکرایەوە';
+
+  @override
+  String get userDeletedSuccess => 'بەکارهێنەر بە سەرکەوتوویی سڕایەوە';
+
+  @override
+  String get uidCopiedMessage => 'ناسنامەی بەکارهێنەر کۆپی کرا';
+
+  @override
+  String get userActivatedMessage => 'بەکارهێنەر چالاک کرا';
+
+  @override
+  String get userDeactivatedMessage => 'بەکارهێنەر ناچالاک کرا';
+
+  @override
+  String get roleUpdatedMessage => 'ڕۆڵ نوێکرایەوە';
+
+  @override
+  String get patientRoleChangeOnly =>
+      'تەنها ڕۆڵی خوێندکار و کارمەند لێرە دەگۆڕدرێت.';
+
+  @override
+  String notificationRecipientsSent(int count) {
+    return 'بۆ $count وەرگر نێردرا.';
+  }
+
+  @override
+  String get availabilityApprovedCleanup =>
+      'پەسەندکرا. هەڵوەشاندنەوەی نۆرەکان پێویستی بە پێداچوونەوەیە.';
+
+  @override
+  String availabilityApprovedCount(int count) {
+    return 'پەسەندکرا. $count نۆرە هەڵوەشایەوە.';
+  }
+
+  @override
+  String get availabilityRejected => 'داواکاری ڕەتکرایەوە.';
+
+  @override
+  String get emulatorGoogleSignInNotice =>
+      'چوونەژوورەوەی دەرەکی گووگڵ لە دۆخی تاقیکردنەوە ناچالاکە. چوونەژوورەوەی تاقیکردنەوەی ناوخۆ بەکاربهێنە.';
+
+  @override
+  String scheduleTimeWithinHours(String start, String end) {
+    return 'کاتێک لە نێوان $start و $end هەڵبژێرە.';
+  }
+
+  @override
+  String get scheduleEndAfterStart =>
+      'کاتی کۆتایی دەبێت دوای کاتی دەستپێک بێت.';
+
+  @override
+  String get scheduleTimeOverlaps =>
+      'ئەم کاتە لەگەڵ کاتێکی تۆمارکراو تێکدەچێت.';
+
+  @override
+  String get selectRecipientFirst => 'پێش ناردن وەرگرێک هەڵبژێرە.';
+
+  @override
+  String get noActiveRecipients => 'هیچ وەرگرێکی چالاک بۆ ئەم ئامانجە نییە.';
+
+  @override
+  String get notesSaveFailed =>
+      'نەتوانرا تێبینییە پزیشکییەکان پاشەکەوت بکرێن. دووبارە هەوڵ بدەوە.';
 }

@@ -1,5 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
+import 'firebase_callable.dart';
 
 /// Service for calling Firebase Cloud Functions related to doctor management
 class DoctorFunctionsService {
@@ -195,15 +196,15 @@ class DoctorFunctionsService {
     required Map<String, dynamic> weeklySchedule,
   }) async {
     try {
-      final callable = _functions.httpsCallable('updateDoctorSchedule');
-      final result = await callable.call<Map<String, dynamic>>({
+      final result =
+          await invokeFirebaseCallable(_functions, 'updateDoctorSchedule', {
         'doctorId': doctorId,
         'weeklySchedule': weeklySchedule,
       });
 
-      return Map<String, dynamic>.from(result.data);
+      return Map<String, dynamic>.from(result as Map);
     } on FirebaseFunctionsException catch (e) {
-      debugPrint('Error updating doctor schedule: ${e.code} - ${e.message}');
+      debugPrint('Error updating doctor schedule: ${e.code}');
       throw DoctorFunctionException(
         code: e.code,
         message: e.message ?? 'Failed to update doctor schedule',

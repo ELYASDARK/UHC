@@ -1,4 +1,5 @@
 import '../../l10n/app_localizations.dart';
+import '../../data/models/appointment_model.dart';
 
 /// Helper class to translate dynamic content like department names and qualifications
 class LocalizationHelper {
@@ -29,7 +30,29 @@ class LocalizationHelper {
       'Family Medicine': l10n.familyMedicine,
     };
 
-    return translations[englishName] ?? englishName;
+    final translatedName = translations[englishName];
+    if (translatedName != null) return translatedName;
+
+    // DepartmentModel stores camelCase keys; older appointments store names.
+    // Only recognize known catalog keys, leaving custom values untouched.
+    for (final entry in translations.entries) {
+      final words = entry.key.split(' ');
+      final key = words.first.toLowerCase() + words.skip(1).join();
+      if (englishName == key) return entry.value;
+    }
+    return englishName;
+  }
+
+  static String translateAppointmentType(
+    AppointmentType type,
+    AppLocalizations l10n,
+  ) {
+    return switch (type) {
+      AppointmentType.regularCheckup => l10n.regularVisit,
+      AppointmentType.followUp => l10n.followUp,
+      AppointmentType.consultation => l10n.consultation,
+      AppointmentType.emergency => l10n.emergency,
+    };
   }
 
   /// Translate qualification/certification from English to current locale

@@ -12,6 +12,7 @@ import 'package:uhc/providers/auth_provider.dart';
 import 'package:uhc/providers/locale_provider.dart';
 import 'package:uhc/providers/theme_provider.dart';
 import 'package:uhc/screens/auth/login_screen.dart';
+import 'package:uhc/screens/splash/splash_screen.dart';
 import 'package:uhc/screens/patient/assistant/assistant_chat_screen.dart';
 import 'package:uhc/screens/patient/booking/booking_success_screen.dart';
 import 'package:uhc/screens/patient/main_shell.dart';
@@ -48,26 +49,29 @@ void main() {
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: action.page,
+          home: AppNavigator(key: AppNavigator.rootKey),
         ),
       ));
       await tester.pump(const Duration(seconds: 2));
       expect(auth.isAuthenticated, isFalse);
 
+      await tester.pumpAndSettle();
+      final rootState = tester.state(find.byType(AppNavigator));
+      Navigator.of(tester.element(find.byType(LoginScreen))).push(
+        MaterialPageRoute(builder: (_) => action.page),
+      );
+      await tester.pumpAndSettle();
       final button = find.text(action.label).last;
       await tester.ensureVisible(button);
       await tester.tap(button);
       await tester.pump();
+      expect(find.byType(SplashScreen), findsNothing);
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
 
       expect(find.byType(LoginScreen), findsOneWidget);
       expect(find.byType(MainShell), findsNothing);
-      expect(
-          tester
-              .widget<AppNavigator>(find.byType(AppNavigator))
-              .initialPatientTab,
-          action.tab);
+      expect(tester.state(find.byType(AppNavigator)), same(rootState));
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }

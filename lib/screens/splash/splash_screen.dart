@@ -9,7 +9,7 @@ import '../../l10n/app_localizations.dart';
 class SplashScreen extends StatelessWidget {
   static const double _logoSize = 170;
   static const String _primaryLogo = 'assets/icons/icon_splash_new.png';
-  static const String _fallbackLogo = 'assets/icons/icon_splash.png';
+  static const String _fallbackLogo = 'assets/icons/icon_splash_new.png';
   static const String _webLogoPath = 'icons/icon_splash_new.png';
 
   const SplashScreen({super.key});

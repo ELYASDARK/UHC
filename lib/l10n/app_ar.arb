@@ -695,7 +695,7 @@
   "notificationsSend": "Send Notifications",
   "permissionRequired": "Permission Required",
   "exportPermissionRequired": "Export Permission Required",
-  "noPermissionForAction": "You do not have permission for this action",
+  "noPermissionForAction": "ليس لديك إذن لتنفيذ هذا الإجراء",
   "generateReport": "Generate Report",
   "generating": "Generating...",
   "addDoctor": "Add Doctor",
@@ -719,7 +719,6 @@
   "createFirstAdmin": "Create your first admin account",
   "bootstrapSuperAdmin": "Bootstrap Super Admin",
   "migrationRunbook": "Migration Runbook",
-
   "assistantTitle": "مساعد المواعيد الذكي",
   "assistantSubtitle": "ابحث عن المواعيد واحجزها عبر المحادثة",
   "assistantDailyLimitHeading": "وصل المساعد إلى الحد اليومي الأقصى.",
@@ -777,5 +776,95 @@
   "assistantInfoTooltip": "معلومات المساعد",
   "assistantClearChatFailed": "فشل مسح سجل المحادثة على الخادم.",
   "assistantHistoryLoadFailed": "تعذر تحميل سجل المحادثة. يرجى التحقق من اتصالك.",
-  "assistantBadge": "المساعد الذكي"
+  "assistantBadge": "المساعد الذكي",
+  "resetZoom": "إعادة ضبط التكبير",
+  "imageNotAvailable": "الصورة غير متاحة",
+  "medicalImageLoadError": "تعذر تحميل الصورة. تحقق من اتصالك وحاول مجددًا.",
+  "scheduleLoadFailed": "تعذر تحميل الجدول. حاول مجددًا.",
+  "loadingAvailability": "جارٍ التحقق من الأوقات المتاحة...",
+  "requestFailed": "تعذر إكمال الطلب. حاول مجددًا.",
+  "requestNetworkError": "تحقق من اتصالك وحاول مجددًا.",
+  "requestConflict": "تغيرت هذه المعلومات. حدّث الصفحة وحاول مجددًا.",
+  "requestLimitReached": "محاولات كثيرة. حاول مرة أخرى لاحقًا.",
+  "requestInvalid": "تحقق من المعلومات المدخلة وحاول مجددًا.",
+  "requestNotFound": "هذا العنصر لم يعد متاحًا. حدّث الصفحة وحاول مجددًا.",
+  "authInvalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة. حاول مجددًا.",
+  "authEmailUsed": "هذا البريد الإلكتروني مسجّل بالفعل.",
+  "authAccountDisabled": "هذا الحساب معطّل. تواصل مع الدعم.",
+  "operationCompleted": "تم بنجاح",
+  "logoutFailed": "تعذر تسجيل الخروج. حاول مجددًا.",
+  "notesSaved": "تم حفظ الملاحظات",
+  "googleAccountLinked": "تم ربط حساب Google",
+  "googleAccountUnlinked": "تم إلغاء ربط حساب Google",
+  "availabilityRequestSent": "تم إرسال الطلب. تبقى متاحًا حتى موافقة المسؤول.",
+  "imageTooLargeLimit": "الصورة كبيرة جدًا. الحد الأقصى {limit} ميغابايت.",
+  "@imageTooLargeLimit": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "couldNotOpenMaps": "تعذر فتح الخرائط",
+  "couldNotOpenDirections": "تعذر فتح الاتجاهات",
+  "couldNotMakeCall": "تعذر إجراء المكالمة",
+  "couldNotOpenEmail": "تعذر فتح البريد الإلكتروني",
+  "openingEmailClient": "جارٍ فتح البريد الإلكتروني...",
+  "openingDialer": "جارٍ فتح الهاتف...",
+  "departmentUpdatedSuccess": "تم تحديث القسم بنجاح",
+  "departmentCreatedSuccess": "تم إنشاء القسم بنجاح",
+  "departmentActivatedMessage": "تم تفعيل القسم",
+  "departmentDeactivatedMessage": "تم تعطيل القسم",
+  "departmentDeletedSuccess": "تم حذف القسم بنجاح",
+  "imageUploadedSuccess": "تم رفع الصورة بنجاح",
+  "doctorUpdatedSuccess": "تم تحديث الطبيب بنجاح",
+  "doctorDeletedSuccess": "تم حذف الطبيب بنجاح",
+  "doctorActivatedMessage": "تم تفعيل الطبيب",
+  "doctorDeactivatedMessage": "تم تعطيل الطبيب",
+  "doctorAvailableMessage": "تم تعيين الطبيب متاحًا",
+  "doctorUnavailableMessage": "تم تعيين الطبيب غير متاح",
+  "scheduleSavedSuccess": "تم حفظ الجدول بنجاح",
+  "reportGeneratedSuccess": "تم إنشاء التقرير بنجاح",
+  "userUpdatedSuccess": "تم تحديث المستخدم بنجاح",
+  "userDeletedSuccess": "تم حذف المستخدم بنجاح",
+  "uidCopiedMessage": "تم نسخ معرّف المستخدم",
+  "userActivatedMessage": "تم تفعيل المستخدم",
+  "userDeactivatedMessage": "تم تعطيل المستخدم",
+  "roleUpdatedMessage": "تم تحديث الدور",
+  "patientRoleChangeOnly": "يمكن تغيير أدوار الطلاب والموظفين فقط هنا.",
+  "notificationRecipientsSent": "تم الإرسال إلى {count} مستلمين.",
+  "@notificationRecipientsSent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "availabilityApprovedCleanup": "تمت الموافقة. يلزم مراجعة إلغاء المواعيد.",
+  "availabilityApprovedCount": "تمت الموافقة. أُلغي {count} مواعيد.",
+  "@availabilityApprovedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "availabilityRejected": "تم رفض الطلب.",
+  "emulatorGoogleSignInNotice": "تسجيل Google الخارجي معطّل في وضع المحاكي. استخدم تسجيل الدخول التجريبي المحلي.",
+  "scheduleTimeWithinHours": "اختر وقتًا بين {start} و{end}.",
+  "@scheduleTimeWithinHours": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduleEndAfterStart": "يجب أن يكون وقت النهاية بعد البداية.",
+  "scheduleTimeOverlaps": "هذا الوقت يتداخل مع موعد موجود.",
+  "selectRecipientFirst": "اختر مستلمًا قبل الإرسال.",
+  "noActiveRecipients": "لا يوجد مستلمون نشطون لهذا الهدف.",
+  "notesSaveFailed": "تعذر حفظ الملاحظات الطبية. حاول مجددًا."
 }

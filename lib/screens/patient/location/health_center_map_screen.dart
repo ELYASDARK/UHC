@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
@@ -26,7 +27,7 @@ class HealthCenterMapScreen extends StatelessWidget {
       ),
       body: ResponsivePage(
         maxWidth: 1180,
-        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+        bottomPadding: UhcResponsive.scrollBottomPadding(context),
         child: Column(
           children: [
             // Map Placeholder
@@ -348,9 +349,11 @@ class HealthCenterMapScreen extends StatelessWidget {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Could not open maps')));
+        AppMessages.show(
+            context,
+            SnackBar(
+                content:
+                    Text(AppMessages.localizations(context).couldNotOpenMaps)));
       }
     }
   }
@@ -363,8 +366,11 @@ class HealthCenterMapScreen extends StatelessWidget {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open directions')),
+        AppMessages.show(
+          context,
+          SnackBar(
+              content: Text(
+                  AppMessages.localizations(context).couldNotOpenDirections)),
         );
       }
     }
@@ -376,9 +382,11 @@ class HealthCenterMapScreen extends StatelessWidget {
       await launchUrl(url);
     } else {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Could not make call')));
+        AppMessages.show(
+            context,
+            SnackBar(
+                content:
+                    Text(AppMessages.localizations(context).couldNotMakeCall)));
       }
     }
   }
@@ -389,9 +397,11 @@ class HealthCenterMapScreen extends StatelessWidget {
       await launchUrl(url);
     } else {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Could not open email')));
+        AppMessages.show(
+            context,
+            SnackBar(
+                content: Text(
+                    AppMessages.localizations(context).couldNotOpenEmail)));
       }
     }
   }

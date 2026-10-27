@@ -389,7 +389,9 @@ function getUpcomingMonday(fromDate = new Date()) {
     throw new Error('Failed to compute upcoming Monday fixture');
 }
 
-const upcomingMonday = getUpcomingMonday();
+// Leave at least 48 hours before the fixture so the reschedule collision
+// assertion is not intercepted by the production 24-hour notice rule.
+const upcomingMonday = getUpcomingMonday(new Date(Date.now() + 48 * 60 * 60 * 1000));
 
 // Helper to seed active department and doctor
 async function seedDoctorAndDepartment(doctorId = 'doc_cardio_test', deptKey = 'cardiology') {

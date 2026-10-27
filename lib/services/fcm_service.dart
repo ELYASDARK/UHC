@@ -45,6 +45,7 @@ class FCMService {
   bool _initialized = false;
   StreamSubscription<String>? _tokenRefreshSubscription;
   String? _tokenOwnerUserId;
+  String? _registrationId;
   int _tokenSessionVersion = 0;
 
   // Stream controller for notification taps
@@ -131,10 +132,27 @@ class FCMService {
     _messageStreamController.add(message);
   }
 
-  /// Get FCM token
+  /// Register and return the installation ID used for direct FCM delivery.
   Future<String?> getToken() async {
     if (EmulatorConfig.isEmulatorEnabled) return null;
-    return await _messaging.getToken();
+    final registered = Completer<String>();
+    final subscription = _messaging.onRegistered.listen((id) {
+      _registrationId = id;
+      if (!registered.isCompleted) registered.complete(id);
+    }, onError: (Object error, StackTrace stack) {
+      if (!registered.isCompleted) registered.completeError(error, stack);
+    });
+    try {
+      // Listen first: native platforms can emit before register() completes.
+      final results = await Future.wait<Object?>([
+        registered.future,
+        _messaging.register(),
+      ], eagerError: true)
+          .timeout(const Duration(seconds: 30));
+      return results.first as String;
+    } finally {
+      await subscription.cancel();
+    }
   }
 
   /// Subscribe to topic (not supported on web)
@@ -155,7 +173,8 @@ class FCMService {
   Future<void> deleteToken() async {
     if (EmulatorConfig.isEmulatorEnabled) return;
     try {
-      await _messaging.deleteToken();
+      await _messaging.unregister();
+      _registrationId = null;
     } catch (e) {
       debugPrint('Failed to delete local FCM token: $e');
     }
@@ -170,43 +189,37 @@ class FCMService {
     _tokenOwnerUserId = userId;
 
     try {
-      final token = await getToken();
-      if (_tokenOwnerUserId != userId ||
-          sessionVersion != _tokenSessionVersion) {
-        return;
-      }
-
-      if (token != null) {
-        await _saveToken(userId, token);
-      }
-
-      if (_tokenOwnerUserId != userId ||
-          sessionVersion != _tokenSessionVersion) {
-        return;
-      }
-
-      _tokenRefreshSubscription =
-          _messaging.onTokenRefresh.listen((newToken) async {
+      var pendingSave = Future<void>.value();
+      // Keep the renewal listener active before triggering registration.
+      _tokenRefreshSubscription = _messaging.onRegistered.listen((id) {
         if (_tokenOwnerUserId != userId ||
             sessionVersion != _tokenSessionVersion) {
           return;
         }
-
-        await _saveToken(userId, newToken);
+        _registrationId = id;
+        pendingSave =
+            pendingSave.then((_) => _saveToken(userId, id, sessionVersion));
+      }, onError: (Object error) {
+        debugPrint('FCM registration stream failed: $error');
       });
+      await getToken();
+      await pendingSave;
     } catch (e) {
       debugPrint('saveTokenToDatabase failed (safe to ignore on web): $e');
     }
   }
 
-  Future<void> _saveToken(String userId, String token) async {
+  Future<void> _saveToken(
+      String userId, String token, int sessionVersion) async {
     if (EmulatorConfig.isEmulatorEnabled) return;
     try {
       final userSnap = await _firestore.collection('users').doc(userId).get();
       final userData = userSnap.data();
       final isDoctor = userData?['role'] == 'doctor';
-      final prefsMap = userData?['notificationSettings'] as Map<String, dynamic>?;
-      final settings = NotificationPreferences.fromMap(prefsMap, isDoctor: isDoctor, isWeb: kIsWeb);
+      final prefsMap =
+          userData?['notificationSettings'] as Map<String, dynamic>?;
+      final settings = NotificationPreferences.fromMap(prefsMap,
+          isDoctor: isDoctor, isWeb: kIsWeb);
 
       final prefs = await SharedPreferences.getInstance();
       var deviceId = prefs.getString('uhc_device_id');
@@ -221,7 +234,7 @@ class FCMService {
       final platform = kIsWeb ? 'web' : _getNativePlatform();
       final supportsLocalReminders = !kIsWeb &&
           (defaultTargetPlatform == TargetPlatform.android ||
-           defaultTargetPlatform == TargetPlatform.iOS);
+              defaultTargetPlatform == TargetPlatform.iOS);
 
       final effectiveAppointmentReminderDelivery = kIsWeb
           ? NotificationDeliveryMode.fcm
@@ -239,24 +252,40 @@ class FCMService {
         } catch (_) {}
       }
 
-      await _firestore
-          .collection('user_tokens')
-          .doc(userId)
-          .collection('tokens')
-          .doc(tokenHash)
-          .set({
-        'token': token,
-        'tokenHash': tokenHash,
-        'deviceId': deviceId,
-        'platform': platform,
-        'supportsLocalReminders': supportsLocalReminders,
-        'onlinePushEnabled': settings.onlinePushEnabled,
-        'appointmentReminderDelivery': effectiveAppointmentReminderDelivery.name,
-        'doctorDailySummaryDelivery': effectiveDoctorDailySummaryDelivery.name,
-        'timeZone': timeZone,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'lastSeenAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final tokens =
+          _firestore.collection('user_tokens').doc(userId).collection('tokens');
+      final previous =
+          await tokens.where('deviceId', isEqualTo: deviceId).get();
+      if (_tokenOwnerUserId != userId ||
+          sessionVersion != _tokenSessionVersion) {
+        return;
+      }
+      final batch = _firestore.batch();
+      for (final old in previous.docs) {
+        if (old.id != tokenHash) batch.delete(old.reference);
+      }
+      // Keep the existing server schema during the documented FID transition.
+      batch.set(
+          tokens.doc(tokenHash),
+          {
+            'fid': token,
+            'registrationType': 'fid',
+            'token': token,
+            'tokenHash': tokenHash,
+            'deviceId': deviceId,
+            'platform': platform,
+            'supportsLocalReminders': supportsLocalReminders,
+            'onlinePushEnabled': settings.onlinePushEnabled,
+            'appointmentReminderDelivery':
+                effectiveAppointmentReminderDelivery.name,
+            'doctorDailySummaryDelivery':
+                effectiveDoctorDailySummaryDelivery.name,
+            'timeZone': timeZone,
+            'updatedAt': FieldValue.serverTimestamp(),
+            'lastSeenAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true));
+      await batch.commit();
     } catch (e) {
       debugPrint('Error inside _saveToken helper: $e');
     }
@@ -276,15 +305,28 @@ class FCMService {
     }
 
     try {
-      final token = await getToken();
-      if (token != null) {
-        final bytes = utf8.encode(token);
-        final tokenHash = sha256.convert(bytes).toString();
+      // Logout must not create a new registration just to remove its record.
+      final prefs = await SharedPreferences.getInstance();
+      final deviceId = prefs.getString('uhc_device_id');
+      if (deviceId != null) {
+        final docs = await _firestore
+            .collection('user_tokens')
+            .doc(userId)
+            .collection('tokens')
+            .where('deviceId', isEqualTo: deviceId)
+            .get();
+        final batch = _firestore.batch();
+        for (final doc in docs.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      } else if (_registrationId != null) {
+        final hash = sha256.convert(utf8.encode(_registrationId!)).toString();
         await _firestore
             .collection('user_tokens')
             .doc(userId)
             .collection('tokens')
-            .doc(tokenHash)
+            .doc(hash)
             .delete();
       }
     } catch (e) {
@@ -294,7 +336,8 @@ class FCMService {
     if (!shouldInvalidateDeviceToken) return;
 
     try {
-      await _messaging.deleteToken();
+      await _messaging.unregister();
+      _registrationId = null;
     } catch (e) {
       debugPrint('Failed to delete local FCM token for $userId: $e');
     }

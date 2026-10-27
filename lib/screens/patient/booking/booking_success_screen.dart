@@ -36,7 +36,7 @@ class BookingSuccessScreen extends StatelessWidget {
       body: ResponsivePage(
         safeArea: true,
         maxWidth: isWide ? 980 : 640,
-        bottomPadding: isWide ? 32 : 100,
+        bottomPadding: isWide ? 32 : 16,
         child: Column(
           children: [
             SizedBox(height: isWide ? 16 : 40),
@@ -212,11 +212,7 @@ class BookingSuccessScreen extends StatelessWidget {
   ) {
     final homeButton = ElevatedButton(
       onPressed: () {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-              builder: (_) => const AppNavigator(initialPatientTab: 0)),
-          (route) => false,
-        );
+        AppNavigator.returnToPatientTab(context, 0);
       },
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
@@ -229,11 +225,7 @@ class BookingSuccessScreen extends StatelessWidget {
 
     final appointmentsButton = OutlinedButton(
       onPressed: () {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-              builder: (_) => const AppNavigator(initialPatientTab: 2)),
-          (route) => false,
-        );
+        AppNavigator.returnToPatientTab(context, 2);
       },
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 16),

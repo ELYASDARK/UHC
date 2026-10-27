@@ -1,6 +1,6 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'dart:async';
 
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -61,16 +61,7 @@ class _AdminNotificationSenderScreenState
     if (mounted) setState(() {});
   }
 
-  String _friendlyError(Object error) {
-    if (error is FirebaseFunctionsException) {
-      final message = error.message?.trim();
-      if (message == null || message.isEmpty || message == 'internal') {
-        return 'The notification service could not complete this request. Please try again after the backend is updated.';
-      }
-      return message;
-    }
-    return 'Something went wrong. Please try again.';
-  }
+  String _friendlyError(Object error) => AppMessages.error(context, error);
 
   void _changeTarget(AdminNotificationTargetType targetType) {
     if (_targetType == targetType) return;
@@ -269,7 +260,8 @@ class _AdminNotificationSenderScreenState
 
     if (!_formKey.currentState!.validate()) return;
     if (_targetType.requiresRecipient && _selectedRecipient == null) {
-      setState(() => _errorText = 'Select a recipient before sending.');
+      setState(() =>
+          _errorText = AppMessages.localizations(context).selectRecipientFirst);
       return;
     }
 
@@ -294,7 +286,8 @@ class _AdminNotificationSenderScreenState
     }
 
     if (preview.recipientCount <= 0) {
-      setState(() => _errorText = 'No active recipients matched this target.');
+      setState(() =>
+          _errorText = AppMessages.localizations(context).noActiveRecipients);
       return;
     }
 
@@ -310,16 +303,18 @@ class _AdminNotificationSenderScreenState
         body: _bodyController.text,
       );
       if (!mounted) return;
-      final successText =
-          'Sent to ${result.recipientCount} recipient${result.recipientCount == 1 ? '' : 's'}.';
+      final successText = AppMessages.localizations(context)
+          .notificationRecipientsSent(result.recipientCount);
       _titleController.clear();
       _bodyController.clear();
       setState(() {
         _successText = successText;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(result.message),
+          content: Text(AppMessages.localizations(context)
+              .notificationRecipientsSent(result.recipientCount)),
           backgroundColor: AppColors.success,
         ),
       );

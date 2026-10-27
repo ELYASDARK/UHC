@@ -1,10 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uhc/l10n/app_localizations.dart';
-import '../../core/constants/app_colors.dart';
+import '../../core/widgets/shell_bottom_navigation_bar.dart';
 import '../../core/widgets/responsive_layout.dart';
 import '../../data/models/doctor_model.dart';
 import '../../data/repositories/doctor_repository.dart';
@@ -16,7 +15,7 @@ import 'schedule/doctor_schedule_management_screen.dart';
 import 'profile/doctor_profile_screen.dart';
 import '../shared/notifications_screen.dart';
 
-/// Doctor navigation shell with 5-tab bottom navigation
+/// Doctor navigation shell with four destinations
 class DoctorShell extends StatefulWidget {
   final DoctorModel doctor;
   final int initialIndex;
@@ -123,10 +122,7 @@ class _DoctorShellState extends State<DoctorShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
-    final hasUnreadNotifications =
-        context.watch<NotificationProvider>().unreadCount > 0;
 
     final body = IndexedStack(
       index: _currentIndex,
@@ -136,7 +132,10 @@ class _DoctorShellState extends State<DoctorShell> {
             ? DoctorDashboardScreen(
                 doctor: _doctor,
                 onDoctorUpdated: _refreshDoctor,
-                onNotificationsTap: () => _onTabTapped(3),
+                onNotificationsTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen())),
                 referenceTime: widget.referenceTime,
               )
             : const SizedBox.shrink(),
@@ -149,14 +148,11 @@ class _DoctorShellState extends State<DoctorShell> {
             : const SizedBox.shrink(),
         // Tab 2: Schedule
         _visitedScreens.contains(2)
-            ? DoctorScheduleManagementScreen(doctor: _doctor)
+            ? DoctorScheduleManagementScreen(
+                doctor: _doctor, isActive: _currentIndex == 2)
             : const SizedBox.shrink(),
-        // Tab 3: Notifications
+        // Tab 3: Profile
         _visitedScreens.contains(3)
-            ? const NotificationsScreen()
-            : const SizedBox.shrink(),
-        // Tab 4: Profile
-        _visitedScreens.contains(4)
             ? DoctorProfileScreen(
                 doctor: _doctor,
                 onDoctorUpdated: _refreshDoctor,
@@ -165,85 +161,37 @@ class _DoctorShellState extends State<DoctorShell> {
       ],
     );
 
-    final bottomNavigationBar = Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: SizedBox(
-        height: 70,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: isDark
-                  ? [
-                      AppColors.surfaceDark.withValues(alpha: 1),
-                      AppColors.surfaceDark,
-                    ]
-                  : [
-                      AppColors.surfaceLight.withValues(alpha: 1),
-                      AppColors.surfaceLight
-                    ],
-            ),
-            border: Border(
-              top: BorderSide(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.black.withValues(alpha: 0.05),
-                width: 0.5,
-              ),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                index: 0,
-                icon: Icons.home_outlined,
-                activeIcon: Icons.home_rounded,
-                label: l10n.home,
-                isDark: isDark,
-              ),
-              _buildNavItem(
-                index: 1,
-                icon: Icons.calendar_today_outlined,
-                activeIcon: Icons.calendar_today_rounded,
-                label: l10n.appointments,
-                isDark: isDark,
-              ),
-              _buildNavItem(
-                index: 2,
-                icon: Icons.schedule_outlined,
-                activeIcon: Icons.schedule_rounded,
-                label: l10n.schedule,
-                isDark: isDark,
-              ),
-              _buildNavItem(
-                index: 3,
-                icon: Icons.notifications_outlined,
-                activeIcon: Icons.notifications_rounded,
-                label: l10n.alerts,
-                isDark: isDark,
-                showBadge: hasUnreadNotifications,
-              ),
-              _buildNavItem(
-                index: 4,
-                icon: Icons.person_outline_rounded,
-                activeIcon: Icons.person_rounded,
-                label: l10n.profile,
-                isDark: isDark,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
     return AdaptiveNavigationScaffold(
       selectedIndex: _currentIndex,
       onDestinationSelected: _onTabTapped,
-      extendBody: true,
+      extendBody: false,
       body: body,
-      bottomNavigationBar: bottomNavigationBar,
+      bottomNavigationBar: ShellBottomNavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: _onTabTapped,
+        destinations: [
+          AdaptiveNavigationDestination(
+              index: 0,
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home_rounded,
+              label: l10n.home),
+          AdaptiveNavigationDestination(
+              index: 1,
+              icon: Icons.calendar_today_outlined,
+              selectedIcon: Icons.calendar_today_rounded,
+              label: l10n.appointments),
+          AdaptiveNavigationDestination(
+              index: 2,
+              icon: Icons.schedule_outlined,
+              selectedIcon: Icons.schedule_rounded,
+              label: l10n.schedule),
+          AdaptiveNavigationDestination(
+              index: 3,
+              icon: Icons.person_outline_rounded,
+              selectedIcon: Icons.person_rounded,
+              label: l10n.profile),
+        ],
+      ),
       destinations: [
         AdaptiveNavigationDestination(
           index: 0,
@@ -265,85 +213,11 @@ class _DoctorShellState extends State<DoctorShell> {
         ),
         AdaptiveNavigationDestination(
           index: 3,
-          icon: Icons.notifications_outlined,
-          selectedIcon: Icons.notifications_rounded,
-          label: l10n.alerts,
-          showBadge: hasUnreadNotifications,
-        ),
-        AdaptiveNavigationDestination(
-          index: 4,
           icon: Icons.person_outline_rounded,
           selectedIcon: Icons.person_rounded,
           label: l10n.profile,
         ),
       ],
-    );
-  }
-
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required IconData activeIcon,
-    required String label,
-    required bool isDark,
-    bool showBadge = false,
-  }) {
-    final isSelected = _currentIndex == index;
-
-    return GestureDetector(
-      onTap: () => _onTabTapped(index),
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 65,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  isSelected ? activeIcon : icon,
-                  color: isSelected
-                      ? AppColors.primary
-                      : (isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight),
-                  size: 24,
-                ),
-                if (showBadge)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.error,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected
-                    ? AppColors.primary
-                    : (isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

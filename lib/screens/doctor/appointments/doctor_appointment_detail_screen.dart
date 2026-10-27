@@ -1,9 +1,15 @@
+import '../../../core/utils/localization_helper.dart';
+
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/appointment_model.dart';
@@ -54,12 +60,9 @@ class _DoctorAppointmentDetailScreenState
     _notesController.text = _appointment.medicalNotes ?? '';
     _qrScanFailures = _appointment.qrScanFailures;
     // Refresh _now every 30 s to keep the confirm-window UI accurate
-    _timeCheckTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) {
-        if (mounted) setState(() => _now = DateTime.now());
-      },
-    );
+    _timeCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
   }
 
   @override
@@ -147,9 +150,12 @@ class _DoctorAppointmentDetailScreenState
     if (result['matched'] == true) {
       _confirmCheckIn(result['qrCode'] as String? ?? '');
     } else if (failures >= 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(AppLocalizations.of(context).manualConfirmUnlocked),
+          content: Text(
+            AppMessages.localizations(context).manualConfirmUnlocked,
+          ),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -167,447 +173,537 @@ class _DoctorAppointmentDetailScreenState
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: kToolbarHeight *
+            (MediaQuery.textScalerOf(context).scale(20) / 20).clamp(1.0, 2.0),
         title: Text(
           l10n.appointmentDetails,
+          maxLines: 2,
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
       ),
-      body: Stack(
-        children: [
-          ResponsivePage(
-            maxWidth: UhcResponsive.isWide(context) ? 760 : 980,
-            bottomPadding: UhcResponsive.isWide(context) ? 120 : 320,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Patient info card ──
-                GestureDetector(
-                  onTap: () => _viewPatientProfile(),
-                  child: _sectionCard(
-                    isDark: isDark,
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color:
-                                    AppColors.secondary.withValues(alpha: 0.15),
-                              ),
-                              child: ClipOval(
-                                child: patientPhoto != null &&
-                                        patientPhoto.isNotEmpty
-                                    ? Image.network(
-                                        patientPhoto,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 380 ||
+              MediaQuery.textScalerOf(context).scale(14) > 19 ||
+              constraints.maxHeight < 420;
+          Widget contentPane(Widget child) =>
+              compact ? child : Expanded(child: child);
+          Widget bodyPane(Widget child) => compact
+              ? SingleChildScrollView(
+                  key: const ValueKey('appointment-detail-scroll'),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: child,
+                )
+              : child;
+          return Stack(
+            children: [
+              bodyPane(Column(
+                children: [
+                  contentPane(
+                    ResponsivePage(
+                      scrollable: !compact,
+                      maxWidth: UhcResponsive.isWide(context) ? 760 : 980,
+                      bottomPadding: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Patient info card ──
+                          GestureDetector(
+                            onTap: () => _viewPatientProfile(),
+                            child: _sectionCard(
+                              isDark: isDark,
+                              child: Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
                                         width: 56,
                                         height: 56,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Center(
-                                          child: Text(
-                                            _appointment.patientName.isNotEmpty
-                                                ? _appointment.patientName[0]
-                                                    .toUpperCase()
-                                                : '?',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.secondary,
-                                            ),
-                                          ),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppColors.secondary
+                                              .withValues(alpha: 0.15),
                                         ),
-                                      )
-                                    : Center(
+                                        child: ClipOval(
+                                          child: patientPhoto != null &&
+                                                  patientPhoto.isNotEmpty
+                                              ? Image(
+                                                  image:
+                                                      CachedNetworkImageProvider(
+                                                    patientPhoto,
+                                                  ),
+                                                  width: 56,
+                                                  height: 56,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      Center(
+                                                    child: Text(
+                                                      _appointment.patientName
+                                                              .isNotEmpty
+                                                          ? _appointment
+                                                              .patientName[0]
+                                                              .toUpperCase()
+                                                          : '?',
+                                                      style: GoogleFonts.outfit(
+                                                        fontSize: 24,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            AppColors.secondary,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                )
+                                              : Center(
+                                                  child: Text(
+                                                    _appointment.patientName
+                                                            .isNotEmpty
+                                                        ? _appointment
+                                                            .patientName[0]
+                                                            .toUpperCase()
+                                                        : '?',
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 24,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          AppColors.secondary,
+                                                    ),
+                                                  ),
+                                                ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _appointment.patientName,
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w600,
+                                                color: isDark
+                                                    ? AppColors.textPrimaryDark
+                                                    : AppColors
+                                                        .textPrimaryLight,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _appointment.patientEmail,
+                                              style: GoogleFonts.roboto(
+                                                fontSize: 13,
+                                                color: isDark
+                                                    ? AppColors
+                                                        .textSecondaryDark
+                                                    : AppColors
+                                                        .textSecondaryLight,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 6,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: _statusColor.withValues(
+                                                    alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                              child: Text(
+                                                _localizedStatus(
+                                                  _appointment.status,
+                                                  l10n,
+                                                ),
+                                                style: GoogleFonts.roboto(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: _statusColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.visibility_rounded,
+                                        size: 14,
+                                        color: AppColors.primary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
                                         child: Text(
-                                          _appointment.patientName.isNotEmpty
-                                              ? _appointment.patientName[0]
-                                                  .toUpperCase()
-                                              : '?',
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.secondary,
+                                          l10n.viewPatientProfile,
+                                          style: GoogleFonts.roboto(
+                                            fontSize: 12,
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
                                       ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _appointment.patientName,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark
-                                          ? AppColors.textPrimaryDark
-                                          : AppColors.textPrimaryLight,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _appointment.patientEmail,
-                                    style: GoogleFonts.roboto(
-                                      fontSize: 13,
-                                      color: isDark
-                                          ? AppColors.textSecondaryDark
-                                          : AppColors.textSecondaryLight,
-                                    ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _statusColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _appointment.statusDisplay,
-                                style: GoogleFonts.roboto(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: _statusColor,
+                          )
+                              .animate(delay: 300.ms)
+                              .fadeIn(duration: 400.ms)
+                              .slideY(begin: 0.02),
+
+                          const SizedBox(height: 16),
+
+                          // ── Appointment details card ──
+                          _sectionCard(
+                            isDark: isDark,
+                            child: Column(
+                              children: [
+                                _detailRow(
+                                  Icons.calendar_today_rounded,
+                                  l10n.date,
+                                  '${_appointment.appointmentDate.day}/${_appointment.appointmentDate.month}/${_appointment.appointmentDate.year}',
+                                  isDark,
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.visibility_rounded,
-                                size: 14, color: AppColors.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              l10n.viewPatientProfile,
-                              style: GoogleFonts.roboto(
-                                fontSize: 12,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                    .animate(delay: 300.ms)
-                    .fadeIn(duration: 400.ms)
-                    .slideY(begin: 0.02),
-
-                const SizedBox(height: 16),
-
-                // ── Appointment details card ──
-                _sectionCard(
-                  isDark: isDark,
-                  child: Column(
-                    children: [
-                      _detailRow(
-                        Icons.calendar_today_rounded,
-                        l10n.date,
-                        '${_appointment.appointmentDate.day}/${_appointment.appointmentDate.month}/${_appointment.appointmentDate.year}',
-                        isDark,
-                      ),
-                      const Divider(height: 24),
-                      _detailRow(
-                        Icons.access_time_rounded,
-                        l10n.time,
-                        _appointment.timeSlot,
-                        isDark,
-                      ),
-                      const Divider(height: 24),
-                      _detailRow(
-                        Icons.medical_services_outlined,
-                        l10n.type,
-                        _appointment.typeDisplay,
-                        isDark,
-                      ),
-                      const Divider(height: 24),
-                      _detailRow(
-                        Icons.local_hospital_outlined,
-                        l10n.department,
-                        _appointment.department,
-                        isDark,
-                      ),
-                      if (_appointment.bookingReference != null) ...[
-                        const Divider(height: 24),
-                        _detailRow(
-                          Icons.confirmation_number_outlined,
-                          l10n.bookingRef,
-                          _appointment.bookingReference!,
-                          isDark,
-                        ),
-                      ],
-                      if (_appointment.notes != null &&
-                          _appointment.notes!.isNotEmpty) ...[
-                        const Divider(height: 24),
-                        _detailRow(
-                          Icons.note_outlined,
-                          l10n.patientNotes,
-                          _appointment.notes!,
-                          isDark,
-                        ),
-                      ],
-                      if (_appointment.cancelReason != null) ...[
-                        const Divider(height: 24),
-                        _detailRow(
-                          Icons.cancel_outlined,
-                          l10n.cancelReason,
-                          _appointment.cancelReason!,
-                          isDark,
-                        ),
-                      ],
-                    ],
-                  ),
-                )
-                    .animate(delay: 400.ms)
-                    .fadeIn(duration: 400.ms)
-                    .slideY(begin: 0.02),
-
-                const SizedBox(height: 16),
-
-                // ── Medical notes section ──
-                _sectionCard(
-                  isDark: isDark,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.edit_note_rounded,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            l10n.medicalNotes,
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _notesController,
-                        maxLines: 5,
-                        decoration: InputDecoration(
-                          hintText: l10n.addMedicalNotesHint,
-                          hintStyle: GoogleFonts.roboto(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                          filled: true,
-                          fillColor:
-                              isDark ? Colors.grey[900] : Colors.grey[50],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        style: GoogleFonts.roboto(
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: _saveMedicalNotes,
-                          icon: const Icon(Icons.save_outlined, size: 18),
-                          label: Text(l10n.saveNotes),
-                        ),
-                      ),
-                      if (_appointment.medicalNotesUpdatedAt != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            '${l10n.lastUpdated} ${_formatDateTime(_appointment.medicalNotesUpdatedAt!)}',
-                            style: GoogleFonts.roboto(
-                              fontSize: 11,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ).animate(delay: 500.ms).fadeIn(duration: 400.ms),
-
-                // ── Patient Documents section ──
-                if (_appointment.status == AppointmentStatus.confirmed ||
-                    _appointment.status == AppointmentStatus.completed) ...[
-                  const SizedBox(height: 16),
-                  Builder(builder: (context) {
-                    final isLocked = _appointment.status ==
-                        AppointmentStatus.completed;
-                    final effectiveColor = isLocked
-                        ? Color.lerp(
-                            AppColors.primary, Colors.grey, 0.35)!
-                        : AppColors.primary;
-
-                    return GestureDetector(
-                      onTap: isLocked
-                          ? () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      l10n.documentsAccessLocked),
-                                  backgroundColor: AppColors.warning,
-                                  behavior: SnackBarBehavior.floating,
+                                const Divider(height: 24),
+                                _detailRow(
+                                  Icons.access_time_rounded,
+                                  l10n.time,
+                                  _appointment.timeSlot,
+                                  isDark,
                                 ),
-                              );
-                            }
-                          : () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      DoctorPatientDocumentsScreen(
-                                    patientId:
-                                        _appointment.patientId,
-                                    patientName:
-                                        _appointment.patientName,
-                                    appointmentId: _appointment.id,
-                                    doctorId: widget.doctor.userId,
-                                    doctorName: widget.doctor.name,
+                                const Divider(height: 24),
+                                _detailRow(
+                                  Icons.medical_services_outlined,
+                                  l10n.type,
+                                  LocalizationHelper.translateAppointmentType(
+                                    _appointment.type,
+                                    l10n,
                                   ),
+                                  isDark,
                                 ),
-                              ),
-                      child: _sectionCard(
-                        isDark: isDark,
-                        child: Opacity(
-                          opacity: isLocked ? 0.6 : 1.0,
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: effectiveColor
-                                      .withValues(alpha: 0.1),
-                                  borderRadius:
-                                      BorderRadius.circular(12),
+                                const Divider(height: 24),
+                                _detailRow(
+                                  Icons.local_hospital_outlined,
+                                  l10n.department,
+                                  LocalizationHelper.translateDepartment(
+                                    _appointment.department,
+                                    l10n,
+                                  ),
+                                  isDark,
                                 ),
-                                child: Icon(Icons.folder_shared,
-                                    color: effectiveColor),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                if (_appointment.bookingReference != null) ...[
+                                  const Divider(height: 24),
+                                  _detailRow(
+                                    Icons.confirmation_number_outlined,
+                                    l10n.bookingRef,
+                                    _appointment.bookingReference!,
+                                    isDark,
+                                  ),
+                                ],
+                                if (_appointment.notes != null &&
+                                    _appointment.notes!.isNotEmpty) ...[
+                                  const Divider(height: 24),
+                                  _detailRow(
+                                    Icons.note_outlined,
+                                    l10n.patientNotes,
+                                    _appointment.notes!,
+                                    isDark,
+                                  ),
+                                ],
+                                if (_appointment.cancelReason != null) ...[
+                                  const Divider(height: 24),
+                                  _detailRow(
+                                    Icons.cancel_outlined,
+                                    l10n.cancelReason,
+                                    _appointment.cancelReason!,
+                                    isDark,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          )
+                              .animate(delay: 400.ms)
+                              .fadeIn(duration: 400.ms)
+                              .slideY(begin: 0.02),
+
+                          const SizedBox(height: 16),
+
+                          // ── Medical notes section ──
+                          _sectionCard(
+                            isDark: isDark,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    Text(
-                                      l10n.patientDocuments,
-                                      style: GoogleFonts.roboto(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 15,
-                                      ),
+                                    Icon(
+                                      Icons.edit_note_rounded,
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      isLocked
-                                          ? l10n
-                                              .documentsAccessLocked
-                                          : l10n
-                                              .viewPatientDocuments,
-                                      style: GoogleFonts.roboto(
-                                        fontSize: 12,
-                                        color: isDark
-                                            ? AppColors
-                                                .textSecondaryDark
-                                            : AppColors
-                                                .textSecondaryLight,
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        l10n.medicalNotes,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark
+                                              ? AppColors.textPrimaryDark
+                                              : AppColors.textPrimaryLight,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              Icon(
-                                isLocked
-                                    ? Icons.lock_outline
-                                    : Icons.chevron_right,
-                                color: isLocked
-                                    ? Colors.grey
-                                    : (isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors
-                                            .textSecondaryLight),
-                                size: isLocked ? 20 : 24,
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: _notesController,
+                                  maxLines: 5,
+                                  decoration: InputDecoration(
+                                    hintText: l10n.addMedicalNotesHint,
+                                    hintStyle: GoogleFonts.roboto(
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
+                                    filled: true,
+                                    fillColor: isDark
+                                        ? Colors.grey[900]
+                                        : Colors.grey[50],
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                  style: GoogleFonts.roboto(
+                                    color: isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: _saveMedicalNotes,
+                                    icon: const Icon(
+                                      Icons.save_outlined,
+                                      size: 18,
+                                    ),
+                                    label: Text(l10n.saveNotes),
+                                  ),
+                                ),
+                                if (_appointment.medicalNotesUpdatedAt != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Text(
+                                      '${l10n.lastUpdated} ${_formatDateTime(_appointment.medicalNotesUpdatedAt!)}',
+                                      style: GoogleFonts.roboto(
+                                        fontSize: 11,
+                                        color: isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ).animate(delay: 500.ms).fadeIn(duration: 400.ms),
+
+                          // ── Patient Documents section ──
+                          if (_appointment.status ==
+                                  AppointmentStatus.confirmed ||
+                              _appointment.status ==
+                                  AppointmentStatus.completed) ...[
+                            const SizedBox(height: 16),
+                            Builder(
+                              builder: (context) {
+                                final isLocked = _appointment.status ==
+                                    AppointmentStatus.completed;
+                                final effectiveColor = isLocked
+                                    ? Color.lerp(
+                                        AppColors.primary,
+                                        Colors.grey,
+                                        0.35,
+                                      )!
+                                    : AppColors.primary;
+
+                                return GestureDetector(
+                                  onTap: isLocked
+                                      ? () {
+                                          AppMessages.show(
+                                            context,
+                                            SnackBar(
+                                              content: Text(
+                                                AppMessages.localizations(
+                                                        context)
+                                                    .documentsAccessLocked,
+                                              ),
+                                              backgroundColor:
+                                                  AppColors.warning,
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
+                                      : () => Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  DoctorPatientDocumentsScreen(
+                                                patientId:
+                                                    _appointment.patientId,
+                                                patientName:
+                                                    _appointment.patientName,
+                                                appointmentId: _appointment.id,
+                                                doctorId: widget.doctor.userId,
+                                                doctorName: widget.doctor.name,
+                                              ),
+                                            ),
+                                          ),
+                                  child: _sectionCard(
+                                    isDark: isDark,
+                                    child: Opacity(
+                                      opacity: isLocked ? 0.6 : 1.0,
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color: effectiveColor.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                12,
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              Icons.folder_shared,
+                                              color: effectiveColor,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  l10n.patientDocuments,
+                                                  style: GoogleFonts.roboto(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 15,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  isLocked
+                                                      ? l10n
+                                                          .documentsAccessLocked
+                                                      : l10n
+                                                          .viewPatientDocuments,
+                                                  style: GoogleFonts.roboto(
+                                                    fontSize: 12,
+                                                    color: isDark
+                                                        ? AppColors
+                                                            .textSecondaryDark
+                                                        : AppColors
+                                                            .textSecondaryLight,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(
+                                            isLocked
+                                                ? Icons.lock_outline
+                                                : Icons.chevron_right,
+                                            color: isLocked
+                                                ? Colors.grey
+                                                : (isDark
+                                                    ? AppColors
+                                                        .textSecondaryDark
+                                                    : AppColors
+                                                        .textSecondaryLight),
+                                            size: isLocked ? 20 : 24,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ).animate(delay: 550.ms).fadeIn(duration: 400.ms),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Actions take their actual height. On short viewports, including an
+                  // open keyboard, both content and actions remain scrollable.
+                  if (_appointment.status != AppointmentStatus.cancelled &&
+                      _appointment.status != AppointmentStatus.noShow)
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: compact
+                            ? double.infinity
+                            : constraints.maxHeight * 0.45,
+                      ),
+                      child: SingleChildScrollView(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 10,
+                                offset: const Offset(0, -2),
                               ),
                             ],
                           ),
+                          child: SafeArea(
+                            top: false,
+                            child: ResponsiveContent(
+                              maxWidth: UhcResponsive.isWide(context)
+                                  ? _wideActionBarMaxWidth
+                                  : 980,
+                              child: Padding(
+                                padding: UhcResponsive.isWide(context)
+                                    ? const EdgeInsets.fromLTRB(24, 14, 24, 18)
+                                    : const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                                child: _buildActions(isDark, l10n),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    );
-                  }).animate(delay: 550.ms).fadeIn(duration: 400.ms),
+                    ),
                 ],
-              ],
-            ),
-          ),
-
-          // ── Sticky bottom action buttons ──
-          if (_appointment.status != AppointmentStatus.cancelled &&
-              _appointment.status != AppointmentStatus.noShow)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
+              )),
+              if (_isSaving)
+                Container(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  child: const Center(child: CircularProgressIndicator()),
                 ),
-                child: SafeArea(
-                  top: false,
-                  child: ResponsiveContent(
-                    maxWidth: UhcResponsive.isWide(context)
-                        ? _wideActionBarMaxWidth
-                        : 980,
-                    child: Padding(
-                      padding: UhcResponsive.isWide(context)
-                          ? const EdgeInsets.fromLTRB(24, 14, 24, 18)
-                          : const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                      child: _buildActions(isDark, l10n),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          if (_isSaving)
-            Container(
-              color: Colors.black.withValues(alpha: 0.3),
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -633,8 +729,6 @@ class _DoctorAppointmentDetailScreenState
               _isBeforeConfirmWindow
                   ? _formatTimeUntilConfirm(l10n)
                   : l10n.confirmWindowExpired,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.grey[300],
@@ -653,11 +747,7 @@ class _DoctorAppointmentDetailScreenState
           ElevatedButton.icon(
             onPressed: _openQrScanner,
             icon: const Icon(Icons.qr_code_scanner),
-            label: Text(
-              l10n.scanQrToConfirm,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            label: Text(l10n.scanQrToConfirm),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.success,
               foregroundColor: Colors.white,
@@ -671,13 +761,11 @@ class _DoctorAppointmentDetailScreenState
       } else {
         actions.add(
           ElevatedButton.icon(
-            onPressed: () => _updateStatus(AppointmentStatus.confirmed),
+            onPressed: _appointment.qrCode?.isNotEmpty == true
+                ? _confirmManually
+                : null,
             icon: const Icon(Icons.check_circle_outline),
-            label: Text(
-              l10n.confirmManual,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            label: Text(l10n.confirmManual),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.success,
               foregroundColor: Colors.white,
@@ -695,13 +783,11 @@ class _DoctorAppointmentDetailScreenState
         status == AppointmentStatus.confirmed) {
       actions.addAll([
         ElevatedButton.icon(
-          onPressed: _completeAppointment,
+          onPressed: status == AppointmentStatus.confirmed
+              ? _completeAppointment
+              : null,
           icon: const Icon(Icons.task_alt_rounded),
-          label: Text(
-            l10n.completed,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          label: Text(l10n.completed),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.info,
             foregroundColor: Colors.white,
@@ -714,13 +800,10 @@ class _DoctorAppointmentDetailScreenState
         OutlinedButton.icon(
           onPressed: () => _updateStatus(AppointmentStatus.noShow),
           icon: const Icon(Icons.person_off_outlined),
-          label: Text(
-            l10n.noShowStatus,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          label: Text(l10n.noShowStatus),
           style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.grey[700],
+            foregroundColor:
+                isDark ? AppColors.textPrimaryDark : Colors.grey[700],
             minimumSize: const Size.fromHeight(48),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -730,11 +813,7 @@ class _DoctorAppointmentDetailScreenState
         OutlinedButton.icon(
           onPressed: _cancelWithReason,
           icon: const Icon(Icons.cancel_outlined),
-          label: Text(
-            l10n.cancel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          label: Text(l10n.cancel),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.error,
             side: const BorderSide(color: AppColors.error),
@@ -768,10 +847,7 @@ class _DoctorAppointmentDetailScreenState
         children: [
           for (var i = 0; i < actions.length; i++) ...[
             if (i > 0) const SizedBox(width: 12),
-            Expanded(
-              flex: _wideActionFlex(i),
-              child: actions[i],
-            ),
+            Expanded(flex: _wideActionFlex(i), child: actions[i]),
           ],
         ],
       );
@@ -808,9 +884,61 @@ class _DoctorAppointmentDetailScreenState
 
   // ---- handlers ----
 
+  Future<void> _confirmManually() async {
+    final code = _appointment.qrCode;
+    if (_isSaving ||
+        _qrScanFailures < 5 ||
+        !_isInConfirmWindow ||
+        _appointment.status != AppointmentStatus.pending ||
+        code == null ||
+        code.isEmpty) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.confirmManual),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.confirmDetails),
+            const SizedBox(height: 12),
+            Text(_appointment.patientName),
+            Text(
+              '${l10n.bookingId}: ${_appointment.bookingReference ?? _appointment.id}',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.confirm),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    // Manual staff verification still uses the authorized QR transaction.
+    await _confirmCheckIn(code);
+  }
+
+  String _localizedStatus(AppointmentStatus status, AppLocalizations l10n) =>
+      switch (status) {
+        AppointmentStatus.pending => l10n.booked,
+        AppointmentStatus.confirmed => l10n.confirmed,
+        AppointmentStatus.completed => l10n.completed,
+        AppointmentStatus.cancelled => l10n.cancelled,
+        AppointmentStatus.noShow => l10n.noShowStatus,
+      };
+
   Future<void> _updateStatus(AppointmentStatus status) async {
     setState(() => _isSaving = true);
-    final l10n = AppLocalizations.of(context);
     final provider = context.read<DoctorAppointmentProvider>();
     final ok = await provider.updateStatus(
       _appointment.id,
@@ -822,18 +950,24 @@ class _DoctorAppointmentDetailScreenState
     );
     if (mounted) {
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(l10n.statusUpdatedTo(status.name)),
+            content: Text(
+              AppMessages.localizations(context).statusUpdatedTo(
+                _localizedStatus(status, AppMessages.localizations(context)),
+              ),
+            ),
             backgroundColor: AppColors.success,
           ),
         );
         Navigator.pop(context);
       } else {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(provider.error ?? 'Failed to update status'),
+            content: Text(AppMessages.error(context, provider.error)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -842,8 +976,8 @@ class _DoctorAppointmentDetailScreenState
   }
 
   Future<void> _confirmCheckIn(String qrCode) async {
+    if (_isSaving) return;
     setState(() => _isSaving = true);
-    final l10n = AppLocalizations.of(context);
     final provider = context.read<DoctorAppointmentProvider>();
     final ok = await provider.confirmCheckIn(
       _appointment.id,
@@ -852,18 +986,30 @@ class _DoctorAppointmentDetailScreenState
     );
     if (mounted) {
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(l10n.statusUpdatedTo(AppointmentStatus.confirmed.name)),
+            content: Text(
+              AppMessages.localizations(
+                context,
+              ).statusUpdatedTo(AppMessages.localizations(context).confirmed),
+            ),
             backgroundColor: AppColors.success,
           ),
         );
-        Navigator.pop(context);
+        setState(() {
+          _appointment = _appointment.copyWith(
+            status: AppointmentStatus.confirmed,
+            isCheckedIn: true,
+          );
+          _isSaving = false;
+        });
       } else {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(provider.error ?? 'Failed to confirm check-in'),
+            content: Text(AppMessages.error(context, provider.error)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -872,8 +1018,8 @@ class _DoctorAppointmentDetailScreenState
   }
 
   Future<void> _completeAppointment() async {
+    if (_isSaving || _appointment.status != AppointmentStatus.confirmed) return;
     setState(() => _isSaving = true);
-    final l10n = AppLocalizations.of(context);
     final provider = context.read<DoctorAppointmentProvider>();
     final notes = _notesController.text.trim().isEmpty
         ? null
@@ -888,18 +1034,22 @@ class _DoctorAppointmentDetailScreenState
     );
     if (mounted) {
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(l10n.appointmentCompleted),
+            content: Text(
+              AppMessages.localizations(context).appointmentCompleted,
+            ),
             backgroundColor: AppColors.success,
           ),
         );
         Navigator.pop(context);
       } else {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(provider.error ?? 'Failed to complete'),
+            content: Text(AppMessages.error(context, provider.error)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -921,17 +1071,15 @@ class _DoctorAppointmentDetailScreenState
   }
 
   Future<void> _cancelWithReason() async {
-    final reasonController = TextEditingController();
+    var enteredReason = '';
     final l10n = AppLocalizations.of(context);
     final reason = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.cancelAppointmentDialogTitle),
         content: TextField(
-          controller: reasonController,
-          decoration: InputDecoration(
-            hintText: l10n.reasonForCancellationHint,
-          ),
+          onChanged: (value) => enteredReason = value,
+          decoration: InputDecoration(hintText: l10n.reasonForCancellationHint),
           maxLines: 3,
           autofocus: true,
         ),
@@ -941,13 +1089,12 @@ class _DoctorAppointmentDetailScreenState
             child: Text(l10n.back),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, reasonController.text.trim()),
+            onPressed: () => Navigator.pop(ctx, enteredReason.trim()),
             child: Text(l10n.confirmCancel),
           ),
         ],
       ),
     );
-    reasonController.dispose();
 
     if (reason == null || reason.isEmpty) return;
 
@@ -964,18 +1111,22 @@ class _DoctorAppointmentDetailScreenState
     );
     if (mounted) {
       if (ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(l10n.appointmentCancelled),
+            content: Text(
+              AppMessages.localizations(context).appointmentCancelled,
+            ),
             backgroundColor: AppColors.success,
           ),
         );
         Navigator.pop(context);
       } else {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(provider.error ?? 'Failed to cancel'),
+            content: Text(AppMessages.error(context, provider.error)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1006,9 +1157,14 @@ class _DoctorAppointmentDetailScreenState
       } else {
         setState(() => _isSaving = false);
       }
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(ok ? 'Notes saved' : 'Failed to save notes'),
+          content: Text(
+            ok
+                ? AppMessages.localizations(context).notesSaved
+                : AppMessages.localizations(context).notesSaveFailed,
+          ),
           backgroundColor: ok ? AppColors.success : AppColors.error,
         ),
       );
@@ -1036,17 +1192,41 @@ class _DoctorAppointmentDetailScreenState
     );
   }
 
-  Widget _detailRow(
-    IconData icon,
-    String label,
-    String value,
-    bool isDark,
-  ) {
+  Widget _detailRow(IconData icon, String label, String value, bool isDark) {
+    if (MediaQuery.sizeOf(context).width < 380 ||
+        MediaQuery.textScalerOf(context).scale(14) > 19) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(icon, size: 20, color: AppColors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Text(label,
+                    style: GoogleFonts.roboto(
+                      fontSize: 14,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ))),
+          ]),
+          const SizedBox(height: 8),
+          Text(value,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
+              )),
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          flex: 5,
+          flex: 2,
           child: Row(
             children: [
               Icon(icon, size: 20, color: AppColors.primary),
@@ -1067,7 +1247,7 @@ class _DoctorAppointmentDetailScreenState
         ),
         const SizedBox(width: 12),
         Expanded(
-          flex: 2,
+          flex: 3,
           child: Text(
             value,
             style: GoogleFonts.poppins(

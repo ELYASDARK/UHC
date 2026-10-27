@@ -1,6 +1,7 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uhc/l10n/app_localizations.dart';
@@ -869,7 +870,8 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                   CircleAvatar(
                     radius: 18,
                     backgroundImage: userData['photoUrl'] != null
-                        ? NetworkImage(userData['photoUrl'] as String)
+                        ? CachedNetworkImageProvider(
+                            userData['photoUrl'] as String)
                         : null,
                     child: userData['photoUrl'] == null
                         ? const Icon(Icons.person)
@@ -942,7 +944,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
   Future<void> _handleAdminAction(
       String action, String uid, String name, bool isActive) async {
     if (!_isActorSuperAdmin()) {
-      _showError('Permission denied: Super Admin access required.');
+      _showError('permission-denied');
       return;
     }
     try {
@@ -951,8 +953,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
         case 'deactivate':
           await _governance.setAdminActiveStatus(
               targetUid: uid, isActive: action == 'activate');
-          _showSuccess(
-              '${action == 'activate' ? 'Activated' : 'Deactivated'} $name');
+          _showSuccess();
           break;
         case 'changeRole':
           _showChangeRoleDialog(uid, name);
@@ -962,14 +963,14 @@ class _AdminControlScreenState extends State<AdminControlScreen>
           break;
         case 'forceSignOut':
           await _governance.forceSignOutUser(targetUid: uid);
-          _showSuccess('Force signed out $name');
+          _showSuccess();
           break;
         case 'delete':
           _showDeleteConfirmDialog(uid, name);
           break;
       }
     } catch (e) {
-      _showError('Action failed: ${_readableError(e)}');
+      _showError(e);
     }
   }
 
@@ -1004,9 +1005,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                   try {
                     await _governance.changeAdminRole(
                         targetUid: uid, newRole: role);
-                    _showSuccess('Role changed to $role');
+                    _showSuccess();
                   } catch (e) {
-                    _showError('Failed: ${_readableError(e)}');
+                    _showError(e);
                   }
                 },
               );
@@ -1057,9 +1058,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                   fullName: nameCtrl.text.trim(),
                 );
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
-                _showSuccess('Admin created');
+                _showSuccess();
               } catch (e) {
-                _showError('Failed: ${_readableError(e)}');
+                _showError(e);
               } finally {
                 if (dialogContext.mounted) {
                   setDialogState(() => isSubmitting = false);
@@ -1258,9 +1259,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                 await _governance.resetAdminPassword(
                     targetUid: uid, newPassword: pwCtrl.text);
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
-                _showSuccess('Password reset for $name');
+                _showSuccess();
               } catch (e) {
-                _showError('Failed: ${_readableError(e)}');
+                _showError(e);
               } finally {
                 if (dialogContext.mounted) {
                   setDialogState(() => isSubmitting = false);
@@ -1397,9 +1398,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
               Navigator.pop(ctx);
               try {
                 await _governance.deleteAdminAccount(targetUid: uid);
-                _showSuccess('Deleted $name');
+                _showSuccess();
               } catch (e) {
-                _showError('Failed: ${_readableError(e)}');
+                _showError(e);
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -1421,7 +1422,7 @@ class _AdminControlScreenState extends State<AdminControlScreen>
         permissions: _permissionPayload(map),
       );
     } catch (e) {
-      _showError('Failed to update permission: ${_readableError(e)}');
+      _showError(e);
     }
   }
 
@@ -1431,9 +1432,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
         targetUid: uid,
         permissions: _permissionPayload(preset.toMap()),
       );
-      _showSuccess('Preset applied');
+      _showSuccess();
     } catch (e) {
-      _showError('Failed: ${_readableError(e)}');
+      _showError(e);
     }
   }
 
@@ -1479,9 +1480,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                 await _governance.assignSuperAdminSlot(
                     targetUid: resolvedUid, slotType: slotType);
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
-                _showSuccess('Slot assigned');
+                _showSuccess();
               } catch (e) {
-                _showError('Failed: ${_readableError(e)}');
+                _showError(e);
               } finally {
                 if (dialogContext.mounted) {
                   setDialogState(() => isSubmitting = false);
@@ -1627,9 +1628,9 @@ class _AdminControlScreenState extends State<AdminControlScreen>
                 await _governance.rotateSuperAdminSlot(
                     slotType: slotType, replacementUid: resolvedUid);
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
-                _showSuccess('Slot rotated');
+                _showSuccess();
               } catch (e) {
-                _showError('Failed: ${_readableError(e)}');
+                _showError(e);
               } finally {
                 if (dialogContext.mounted) {
                   setDialogState(() => isSubmitting = false);
@@ -1767,39 +1768,22 @@ class _AdminControlScreenState extends State<AdminControlScreen>
     return null;
   }
 
-  void _showSuccess(String msg) {
+  void _showSuccess() {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: AppColors.success));
+    AppMessages.show(
+        context,
+        SnackBar(
+            content:
+                Text(AppMessages.localizations(context).operationCompleted),
+            backgroundColor: AppColors.success));
   }
 
-  String _readableError(Object error) {
-    if (error is FirebaseFunctionsException) {
-      final raw = (error.message ?? '').trim();
-      if (raw.isNotEmpty && raw.toLowerCase() != 'internal') {
-        return raw;
-      }
-      switch (error.code) {
-        case 'permission-denied':
-          return 'Permission denied. Super Admin access is required.';
-        case 'not-found':
-          return 'Target account not found.';
-        case 'failed-precondition':
-          return 'Action is not allowed for the selected account.';
-        case 'invalid-argument':
-          return 'Invalid input. Please review and try again.';
-        case 'unauthenticated':
-          return 'Session expired. Please login again.';
-        default:
-          return 'Server error (${error.code}). Please try again.';
-      }
-    }
-    return error.toString().replaceFirst('Exception: ', '').trim();
-  }
-
-  void _showError(String msg) {
+  void _showError(Object error) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: AppColors.error));
+    AppMessages.show(
+        context,
+        SnackBar(
+            content: Text(AppMessages.error(context, error)),
+            backgroundColor: AppColors.error));
   }
 }

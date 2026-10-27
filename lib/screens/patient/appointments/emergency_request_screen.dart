@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -74,7 +76,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
       ),
       body: ResponsivePage(
         maxWidth: 860,
-        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+        bottomPadding: UhcResponsive.scrollBottomPadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -180,7 +182,7 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
                     CircleAvatar(
                       radius: 25,
                       backgroundImage: widget.doctor!.photoUrl != null
-                          ? NetworkImage(widget.doctor!.photoUrl!)
+                          ? CachedNetworkImageProvider(widget.doctor!.photoUrl!)
                           : null,
                       child: widget.doctor!.photoUrl == null
                           ? const Icon(Icons.person)
@@ -386,12 +388,13 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
   }
 
   Future<void> _submitRequest() async {
-    final l10n = AppLocalizations.of(context);
     final user = context.read<AuthProvider>().user;
     if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.pleaseLoginFirst)));
+      AppMessages.show(
+          context,
+          SnackBar(
+              content:
+                  Text(AppMessages.localizations(context).pleaseLoginFirst)));
       return;
     }
 
@@ -428,9 +431,10 @@ class _EmergencyRequestScreenState extends State<EmergencyRequestScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('${l10n.error}: ${e.toString()}'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );

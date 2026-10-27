@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -235,7 +237,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
         if (bytes.lengthInBytes > _userPhotoMaxSizeBytes) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            AppMessages.show(
+              context,
               SnackBar(
                 content: Row(
                   children: [
@@ -244,7 +247,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 5 MB.',
+                        AppMessages.localizations(context)
+                            .imageTooLargeLimit(5),
                       ),
                     ),
                   ],
@@ -267,9 +271,10 @@ class _UserFormDialogState extends State<UserFormDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error picking image: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -382,9 +387,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
         if (mounted) {
           Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('User updated successfully'),
+          AppMessages.show(
+            context,
+            SnackBar(
+              content:
+                  Text(AppMessages.localizations(context).userUpdatedSuccess),
               backgroundColor: AppColors.success,
             ),
           );
@@ -436,9 +443,10 @@ class _UserFormDialogState extends State<UserFormDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -672,7 +680,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                                   backgroundImage: _imageBytes != null
                                       ? MemoryImage(_imageBytes!)
                                       : (_photoUrlController.text.isNotEmpty
-                                          ? NetworkImage(
+                                          ? CachedNetworkImageProvider(
                                               _photoUrlController.text)
                                           : null) as ImageProvider?,
                                   child: (_imageBytes == null &&
@@ -996,9 +1004,10 @@ class _UserFormDialogState extends State<UserFormDialog> {
     if (uid.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: uid));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('UID copied'),
+    AppMessages.show(
+      context,
+      SnackBar(
+        content: Text(AppMessages.localizations(context).uidCopiedMessage),
         backgroundColor: AppColors.success,
       ),
     );

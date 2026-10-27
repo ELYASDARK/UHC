@@ -723,9 +723,8 @@
       }
     }
   },
-    "doctorDocument": "Doctor Document",
+  "doctorDocument": "Doctor Document",
   "myDocument": "My Document",
-
   "superAdmin": "Super Admin",
   "superAdminDashboard": "Super Admin Dashboard",
   "adminGovernance": "Admin Governance",
@@ -733,13 +732,11 @@
   "permissions": "Permissions",
   "slots": "Slots",
   "auditLogs": "Audit Logs",
-
   "totalAdmins": "Total Admins",
   "activeAdmins": "Active",
   "inactiveAdmins": "Inactive",
   "superAdmins": "Super Admins",
   "superAdminSlots": "Super Admin Slots",
-
   "slotHealthy": "All Slots Healthy",
   "slotAttentionNeeded": "Slot Attention Needed",
   "primarySlot": "Primary",
@@ -749,14 +746,14 @@
   "inactiveAdminWarning": "{count} admin account(s) are inactive",
   "@inactiveAdminWarning": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "riskWarnings": "Risk Warnings",
-
   "adminControl": "Admin Control",
   "viewOnlyMode": "View-only mode: only Super Admin can perform governance actions.",
-
   "createAdmin": "Create Admin",
   "promote": "Promote",
   "demote": "Demote",
@@ -768,7 +765,6 @@
   "permissionsUpdate": "Permissions Update",
   "slotAssign": "Slot Assign",
   "slotRotate": "Slot Rotate",
-
   "allActions": "All Actions",
   "filterByTarget": "Filter by Target",
   "filterByActor": "Filter by Actor",
@@ -781,18 +777,15 @@
   "noAuditLogsFound": "No audit logs found",
   "noRecentActivity": "No recent activity",
   "recentAuditActivity": "Recent Audit Activity",
-
   "assignSlot": "Assign Slot",
   "rotateSlot": "Rotate Slot",
   "slotType": "Slot Type",
   "replacementUid": "Replacement UID",
   "maxSlotsReached": "Maximum 2 Super Admin slots reached",
-
   "fullAccessPreset": "Full Access",
   "readOnlyPreset": "Read Only",
   "operationsPreset": "Operations",
   "customPreset": "Custom",
-
   "doctorsManage": "Manage Doctors",
   "departmentsManage": "Manage Departments",
   "usersManageNonAdmin": "Manage Users (Non-Admin)",
@@ -801,42 +794,32 @@
   "reportsView": "View Reports",
   "analyticsView": "View Analytics",
   "notificationsSend": "Send Notifications",
-
   "permissionRequired": "Permission Required",
   "exportPermissionRequired": "Export Permission Required",
   "noPermissionForAction": "You do not have permission for this action",
-
   "generateReport": "Generate Report",
   "generating": "Generating...",
-
   "addDoctor": "Add Doctor",
   "addDepartment": "Add Department",
   "addUser": "Add User",
-
   "editDoctor": "Edit Doctor",
   "deleteDoctor": "Delete Doctor",
   "toggleDoctorStatus": "Toggle Doctor Status",
-
   "editDepartment": "Edit Department",
   "deleteDepartment": "Delete Department",
   "toggleDepartmentStatus": "Toggle Department Status",
-
   "editUser": "Edit User",
   "deleteUser": "Delete User",
   "toggleUserStatus": "Toggle User Status",
   "changeUserRole": "Change User Role",
-
   "confirmDeleteTitle": "Confirm Delete",
   "confirmDeleteMessage": "Are you sure you want to delete this? This action cannot be undone.",
   "confirmToggleStatusTitle": "Toggle Status",
   "confirmToggleStatusMessage": "Are you sure you want to change the status?",
-
   "noAdminsFound": "No admin accounts found",
   "createFirstAdmin": "Create your first admin account",
-
   "bootstrapSuperAdmin": "Bootstrap Super Admin",
   "migrationRunbook": "Migration Runbook",
-
   "assistantTitle": "AI Scheduling Assistant",
   "assistantSubtitle": "Find and book appointments with natural chat",
   "assistantDailyLimitHeading": "The assistant has reached today’s limit.",
@@ -894,5 +877,95 @@
   "assistantInfoTooltip": "Assistant Information",
   "assistantClearChatFailed": "Failed to clear chat history on server.",
   "assistantHistoryLoadFailed": "Unable to load conversation history. Check your connection.",
-  "assistantBadge": "AI Assistant"
-}
+  "assistantBadge": "AI Assistant",
+  "resetZoom": "Reset zoom",
+  "imageNotAvailable": "Image not available",
+  "medicalImageLoadError": "The image could not be loaded. Check your connection and try again.",
+  "scheduleLoadFailed": "Could not load the schedule. Try again.",
+  "loadingAvailability": "Checking available times...",
+  "requestFailed": "Could not complete this request. Please try again.",
+  "requestNetworkError": "Check your connection and try again.",
+  "requestConflict": "This information has changed. Refresh and try again.",
+  "requestLimitReached": "Too many attempts. Please try again later.",
+  "requestInvalid": "Check the entered information and try again.",
+  "requestNotFound": "This item is no longer available. Refresh and try again.",
+  "authInvalidCredentials": "Incorrect email or password. Please try again.",
+  "authEmailUsed": "This email is already registered.",
+  "authAccountDisabled": "This account has been disabled. Contact support.",
+  "operationCompleted": "Done successfully",
+  "logoutFailed": "Could not sign out. Please try again.",
+  "notesSaved": "Notes saved",
+  "googleAccountLinked": "Google account linked",
+  "googleAccountUnlinked": "Google account unlinked",
+  "availabilityRequestSent": "Request sent. You remain available until admin approval.",
+  "imageTooLargeLimit": "Image is too large. Maximum size is {limit} MB.",
+  "@imageTooLargeLimit": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "couldNotOpenMaps": "Could not open maps",
+  "couldNotOpenDirections": "Could not open directions",
+  "couldNotMakeCall": "Could not make the call",
+  "couldNotOpenEmail": "Could not open email",
+  "openingEmailClient": "Opening email...",
+  "openingDialer": "Opening dialer...",
+  "departmentUpdatedSuccess": "Department updated successfully",
+  "departmentCreatedSuccess": "Department created successfully",
+  "departmentActivatedMessage": "Department activated",
+  "departmentDeactivatedMessage": "Department deactivated",
+  "departmentDeletedSuccess": "Department deleted successfully",
+  "imageUploadedSuccess": "Image uploaded successfully",
+  "doctorUpdatedSuccess": "Doctor updated successfully",
+  "doctorDeletedSuccess": "Doctor deleted successfully",
+  "doctorActivatedMessage": "Doctor activated",
+  "doctorDeactivatedMessage": "Doctor deactivated",
+  "doctorAvailableMessage": "Doctor marked available",
+  "doctorUnavailableMessage": "Doctor marked unavailable",
+  "scheduleSavedSuccess": "Schedule saved successfully",
+  "reportGeneratedSuccess": "Report generated successfully",
+  "userUpdatedSuccess": "User updated successfully",
+  "userDeletedSuccess": "User deleted successfully",
+  "uidCopiedMessage": "UID copied",
+  "userActivatedMessage": "User activated",
+  "userDeactivatedMessage": "User deactivated",
+  "roleUpdatedMessage": "Role updated",
+  "patientRoleChangeOnly": "Only student and staff roles can be changed here.",
+  "notificationRecipientsSent": "Sent to {count} recipients.",
+  "@notificationRecipientsSent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "availabilityApprovedCleanup": "Approved. Appointment cleanup needs review.",
+  "availabilityApprovedCount": "Approved. {count} appointments were cancelled.",
+  "@availabilityApprovedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "availabilityRejected": "Request rejected.",
+  "emulatorGoogleSignInNotice": "External Google Sign-In is disabled in emulator mode. Use local demo sign-in.",
+  "scheduleTimeWithinHours": "Choose a time between {start} and {end}.",
+  "@scheduleTimeWithinHours": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduleEndAfterStart": "End time must be after start time.",
+  "scheduleTimeOverlaps": "This time overlaps an existing slot.",
+  "selectRecipientFirst": "Select a recipient before sending.",
+  "noActiveRecipients": "No active recipients matched this target.",
+  "notesSaveFailed": "Could not save medical notes. Please try again."
+}

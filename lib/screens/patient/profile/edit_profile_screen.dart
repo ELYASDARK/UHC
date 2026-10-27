@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -72,7 +74,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const maxSizeBytes = 25 * 1024 * 1024; // 25 MB
         if (bytes.lengthInBytes > maxSizeBytes) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            AppMessages.show(
+              context,
               SnackBar(
                 content: Row(
                   children: [
@@ -81,7 +84,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 25 MB.',
+                        AppMessages.localizations(context)
+                            .imageTooLargeLimit(25),
                       ),
                     ),
                   ],
@@ -106,9 +110,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       debugPrint('Error picking image: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(AppLocalizations.of(context).error),
+            content: Text(AppMessages.localizations(context).error),
             backgroundColor: AppColors.error,
           ),
         );
@@ -292,13 +297,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
             content: Row(
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 12),
-                Text(AppLocalizations.of(context).profileUpdated),
+                Text(AppMessages.localizations(context).profileUpdated),
               ],
             ),
             backgroundColor: AppColors.success,
@@ -312,9 +318,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -359,7 +366,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       body: ResponsivePage(
         maxWidth: 760,
-        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+        bottomPadding: UhcResponsive.scrollBottomPadding(context),
         child: Form(
           key: _formKey,
           child: Column(
@@ -614,13 +621,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         onPressed: () async {
                           final success = await authProvider.linkWithGoogle();
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppMessages.show(
+                            context,
                             SnackBar(
                               content: Text(
                                 success
-                                    ? 'Google account linked!'
-                                    : authProvider.errorMessage ??
-                                        'Failed to link',
+                                    ? AppMessages.localizations(context)
+                                        .googleAccountLinked
+                                    : AppMessages.error(
+                                        context, authProvider.errorMessage),
                               ),
                               backgroundColor:
                                   success ? AppColors.success : AppColors.error,
@@ -662,13 +671,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           final success = await authProvider.unlinkGoogle();
                           if (!context.mounted) return;
 
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          AppMessages.show(
+                            context,
                             SnackBar(
                               content: Text(
                                 success
-                                    ? 'Google account unlinked.'
-                                    : authProvider.errorMessage ??
-                                        'Failed to unlink',
+                                    ? AppMessages.localizations(context)
+                                        .googleAccountUnlinked
+                                    : AppMessages.error(
+                                        context, authProvider.errorMessage),
                               ),
                               backgroundColor:
                                   success ? AppColors.success : AppColors.error,
@@ -705,8 +716,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     // 3. Existing Network URL
     if (user?.photoUrl != null && user!.photoUrl!.isNotEmpty) {
-      return Image.network(
-        user.photoUrl!,
+      return Image(
+        image: CachedNetworkImageProvider(user.photoUrl!),
         fit: BoxFit.cover,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;

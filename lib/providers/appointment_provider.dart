@@ -37,18 +37,15 @@ class AppointmentProvider extends ChangeNotifier {
   Future<void> loadAppointments(String userId, {String? email}) async {
     _isLoading = true;
     _error = null;
-    // Note: Don't call notifyListeners() here to avoid "setState during build" error
-    // The finally block will notify listeners when loading completes
+    notifyListeners();
 
     try {
-      _upcomingAppointments = await _appointmentRepo.getUpcomingAppointments(
-        userId,
-        email: email,
-      );
-      _pastAppointments = await _appointmentRepo.getPastAppointments(
-        userId,
-        email: email,
-      );
+      final results = await Future.wait([
+        _appointmentRepo.getUpcomingAppointments(userId, email: email),
+        _appointmentRepo.getPastAppointments(userId, email: email),
+      ]);
+      _upcomingAppointments = results[0];
+      _pastAppointments = results[1];
       await _fetchDoctorPhotos();
       _error = null;
     } catch (e) {

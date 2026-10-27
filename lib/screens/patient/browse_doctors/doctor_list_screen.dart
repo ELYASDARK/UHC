@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -66,6 +67,16 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
       if (widget.captureState == DoctorListCaptureState.error) {
         _error = 'Failed to load doctors. Pull to retry.';
       }
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant DoctorListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialDepartmentKey != widget.initialDepartmentKey ||
+        oldWidget.initialDepartment != widget.initialDepartment) {
+      _selectedDepartmentName =
+          widget.initialDepartmentKey ?? widget.initialDepartment?.name;
     }
   }
 
@@ -201,7 +212,8 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(_error!, style: TextStyle(color: AppColors.error)),
+              child: Text(AppMessages.error(context, _error),
+                  style: TextStyle(color: AppColors.error)),
             ),
 
           // Doctor list
@@ -283,7 +295,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     return ResponsiveListView(
       padding: UhcResponsive.pagePadding(
         context,
-        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        bottom: UhcResponsive.scrollBottomPadding(context),
       ),
       maxWidth: 1440,
       gridOnWide: true,
@@ -338,7 +350,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     return ResponsiveListView(
       padding: UhcResponsive.pagePadding(
         context,
-        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        bottom: UhcResponsive.scrollBottomPadding(context),
       ),
       maxWidth: 1440,
       gridOnWide: true,
@@ -374,9 +386,11 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   }
 
   void _showDoctorUnavailableMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('This doctor is not available for booking right now.'),
+    AppMessages.show(
+      context,
+      SnackBar(
+        content: Text(
+            AppMessages.localizations(context).doctorNotAvailableSelectAnother),
         backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
       ),
@@ -512,9 +526,11 @@ class DoctorDetailScreen extends StatelessWidget {
   const DoctorDetailScreen({super.key, required this.doctor});
 
   void _showUnavailableDoctorMessage(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('This doctor is not available for booking right now.'),
+    AppMessages.show(
+      context,
+      SnackBar(
+        content: Text(
+            AppMessages.localizations(context).doctorNotAvailableSelectAnother),
         backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
       ),
@@ -674,9 +690,8 @@ class DoctorDetailScreen extends StatelessWidget {
                               ? Icons.check_circle_rounded
                               : Icons.cancel_rounded,
                           isDark,
-                          valueColor: doctor.canBook
-                              ? AppColors.success
-                              : Colors.red,
+                          valueColor:
+                              doctor.canBook ? AppColors.success : Colors.red,
                         ),
                       ],
                     ),
@@ -743,7 +758,7 @@ class DoctorDetailScreen extends StatelessWidget {
                     }).toList(),
                   ),
 
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -781,8 +796,7 @@ class DoctorDetailScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     side: BorderSide(
-                      color:
-                          doctor.canBook ? AppColors.primary : Colors.grey,
+                      color: doctor.canBook ? AppColors.primary : Colors.grey,
                       width: 1.5,
                     ),
                   ),
@@ -852,7 +866,7 @@ class DoctorDetailScreen extends StatelessWidget {
       ),
       body: ResponsivePage(
         maxWidth: 1180,
-        bottomPadding: 120,
+        bottomPadding: UhcResponsive.scrollBottomPadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -963,9 +977,8 @@ class DoctorDetailScreen extends StatelessWidget {
                               ? Icons.check_circle_rounded
                               : Icons.cancel_rounded,
                           isDark,
-                          valueColor: doctor.canBook
-                              ? AppColors.success
-                              : Colors.red,
+                          valueColor:
+                              doctor.canBook ? AppColors.success : Colors.red,
                         ),
                       ],
                     ),

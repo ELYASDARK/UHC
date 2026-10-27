@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -40,9 +41,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(AppLocalizations.of(context).passwordChanged),
+            content: Text(AppMessages.localizations(context).passwordChanged),
             backgroundColor: AppColors.success,
           ),
         );
@@ -50,16 +52,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Failed to change password';
-        if (e.toString().contains('Incorrect password')) {
-          errorMessage = 'The current password is incorrect';
-        } else if (e.toString().contains('weak-password')) {
-          errorMessage = 'The new password is too weak';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(errorMessage),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );

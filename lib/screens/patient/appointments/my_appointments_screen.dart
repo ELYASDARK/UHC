@@ -1,8 +1,13 @@
+import '../../../core/utils/localization_helper.dart';
+
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
@@ -33,6 +38,9 @@ class MyAppointmentsScreen extends StatefulWidget {
 class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _initialLoad = true;
+
+  Future<void> refreshAppointments() => _loadAppointments();
 
   // Public method to switch tabs from outside
   void switchToTab(int index) {
@@ -51,7 +59,7 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
     );
     // Defer loading to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadAppointments();
+      if (mounted) _loadAppointments();
     });
   }
 
@@ -80,6 +88,7 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
         email: authProvider.user!.email,
       );
     }
+    if (mounted) setState(() => _initialLoad = false);
   }
 
   @override
@@ -91,7 +100,7 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
       builder: (context, appointmentProvider, child) {
         final upcomingAppointments = appointmentProvider.upcomingAppointments;
         final pastAppointments = appointmentProvider.pastAppointments;
-        final isLoading = appointmentProvider.isLoading;
+        final isLoading = _initialLoad || appointmentProvider.isLoading;
 
         return Scaffold(
           appBar: AppBar(
@@ -132,11 +141,11 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
   ) {
     final l10n = AppLocalizations.of(context);
 
-    if (isLoading) {
+    if (isLoading && (appointments.isEmpty || _initialLoad)) {
       return ResponsiveListView(
         padding: UhcResponsive.pagePadding(
           context,
-          bottom: UhcResponsive.isWide(context) ? 32 : 100,
+          bottom: UhcResponsive.scrollBottomPadding(context),
         ),
         maxWidth: 1320,
         gridOnWide: true,
@@ -145,6 +154,16 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
         childAspectRatio: 2.8,
         itemCount: 3,
         itemBuilder: (context, index) => const AppointmentCardSkeleton(),
+      );
+    }
+
+    if (context.read<AppointmentProvider>().error != null) {
+      return Center(
+        child: TextButton.icon(
+          onPressed: _loadAppointments,
+          icon: const Icon(Icons.refresh),
+          label: Text(l10n.tryAgain),
+        ),
       );
     }
 
@@ -207,7 +226,7 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
       child: ResponsiveListView(
         padding: UhcResponsive.pagePadding(
           context,
-          bottom: UhcResponsive.isWide(context) ? 32 : 100,
+          bottom: UhcResponsive.scrollBottomPadding(context),
         ),
         maxWidth: 1320,
         gridOnWide: true,
@@ -240,9 +259,12 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
     final result = await CancelAppointmentDialog.show(context, appointment);
     if (result == true) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Appointment cancelled successfully'),
+        AppMessages.show(
+          context,
+          SnackBar(
+            content: Text(
+              AppMessages.localizations(context).appointmentCancelled,
+            ),
             backgroundColor: AppColors.success,
           ),
         );
@@ -281,9 +303,12 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
             _loadAppointments();
           }
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not load doctor details'),
+          AppMessages.show(
+            context,
+            SnackBar(
+              content: Text(
+                AppMessages.localizations(context).failedToLoadDoctors,
+              ),
               backgroundColor: AppColors.error,
             ),
           );
@@ -294,9 +319,10 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
       if (mounted) Navigator.pop(context);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -388,8 +414,8 @@ class _AppointmentCard extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: photoUrl != null && photoUrl!.isNotEmpty
-                        ? Image.network(
-                            photoUrl!,
+                        ? Image(
+                            image: CachedNetworkImageProvider(photoUrl!),
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,
@@ -438,7 +464,10 @@ class _AppointmentCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        appointment.department,
+                        LocalizationHelper.translateDepartment(
+                          appointment.department,
+                          l10n,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.roboto(
@@ -665,7 +694,8 @@ class _AppointmentDetailSheet extends StatelessWidget {
                       ],
                     ),
                     child: QrImageView(
-                      data: appointment.qrCode ?? 'UHC_APPOINTMENT:${appointment.id}',
+                      data: appointment.qrCode ??
+                          'UHC_APPOINTMENT:${appointment.id}',
                       version: QrVersions.auto,
                       size: 160,
                       backgroundColor: Colors.white,
@@ -713,8 +743,19 @@ class _AppointmentDetailSheet extends StatelessWidget {
 
           // Details
           _buildDetailRow(l10n.doctor, appointment.doctorName, isDark),
-          _buildDetailRow(l10n.department, appointment.department, isDark),
-          _buildDetailRow(l10n.type, appointment.typeDisplay, isDark),
+          _buildDetailRow(
+            l10n.department,
+            LocalizationHelper.translateDepartment(
+              appointment.department,
+              l10n,
+            ),
+            isDark,
+          ),
+          _buildDetailRow(
+            l10n.type,
+            LocalizationHelper.translateAppointmentType(appointment.type, l10n),
+            isDark,
+          ),
           _buildDetailRow(
             l10n.date,
             '${appointment.appointmentDate.day}/${appointment.appointmentDate.month}/${appointment.appointmentDate.year}',
@@ -758,25 +799,32 @@ class _AppointmentDetailSheet extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.roboto(
-              fontSize: 14,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
             ),
           ),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimaryLight,
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
+              ),
             ),
           ),
         ],

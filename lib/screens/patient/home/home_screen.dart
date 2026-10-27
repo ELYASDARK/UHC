@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'package:flutter/material.dart';
@@ -138,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ResponsivePage(
             physics: const AlwaysScrollableScrollPhysics(),
             maxWidth: 1560,
-            bottomPadding: isWide ? 32 : 100,
+            bottomPadding: UhcResponsive.scrollBottomPadding(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -221,8 +223,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ClipOval(
             child: photoUrl != null
                 ? (photoUrl.startsWith('http')
-                    ? Image.network(
-                        photoUrl,
+                    ? Image(
+                        image: CachedNetworkImageProvider(photoUrl),
                         width: 56,
                         height: 56,
                         fit: BoxFit.cover,
@@ -383,7 +385,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   Widget _buildAssistantCard(BuildContext context, bool isDark) {
     final l10n = AppLocalizations.of(context);
     return GradientCard(
@@ -407,7 +408,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    Container(
+                    Flexible(
+                        child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 3,
@@ -425,17 +427,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: Colors.white,
                           ),
                           const SizedBox(width: 4),
-                          Text(
+                          Flexible(
+                              child: Text(
                             l10n.assistantBadge,
                             style: GoogleFonts.poppins(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
-                          ),
+                          )),
                         ],
                       ),
-                    ),
+                    )),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -469,13 +472,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        l10n.getStarted,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF4F46E5),
-                        ),
+                      Flexible(
+                        child: Text(l10n.getStarted,
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF4F46E5),
+                            )),
                       ),
                       const SizedBox(width: 6),
                       const Icon(
@@ -592,7 +595,8 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
+            Expanded(
+                child: Text(
               AppLocalizations.of(context).departments,
               style: GoogleFonts.poppins(
                 fontSize: 18,
@@ -601,7 +605,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? AppColors.textPrimaryDark
                     : AppColors.textPrimaryLight,
               ),
-            ),
+            )),
             TextButton(
               onPressed: widget.onDepartmentsTap, // Use new callback
               child: Text(
@@ -629,7 +633,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    _error!,
+                    AppMessages.error(context, _error),
                     style: GoogleFonts.roboto(
                       fontSize: 12,
                       color: AppColors.error,
@@ -665,7 +669,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   for (final dept in _departments.take(count))
                     SizedBox(
                       width: cardWidth,
-                      height: 128,
+                      height: 128 *
+                          (MediaQuery.textScalerOf(context).scale(11) / 11)
+                              .clamp(1.0, double.infinity),
                       child:
                           _buildDepartmentCard(dept, isDark, fillWidth: true),
                     ),
@@ -675,7 +681,9 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         else
           SizedBox(
-            height: 128,
+            height: 128 *
+                (MediaQuery.textScalerOf(context).scale(11) / 11)
+                    .clamp(1.0, double.infinity),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _departments.length > 4 ? 4 : _departments.length,
@@ -723,7 +731,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () => widget.onDepartmentTap?.call(dept.departmentKey),
       child: Container(
-        width: fillWidth ? double.infinity : 110,
+        width: fillWidth
+            ? double.infinity
+            : 110 *
+                (MediaQuery.textScalerOf(context).scale(11) / 11)
+                    .clamp(1.0, double.infinity),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
@@ -803,7 +815,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        if (isWide)
+        if (isWide || MediaQuery.textScalerOf(context).scale(14) > 18)
           Column(
             children: [
               for (final tip in tips) ...[

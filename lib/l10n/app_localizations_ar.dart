@@ -2144,8 +2144,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get exportPermissionRequired => 'Export Permission Required';
 
   @override
-  String get noPermissionForAction =>
-      'You do not have permission for this action';
+  String get noPermissionForAction => 'ليس لديك إذن لتنفيذ هذا الإجراء';
 
   @override
   String get generateReport => 'Generate Report';
@@ -2364,4 +2363,197 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get assistantBadge => 'المساعد الذكي';
+
+  @override
+  String get resetZoom => 'إعادة ضبط التكبير';
+
+  @override
+  String get imageNotAvailable => 'الصورة غير متاحة';
+
+  @override
+  String get medicalImageLoadError =>
+      'تعذر تحميل الصورة. تحقق من اتصالك وحاول مجددًا.';
+
+  @override
+  String get scheduleLoadFailed => 'تعذر تحميل الجدول. حاول مجددًا.';
+
+  @override
+  String get loadingAvailability => 'جارٍ التحقق من الأوقات المتاحة...';
+
+  @override
+  String get requestFailed => 'تعذر إكمال الطلب. حاول مجددًا.';
+
+  @override
+  String get requestNetworkError => 'تحقق من اتصالك وحاول مجددًا.';
+
+  @override
+  String get requestConflict =>
+      'تغيرت هذه المعلومات. حدّث الصفحة وحاول مجددًا.';
+
+  @override
+  String get requestLimitReached => 'محاولات كثيرة. حاول مرة أخرى لاحقًا.';
+
+  @override
+  String get requestInvalid => 'تحقق من المعلومات المدخلة وحاول مجددًا.';
+
+  @override
+  String get requestNotFound =>
+      'هذا العنصر لم يعد متاحًا. حدّث الصفحة وحاول مجددًا.';
+
+  @override
+  String get authInvalidCredentials =>
+      'البريد الإلكتروني أو كلمة المرور غير صحيحة. حاول مجددًا.';
+
+  @override
+  String get authEmailUsed => 'هذا البريد الإلكتروني مسجّل بالفعل.';
+
+  @override
+  String get authAccountDisabled => 'هذا الحساب معطّل. تواصل مع الدعم.';
+
+  @override
+  String get operationCompleted => 'تم بنجاح';
+
+  @override
+  String get logoutFailed => 'تعذر تسجيل الخروج. حاول مجددًا.';
+
+  @override
+  String get notesSaved => 'تم حفظ الملاحظات';
+
+  @override
+  String get googleAccountLinked => 'تم ربط حساب Google';
+
+  @override
+  String get googleAccountUnlinked => 'تم إلغاء ربط حساب Google';
+
+  @override
+  String get availabilityRequestSent =>
+      'تم إرسال الطلب. تبقى متاحًا حتى موافقة المسؤول.';
+
+  @override
+  String imageTooLargeLimit(int limit) {
+    return 'الصورة كبيرة جدًا. الحد الأقصى $limit ميغابايت.';
+  }
+
+  @override
+  String get couldNotOpenMaps => 'تعذر فتح الخرائط';
+
+  @override
+  String get couldNotOpenDirections => 'تعذر فتح الاتجاهات';
+
+  @override
+  String get couldNotMakeCall => 'تعذر إجراء المكالمة';
+
+  @override
+  String get couldNotOpenEmail => 'تعذر فتح البريد الإلكتروني';
+
+  @override
+  String get openingEmailClient => 'جارٍ فتح البريد الإلكتروني...';
+
+  @override
+  String get openingDialer => 'جارٍ فتح الهاتف...';
+
+  @override
+  String get departmentUpdatedSuccess => 'تم تحديث القسم بنجاح';
+
+  @override
+  String get departmentCreatedSuccess => 'تم إنشاء القسم بنجاح';
+
+  @override
+  String get departmentActivatedMessage => 'تم تفعيل القسم';
+
+  @override
+  String get departmentDeactivatedMessage => 'تم تعطيل القسم';
+
+  @override
+  String get departmentDeletedSuccess => 'تم حذف القسم بنجاح';
+
+  @override
+  String get imageUploadedSuccess => 'تم رفع الصورة بنجاح';
+
+  @override
+  String get doctorUpdatedSuccess => 'تم تحديث الطبيب بنجاح';
+
+  @override
+  String get doctorDeletedSuccess => 'تم حذف الطبيب بنجاح';
+
+  @override
+  String get doctorActivatedMessage => 'تم تفعيل الطبيب';
+
+  @override
+  String get doctorDeactivatedMessage => 'تم تعطيل الطبيب';
+
+  @override
+  String get doctorAvailableMessage => 'تم تعيين الطبيب متاحًا';
+
+  @override
+  String get doctorUnavailableMessage => 'تم تعيين الطبيب غير متاح';
+
+  @override
+  String get scheduleSavedSuccess => 'تم حفظ الجدول بنجاح';
+
+  @override
+  String get reportGeneratedSuccess => 'تم إنشاء التقرير بنجاح';
+
+  @override
+  String get userUpdatedSuccess => 'تم تحديث المستخدم بنجاح';
+
+  @override
+  String get userDeletedSuccess => 'تم حذف المستخدم بنجاح';
+
+  @override
+  String get uidCopiedMessage => 'تم نسخ معرّف المستخدم';
+
+  @override
+  String get userActivatedMessage => 'تم تفعيل المستخدم';
+
+  @override
+  String get userDeactivatedMessage => 'تم تعطيل المستخدم';
+
+  @override
+  String get roleUpdatedMessage => 'تم تحديث الدور';
+
+  @override
+  String get patientRoleChangeOnly =>
+      'يمكن تغيير أدوار الطلاب والموظفين فقط هنا.';
+
+  @override
+  String notificationRecipientsSent(int count) {
+    return 'تم الإرسال إلى $count مستلمين.';
+  }
+
+  @override
+  String get availabilityApprovedCleanup =>
+      'تمت الموافقة. يلزم مراجعة إلغاء المواعيد.';
+
+  @override
+  String availabilityApprovedCount(int count) {
+    return 'تمت الموافقة. أُلغي $count مواعيد.';
+  }
+
+  @override
+  String get availabilityRejected => 'تم رفض الطلب.';
+
+  @override
+  String get emulatorGoogleSignInNotice =>
+      'تسجيل Google الخارجي معطّل في وضع المحاكي. استخدم تسجيل الدخول التجريبي المحلي.';
+
+  @override
+  String scheduleTimeWithinHours(String start, String end) {
+    return 'اختر وقتًا بين $start و$end.';
+  }
+
+  @override
+  String get scheduleEndAfterStart => 'يجب أن يكون وقت النهاية بعد البداية.';
+
+  @override
+  String get scheduleTimeOverlaps => 'هذا الوقت يتداخل مع موعد موجود.';
+
+  @override
+  String get selectRecipientFirst => 'اختر مستلمًا قبل الإرسال.';
+
+  @override
+  String get noActiveRecipients => 'لا يوجد مستلمون نشطون لهذا الهدف.';
+
+  @override
+  String get notesSaveFailed => 'تعذر حفظ الملاحظات الطبية. حاول مجددًا.';
 }

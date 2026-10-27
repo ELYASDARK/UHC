@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -189,9 +190,10 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           setState(() {
             _prefs = previousPrefs;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text('Failed to save settings: $e'),
+              content: Text(AppMessages.error(context, e)),
               backgroundColor: AppColors.error,
             ),
           );

@@ -24,7 +24,7 @@
     },
     "functions": {
         "source": "functions",
-        "runtime": "nodejs22",
+        "runtime": "nodejs24",
         "ignore": [
             "node_modules",
             ".git",

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -14,6 +16,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/utils/locale_utils.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../appointments/doctor_appointment_detail_screen.dart';
+import 'doctor_schedule_entries.dart';
 
 /// Doctor's own schedule view
 ///
@@ -23,8 +26,15 @@ import '../appointments/doctor_appointment_detail_screen.dart';
 ///   3. Booked slot cards linking to appointment details
 class DoctorScheduleManagementScreen extends StatefulWidget {
   final DoctorModel doctor;
+  final AppointmentRepository? appointmentRepository;
+  final bool isActive;
 
-  const DoctorScheduleManagementScreen({super.key, required this.doctor});
+  const DoctorScheduleManagementScreen({
+    super.key,
+    required this.doctor,
+    this.appointmentRepository,
+    this.isActive = true,
+  });
 
   @override
   State<DoctorScheduleManagementScreen> createState() =>
@@ -32,74 +42,89 @@ class DoctorScheduleManagementScreen extends StatefulWidget {
 }
 
 class _DoctorScheduleManagementScreenState
-    extends State<DoctorScheduleManagementScreen> {
-  final AppointmentRepository _appointmentRepo = AppointmentRepository();
+    extends State<DoctorScheduleManagementScreen> with WidgetsBindingObserver {
+  late final AppointmentRepository _appointmentRepo;
 
   CalendarFormat _calendarFormat = CalendarFormat.week;
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
 
-  List<String> _bookedSlots = [];
-  Map<String, AppointmentModel> _slotAppointments = {};
+  List<AppointmentModel> _appointments = [];
   bool _isLoadingSlots = false;
+  bool _loadFailed = false;
+  int _requestId = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _appointmentRepo = widget.appointmentRepository ?? AppointmentRepository();
     _loadBookedSlots(_selectedDay);
+  }
+
+  @override
+  void didUpdateWidget(covariant DoctorScheduleManagementScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final doctorChanged = widget.doctor.id != oldWidget.doctor.id ||
+        jsonEncode(widget.doctor.toFirestore()['weeklySchedule']) !=
+            jsonEncode(oldWidget.doctor.toFirestore()['weeklySchedule']);
+    if (doctorChanged || (widget.isActive && !oldWidget.isActive)) {
+      _loadBookedSlots(_selectedDay);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.isActive) {
+      _loadBookedSlots(_selectedDay);
+    }
+  }
+
+  @override
+  void dispose() {
+    _requestId++;
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   // ---- data ----
   Future<void> _loadBookedSlots(DateTime date) async {
-    setState(() => _isLoadingSlots = true);
+    if (!mounted) return;
+    final requestId = ++_requestId;
+    final doctorId = widget.doctor.id;
+    setState(() {
+      _isLoadingSlots = true;
+      _loadFailed = false;
+      _appointments = [];
+    });
     try {
       final appointments = await _appointmentRepo.getDoctorAppointments(
-        widget.doctor.id,
+        doctorId,
         date,
+        requireServer: true,
       );
+      if (!mounted || requestId != _requestId) return;
       setState(() {
-        _bookedSlots = appointments.map((a) => a.timeSlot).toList();
-        _slotAppointments = {
-          for (final a in appointments) a.timeSlot: a,
-        };
+        _appointments = appointments;
+        _isLoadingSlots = false;
       });
-    } catch (e) {
-      debugPrint('Failed to load booked slots: $e');
-    } finally {
-      setState(() => _isLoadingSlots = false);
+    } catch (_) {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _loadFailed = true;
+        _isLoadingSlots = false;
+      });
     }
   }
 
-  String _getDayName(DateTime date) {
-    const days = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ];
-    return days[date.weekday - 1];
-  }
-
   List<TimeSlot> _getDaySlots(DateTime date) {
-    final dayName = _getDayName(date);
-    return widget.doctor.weeklySchedule[dayName] ?? [];
-  }
-
-  bool _isWorkingDay(DateTime date) {
-    return _getDaySlots(date).isNotEmpty;
-  }
-
-  bool _isSlotPast(DateTime date, String startTime) {
-    if (!isSameDay(date, DateTime.now())) return false;
-    final parts = startTime.split(':');
-    if (parts.length != 2) return false;
-    final hour = int.tryParse(parts[0]) ?? 0;
-    final minute = int.tryParse(parts[1]) ?? 0;
-    final slotTime = DateTime(date.year, date.month, date.day, hour, minute);
-    return slotTime.isBefore(DateTime.now());
+    final dayName = DoctorModel.dayOfWeekName(date);
+    return widget.doctor.weeklySchedule[dayName] ??
+        widget.doctor.weeklySchedule.entries
+            .where((entry) => entry.key.toLowerCase() == dayName)
+            .map((entry) => entry.value)
+            .firstOrNull ??
+        [];
   }
 
   // ---- build ----
@@ -108,6 +133,14 @@ class _DoctorScheduleManagementScreenState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
     final daySlots = _getDaySlots(_selectedDay);
+    final entries = doctorScheduleEntries(
+      doctorId: widget.doctor.id,
+      date: _selectedDay,
+      slots: daySlots,
+      appointments: _appointments,
+    );
+    final bookedCount =
+        entries.where((entry) => entry.appointment != null).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -140,7 +173,6 @@ class _DoctorScheduleManagementScreenState
                 lastDay: DateTime.now().add(const Duration(days: 60)),
                 focusedDay: _focusedDay,
                 calendarFormat: _calendarFormat,
-                enabledDayPredicate: _isWorkingDay,
                 selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                 onDaySelected: (selected, focused) {
                   if (!isSameDay(_selectedDay, selected)) {
@@ -228,9 +260,13 @@ class _DoctorScheduleManagementScreenState
                           ),
                         ),
                         Text(
-                          daySlots.isEmpty
-                              ? l10n.noScheduleSet
-                              : '${l10n.slotsLabel(daySlots.length)} • ${l10n.bookedCount(_bookedSlots.length)}',
+                          _isLoadingSlots
+                              ? l10n.loadingAvailability
+                              : _loadFailed
+                                  ? l10n.scheduleLoadFailed
+                                  : daySlots.isEmpty && bookedCount == 0
+                                      ? l10n.noScheduleSet
+                                      : '${l10n.slotsLabel(daySlots.length)} • ${l10n.bookedCount(bookedCount)}',
                           style: GoogleFonts.roboto(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -251,11 +287,16 @@ class _DoctorScheduleManagementScreenState
 
           // Slots list
           Expanded(
-            child: _isLoadingSlots
-                ? _buildSlotsSkeleton()
-                : daySlots.isEmpty
-                    ? _buildEmptyDay(isDark, l10n)
-                    : _buildSlotsList(daySlots, isDark, l10n),
+            child: RefreshIndicator(
+              onRefresh: () => _loadBookedSlots(_selectedDay),
+              child: _isLoadingSlots
+                  ? _buildSlotsSkeleton()
+                  : _loadFailed
+                      ? _buildLoadError(l10n)
+                      : entries.isEmpty
+                          ? _buildEmptyDay(isDark, l10n)
+                          : _buildSlotsList(entries, isDark, l10n),
+            ),
           ),
         ],
       ),
@@ -264,10 +305,10 @@ class _DoctorScheduleManagementScreenState
 
   // ---- slots list ----
   Widget _buildSlotsList(
-      List<TimeSlot> slots, bool isDark, AppLocalizations l10n) {
+      List<DoctorScheduleEntry> entries, bool isDark, AppLocalizations l10n) {
     return ResponsiveListView(
       maxWidth: 1180,
-      gridOnWide: true,
+      gridOnWide: false,
       tabletColumns: 1,
       laptopColumns: 2,
       desktopColumns: 2,
@@ -275,18 +316,16 @@ class _DoctorScheduleManagementScreenState
       padding: UhcResponsive.pagePadding(
         context,
         top: 0,
-        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        bottom: UhcResponsive.scrollBottomPadding(context),
       ),
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: slots.length,
+      itemCount: entries.length,
       itemBuilder: (context, index) {
-        final slot = slots[index];
-        final isBooked = _bookedSlots.contains(slot.display);
-        final isPast = _isSlotPast(_selectedDay, slot.startTime);
-        final appointment = _slotAppointments[slot.display];
+        final slot = entries[index].slot;
+        final isPast =
+            scheduleSlotIsPast(_selectedDay, slot.startTime, DateTime.now());
 
-        return _slotCard(
-                slot, isDark, isBooked, isPast, appointment, l10n, index)
+        return _slotCard(entries[index], isDark, isPast, l10n)
             .animate(delay: Duration(milliseconds: index * 100))
             .fadeIn(duration: 400.ms)
             .slideX(begin: 0.05);
@@ -295,21 +334,21 @@ class _DoctorScheduleManagementScreenState
   }
 
   Widget _slotCard(
-    TimeSlot slot,
+    DoctorScheduleEntry entry,
     bool isDark,
-    bool isBooked,
     bool isPast,
-    AppointmentModel? appointment,
     AppLocalizations l10n,
-    int index,
   ) {
+    final slot = entry.slot;
+    final appointment = entry.appointment;
+    final isBooked = appointment != null;
     final Color statusColor;
     final String statusText;
     final IconData statusIcon;
 
     if (isBooked) {
       statusColor = AppColors.primary;
-      statusText = appointment?.patientName ?? l10n.booked;
+      statusText = appointment.patientName;
       statusIcon = Icons.person_rounded;
     } else if (isPast) {
       statusColor = Colors.grey;
@@ -326,11 +365,8 @@ class _DoctorScheduleManagementScreenState
     }
 
     return GestureDetector(
-      onTap: isBooked && appointment != null
-          ? () => _openAppointment(appointment)
-          : null,
+      onTap: isBooked ? () => _openAppointment(appointment) : null,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
@@ -353,33 +389,35 @@ class _DoctorScheduleManagementScreenState
           children: [
             // Time
             SizedBox(
-              width: 58,
+              width: MediaQuery.textScalerOf(context).scale(14) * 4.5,
               child: Text(
                 slot.display,
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: isPast
+                  color: isPast && !isBooked
                       ? Colors.grey
                       : isDark
                           ? AppColors.textPrimaryDark
                           : AppColors.textPrimaryLight,
-                  decoration: isPast ? TextDecoration.lineThrough : null,
+                  decoration:
+                      isPast && !isBooked ? TextDecoration.lineThrough : null,
                 ),
               ),
             ),
             const SizedBox(width: 12),
 
             Container(
-              width: 36,
+              width: 3,
               height: 36,
               decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
+                color: statusColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(statusIcon, size: 18, color: statusColor),
             ),
             const SizedBox(width: 12),
+            Icon(statusIcon, size: 18, color: statusColor),
+            const SizedBox(width: 10),
 
             // Status info
             Expanded(
@@ -401,11 +439,11 @@ class _DoctorScheduleManagementScreenState
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (isBooked && appointment != null)
+                  if (isBooked)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(
-                        '${appointment.typeDisplay} • ${appointment.statusDisplay}',
+                        '${_typeLabel(appointment.type, l10n)} • ${_statusLabel(appointment.status, l10n)}',
                         style: GoogleFonts.roboto(
                           fontSize: 12,
                           color: isDark
@@ -419,7 +457,7 @@ class _DoctorScheduleManagementScreenState
             ),
 
             // Arrow for booked
-            if (isBooked && appointment != null)
+            if (isBooked)
               const Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.primary,
@@ -432,6 +470,43 @@ class _DoctorScheduleManagementScreenState
   }
 
   // ---- empty & skeleton ----
+  Widget _buildLoadError(AppLocalizations l10n) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      children: [
+        const Icon(Icons.cloud_off_outlined, size: 40),
+        const SizedBox(height: 12),
+        Text(l10n.scheduleLoadFailed, textAlign: TextAlign.center),
+        const SizedBox(height: 12),
+        Center(
+          child: FilledButton.icon(
+            onPressed: () => _loadBookedSlots(_selectedDay),
+            icon: const Icon(Icons.refresh),
+            label: Text(l10n.retry),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _typeLabel(AppointmentType type, AppLocalizations l10n) =>
+      switch (type) {
+        AppointmentType.regularCheckup => l10n.regularVisit,
+        AppointmentType.followUp => l10n.followUp,
+        AppointmentType.consultation => l10n.consultation,
+        AppointmentType.emergency => l10n.emergency,
+      };
+
+  String _statusLabel(AppointmentStatus status, AppLocalizations l10n) =>
+      switch (status) {
+        AppointmentStatus.pending => l10n.pending,
+        AppointmentStatus.confirmed => l10n.confirmed,
+        AppointmentStatus.completed => l10n.completed,
+        AppointmentStatus.cancelled => l10n.cancelled,
+        AppointmentStatus.noShow => l10n.noShowStatus,
+      };
+
   Widget _buildEmptyDay(bool isDark, AppLocalizations l10n) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -486,7 +561,7 @@ class _DoctorScheduleManagementScreenState
       padding: UhcResponsive.pagePadding(
         context,
         top: 0,
-        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        bottom: UhcResponsive.scrollBottomPadding(context),
       ),
       itemCount: 6,
       itemBuilder: (_, i) => Padding(
@@ -507,12 +582,11 @@ class _DoctorScheduleManagementScreenState
         ),
       ),
     ).then((_) {
+      if (!mounted) return;
       _loadBookedSlots(_selectedDay);
-      if (mounted) {
-        context
-            .read<DoctorAppointmentProvider>()
-            .loadAppointments(widget.doctor.id);
-      }
+      context
+          .read<DoctorAppointmentProvider>()
+          .loadAppointments(widget.doctor.id);
     });
   }
 

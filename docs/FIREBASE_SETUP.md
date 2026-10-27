@@ -360,6 +360,21 @@ Functions runtime code imports `Timestamp` and `FieldValue` directly from
 `admin.firestore` function and can omit its static members; accessing them through
 that namespace caused history and notification requests to fail with `INTERNAL`.
 
+The admin schedule callable also uses this transport in Android emulator mode.
+To exercise schedule saving through the actual local Functions runtime, start
+the Auth, Firestore and Functions emulators on the ports above, then run:
+
+```powershell
+$env:GCLOUD_PROJECT = 'demo-uhc-test'
+$env:FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080'
+$env:FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099'
+npm --prefix functions run test:callable-emulator
+```
+
+This test refuses other project/host configurations. It creates and removes
+its own synthetic users/doctor, verifies schedule persistence and unchanged
+profile fields, and rejects student and unauthorized-admin writes.
+
 For UI automation with Dart MCP's `flutter_driver_command`, use the debug test
 entry point instead:
 

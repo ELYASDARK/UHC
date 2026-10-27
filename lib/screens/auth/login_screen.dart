@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import '../../core/widgets/custom_text_field.dart';
 import '../../core/widgets/responsive_layout.dart';
 import '../../core/config/emulator_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 
 /// Login screen
 class LoginScreen extends StatefulWidget {
@@ -30,6 +32,24 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isGoogleLoading = false;
+  bool _isSavingLanguage = false;
+
+  Future<void> _selectLanguage(String code) async {
+    if (_isSavingLanguage) return;
+    setState(() => _isSavingLanguage = true);
+    try {
+      await context.read<LocaleProvider>().setLocaleByCode(code);
+    } catch (_) {
+      if (mounted) {
+        AppMessages.show(
+          context,
+          SnackBar(content: Text(AppMessages.localizations(context).tryAgain)),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingLanguage = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -52,9 +72,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success && mounted) {
         widget.onLoginSuccess();
       } else if (mounted && authProvider.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(authProvider.errorMessage!),
+            content:
+                Text(AppMessages.error(context, authProvider.errorMessage)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -82,9 +104,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success && mounted) {
       widget.onLoginSuccess();
     } else if (mounted && authProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(authProvider.errorMessage!),
+          content: Text(AppMessages.error(context, authProvider.errorMessage)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -99,9 +122,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success && mounted) {
       widget.onLoginSuccess();
     } else if (mounted && authProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(authProvider.errorMessage!),
+          content: Text(AppMessages.error(context, authProvider.errorMessage)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -113,6 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final authProvider = context.watch<AuthProvider>();
     final l10n = AppLocalizations.of(context);
+    final locale = context.watch<LocaleProvider>();
 
     // Use a GestureDetector to dismiss keyboard on tap outside
     return GestureDetector(
@@ -125,7 +150,48 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: PopupMenuButton<String>(
+                  key: const ValueKey('login-language-menu'),
+                  tooltip: l10n.selectLanguage,
+                  enabled: !authProvider.isLoading && !_isSavingLanguage,
+                  initialValue: locale.locale.languageCode,
+                  onSelected: _selectLanguage,
+                  itemBuilder: (_) => [
+                    for (final entry in AppLocale.languageNames.entries)
+                      CheckedPopupMenuItem(
+                        value: entry.key,
+                        checked: locale.locale.languageCode == entry.key,
+                        child: Text(entry.value),
+                      ),
+                  ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.language, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              locale.languageName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: AppColors.primary),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_drop_down,
+                              color: AppColors.primary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Header
               Text(
@@ -267,10 +333,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 iconPath: 'assets/icons/google.png',
                 onPressed: EmulatorConfig.isEmulatorEnabled
                     ? () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                        AppMessages.show(
+                          context,
+                          SnackBar(
                             content: Text(
-                              'External Google Sign-In is disabled in emulator mode. Use local demo patient sign-in below.',
+                              AppMessages.localizations(context).emulatorGoogleSignInNotice,
                             ),
                           ),
                         );
@@ -290,7 +357,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: BoxDecoration(
                     color: Colors.blue.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                    border:
+                        Border.all(color: Colors.blue.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     children: [

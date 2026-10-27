@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/qr_scan_stability.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/doctor_appointment_provider.dart';
@@ -36,6 +37,7 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
   MobileScannerController? _controller;
   late int _failures;
   bool _isProcessing = false;
+  final _stability = QrScanStability();
   String? _errorMessage;
 
   static const int _maxAttempts = 5;
@@ -45,7 +47,11 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
     super.initState();
     _failures = widget.initialFailures;
     if (widget.captureState == null) {
-      _controller = MobileScannerController();
+      _controller = MobileScannerController(
+        formats: const [BarcodeFormat.qrCode],
+        detectionSpeed: DetectionSpeed.normal,
+        detectionTimeoutMs: 250,
+      );
     }
   }
 
@@ -57,12 +63,17 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
 
   void _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
-    final barcode = capture.barcodes.firstOrNull;
-    if (barcode == null || barcode.rawValue == null) return;
+    final values = capture.barcodes
+        .where((barcode) => barcode.format == BarcodeFormat.qrCode)
+        .map((barcode) => barcode.rawValue?.trim())
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .toSet();
+    final scannedValue = values.length == 1 ? values.single : null;
+    if (!_stability.accept(scannedValue, DateTime.now())) return;
 
     setState(() => _isProcessing = true);
 
-    final scannedValue = barcode.rawValue!.trim();
     if (scannedValue == widget.expectedQrCode) {
       // ── Match ──
       if (mounted) {
@@ -78,6 +89,7 @@ class _QrScanConfirmScreenState extends State<QrScanConfirmScreen> {
     // ── Wrong QR — increment in Firestore ──
     final provider = context.read<DoctorAppointmentProvider>();
     await provider.incrementQrScanFailures(widget.appointmentId);
+    if (!mounted) return;
 
     setState(() {
       _failures++;

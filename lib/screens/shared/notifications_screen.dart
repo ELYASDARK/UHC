@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -95,31 +96,36 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final cancellationError = result['cancellationError']?.toString();
       final message = approved
           ? cancellationError != null && cancellationError.isNotEmpty
-              ? 'Approved. Appointment cleanup needs review.'
-              : 'Approved. $cancelledCount appointment(s) were cancelled.'
-          : 'Request rejected.';
-      ScaffoldMessenger.of(context).showSnackBar(
+              ? AppMessages.localizations(context).availabilityApprovedCleanup
+              : AppMessages.localizations(context)
+                  .availabilityApprovedCount(cancelledCount)
+          : AppMessages.localizations(context).availabilityRejected;
+      AppMessages.show(
+        context,
         SnackBar(
           content: Text(message),
-          backgroundColor:
-              approved && cancellationError != null && cancellationError.isNotEmpty
-                  ? AppColors.warning
-                  : AppColors.success,
+          backgroundColor: approved &&
+                  cancellationError != null &&
+                  cancellationError.isNotEmpty
+              ? AppColors.warning
+              : AppColors.success,
         ),
       );
     } on DoctorFunctionException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(e.userMessage),
+          content: Text(AppMessages.error(context, e)),
           backgroundColor: AppColors.error,
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text('Failed to review request: $e'),
+          content: Text(AppMessages.error(context, e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -168,7 +174,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           return RefreshIndicator(
             onRefresh: _loadNotifications,
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              padding: EdgeInsets.fromLTRB(
+                  16, 16, 16, UhcResponsive.scrollBottomPadding(context)),
               itemCount: provider.notifications.length,
               itemBuilder: (context, index) {
                 final n = provider.notifications[index];
@@ -179,8 +186,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     isDark: isDark,
                     onTap: () => _onNotificationTap(n),
                     onConfirmDismiss: () => _onConfirmNotificationDismiss(n),
-                    showAvailabilityActions:
-                        _canReviewAvailabilityRequest(n),
+                    showAvailabilityActions: _canReviewAvailabilityRequest(n),
                     isReviewing: _reviewingAvailabilityRequestId ==
                         _availabilityRequestId(n),
                     onApprove: () => _reviewAvailabilityRequest(n, true),
@@ -408,15 +414,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     NotificationModel notification,
   ) async {
     final notificationProvider = context.read<NotificationProvider>();
-    final l10n = AppLocalizations.of(context);
     try {
       // The user requested: wait for deleteNotification to return true
       await notificationProvider.deleteNotification(notification.id);
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.error), backgroundColor: AppColors.error),
+        AppMessages.show(
+          context,
+          SnackBar(
+              content: Text(AppMessages.localizations(context).error),
+              backgroundColor: AppColors.error),
         );
       }
       return false;
