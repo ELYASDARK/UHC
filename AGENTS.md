@@ -48,6 +48,8 @@ For every feature or bug fix exercised on the Android emulator, capture screensh
 
 ## Commit and pull request guidelines
 
+Use the installed GitHub CLI (`gh`) for GitHub operations, including creating, viewing and updating pull requests. Do not use GitHub MCP tools. When the user requests a PR, proceed with the necessary commit, branch push and PR creation within the authorized scope without asking for redundant confirmation. This does not authorize merging or deploying, uploading local reports or sensitive data, or bypassing required approval checks.
+
 Use descriptive imperative commit subjects, such as `Fix booking concurrency and patient navigation`. PRs should explain the problem, resulting behavior, and checks performed; link relevant issues and include screenshots for UI changes.
 
 ## Security and agent instructions
