@@ -76,6 +76,39 @@ service firebase.storage {
       allow delete: if hasPermission('users.manageNonAdmin');
     }
 
+    match /medical_document_replacement_files/{docId}/{operationId} {
+      function operation() {
+        return firestore.get(/databases/(default)/documents/medical_document_replacements/$(operationId)).data;
+      }
+      allow create: if resource == null && googleLinkedUser() && validMedicalDocument() &&
+        !request.resource.metadata.keys().hasAny([
+          'uhcReplacementUser', 'uhcReplacementAuthor', 'uhcReplacementCommitted'
+        ]) &&
+        request.resource.size > 0 && operation().docId == docId &&
+        operation().actor == request.auth.uid && operation().status == 'uploading' &&
+        operation().expiresAt > request.time;
+      // Immutable uploads avoid overwrite/cleanup races. Only the server swaps
+      // a document reference; existing Firestore metadata rules stay strict.
+      // Each branch reads at most two Firestore documents: caller + operation
+      // for staging, or caller + doctor-patient access for committed files.
+      allow read: if googleLinkedUser() &&
+        (
+          (('uhcReplacementCommitted' in resource.metadata) &&
+            resource.metadata.uhcReplacementCommitted == 'true' &&
+            (resource.metadata.uhcReplacementUser == request.auth.uid ||
+              doctorHasPatientAccess(resource.metadata.uhcReplacementUser) ||
+              hasPermission('reports.view') || hasPermission('appointments.view'))) ||
+          (!('uhcReplacementCommitted' in resource.metadata) &&
+            operation().docId == docId && operation().actor == request.auth.uid &&
+            operation().status == 'uploading' && operation().expiresAt > request.time)
+        );
+      allow delete: if googleLinkedUser() &&
+        resource.metadata.uhcReplacementCommitted == 'true' &&
+        resource.metadata.uhcReplacementAuthor == request.auth.uid &&
+        (resource.metadata.uhcReplacementUser == request.auth.uid ||
+          doctorHasPatientAccess(resource.metadata.uhcReplacementUser));
+    }
+
     match /medical_documents/{userId}/{scope}/{fileName} {
       allow read: if googleLinkedUser() &&
         (

@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -35,9 +36,10 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
       widget.onLinked();
     } else {
       final errorMsg = authProvider.errorMessage ?? 'Failed to link account';
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(errorMsg),
+          content: Text(AppMessages.error(context, errorMsg)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -75,9 +77,10 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
         );
       } catch (_) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Logout failed. Please try again.'),
+        AppMessages.show(
+          context,
+          SnackBar(
+            content: Text(AppMessages.localizations(context).logoutFailed),
             backgroundColor: AppColors.error,
           ),
         );
@@ -200,7 +203,9 @@ class _LinkGoogleScreenState extends State<LinkGoogleScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                              color: isDark
+                                  ? Colors.grey[700]!
+                                  : Colors.grey[300]!,
                               width: 0.5,
                             ),
                           ),

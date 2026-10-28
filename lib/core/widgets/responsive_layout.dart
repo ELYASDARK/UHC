@@ -39,6 +39,10 @@ class UhcResponsive {
 
   static bool isWide(BuildContext context) => breakpointOf(context).isWide;
 
+  // Shell navigation consumes its inset; standalone pages keep gesture clearance.
+  static double scrollBottomPadding(BuildContext context) =>
+      (isWide(context) ? 32 : 16) + MediaQuery.paddingOf(context).bottom;
+
   static EdgeInsets pagePadding(
     BuildContext context, {
     double? top,

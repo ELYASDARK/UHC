@@ -184,7 +184,8 @@ class SocialButton extends StatelessWidget {
                           width: 18,
                           height: 18,
                           fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
                             Icons.g_mobiledata,
                             size: 18,
                             color: Colors.red,
@@ -194,12 +195,17 @@ class SocialButton extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    text,
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? Colors.white : Colors.black87,
+                  Flexible(
+                    child: Text(
+                      text,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
                     ),
                   ),
                 ],

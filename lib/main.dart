@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -97,7 +98,8 @@ void main() async {
     // Never silently fall back to running the app against production!
     if (EmulatorConfig.isEmulatorEnabled) {
       runApp(EmulatorStartupErrorApp(
-        errorMessage: 'Emulator connection failed:\n$e\n\nApp startup aborted to prevent accidental production connection.',
+        errorMessage:
+            'Emulator connection failed:\n$e\n\nApp startup aborted to prevent accidental production connection.',
       ));
       return;
     }
@@ -129,7 +131,8 @@ Future<void> _configureFirestoreDefaults() async {
 /// Initialize non-critical services asynchronously after app starts
 Future<void> _initializeServicesAsync() async {
   if (EmulatorConfig.isEmulatorEnabled) {
-    debugPrint('[EMULATOR] FCM, Crashlytics, and external services are disabled in emulator mode.');
+    debugPrint(
+        '[EMULATOR] FCM, Crashlytics, and external services are disabled in emulator mode.');
     return;
   }
 
@@ -204,7 +207,8 @@ class EmulatorStartupErrorApp extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.black45,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                    border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: 0.5)),
                   ),
                   child: Text(
                     errorMessage,
@@ -326,7 +330,7 @@ class UHCApp extends StatelessWidget {
               );
             },
 
-            home: const AppNavigator(),
+            home: AppNavigator(key: AppNavigator.rootKey),
           );
         },
       ),
@@ -336,16 +340,25 @@ class UHCApp extends StatelessWidget {
 
 /// Main app navigator handling auth state and navigation flow
 class AppNavigator extends StatefulWidget {
+  static final rootKey = GlobalKey<AppNavigatorState>();
+
+  /// Return to the existing authenticated shell without repeating startup.
+  static void returnToPatientTab(BuildContext context, int index) {
+    rootKey.currentState?._patientShellKey.currentState?.selectTab(index);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   final int initialPatientTab;
 
   const AppNavigator({super.key, this.initialPatientTab = 0});
 
   @override
-  State<AppNavigator> createState() => _AppNavigatorState();
+  State<AppNavigator> createState() => AppNavigatorState();
 }
 
-class _AppNavigatorState extends State<AppNavigator> {
+class AppNavigatorState extends State<AppNavigator> {
   static const String _onboardingKey = 'onboarding_complete';
+  final _patientShellKey = GlobalKey<MainShellState>();
 
   bool _bootReady = false;
   bool _onboardingComplete = false;
@@ -613,10 +626,10 @@ class _AppNavigatorState extends State<AppNavigator> {
                             );
                           } catch (_) {
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
+                            AppMessages.show(context,
+                              SnackBar(
                                 content:
-                                    Text('Logout failed. Please try again.'),
+                                    Text(AppMessages.localizations(context).logoutFailed),
                               ),
                             );
                           }
@@ -632,7 +645,8 @@ class _AppNavigatorState extends State<AppNavigator> {
             screen = DoctorShell(doctor: _doctorModel!);
           }
         } else {
-          screen = MainShell(initialIndex: widget.initialPatientTab);
+          screen = MainShell(
+              key: _patientShellKey, initialIndex: widget.initialPatientTab);
         }
       }
     } else {

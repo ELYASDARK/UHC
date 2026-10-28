@@ -4617,6 +4617,360 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'AI Assistant'**
   String get assistantBadge;
+
+  /// No description provided for @resetZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset zoom'**
+  String get resetZoom;
+
+  /// No description provided for @imageNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Image not available'**
+  String get imageNotAvailable;
+
+  /// No description provided for @medicalImageLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'The image could not be loaded. Check your connection and try again.'**
+  String get medicalImageLoadError;
+
+  /// No description provided for @scheduleLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the schedule. Try again.'**
+  String get scheduleLoadFailed;
+
+  /// No description provided for @loadingAvailability.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking available times...'**
+  String get loadingAvailability;
+
+  /// No description provided for @requestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete this request. Please try again.'**
+  String get requestFailed;
+
+  /// No description provided for @requestNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your connection and try again.'**
+  String get requestNetworkError;
+
+  /// No description provided for @requestConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'This information has changed. Refresh and try again.'**
+  String get requestConflict;
+
+  /// No description provided for @requestLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Please try again later.'**
+  String get requestLimitReached;
+
+  /// No description provided for @requestInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the entered information and try again.'**
+  String get requestInvalid;
+
+  /// No description provided for @requestNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This item is no longer available. Refresh and try again.'**
+  String get requestNotFound;
+
+  /// No description provided for @authInvalidCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect email or password. Please try again.'**
+  String get authInvalidCredentials;
+
+  /// No description provided for @authEmailUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'This email is already registered.'**
+  String get authEmailUsed;
+
+  /// No description provided for @authAccountDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has been disabled. Contact support.'**
+  String get authAccountDisabled;
+
+  /// No description provided for @operationCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Done successfully'**
+  String get operationCompleted;
+
+  /// No description provided for @logoutFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not sign out. Please try again.'**
+  String get logoutFailed;
+
+  /// No description provided for @notesSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes saved'**
+  String get notesSaved;
+
+  /// No description provided for @googleAccountLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Google account linked'**
+  String get googleAccountLinked;
+
+  /// No description provided for @googleAccountUnlinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Google account unlinked'**
+  String get googleAccountUnlinked;
+
+  /// No description provided for @availabilityRequestSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Request sent. You remain available until admin approval.'**
+  String get availabilityRequestSent;
+
+  /// No description provided for @imageTooLargeLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Image is too large. Maximum size is {limit} MB.'**
+  String imageTooLargeLimit(int limit);
+
+  /// No description provided for @couldNotOpenMaps.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open maps'**
+  String get couldNotOpenMaps;
+
+  /// No description provided for @couldNotOpenDirections.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open directions'**
+  String get couldNotOpenDirections;
+
+  /// No description provided for @couldNotMakeCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not make the call'**
+  String get couldNotMakeCall;
+
+  /// No description provided for @couldNotOpenEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open email'**
+  String get couldNotOpenEmail;
+
+  /// No description provided for @openingEmailClient.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening email...'**
+  String get openingEmailClient;
+
+  /// No description provided for @openingDialer.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening dialer...'**
+  String get openingDialer;
+
+  /// No description provided for @departmentUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Department updated successfully'**
+  String get departmentUpdatedSuccess;
+
+  /// No description provided for @departmentCreatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Department created successfully'**
+  String get departmentCreatedSuccess;
+
+  /// No description provided for @departmentActivatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Department activated'**
+  String get departmentActivatedMessage;
+
+  /// No description provided for @departmentDeactivatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Department deactivated'**
+  String get departmentDeactivatedMessage;
+
+  /// No description provided for @departmentDeletedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Department deleted successfully'**
+  String get departmentDeletedSuccess;
+
+  /// No description provided for @imageUploadedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Image uploaded successfully'**
+  String get imageUploadedSuccess;
+
+  /// No description provided for @doctorUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor updated successfully'**
+  String get doctorUpdatedSuccess;
+
+  /// No description provided for @doctorDeletedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor deleted successfully'**
+  String get doctorDeletedSuccess;
+
+  /// No description provided for @doctorActivatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor activated'**
+  String get doctorActivatedMessage;
+
+  /// No description provided for @doctorDeactivatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor deactivated'**
+  String get doctorDeactivatedMessage;
+
+  /// No description provided for @doctorAvailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor marked available'**
+  String get doctorAvailableMessage;
+
+  /// No description provided for @doctorUnavailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor marked unavailable'**
+  String get doctorUnavailableMessage;
+
+  /// No description provided for @scheduleSavedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule saved successfully'**
+  String get scheduleSavedSuccess;
+
+  /// No description provided for @reportGeneratedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Report generated successfully'**
+  String get reportGeneratedSuccess;
+
+  /// No description provided for @userUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'User updated successfully'**
+  String get userUpdatedSuccess;
+
+  /// No description provided for @userDeletedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'User deleted successfully'**
+  String get userDeletedSuccess;
+
+  /// No description provided for @uidCopiedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'UID copied'**
+  String get uidCopiedMessage;
+
+  /// No description provided for @userActivatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'User activated'**
+  String get userActivatedMessage;
+
+  /// No description provided for @userDeactivatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'User deactivated'**
+  String get userDeactivatedMessage;
+
+  /// No description provided for @roleUpdatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Role updated'**
+  String get roleUpdatedMessage;
+
+  /// No description provided for @patientRoleChangeOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only student and staff roles can be changed here.'**
+  String get patientRoleChangeOnly;
+
+  /// No description provided for @notificationRecipientsSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to {count} recipients.'**
+  String notificationRecipientsSent(int count);
+
+  /// No description provided for @availabilityApprovedCleanup.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved. Appointment cleanup needs review.'**
+  String get availabilityApprovedCleanup;
+
+  /// No description provided for @availabilityApprovedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved. {count} appointments were cancelled.'**
+  String availabilityApprovedCount(int count);
+
+  /// No description provided for @availabilityRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Request rejected.'**
+  String get availabilityRejected;
+
+  /// No description provided for @emulatorGoogleSignInNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'External Google Sign-In is disabled in emulator mode. Use local demo sign-in.'**
+  String get emulatorGoogleSignInNotice;
+
+  /// No description provided for @scheduleTimeWithinHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a time between {start} and {end}.'**
+  String scheduleTimeWithinHours(String start, String end);
+
+  /// No description provided for @scheduleEndAfterStart.
+  ///
+  /// In en, this message translates to:
+  /// **'End time must be after start time.'**
+  String get scheduleEndAfterStart;
+
+  /// No description provided for @scheduleTimeOverlaps.
+  ///
+  /// In en, this message translates to:
+  /// **'This time overlaps an existing slot.'**
+  String get scheduleTimeOverlaps;
+
+  /// No description provided for @selectRecipientFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a recipient before sending.'**
+  String get selectRecipientFirst;
+
+  /// No description provided for @noActiveRecipients.
+  ///
+  /// In en, this message translates to:
+  /// **'No active recipients matched this target.'**
+  String get noActiveRecipients;
+
+  /// No description provided for @notesSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save medical notes. Please try again.'**
+  String get notesSaveFailed;
 }
 
 class _AppLocalizationsDelegate

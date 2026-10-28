@@ -301,7 +301,7 @@ but never calls Gemini or consumes generation quota.
 
 `confirmAppointmentCheckIn` validates the QR value and the window from 5 minutes before to 10 minutes after the appointment. Appointment times are interpreted in Baghdad time by the backend helper.
 
-The doctor UI still exposes manual confirmation after five failed scans. That action calls `updateAppointmentStatus` with `confirmed`, which the backend rejects. It is not a working fallback in this checkout; use QR check-in. Resolving the mismatch requires an application change, not a permission adjustment.
+After five failed scans, the doctor UI offers manual verification of patient and booking details within the check-in window. It submits the appointment's QR value through `confirmAppointmentCheckIn`, using the same authorized transaction as camera scanning. Direct confirmation through `updateAppointmentStatus` remains rejected. The failed-scan threshold is a UI eligibility rule, not a server-enforced scan counter.
 
 ## Rules and troubleshooting
 

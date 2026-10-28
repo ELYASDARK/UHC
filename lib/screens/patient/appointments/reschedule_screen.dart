@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -123,7 +124,7 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
           ? _buildPolicyViolation(isDark)
           : ResponsivePage(
               maxWidth: 860,
-              bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+              bottomPadding: UhcResponsive.scrollBottomPadding(context),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -490,11 +491,12 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
   }
 
   Future<void> _confirmReschedule() async {
-    final l10n = AppLocalizations.of(context);
     if (widget.doctor != null && !widget.doctor!.canBook) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(l10n.doctorNotAvailableSelectAnother),
+          content: Text(AppMessages.localizations(context)
+              .doctorNotAvailableSelectAnother),
           backgroundColor: AppColors.error,
         ),
       );
@@ -516,9 +518,11 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
 
       if (success) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text(l10n.rescheduleSuccess),
+              content:
+                  Text(AppMessages.localizations(context).rescheduleSuccess),
               backgroundColor: AppColors.success,
             ),
           );
@@ -526,9 +530,11 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text(l10n.rescheduleFailedSlotTaken),
+              content: Text(
+                  AppMessages.localizations(context).rescheduleFailedSlotTaken),
               backgroundColor: AppColors.error,
             ),
           );
@@ -536,9 +542,10 @@ class _RescheduleScreenState extends State<RescheduleScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('${l10n.error}: ${e.toString()}'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );

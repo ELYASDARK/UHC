@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/department_icons.dart';
@@ -735,12 +736,13 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
             content: Text(
               widget.id != null
-                  ? 'Department updated successfully'
-                  : 'Department created successfully',
+                  ? AppMessages.localizations(context).departmentUpdatedSuccess
+                  : AppMessages.localizations(context).departmentCreatedSuccess,
             ),
             backgroundColor: AppColors.success,
           ),
@@ -748,18 +750,20 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
       }
     } on DepartmentFunctionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(e.userMessage),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );

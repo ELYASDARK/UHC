@@ -1,7 +1,11 @@
+import '../../../core/utils/localization_helper.dart';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
@@ -30,13 +34,14 @@ class DoctorAppointmentsScreen extends StatefulWidget {
 class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _initialLoad = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadAppointments();
+      if (mounted) _loadAppointments();
     });
   }
 
@@ -49,6 +54,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
   Future<void> _loadAppointments() async {
     final provider = context.read<DoctorAppointmentProvider>();
     await provider.loadAppointments(widget.doctor.id);
+    if (mounted) setState(() => _initialLoad = false);
   }
 
   @override
@@ -79,7 +85,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
                 provider.upcomingAppointments,
                 true,
                 isDark,
-                provider.isLoading,
+                _initialLoad || provider.isLoading,
                 l10n,
                 provider,
               ),
@@ -87,7 +93,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
                 provider.pastAppointments,
                 false,
                 isDark,
-                provider.isLoading,
+                _initialLoad || provider.isLoading,
                 l10n,
                 provider,
               ),
@@ -106,11 +112,11 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
     AppLocalizations l10n,
     DoctorAppointmentProvider provider,
   ) {
-    if (isLoading) {
+    if (isLoading && (_initialLoad || appointments.isEmpty)) {
       return ResponsiveListView(
         padding: UhcResponsive.pagePadding(
           context,
-          bottom: UhcResponsive.isWide(context) ? 32 : 100,
+          bottom: UhcResponsive.scrollBottomPadding(context),
         ),
         maxWidth: 1320,
         gridOnWide: true,
@@ -176,7 +182,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
       child: ResponsiveListView(
         padding: UhcResponsive.pagePadding(
           context,
-          bottom: UhcResponsive.isWide(context) ? 32 : 100,
+          bottom: UhcResponsive.scrollBottomPadding(context),
         ),
         maxWidth: 1320,
         gridOnWide: true,
@@ -287,8 +293,8 @@ class _DoctorAppointmentCard extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: photoUrl != null && photoUrl!.isNotEmpty
-                        ? Image.network(
-                            photoUrl!,
+                        ? Image(
+                            image: CachedNetworkImageProvider(photoUrl!),
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,
@@ -337,7 +343,10 @@ class _DoctorAppointmentCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        appointment.typeDisplay,
+                        LocalizationHelper.translateAppointmentType(
+                          appointment.type,
+                          l10n,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.roboto(

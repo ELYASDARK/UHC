@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -203,8 +205,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                             child: OutlinedButton.icon(
                               onPressed: () {
                                 setState(() {
-                                  _displayLimit =
-                                      (_displayLimit + 200).clamp(200, _maxDisplayLimit);
+                                  _displayLimit = (_displayLimit + 200)
+                                      .clamp(200, _maxDisplayLimit);
                                 });
                               },
                               icon: const Icon(Icons.expand_more),
@@ -254,9 +256,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   void _showPermissionDenied() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('You do not have permission for this action'),
+    AppMessages.show(
+      context,
+      SnackBar(
+        content: Text(AppMessages.localizations(context).noPermissionForAction),
         backgroundColor: AppColors.warning,
         behavior: SnackBarBehavior.floating,
       ),
@@ -323,7 +326,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       radius: 30,
                       backgroundImage: data['photoUrl'] != null &&
                               (data['photoUrl'] as String).isNotEmpty
-                          ? NetworkImage(data['photoUrl'])
+                          ? CachedNetworkImageProvider(data['photoUrl'])
                           : null,
                       child: data['photoUrl'] == null ||
                               (data['photoUrl'] as String).isEmpty
@@ -607,9 +610,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Future<void> _copyUid(String uid) async {
     await Clipboard.setData(ClipboardData(text: uid));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('UID copied'),
+    AppMessages.show(
+      context,
+      SnackBar(
+        content: Text(AppMessages.localizations(context).uidCopiedMessage),
         backgroundColor: AppColors.success,
       ),
     );
@@ -732,7 +736,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         backgroundColor:
                             AppColors.primary.withValues(alpha: 0.1),
                         backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                            ? NetworkImage(photoUrl)
+                            ? CachedNetworkImageProvider(photoUrl)
                             : null,
                         child: photoUrl == null || photoUrl.isEmpty
                             ? Text(
@@ -1043,19 +1047,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content:
-                Text(currentStatus ? 'User deactivated' : 'User activated'),
+            content: Text(currentStatus
+                ? AppMessages.localizations(context).userDeactivatedMessage
+                : AppMessages.localizations(context).userActivatedMessage),
             backgroundColor: AppColors.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Failed to update status: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1098,17 +1105,20 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     try {
       await _userFunctionsService.unlinkGoogleProvider(targetUid: targetUid);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Google provider unlinked successfully.'),
+      AppMessages.show(
+        context,
+        SnackBar(
+          content:
+              Text(AppMessages.localizations(context).googleAccountUnlinked),
           backgroundColor: AppColors.success,
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text('Failed to unlink Google: $e'),
+          content: Text(AppMessages.error(context, e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -1188,17 +1198,19 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('User deleted successfully'),
+      AppMessages.show(
+        context,
+        SnackBar(
+          content: Text(AppMessages.localizations(context).userDeletedSuccess),
           backgroundColor: AppColors.success,
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text('Failed to delete user: $e'),
+          content: Text(AppMessages.error(context, e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -1207,9 +1219,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   void _changeUserRole(String id, UserRole currentRole) {
     if (currentRole != UserRole.student && currentRole != UserRole.staff) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only student and staff roles can be changed here.'),
+      AppMessages.show(
+        context,
+        SnackBar(
+          content:
+              Text(AppMessages.localizations(context).patientRoleChangeOnly),
           backgroundColor: AppColors.error,
         ),
       );
@@ -1256,9 +1270,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         if (!dialogContext.mounted) return;
                         Navigator.pop(dialogContext);
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Role updated'),
+                        AppMessages.show(
+                          context,
+                          SnackBar(
+                            content: Text(AppMessages.localizations(context)
+                                .roleUpdatedMessage),
                             backgroundColor: AppColors.success,
                           ),
                         );
@@ -1266,9 +1282,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         if (!dialogContext.mounted) return;
                         Navigator.pop(dialogContext);
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppMessages.show(
+                          context,
                           SnackBar(
-                            content: Text('Failed to change role: $e'),
+                            content: Text(AppMessages.error(context, e)),
                             backgroundColor: AppColors.error,
                           ),
                         );

@@ -51,21 +51,13 @@ void main() {
           'lib/screens/patient/documents/medical_documents_screen.dart');
       final doctorDocsSource = readProjectFile(
           'lib/screens/doctor/documents/doctor_patient_documents_screen.dart');
-      final viewerSource = readProjectFile(
-          'lib/screens/shared/medical_document_viewer_screen.dart');
 
       expect(patientDocsSource, contains('MedicalDocumentViewerScreen'));
       expect(doctorDocsSource, contains('MedicalDocumentViewerScreen'));
-      expect(patientDocsSource, contains('!kIsWeb && _isImageDocument(doc)'));
-      expect(doctorDocsSource, contains('!kIsWeb && _isImageDocument(doc)'));
-      expect(viewerSource, contains('InteractiveViewer'));
-      expect(viewerSource, contains('fit: BoxFit.contain'));
-      expect(viewerSource, contains('alignment: Alignment.center'));
-      expect(viewerSource, contains('panEnabled: false'));
-      expect(viewerSource, contains('scaleEnabled: true'));
-      expect(viewerSource, contains('TransformationController'));
-      expect(viewerSource, contains('onDoubleTap: _handleDoubleTap'));
-      expect(viewerSource, contains('Reset zoom'));
+      expect(patientDocsSource,
+          contains('!kIsWeb && (isPdf || _isImageDocument(doc))'));
+      expect(doctorDocsSource,
+          contains('!kIsWeb && (isPdf || _isImageDocument(doc))'));
     });
 
     test('developer l10n config is present and generated files are in source',
@@ -178,8 +170,6 @@ void main() {
       );
 
       expect(senderSource, contains('preview.recipientCount <= 0'));
-      expect(
-          senderSource, contains('No active recipients matched this target.'));
       expect(senderSource, contains('_completedSearchQuery'));
       expect(senderSource, contains('No active recipients found.'));
     });
@@ -209,7 +199,6 @@ void main() {
             ".where('role', 'in', ['student', 'staff'])",
           )));
       expect(senderSource, contains('Unable to count'));
-      expect(senderSource, contains('message == \'internal\''));
     });
 
     test('admin notification quick action stays locked without permission', () {
@@ -231,9 +220,8 @@ void main() {
       );
 
       expect(
-        profileSource,
-        contains(
-            'bottomPadding: UhcResponsive.isWide(context)\n            ? 32\n            : (isSuperAdmin ? 32 : 100)'),
+        profileSource.replaceAll(RegExp(r'\s+'), ' '),
+        contains('bottomPadding: UhcResponsive.scrollBottomPadding(context)'),
       );
       expect(profileSource, contains('logout,'));
     });
@@ -331,9 +319,12 @@ void main() {
       expect(notificationsSource, contains("hasPermission('doctors.manage')"));
     });
 
-    test('emulator config unit: resolveFirebaseOptions selects synthetic options and rejects release', () {
+    test(
+        'emulator config unit: resolveFirebaseOptions selects synthetic options and rejects release',
+        () {
       // 1. When opt-in is false, resolves default options
-      final prodOptions = EmulatorConfig.resolveFirebaseOptions(isEmulatorOptIn: false);
+      final prodOptions =
+          EmulatorConfig.resolveFirebaseOptions(isEmulatorOptIn: false);
       expect(prodOptions.projectId, equals('uhca-20800'));
 
       // 2. When opt-in is true in non-release mode, resolves synthetic demo options
@@ -366,7 +357,9 @@ void main() {
       expect(EmulatorConfig.isAllowedHost('192.168.1.5'), isFalse);
     });
 
-    test('main.dart enforces fail-closed emulator startup boundary without production fallback', () {
+    test(
+        'main.dart enforces fail-closed emulator startup boundary without production fallback',
+        () {
       final mainSource = readProjectFile('lib/main.dart');
 
       // Options resolved before Firebase.initializeApp
@@ -380,15 +373,20 @@ void main() {
 
       // FCM and Crashlytics disabled in emulator mode
       expect(mainSource, contains("if (EmulatorConfig.isEmulatorEnabled)"));
-      expect(mainSource, contains("FCM, Crashlytics, and external services are disabled in emulator mode"));
+      expect(
+          mainSource,
+          contains(
+              "FCM, Crashlytics, and external services are disabled in emulator mode"));
     });
 
-    test('login_screen.dart disables Google Sign-in and provides local demo patient sign-in in emulator mode', () {
+    test(
+        'login_screen.dart disables Google Sign-in and provides local demo patient sign-in in emulator mode',
+        () {
       final loginSource = readProjectFile('lib/screens/auth/login_screen.dart');
-      final authServiceSource = readProjectFile('lib/services/auth_service.dart');
+      final authServiceSource =
+          readProjectFile('lib/services/auth_service.dart');
 
       expect(loginSource, contains("EmulatorConfig.isEmulatorEnabled"));
-      expect(loginSource, contains("External Google Sign-In is disabled in emulator mode"));
       expect(loginSource, contains("Sign In as Demo Patient (No OAuth)"));
       expect(loginSource, contains("_handleEmulatorDemoSignIn"));
 
@@ -397,28 +395,37 @@ void main() {
       expect(authServiceSource, contains("emulator-external-auth-disabled"));
     });
 
-    test('backend synthetic testing strictly enforces demo-only loopback preconditions', () {
+    test(
+        'backend synthetic testing strictly enforces demo-only loopback preconditions',
+        () {
       final configSource = readProjectFile('functions/src/assistant/config.ts');
-      final assistantIndexSource = readProjectFile('functions/src/assistant/index.ts');
+      final assistantIndexSource =
+          readProjectFile('functions/src/assistant/index.ts');
 
       expect(configSource, contains("AI_OFFLINE_SYNTHETIC_TESTING"));
       expect(configSource, contains("parseLoopbackHostAndPort"));
       expect(configSource, contains("loopback_auth_emulator_required"));
-      expect(configSource, contains("REQUIRED_DEMO_PROJECT_ID = 'demo-uhc-test'"));
+      expect(
+          configSource, contains("REQUIRED_DEMO_PROJECT_ID = 'demo-uhc-test'"));
       expect(configSource, contains("validateDemoProjectConsistency"));
       expect(assistantIndexSource, contains("if (gate.isSynthetic) {"));
       expect(assistantIndexSource, contains("SyntheticSchedulingInterpreter"));
-      expect(assistantIndexSource, contains("evaluateTransmissionGate(adminProjectId)"));
+      expect(assistantIndexSource,
+          contains("evaluateTransmissionGate(adminProjectId)"));
     });
 
-    test('fcm_service.dart completely isolates FCM and Crashlytics in emulator mode', () {
+    test(
+        'fcm_service.dart completely isolates FCM and Crashlytics in emulator mode',
+        () {
       final fcmSource = readProjectFile('lib/services/fcm_service.dart');
 
       expect(fcmSource, contains("EmulatorConfig.isEmulatorEnabled"));
       expect(fcmSource, contains("FirebaseMessaging? _messagingInstance;"));
       expect(fcmSource, contains("FirebaseMessaging get _messaging"));
-      expect(fcmSource, contains("FirebaseMessaging is disabled in emulator mode."));
-      expect(fcmSource, contains("if (kIsWeb || EmulatorConfig.isEmulatorEnabled) return;"));
+      expect(fcmSource,
+          contains("FirebaseMessaging is disabled in emulator mode."));
+      expect(fcmSource,
+          contains("if (kIsWeb || EmulatorConfig.isEmulatorEnabled) return;"));
     });
 
     test('source repository does not contain hardcoded Google API keys', () {

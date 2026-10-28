@@ -1,8 +1,13 @@
+import '../../../core/utils/localization_helper.dart';
+
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:provider/provider.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/glassmorphic_card.dart';
 import '../../../core/widgets/loading_skeleton.dart';
@@ -98,7 +103,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     child: ResponsivePage(
                       physics: const AlwaysScrollableScrollPhysics(),
                       maxWidth: 1560,
-                      bottomPadding: isWide ? 32 : 100,
+                      bottomPadding: UhcResponsive.scrollBottomPadding(context),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -196,10 +201,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         height: 58,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2.5,
-                          ),
+                          border: Border.all(color: Colors.white, width: 2.5),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.15),
@@ -211,8 +213,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         child: ClipOval(
                           child: _doctor.photoUrl != null &&
                                   _doctor.photoUrl!.isNotEmpty
-                              ? Image.network(
-                                  _doctor.photoUrl!,
+                              ? Image(
+                                  image: CachedNetworkImageProvider(
+                                    _doctor.photoUrl!,
+                                  ),
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) =>
                                       _buildCardFallbackAvatar(),
@@ -323,8 +327,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
@@ -347,11 +353,12 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         boxShadow: [
                           if (_doctor.isAvailable)
                             BoxShadow(
-                              color:
-                                  availabilityDotColor.withValues(alpha: 0.4),
+                              color: availabilityDotColor.withValues(
+                                alpha: 0.4,
+                              ),
                               blurRadius: 6,
                               spreadRadius: 1,
-                            )
+                            ),
                         ],
                       ),
                     ),
@@ -385,10 +392,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                             ? null
                             : _toggleAvailability,
                         activeThumbColor: Colors.white,
-                        activeTrackColor:
-                            AppColors.success.withValues(alpha: 0.8),
-                        inactiveTrackColor:
-                            Colors.white.withValues(alpha: 0.2),
+                        activeTrackColor: AppColors.success.withValues(
+                          alpha: 0.8,
+                        ),
+                        inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
                         inactiveThumbColor: Colors.white70,
                       ),
                     ),
@@ -453,7 +460,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
   // ---- 2. Stats row ----
   Widget _buildStatsRow(
-      bool isDark, DoctorAppointmentProvider provider, AppLocalizations l10n) {
+    bool isDark,
+    DoctorAppointmentProvider provider,
+    AppLocalizations l10n,
+  ) {
     final now = _now;
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -691,7 +701,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${next.timeSlot}  •  ${next.typeDisplay}',
+                          '${next.timeSlot}  •  ${LocalizationHelper.translateAppointmentType(next.type, l10n)}',
                           style: GoogleFonts.roboto(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -736,7 +746,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
   // ---- 4. Today's appointments ----
   Widget _buildTodaysList(
-      bool isDark, DoctorAppointmentProvider provider, AppLocalizations l10n) {
+    bool isDark,
+    DoctorAppointmentProvider provider,
+    AppLocalizations l10n,
+  ) {
     final now = _now;
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -810,6 +823,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   }
 
   Widget _todayCard(AppointmentModel appt, bool isDark, int index) {
+    final l10n = AppLocalizations.of(context);
     final statusColor = _statusColor(appt.status);
 
     return GestureDetector(
@@ -871,7 +885,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    appt.typeDisplay,
+                    LocalizationHelper.translateAppointmentType(
+                      appt.type,
+                      l10n,
+                    ),
                     style: GoogleFonts.roboto(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -884,7 +901,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 4,
+              ),
               decoration: BoxDecoration(
                 color: statusColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
@@ -910,7 +930,8 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   // ---- skeleton ----
   Widget _buildSkeleton(bool isDark) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, UhcResponsive.scrollBottomPadding(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -967,9 +988,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     } on DoctorFunctionException catch (e) {
       if (mounted) {
         setState(() => _togglingAvailability = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(e.userMessage),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -977,10 +999,10 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _togglingAvailability = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(
-                '${AppLocalizations.of(context).failedToUpdateAvailability}: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1012,9 +1034,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text('Request unavailable status'),
-                  ),
+                  const Expanded(child: Text('Request unavailable status')),
                 ],
               ),
               content: ConstrainedBox(
@@ -1095,10 +1115,11 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         _togglingAvailability = false;
       });
       widget.onDoctorUpdated?.call();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+      AppMessages.show(
+        context,
+        SnackBar(
           content: Text(
-            'Request sent. You remain available until admin approval.',
+            AppMessages.localizations(context).availabilityRequestSent,
           ),
           backgroundColor: AppColors.success,
         ),
@@ -1106,18 +1127,20 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     } on DoctorFunctionException catch (e) {
       if (!mounted) return;
       setState(() => _togglingAvailability = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(e.userMessage),
+          content: Text(AppMessages.error(context, e)),
           backgroundColor: AppColors.error,
         ),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _togglingAvailability = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text('Failed to submit availability request: $e'),
+          content: Text(AppMessages.error(context, e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -1128,10 +1151,8 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DoctorAppointmentDetailScreen(
-          appointment: appt,
-          doctor: _doctor,
-        ),
+        builder: (_) =>
+            DoctorAppointmentDetailScreen(appointment: appt, doctor: _doctor),
       ),
     ).then((_) {
       // Refresh after returning from detail
@@ -1159,8 +1180,9 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
   String _monthAbbr(int month) {
     final locale = safeIntlLocale(context);
-    return intl.DateFormat('MMM', locale)
-        .format(DateTime(0, month))
-        .toUpperCase();
+    return intl.DateFormat(
+      'MMM',
+      locale,
+    ).format(DateTime(0, month)).toUpperCase();
   }
 }

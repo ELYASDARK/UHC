@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'dart:convert';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -80,10 +82,14 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
         .snapshots()
         .listen((snapshot) {
       if (!snapshot.exists || !mounted) return;
+      final updatedDoctor = DoctorModel.fromFirestore(snapshot);
+      final scheduleChanged = _doctor.canBook != updatedDoctor.canBook ||
+          jsonEncode(_doctor.toFirestore()['weeklySchedule']) !=
+              jsonEncode(updatedDoctor.toFirestore()['weeklySchedule']);
       setState(() {
-        _doctor = DoctorModel.fromFirestore(snapshot);
+        _doctor = updatedDoctor;
       });
-      if (widget.captureBookedSlots == null) {
+      if (scheduleChanged && widget.captureBookedSlots == null) {
         _loadAvailability(_selectedDay);
       }
     });
@@ -398,7 +404,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
       padding: UhcResponsive.pagePadding(
         context,
         top: 0,
-        bottom: UhcResponsive.isWide(context) ? 32 : 100,
+        bottom: UhcResponsive.scrollBottomPadding(context),
       ),
       itemCount: slots.length,
       itemBuilder: (context, index) {
@@ -535,9 +541,11 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
 
   void _onSlotTap(TimeSlot slot) {
     if (!_doctor.canBook) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This doctor is not available for booking right now.'),
+      AppMessages.show(
+        context,
+        SnackBar(
+          content: Text(AppMessages.localizations(context)
+              .doctorNotAvailableSelectAnother),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),

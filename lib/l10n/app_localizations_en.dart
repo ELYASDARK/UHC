@@ -2378,4 +2378,201 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantBadge => 'AI Assistant';
+
+  @override
+  String get resetZoom => 'Reset zoom';
+
+  @override
+  String get imageNotAvailable => 'Image not available';
+
+  @override
+  String get medicalImageLoadError =>
+      'The image could not be loaded. Check your connection and try again.';
+
+  @override
+  String get scheduleLoadFailed => 'Could not load the schedule. Try again.';
+
+  @override
+  String get loadingAvailability => 'Checking available times...';
+
+  @override
+  String get requestFailed =>
+      'Could not complete this request. Please try again.';
+
+  @override
+  String get requestNetworkError => 'Check your connection and try again.';
+
+  @override
+  String get requestConflict =>
+      'This information has changed. Refresh and try again.';
+
+  @override
+  String get requestLimitReached =>
+      'Too many attempts. Please try again later.';
+
+  @override
+  String get requestInvalid => 'Check the entered information and try again.';
+
+  @override
+  String get requestNotFound =>
+      'This item is no longer available. Refresh and try again.';
+
+  @override
+  String get authInvalidCredentials =>
+      'Incorrect email or password. Please try again.';
+
+  @override
+  String get authEmailUsed => 'This email is already registered.';
+
+  @override
+  String get authAccountDisabled =>
+      'This account has been disabled. Contact support.';
+
+  @override
+  String get operationCompleted => 'Done successfully';
+
+  @override
+  String get logoutFailed => 'Could not sign out. Please try again.';
+
+  @override
+  String get notesSaved => 'Notes saved';
+
+  @override
+  String get googleAccountLinked => 'Google account linked';
+
+  @override
+  String get googleAccountUnlinked => 'Google account unlinked';
+
+  @override
+  String get availabilityRequestSent =>
+      'Request sent. You remain available until admin approval.';
+
+  @override
+  String imageTooLargeLimit(int limit) {
+    return 'Image is too large. Maximum size is $limit MB.';
+  }
+
+  @override
+  String get couldNotOpenMaps => 'Could not open maps';
+
+  @override
+  String get couldNotOpenDirections => 'Could not open directions';
+
+  @override
+  String get couldNotMakeCall => 'Could not make the call';
+
+  @override
+  String get couldNotOpenEmail => 'Could not open email';
+
+  @override
+  String get openingEmailClient => 'Opening email...';
+
+  @override
+  String get openingDialer => 'Opening dialer...';
+
+  @override
+  String get departmentUpdatedSuccess => 'Department updated successfully';
+
+  @override
+  String get departmentCreatedSuccess => 'Department created successfully';
+
+  @override
+  String get departmentActivatedMessage => 'Department activated';
+
+  @override
+  String get departmentDeactivatedMessage => 'Department deactivated';
+
+  @override
+  String get departmentDeletedSuccess => 'Department deleted successfully';
+
+  @override
+  String get imageUploadedSuccess => 'Image uploaded successfully';
+
+  @override
+  String get doctorUpdatedSuccess => 'Doctor updated successfully';
+
+  @override
+  String get doctorDeletedSuccess => 'Doctor deleted successfully';
+
+  @override
+  String get doctorActivatedMessage => 'Doctor activated';
+
+  @override
+  String get doctorDeactivatedMessage => 'Doctor deactivated';
+
+  @override
+  String get doctorAvailableMessage => 'Doctor marked available';
+
+  @override
+  String get doctorUnavailableMessage => 'Doctor marked unavailable';
+
+  @override
+  String get scheduleSavedSuccess => 'Schedule saved successfully';
+
+  @override
+  String get reportGeneratedSuccess => 'Report generated successfully';
+
+  @override
+  String get userUpdatedSuccess => 'User updated successfully';
+
+  @override
+  String get userDeletedSuccess => 'User deleted successfully';
+
+  @override
+  String get uidCopiedMessage => 'UID copied';
+
+  @override
+  String get userActivatedMessage => 'User activated';
+
+  @override
+  String get userDeactivatedMessage => 'User deactivated';
+
+  @override
+  String get roleUpdatedMessage => 'Role updated';
+
+  @override
+  String get patientRoleChangeOnly =>
+      'Only student and staff roles can be changed here.';
+
+  @override
+  String notificationRecipientsSent(int count) {
+    return 'Sent to $count recipients.';
+  }
+
+  @override
+  String get availabilityApprovedCleanup =>
+      'Approved. Appointment cleanup needs review.';
+
+  @override
+  String availabilityApprovedCount(int count) {
+    return 'Approved. $count appointments were cancelled.';
+  }
+
+  @override
+  String get availabilityRejected => 'Request rejected.';
+
+  @override
+  String get emulatorGoogleSignInNotice =>
+      'External Google Sign-In is disabled in emulator mode. Use local demo sign-in.';
+
+  @override
+  String scheduleTimeWithinHours(String start, String end) {
+    return 'Choose a time between $start and $end.';
+  }
+
+  @override
+  String get scheduleEndAfterStart => 'End time must be after start time.';
+
+  @override
+  String get scheduleTimeOverlaps => 'This time overlaps an existing slot.';
+
+  @override
+  String get selectRecipientFirst => 'Select a recipient before sending.';
+
+  @override
+  String get noActiveRecipients => 'No active recipients matched this target.';
+
+  @override
+  String get notesSaveFailed =>
+      'Could not save medical notes. Please try again.';
 }

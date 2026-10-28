@@ -6,6 +6,7 @@
         "seed:emulator": "npm run build && node lib/assistant/seedCli.js",
         "test": "npm run build && node test/admin_deletion.test.js && node test/assistant.test.js",
         "test:emulator": "npm run build && node test/emulator_integration.test.js",
+        "test:callable-emulator": "npm run build && node test/doctor_schedule_callable_emulator.test.js",
         "serve": "npm run build && firebase emulators:start --only functions",
         "shell": "npm run build && firebase functions:shell",
         "start": "npm run shell",
@@ -13,7 +14,7 @@
         "logs": "firebase functions:log"
     },
     "engines": {
-        "node": ">=18"
+        "node": "24"
     },
     "main": "lib/index.js",
     "dependencies": {

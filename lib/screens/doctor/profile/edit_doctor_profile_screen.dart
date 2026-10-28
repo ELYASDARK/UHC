@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -120,13 +122,14 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
             content: Row(
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 12),
-                Text(AppLocalizations.of(context).profileUpdated),
+                Text(AppMessages.localizations(context).profileUpdated),
               ],
             ),
             backgroundColor: AppColors.success,
@@ -140,9 +143,10 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -186,7 +190,8 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
         const maxSizeBytes = 25 * 1024 * 1024; // 25 MB
         if (bytes.lengthInBytes > maxSizeBytes) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            AppMessages.show(
+              context,
               SnackBar(
                 content: Row(
                   children: [
@@ -195,7 +200,8 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Image is too large (${(bytes.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB). Maximum size is 25 MB.',
+                        AppMessages.localizations(context)
+                            .imageTooLargeLimit(25),
                       ),
                     ),
                   ],
@@ -220,9 +226,10 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
     } catch (e) {
       debugPrint('Error picking image: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(AppLocalizations.of(context).error),
+            content: Text(AppMessages.localizations(context).error),
             backgroundColor: AppColors.error,
           ),
         );
@@ -351,7 +358,7 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
       ),
       body: ResponsivePage(
         maxWidth: 760,
-        bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+        bottomPadding: UhcResponsive.scrollBottomPadding(context),
         child: Form(
           key: _formKey,
           child: Column(
@@ -520,8 +527,9 @@ class _EditDoctorProfileScreenState extends State<EditDoctorProfileScreen> {
                             fit: BoxFit.cover,
                           )
                         : hasExistingImage
-                            ? Image.network(
-                                widget.doctor.photoUrl!,
+                            ? Image(
+                                image: CachedNetworkImageProvider(
+                                    widget.doctor.photoUrl!),
                                 width: 120,
                                 height: 120,
                                 fit: BoxFit.cover,

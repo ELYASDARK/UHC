@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -751,10 +752,15 @@ class _DepartmentManagementScreenState
         isActive: !currentStatus,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
             content: Text(
-              currentStatus ? 'Department deactivated' : 'Department activated',
+              currentStatus
+                  ? AppMessages.localizations(context)
+                      .departmentDeactivatedMessage
+                  : AppMessages.localizations(context)
+                      .departmentActivatedMessage,
             ),
             backgroundColor: AppColors.success,
           ),
@@ -762,18 +768,20 @@ class _DepartmentManagementScreenState
       }
     } on DepartmentFunctionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(e.userMessage),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Error updating department status: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -838,27 +846,31 @@ class _DepartmentManagementScreenState
       try {
         await _departmentFunctionsService.deleteDepartment(departmentId: id);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Department deleted successfully'),
+          AppMessages.show(
+            context,
+            SnackBar(
+              content: Text(
+                  AppMessages.localizations(context).departmentDeletedSuccess),
               backgroundColor: AppColors.success,
             ),
           );
         }
       } on DepartmentFunctionException catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text(e.userMessage),
+              content: Text(AppMessages.error(context, e)),
               backgroundColor: AppColors.error,
             ),
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text('Error deleting department: $e'),
+              content: Text(AppMessages.error(context, e)),
               backgroundColor: AppColors.error,
             ),
           );
@@ -1219,9 +1231,10 @@ class _DepartmentManagementScreenState
   }
 
   void _showPermissionDenied() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('You do not have permission for this action'),
+    AppMessages.show(
+      context,
+      SnackBar(
+        content: Text(AppMessages.localizations(context).noPermissionForAction),
         backgroundColor: AppColors.warning,
         behavior: SnackBarBehavior.floating,
       ),

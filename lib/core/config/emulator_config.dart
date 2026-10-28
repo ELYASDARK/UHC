@@ -123,17 +123,23 @@ class EmulatorConfig {
 
     final host = loopbackHost;
     if (!isAllowedHost(host)) {
-      throw StateError('Refusing to connect emulators: Disallowed emulator host "$host".');
+      throw StateError(
+          'Refusing to connect emulators: Disallowed emulator host "$host".');
     }
 
-    debugPrint('[EMULATOR] Connecting to Firebase emulators on $host for demo project $projectId');
+    debugPrint(
+        '[EMULATOR] Connecting to Firebase emulators on $host for demo project $projectId');
 
     try {
-      // NOTE: useAuthEmulator MUST be awaited
-      await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-      FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-      FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
-      FirebaseStorage.instance.useStorageEmulator(host, 9199);
+      // Preserve the validated host, including localhost used by ADB tunnels.
+      await FirebaseAuth.instance
+          .useAuthEmulator(host, 9099, automaticHostMapping: false);
+      FirebaseFirestore.instance
+          .useFirestoreEmulator(host, 8080, automaticHostMapping: false);
+      FirebaseFunctions.instance
+          .useFunctionsEmulator(host, 5001, automaticHostMapping: false);
+      await FirebaseStorage.instance
+          .useStorageEmulator(host, 9199, automaticHostMapping: false);
       debugPrint('[EMULATOR] All Firebase emulators configured successfully.');
     } catch (e) {
       debugPrint('[EMULATOR] Error configuring emulators: $e');

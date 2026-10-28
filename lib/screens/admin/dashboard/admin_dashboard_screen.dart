@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -459,9 +460,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   void _showPermissionDenied() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('You do not have permission for this action'),
+    AppMessages.show(
+      context,
+      SnackBar(
+        content: Text(AppMessages.localizations(context).noPermissionForAction),
         backgroundColor: AppColors.warning,
         behavior: SnackBarBehavior.floating,
       ),

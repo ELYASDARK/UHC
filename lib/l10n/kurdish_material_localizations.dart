@@ -17,6 +17,9 @@ class KurdishMaterialLocalizations extends DefaultMaterialLocalizations {
   String get closeButtonLabel => 'داخستن';
 
   @override
+  String get closeButtonTooltip => 'داخستن';
+
+  @override
   String get continueButtonLabel => 'بەردەوامبوون';
 
   @override

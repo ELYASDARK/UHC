@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
@@ -53,7 +54,8 @@ class _AssistantConfirmationSheetState
         widget.provider.failureKind == AssistantFailureKind.staleOffer
             ? l10n.assistantStaleOffer
             : l10n.bookingFailed;
-    ScaffoldMessenger.of(context).showSnackBar(
+    AppMessages.show(
+      context,
       SnackBar(content: Text(message), backgroundColor: AppColors.error),
     );
   }

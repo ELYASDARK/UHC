@@ -11,7 +11,10 @@ import '../services/local_notification_service.dart';
 
 /// Provider for managing doctor-side appointment state
 class DoctorAppointmentProvider extends ChangeNotifier {
-  final AppointmentRepository _appointmentRepo = AppointmentRepository();
+  final AppointmentRepository _appointmentRepo;
+
+  DoctorAppointmentProvider({AppointmentRepository? appointmentRepository})
+      : _appointmentRepo = appointmentRepository ?? AppointmentRepository();
   final UserRepository _userRepo = UserRepository();
 
   List<AppointmentModel> _appointments = [];

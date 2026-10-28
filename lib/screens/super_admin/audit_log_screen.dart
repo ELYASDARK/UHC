@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -126,9 +127,10 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-              content: Text('Failed to load logs: $e'),
+              content: Text(AppMessages.error(context, e)),
               backgroundColor: AppColors.error),
         );
       }
@@ -424,10 +426,11 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               final resolvedUid = await _resolveUidFromInput(raw);
               if (resolvedUid == null) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('User not found. Enter a valid UID or email.'),
+                AppMessages.show(
+                  context,
+                  SnackBar(
+                    content: Text(
+                        AppMessages.localizations(context).requestNotFound),
                     backgroundColor: AppColors.error,
                   ),
                 );
@@ -480,10 +483,11 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
               final resolvedUid = await _resolveUidFromInput(raw);
               if (resolvedUid == null) {
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('User not found. Enter a valid UID or email.'),
+                AppMessages.show(
+                  context,
+                  SnackBar(
+                    content: Text(
+                        AppMessages.localizations(context).requestNotFound),
                     backgroundColor: AppColors.error,
                   ),
                 );

@@ -6,7 +6,17 @@ import '../data/models/medical_document_model.dart';
 
 /// Provider for managing medical documents state
 class DocumentProvider extends ChangeNotifier {
-  final DocumentRepository _repo = DocumentRepository();
+  final DocumentRepository _repo;
+
+  DocumentProvider({DocumentRepository? repository})
+      : _repo = repository ?? DocumentRepository();
+
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
 
   bool _isUploading = false;
   double _uploadProgress = 0;
@@ -38,6 +48,7 @@ class DocumentProvider extends ChangeNotifier {
     String addedByName = '',
     String? appointmentId,
   }) async {
+    if (_isUploading) return false;
     try {
       _isUploading = true;
       _uploadProgress = 0;
@@ -120,42 +131,24 @@ class DocumentProvider extends ChangeNotifier {
     String? oldStoragePath,
     String? appointmentId,
   }) async {
+    if (_isUploading) return false;
     try {
       _isUploading = true;
       _uploadProgress = 0;
       _error = null;
       notifyListeners();
 
-      // Upload new file with progress
-      final upload = _repo.uploadFileWithProgress(
-        userId,
-        bytes,
-        fileName,
-        appointmentId: appointmentId,
+      await _repo.replaceDocument(
+        docId: docId,
+        expectedStoragePath: oldStoragePath ?? '',
+        metadata: Map.of(metaData),
+        bytes: bytes,
+        fileName: fileName,
+        onProgress: (progress) {
+          _uploadProgress = progress;
+          notifyListeners();
+        },
       );
-
-      _uploadSubscription?.cancel();
-      _uploadSubscription = upload.task.snapshotEvents.listen((event) {
-        _uploadProgress = event.bytesTransferred / event.totalBytes;
-        notifyListeners();
-      });
-
-      await upload.task;
-      _uploadSubscription = null;
-      final url = await upload.task.snapshot.ref.getDownloadURL();
-
-      // Merge file info into metadata
-      metaData['url'] = url;
-      metaData['fileName'] = fileName;
-      metaData['storagePath'] = upload.storagePath;
-
-      // Update Firestore doc
-      await _repo.updateDocument(docId, metaData);
-
-      // Delete old file from storage if it exists
-      if (oldStoragePath != null && oldStoragePath.isNotEmpty) {
-        await _repo.deleteStorageFile(oldStoragePath);
-      }
 
       _isUploading = false;
       _uploadProgress = 0;
@@ -186,6 +179,7 @@ class DocumentProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _uploadSubscription?.cancel();
     super.dispose();
   }

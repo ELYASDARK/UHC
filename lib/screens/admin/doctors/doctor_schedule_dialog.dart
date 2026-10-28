@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/responsive_layout.dart';
@@ -119,6 +120,139 @@ class DaySchedule {
       }
     }
     return DaySchedule(slots: parsedSlots);
+  }
+}
+
+typedef SavedDoctorSchedule = ({
+  Map<String, dynamic>? schedule,
+  Map<String, dynamic>? hours,
+});
+
+class DoctorScheduleLoader extends StatefulWidget {
+  final String doctorId;
+  final Future<SavedDoctorSchedule> Function() load;
+
+  const DoctorScheduleLoader({
+    super.key,
+    required this.doctorId,
+    required this.load,
+  });
+
+  @override
+  State<DoctorScheduleLoader> createState() => _DoctorScheduleLoaderState();
+}
+
+class _DoctorScheduleLoaderState extends State<DoctorScheduleLoader> {
+  late final Future<SavedDoctorSchedule> _savedSchedule;
+
+  @override
+  void initState() {
+    super.initState();
+    _savedSchedule = widget.load();
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<SavedDoctorSchedule>(
+        future: _savedSchedule,
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return DoctorScheduleDialog(
+              doctorId: widget.doctorId,
+              currentSchedule: snapshot.data!.schedule,
+              departmentWorkingHours: snapshot.data!.hours,
+            );
+          }
+          return DoctorScheduleFrame(
+            child: Center(
+              child: snapshot.hasError
+                  ? Text(AppMessages.localizations(context).scheduleLoadFailed)
+                  : const CircularProgressIndicator(),
+            ),
+          );
+        },
+      );
+}
+
+/// Keeps the same dialog geometry while server data is loading or ready.
+class DoctorScheduleFrame extends StatelessWidget {
+  final Widget child;
+  final bool isSaving;
+  final VoidCallback? onSave;
+
+  const DoctorScheduleFrame({
+    super.key,
+    required this.child,
+    this.isSaving = false,
+    this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.calendar_month, color: AppColors.primary),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('Manage Schedule')),
+        ],
+      ),
+      content: SizedBox(
+        width: UhcResponsive.dialogWidth(
+          context,
+          tabletWidth: 560,
+          laptopWidth: 620,
+          desktopWidth: 680,
+        ),
+        height: MediaQuery.of(context).size.height * 0.62,
+        child: child,
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+      actions: [
+        SizedBox(
+          width: UhcResponsive.dialogWidth(
+            context,
+            tabletWidth: 560,
+            laptopWidth: 620,
+            desktopWidth: 680,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: isSaving ? null : onSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Save Schedule'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -264,8 +398,8 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
       if (_toMin(startTime) < _toMin(deptHours.start) ||
           _toMin(startTime) >= _toMin(deptHours.end)) {
         _showError(
-          'Start time must be between '
-          '${_fmtTime(deptHours.start)} and ${_fmtTime(deptHours.end)}',
+          AppMessages.localizations(context).scheduleTimeWithinHours(
+              _fmtTime(deptHours.start), _fmtTime(deptHours.end)),
         );
         return;
       }
@@ -289,8 +423,8 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
       if (_toMin(endTime) > _toMin(deptHours.end) ||
           _toMin(endTime) <= _toMin(deptHours.start)) {
         _showError(
-          'End time must be between '
-          '${_fmtTime(deptHours.start)} and ${_fmtTime(deptHours.end)}',
+          AppMessages.localizations(context).scheduleTimeWithinHours(
+              _fmtTime(deptHours.start), _fmtTime(deptHours.end)),
         );
         return;
       }
@@ -300,14 +434,14 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
 
     // Validate end time is after start time
     if (!newSlot.isValid()) {
-      _showError('End time must be after start time');
+      _showError(AppMessages.localizations(context).scheduleEndAfterStart);
       return;
     }
 
     // Check for overlapping slots
     for (final existingSlot in _schedule[day]!.slots) {
       if (newSlot.overlaps(existingSlot)) {
-        _showError('This time slot overlaps with an existing slot');
+        _showError(AppMessages.localizations(context).scheduleTimeOverlaps);
         return;
       }
     }
@@ -355,14 +489,15 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
           children: [
             Icon(Icons.error_outline, color: AppColors.error, size: 22),
             const SizedBox(width: 8),
-            const Text('Invalid Time', style: TextStyle(fontSize: 16)),
+            Text(AppMessages.localizations(context).error,
+                style: const TextStyle(fontSize: 16)),
           ],
         ),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
+            child: Text(AppMessages.localizations(context).ok),
           ),
         ],
       ),
@@ -390,16 +525,18 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Schedule saved successfully'),
+        AppMessages.show(
+          context,
+          SnackBar(
+            content:
+                Text(AppMessages.localizations(context).scheduleSavedSuccess),
             backgroundColor: AppColors.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        _showError('Error saving schedule: $e');
+        _showError(AppMessages.error(context, e));
       }
     } finally {
       if (mounted) {
@@ -411,77 +548,13 @@ class _DoctorScheduleDialogState extends State<DoctorScheduleDialog> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.calendar_month, color: AppColors.primary),
-          const SizedBox(width: 8),
-          const Expanded(child: Text('Manage Schedule')),
-        ],
+    return DoctorScheduleFrame(
+      isSaving: _isSaving,
+      onSave: _saveSchedule,
+      child: ListView.builder(
+        itemCount: _days.length,
+        itemBuilder: (context, index) => _buildDayItem(_days[index], isDark),
       ),
-      content: SizedBox(
-        width: UhcResponsive.dialogWidth(
-          context,
-          tabletWidth: 560,
-          laptopWidth: 620,
-          desktopWidth: 680,
-        ),
-        height: MediaQuery.of(context).size.height * 0.62,
-        child: ListView.builder(
-          itemCount: _days.length,
-          itemBuilder: (context, index) {
-            final day = _days[index];
-            return _buildDayItem(day, isDark);
-          },
-        ),
-      ),
-      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-      actions: [
-        SizedBox(
-          width: UhcResponsive.dialogWidth(
-            context,
-            tabletWidth: 560,
-            laptopWidth: 620,
-            desktopWidth: 680,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: _isSaving ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveSchedule,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Save Schedule'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 

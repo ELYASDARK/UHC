@@ -66,9 +66,10 @@ UHC is a Flutter application for university health centers. Students and staff c
 - **Appointment Booking**. Browse by department or doctor, pick available time slots, and confirm bookings; unavailable or inactive doctors are locked in the UI and rejected by the backend
 - **AI Appointment Assistant**. Natural language scheduling assistant powered by Gemini 3.5 Flash Lite; supports English, Arabic, and Kurdish Sorani, extracts structured scheduling intents, presents expiring offers from real doctor schedules, and requires affirmative confirmation
 - **Appointment Management**. View upcoming/past appointments, reschedule, or cancel with reason tracking
-- **Medical Documents**. Upload and organize lab results, prescriptions, and imaging reports
+- **Medical Documents**. Upload, organize, and replace lab results, prescriptions, and imaging reports
 - **Push Notifications**. FCM push, local mobile reminders, and in-app notification center with visibility-safe scheduled alerts
 - **Profile Management**. Edit personal info, change password, upload profile photo
+- **Language Selection**. Switch English, Arabic, or Kurdish from the login dropdown or the profile language screen
 - **QR Code**. Generate QR codes for appointments
 - **Dark Mode**. System-aware or manual theme toggle
 
@@ -79,9 +80,9 @@ UHC is a Flutter application for university health centers. Students and staff c
 
 - **Dashboard Overview**. Daily stats (patients, appointments, completed, pending) and upcoming appointments
 - **Appointment Management**. View upcoming and past appointments with patient details and status badges
-- **QR-Verified Check-In**. Camera-based confirmation from 5 minutes before to 10 minutes after the appointment; see the check-in limitation below
+- **QR-Verified Check-In**. Camera-based confirmation from 5 minutes before to 10 minutes after the appointment. After five failed scans, the UI offers manual verification of patient and booking details through the same authorized check-in operation
 - **Schedule View**. Week, two-week, and month calendars with daily booked, available, and past slots; admins configure weekly working hours
-- **Appointment Details**. Full appointment view with patient info, medical notes editor, and action buttons (confirm, complete, cancel, no-show)
+- **Appointment Details**. Patient info, medical notes, check-in, complete, cancel, and no-show actions. Complete remains disabled until check-in succeeds; the backend also rejects completion of unconfirmed appointments
 - **Patient Profiles**. View patient details, profile photos, medical info, and appointment history from within appointment context
 - **Doctor Profile & Settings**. Edit specialization, bio, qualifications; configure notifications, language, and theme
 - **Availability Requests**. Request unavailable status with a note for admin approval, stay available while pending, and sync the dashboard switch in real time when admin changes availability
@@ -217,6 +218,7 @@ uhc/
 │   ├── appointments.ts             # Appointment lifecycle
 │   ├── assistant/                  # Gemini client, intent parsing, schedule matcher, quota
 │   ├── doctors.ts                  # Doctor accounts, profiles, schedules
+│   ├── documentReplacement.ts      # Authorized replacement and bounded file cleanup
 │   ├── users.ts                    # Student/staff accounts and setup
 │   ├── departments.ts              # Department operations
 │   ├── doctorAvailability.ts       # Availability requests and review
@@ -246,13 +248,13 @@ uhc/
 | Requirement | Version |
 |:---|:---|
 | Flutter SDK | A stable release that satisfies both SDK constraints below |
-| Locked SDK constraints | Flutter >=3.38.4 and bundled Dart >=3.11.0, <4.0.0 |
-| Node.js | 22, matching the Functions runtime in `firebase.json` |
+| Locked SDK constraints | Flutter >=3.47.0 and bundled Dart >=3.13.0, <4.0.0 |
+| Node.js | 24, matching the Functions runtime in `firebase.json` |
 | Firebase CLI | 15.19.0, the version used to check the deployment flags below |
 | FlutterFire CLI | Required to generate the Firebase app configuration |
 | Android Studio / Xcode | Android tooling for Android builds; macOS and Xcode for iOS builds |
 
-The resolved dependencies in `pubspec.lock` require newer SDKs than the minimum declared in `pubspec.yaml`. Check `flutter --version` and use a Flutter release whose bundled Dart also meets the locked constraints.
+The resolved dependencies in `pubspec.lock` require a newer Dart SDK than the minimum declared in `pubspec.yaml`. Check `flutter --version` and use a Flutter release whose bundled Dart also meets the locked constraints.
 
 ### Quick Start
 
@@ -301,7 +303,9 @@ Follow the [Firebase setup guide](docs/FIREBASE_SETUP.md) for project selection,
 
 ## Cloud Functions
 
-Cloud Functions handle appointment operations, the AI Appointment Assistant, account management, availability requests, notifications, and Super Admin governance. Protected operations require an active account with a linked Google provider and the relevant permissions.
+Cloud Functions handle appointment operations, medical-document replacement and cleanup, the AI Appointment Assistant, account management, availability requests, notifications, and Super Admin governance. Protected operations require an active account with a linked Google provider and the relevant permissions.
+
+Medical-document replacement uses `replaceMedicalDocument`, `queueMedicalDocumentCleanup`, and `cleanDocumentReplacements` in `functions/src/documentReplacement.ts`. These second-generation functions authorize replacements, queue obsolete files, and process bounded cleanup batches alongside the Storage access rules.
 
 See the [Cloud Functions reference](docs/CLOUD_FUNCTIONS.md) for the full function list, access requirements, and Google-linking troubleshooting.
 
@@ -385,6 +389,8 @@ Run the checks above before compiling release artifacts.
 
 Use your production app identifiers, Firebase project, and signing configuration before creating a release build. The commands below compile release artifacts; they do not configure signing or publish to an app store.
 
+The checked-in Android release build currently uses the debug signing configuration in `android/app/build.gradle.kts`. Configure your own release signing before store distribution. Keep keystores and signing passwords out of Git.
+
 ```bash
 # Android
 flutter build apk --release          # APK
@@ -414,8 +420,9 @@ flutter build web --release
 
 ### Known limitations
 
-- The doctor UI offers manual confirmation after five failed scans, but the backend rejects confirmation through `updateAppointmentStatus`. QR check-in remains the supported confirmation path. See the [appointment reference](docs/CLOUD_FUNCTIONS.md#appointment-lifecycle).
-- Web push needs project-specific VAPID configuration; the current token helper does not pass a VAPID key. See [Web notification setup](docs/FIREBASE_SETUP.md#web-notifications).
+- Some calendar labels remain English in Arabic layouts; admin Schedule editor labels also remain English.
+- PDF viewing has been exercised on Android with simple synthetic documents; large/multipage PDFs and non-Android rendering require further validation.
+- Web push needs project-specific VAPID configuration; the current registration helper does not pass a VAPID key. See [Web notification setup](docs/FIREBASE_SETUP.md#web-notifications).
 - Build commands alone do not verify sign-in, push delivery, or production capacity. Test those flows against your configured Firebase project before handoff.
 
 ---

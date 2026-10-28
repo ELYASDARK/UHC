@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -67,9 +68,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         _emailSent = true;
       });
     } else if (authProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(authProvider.errorMessage!),
+          content: Text(AppMessages.error(context, authProvider.errorMessage)),
           backgroundColor: AppColors.error,
         ),
       );

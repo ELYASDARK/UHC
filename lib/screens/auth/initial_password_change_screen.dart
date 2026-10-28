@@ -1,3 +1,4 @@
+import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -50,10 +51,11 @@ class _InitialPasswordChangeScreenState
     setState(() => _isLoading = false);
 
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
           content: Text(
-            authProvider.errorMessage ?? 'Failed to update password.',
+            AppMessages.error(context, authProvider.errorMessage),
           ),
           backgroundColor: AppColors.error,
         ),
@@ -92,9 +94,10 @@ class _InitialPasswordChangeScreenState
           );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Logout failed. Please try again.'),
+      AppMessages.show(
+        context,
+        SnackBar(
+          content: Text(AppMessages.localizations(context).logoutFailed),
           backgroundColor: AppColors.error,
         ),
       );

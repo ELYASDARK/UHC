@@ -120,7 +120,7 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
               onRefresh: _loadDepartments,
               child: ResponsivePage(
                 maxWidth: 1440,
-                bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+                bottomPadding: UhcResponsive.scrollBottomPadding(context),
                 physics: const BouncingScrollPhysics(
                   parent: AlwaysScrollableScrollPhysics(),
                 ),

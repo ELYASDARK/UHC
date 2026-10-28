@@ -1,3 +1,5 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +7,9 @@ import '../../../core/constants/app_colors.dart';
 import '../../../data/models/doctor_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/doctor_functions_service.dart';
+import '../../../l10n/app_localizations.dart';
 import 'doctor_form_dialog.dart';
+import 'doctor_schedule_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/widgets/role_english_ltr_scope.dart';
@@ -27,6 +31,15 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   String _searchQuery = '';
   Set<Department> _selectedDepartments = {};
   Set<_DoctorStatusFilter> _selectedStatusFilters = {};
+  late final Stream<QuerySnapshot> _doctorsStream;
+  bool _scheduleDialogOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _doctorsStream =
+        _firestore.collection('doctors').orderBy('name').snapshots();
+  }
 
   String _displayDoctorName(Object? value) {
     final name = (value ?? 'Unknown').toString().trim();
@@ -180,7 +193,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
             // Doctors List
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: _getDoctorsStream(),
+                stream: _doctorsStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return SkeletonList(
@@ -272,8 +285,47 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
     );
   }
 
-  Stream<QuerySnapshot> _getDoctorsStream() {
-    return _firestore.collection('doctors').orderBy('name').snapshots();
+  Future<void> _showSchedule(String doctorId) async {
+    if (!_canManage) {
+      _showPermissionDenied();
+      return;
+    }
+    if (_scheduleDialogOpen) return;
+    _scheduleDialogOpen = true;
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => DoctorScheduleLoader(
+          doctorId: doctorId,
+          load: () => _loadSchedule(doctorId),
+        ),
+      );
+    } finally {
+      _scheduleDialogOpen = false;
+    }
+  }
+
+  Future<SavedDoctorSchedule> _loadSchedule(String doctorId) async {
+    // Keep server values independent of profile-editor drafts.
+    final doctor = await _firestore.collection('doctors').doc(doctorId).get(
+          const GetOptions(source: Source.server),
+        );
+    if (!doctor.exists) throw StateError('Doctor no longer exists');
+    final data = doctor.data()!;
+    final department = await _firestore
+        .collection('departments')
+        .where('key', isEqualTo: data['department'])
+        .limit(1)
+        .get(const GetOptions(source: Source.server));
+    if (!mounted || !_canManage) throw StateError('Doctor access unavailable');
+    final schedule = data['weeklySchedule'];
+    final hours = department.docs.isEmpty
+        ? null
+        : department.docs.first.data()['workingHours'];
+    return (
+      schedule: schedule is Map ? Map<String, dynamic>.from(schedule) : null,
+      hours: hours is Map ? Map<String, dynamic>.from(hours) : null,
+    );
   }
 
   String _statusFilterLabel(_DoctorStatusFilter status) {
@@ -374,7 +426,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                       radius: 30,
                       backgroundImage: data['photoUrl'] != null &&
                               (data['photoUrl'] as String).isNotEmpty
-                          ? NetworkImage(data['photoUrl'])
+                          ? CachedNetworkImageProvider(data['photoUrl'])
                           : null,
                       child: data['photoUrl'] == null ||
                               (data['photoUrl'] as String).isEmpty
@@ -452,6 +504,9 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                             DoctorFormDialog(id: id, data: data),
                       );
                       break;
+                    case 'schedule':
+                      _showSchedule(id);
+                      break;
                     case 'delete':
                       _confirmDelete(id, data['name'] ?? 'this doctor', data);
                       break;
@@ -482,6 +537,21 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                         const Icon(Icons.edit, size: 18),
                         const SizedBox(width: 8),
                         const Text('Edit'),
+                        if (!_canManage) ...[
+                          const Spacer(),
+                          const Icon(Icons.lock_outline, size: 16),
+                        ],
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'schedule',
+                    enabled: _canManage,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_month_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        Text(AppLocalizations.of(this.context).schedule),
                         if (!_canManage) ...[
                           const Spacer(),
                           const Icon(Icons.lock_outline, size: 16),
@@ -721,27 +791,31 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         await _doctorFunctionsService.deleteDoctorAccount(doctorId: id);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Doctor deleted successfully'),
+          AppMessages.show(
+            context,
+            SnackBar(
+              content:
+                  Text(AppMessages.localizations(context).doctorDeletedSuccess),
               backgroundColor: AppColors.success,
             ),
           );
         }
       } on DoctorFunctionException catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text(e.userMessage),
+              content: Text(AppMessages.error(context, e)),
               backgroundColor: AppColors.error,
             ),
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text('Error deleting doctor: $e'),
+              content: Text(AppMessages.error(context, e)),
               backgroundColor: AppColors.error,
             ),
           );
@@ -757,10 +831,13 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         isActive: !currentStatus,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
             content: Text(
-              currentStatus ? 'Doctor deactivated' : 'Doctor activated',
+              currentStatus
+                  ? AppMessages.localizations(context).doctorDeactivatedMessage
+                  : AppMessages.localizations(context).doctorActivatedMessage,
             ),
             backgroundColor: AppColors.success,
           ),
@@ -768,18 +845,20 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
       }
     } on DoctorFunctionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(e.userMessage),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Failed to update doctor status: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -797,12 +876,13 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
         isAvailable: !currentAvailability,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
             content: Text(
               currentAvailability
-                  ? 'Doctor marked unavailable'
-                  : 'Doctor marked available',
+                  ? AppMessages.localizations(context).doctorUnavailableMessage
+                  : AppMessages.localizations(context).doctorAvailableMessage,
             ),
             backgroundColor: AppColors.success,
           ),
@@ -810,18 +890,20 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
       }
     } on DoctorFunctionException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(e.userMessage),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text('Failed to update doctor availability: $e'),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -930,7 +1012,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                         backgroundColor:
                             AppColors.primary.withValues(alpha: 0.1),
                         backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                            ? NetworkImage(photoUrl)
+                            ? CachedNetworkImageProvider(photoUrl)
                             : null,
                         child: photoUrl == null || photoUrl.isEmpty
                             ? Text(
@@ -1195,9 +1277,10 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
   }
 
   void _showPermissionDenied() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('You do not have permission for this action'),
+    AppMessages.show(
+      context,
+      SnackBar(
+        content: Text(AppMessages.localizations(context).noPermissionForAction),
         backgroundColor: AppColors.warning,
         behavior: SnackBarBehavior.floating,
       ),

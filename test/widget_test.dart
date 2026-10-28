@@ -5,6 +5,7 @@ import 'package:cloud_firestore_platform_interface/src/pigeon/messages.pigeon.da
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -57,6 +58,14 @@ void main() {
                         'key': 'dentistry',
                         'name': 'Dentistry',
                         'description': 'Dental appointments',
+                        'isActive': true,
+                      },
+                      metadata: metadata),
+                  InternalDocumentSnapshot(
+                      path: 'departments/generalMedicine',
+                      data: {
+                        'key': 'generalMedicine',
+                        'name': 'General Medicine',
                         'isActive': true,
                       },
                       metadata: metadata)
@@ -122,6 +131,25 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(HomeScreen).hitTestable(), findsOneWidget);
     expect(find.byType(DoctorListScreen).hitTestable(), findsNothing);
+    // Regression: fixed-height Home cards overflowed with Android font scale 1.7.
+    tester.view.physicalSize = const Size(320, 640);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.7;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pump(const Duration(seconds: 2));
+    final departmentLabel = find.descendant(
+        of: find.byType(HomeScreen), matching: find.text('General'));
+    await tester.ensureVisible(departmentLabel);
+    await tester.pump(const Duration(milliseconds: 400));
+    final paragraph = tester.renderObject<RenderParagraph>(departmentLabel);
+    final boxes = paragraph.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 7));
+    expect(boxes.map((box) => box.top).toSet(), hasLength(1),
+        reason:
+            'A single department word must fit on one line at font scale 1.7');
+    await tester.ensureVisible(find.text('Stay Hydrated'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Stay Hydrated').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

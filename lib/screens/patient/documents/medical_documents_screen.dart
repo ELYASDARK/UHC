@@ -1,9 +1,13 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import '../../../core/utils/medical_document_url.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/document_provider.dart';
@@ -11,6 +15,7 @@ import '../../../data/models/medical_document_model.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../shared/medical_document_viewer_screen.dart';
+import '../../shared/medical_pdf_viewer_screen.dart';
 
 /// Medical document upload and management screen
 class MedicalDocumentsScreen extends StatefulWidget {
@@ -47,20 +52,15 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     ];
   }
 
-  bool _isTrustedMedicalDocumentUrl(Uri uri) {
-    return uri.scheme == 'https' &&
-        uri.host == 'firebasestorage.googleapis.com' &&
-        uri.path.contains('/o/medical_documents%2F');
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final user = context.read<AuthProvider>().user;
     if (user != null && user.id != _currentUserId) {
       _currentUserId = user.id;
-      _documentsStream =
-          context.read<DocumentProvider>().streamDocuments(user.id);
+      _documentsStream = context.read<DocumentProvider>().streamDocuments(
+            user.id,
+          );
     }
   }
 
@@ -86,8 +86,9 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                 ),
               )
             : const Icon(Icons.upload_file),
-        label:
-            Text(docProvider.isUploading ? l10n.loading : l10n.uploadDocument),
+        label: Text(
+          docProvider.isUploading ? l10n.loading : l10n.uploadDocument,
+        ),
         backgroundColor: AppColors.primary,
         shape: const StadiumBorder(),
       ),
@@ -112,7 +113,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Text(
-                              '${l10n.errorLoadingDocuments}: ${snapshot.error}',
+                              AppMessages.error(context, snapshot.error),
                               textAlign: TextAlign.center,
                               style: const TextStyle(color: AppColors.error),
                             ),
@@ -122,9 +123,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
 
                       if (snapshot.connectionState == ConnectionState.waiting &&
                           !snapshot.hasData) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
+                        return const Center(child: CircularProgressIndicator());
                       }
 
                       if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -474,9 +473,13 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       if (nameController.text.isEmpty || selectedType == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppMessages.show(
+                          context,
                           SnackBar(
-                            content: Text(l10n.pleaseFillRequiredFields),
+                            content: Text(
+                              AppMessages.localizations(context)
+                                  .pleaseFillRequiredFields,
+                            ),
                           ),
                         );
                         return;
@@ -504,10 +507,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     );
   }
 
-  void _showEditDialog(
-    BuildContext context,
-    MedicalDocumentModel doc,
-  ) {
+  void _showEditDialog(BuildContext context, MedicalDocumentModel doc) {
     String? selectedType = doc.type.toFirestoreString();
     final nameController = TextEditingController(text: doc.name);
     final notesController = TextEditingController(text: doc.notes);
@@ -620,8 +620,9 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    border:
-                        Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -642,7 +643,7 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                       ),
                       TextButton(
                         onPressed: () async {
-                          final result = await FilePicker.pickFiles(
+                          final result = await FilePicker.pickFile(
                             type: FileType.custom,
                             allowedExtensions: [
                               'pdf',
@@ -652,16 +653,16 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                               'doc',
                               'docx',
                             ],
-                            withData: true,
                           );
-                          if (result != null && result.files.isNotEmpty) {
+                          if (result != null) {
                             setSheetState(() {
-                              newFile = result.files.single;
+                              newFile = result;
                             });
                           }
                         },
-                        child:
-                            Text(newFile != null ? l10n.change : l10n.replace),
+                        child: Text(
+                          newFile != null ? l10n.change : l10n.replace,
+                        ),
                       ),
                     ],
                   ),
@@ -674,9 +675,14 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       if (nameController.text.isEmpty || selectedType == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        AppMessages.show(
+                          context,
                           SnackBar(
-                              content: Text(l10n.pleaseFillRequiredFields)),
+                            content: Text(
+                              AppMessages.localizations(context)
+                                  .pleaseFillRequiredFields,
+                            ),
+                          ),
                         );
                         return;
                       }
@@ -714,44 +720,42 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
   }) async {
     final user = context.read<AuthProvider>().user;
     final docProvider = context.read<DocumentProvider>();
-    final l10n = AppLocalizations.of(context);
 
     bool success;
-
-    if (newFile != null && user != null) {
-      // Update with file replacement
-      final bytes = newFile.bytes;
-      if (bytes == null) {
-        success = false;
-      } else {
+    try {
+      if (newFile != null && user != null) {
+        // Update with file replacement
+        final bytes = await newFile.readAsBytes();
         final fileName = newFile.name;
 
         success = await docProvider.updateDocumentWithFile(
           docId: doc.id,
           userId: user.id,
-          metaData: {
-            'name': newName,
-            'type': newType,
-            'notes': newNotes,
-          },
+          metaData: {'name': newName, 'type': newType, 'notes': newNotes},
           bytes: bytes,
           fileName: fileName,
           oldStoragePath: doc.storagePath,
         );
+      } else {
+        // Metadata-only update
+        success = await docProvider.updateDocument(doc.id, {
+          'name': newName,
+          'type': newType,
+          'notes': newNotes,
+        });
       }
-    } else {
-      // Metadata-only update
-      success = await docProvider.updateDocument(doc.id, {
-        'name': newName,
-        'type': newType,
-        'notes': newNotes,
-      });
+    } on Exception {
+      success = false;
     }
-
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      AppMessages.show(
+        context,
         SnackBar(
-          content: Text(success ? l10n.documentUpdated : l10n.updateFailed),
+          content: Text(
+            success
+                ? AppMessages.localizations(context).documentUpdated
+                : AppMessages.localizations(context).updateFailed,
+          ),
           backgroundColor: success ? AppColors.success : AppColors.error,
         ),
       );
@@ -767,25 +771,20 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     if (user == null) return;
 
     try {
-      final result = await FilePicker.pickFiles(
+      final result = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
-        withData: true,
       );
 
-      if (result == null || result.files.isEmpty) return;
+      if (result == null) return;
 
-      final pickedFile = result.files.single;
+      final pickedFile = result;
       final fileName = pickedFile.name;
-      final bytes = pickedFile.bytes;
-      if (bytes == null) {
-        throw Exception('Could not read selected file bytes.');
-      }
+      final bytes = await pickedFile.readAsBytes();
 
       if (!mounted) return;
 
       final docProvider = context.read<DocumentProvider>();
-      final l10n = AppLocalizations.of(context);
 
       final success = await docProvider.uploadAndAddDocument(
         userId: user.id,
@@ -800,20 +799,24 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(success ? l10n.documentUploaded : l10n.uploadFailed),
+            content: Text(
+              success
+                  ? AppMessages.localizations(context).documentUploaded
+                  : AppMessages.localizations(context).uploadFailed,
+            ),
             backgroundColor: success ? AppColors.success : AppColors.error,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
-            content: Text(
-              '${AppLocalizations.of(context).uploadFailed}: ${e.toString()}',
-            ),
+            content: Text(AppMessages.error(context, e)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -832,27 +835,31 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
   Future<void> _viewDocument(MedicalDocumentModel doc) async {
     final url = doc.url;
     if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).noURLProvided)),
+      AppMessages.show(
+        context,
+        SnackBar(
+          content: Text(AppMessages.localizations(context).noURLProvided),
+        ),
       );
       return;
     }
 
     try {
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        if (!_isTrustedMedicalDocumentUrl(uri)) {
+      final isPdf = doc.fileName.toLowerCase().endsWith('.pdf');
+      if (_isImageDocument(doc) || isPdf || await canLaunchUrl(uri)) {
+        if (!isTrustedMedicalDocumentUrl(uri, Firebase.app().options)) {
           throw Exception('Document URL is not trusted.');
         }
-        if (!kIsWeb && _isImageDocument(doc)) {
+        if (!kIsWeb && (isPdf || _isImageDocument(doc))) {
           if (!mounted) return;
           await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => MedicalDocumentViewerScreen(
-                imageUrl: url,
-                title: doc.name,
-              ),
+              builder: (_) => isPdf
+                  ? MedicalPdfViewerScreen(
+                      url: url, storagePath: doc.storagePath, title: doc.name)
+                  : MedicalDocumentViewerScreen(imageUrl: url, title: doc.name),
             ),
           );
           return;
@@ -860,21 +867,21 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
         await launchUrl(uri, mode: LaunchMode.inAppWebView);
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          AppMessages.show(
+            context,
             SnackBar(
-              content: Text(AppLocalizations.of(context).couldNotOpenDocument),
+              content: Text(
+                AppMessages.localizations(context).couldNotOpenDocument,
+              ),
             ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${AppLocalizations.of(context).errorOpeningDocument}: $e',
-            ),
-          ),
+        AppMessages.show(
+          context,
+          SnackBar(content: Text(AppMessages.error(context, e))),
         );
       }
     }
@@ -904,16 +911,19 @@ class _MedicalDocumentsScreenState extends State<MedicalDocumentsScreen> {
     if (confirmed == true && mounted) {
       final docProvider = context.read<DocumentProvider>();
 
-      final success =
-          await docProvider.deleteDocument(docId, storagePath ?? '');
+      final success = await docProvider.deleteDocument(
+        docId,
+        storagePath ?? '',
+      );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        AppMessages.show(
+          context,
           SnackBar(
             content: Text(
               success
-                  ? AppLocalizations.of(context).documentDeleted
-                  : AppLocalizations.of(context).somethingWentWrong,
+                  ? AppMessages.localizations(context).documentDeleted
+                  : AppMessages.localizations(context).somethingWentWrong,
             ),
             backgroundColor: success ? AppColors.success : AppColors.error,
           ),

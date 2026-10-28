@@ -1,8 +1,13 @@
+import '../../../core/utils/localization_helper.dart';
+
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/glassmorphic_card.dart';
@@ -57,10 +62,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
     try {
       // Load patient profile + appointment history in parallel
-      final results = await Future.wait([
-        _loadPatient(),
-        _loadHistory(),
-      ]);
+      final results = await Future.wait([_loadPatient(), _loadHistory()]);
       if (mounted) {
         setState(() {
           _patient = results[0] as UserModel?;
@@ -120,7 +122,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   onRefresh: _loadData,
                   child: ResponsivePage(
                     maxWidth: 1080,
-                    bottomPadding: UhcResponsive.isWide(context) ? 32 : 100,
+                    bottomPadding: UhcResponsive.scrollBottomPadding(context),
                     physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,7 +152,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             radius: 32,
             backgroundColor: Colors.white.withValues(alpha: 0.2),
             backgroundImage: patient?.photoUrl != null
-                ? NetworkImage(patient!.photoUrl!)
+                ? CachedNetworkImageProvider(patient!.photoUrl!)
                 : null,
             child: patient?.photoUrl == null
                 ? Text(
@@ -220,44 +222,54 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     final items = <_InfoItem>[];
 
     if (patient.phoneNumber != null && patient.phoneNumber!.isNotEmpty) {
-      items.add(_InfoItem(
-        icon: Icons.phone_rounded,
-        label: l10n.phone,
-        value: patient.phoneNumber!,
-        color: AppColors.primary,
-      ));
+      items.add(
+        _InfoItem(
+          icon: Icons.phone_rounded,
+          label: l10n.phone,
+          value: patient.phoneNumber!,
+          color: AppColors.primary,
+        ),
+      );
     }
     if (patient.dateOfBirth != null) {
-      items.add(_InfoItem(
-        icon: Icons.cake_rounded,
-        label: l10n.dateOfBirth,
-        value: DateFormat('dd MMM yyyy').format(patient.dateOfBirth!),
-        color: AppColors.info,
-      ));
+      items.add(
+        _InfoItem(
+          icon: Icons.cake_rounded,
+          label: l10n.dateOfBirth,
+          value: DateFormat('dd MMM yyyy').format(patient.dateOfBirth!),
+          color: AppColors.info,
+        ),
+      );
     }
     if (patient.bloodType != null && patient.bloodType!.isNotEmpty) {
-      items.add(_InfoItem(
-        icon: Icons.bloodtype_rounded,
-        label: l10n.bloodType,
-        value: patient.bloodType!,
-        color: AppColors.error,
-      ));
+      items.add(
+        _InfoItem(
+          icon: Icons.bloodtype_rounded,
+          label: l10n.bloodType,
+          value: patient.bloodType!,
+          color: AppColors.error,
+        ),
+      );
     }
     if (patient.allergies != null && patient.allergies!.isNotEmpty) {
-      items.add(_InfoItem(
-        icon: Icons.warning_amber_rounded,
-        label: l10n.allergies,
-        value: patient.allergies!,
-        color: AppColors.warning,
-      ));
+      items.add(
+        _InfoItem(
+          icon: Icons.warning_amber_rounded,
+          label: l10n.allergies,
+          value: patient.allergies!,
+          color: AppColors.warning,
+        ),
+      );
     }
     if (patient.studentId != null && patient.studentId!.isNotEmpty) {
-      items.add(_InfoItem(
-        icon: Icons.badge_rounded,
-        label: l10n.studentId,
-        value: patient.studentId!,
-        color: AppColors.secondary,
-      ));
+      items.add(
+        _InfoItem(
+          icon: Icons.badge_rounded,
+          label: l10n.studentId,
+          value: patient.studentId!,
+          color: AppColors.secondary,
+        ),
+      );
     }
 
     if (items.isEmpty) return const SizedBox.shrink();
@@ -410,6 +422,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   }
 
   Widget _historyCard(AppointmentModel appt, bool isDark) {
+    final l10n = AppLocalizations.of(context);
     final statusColor = _statusColor(appt.status);
 
     return GestureDetector(
@@ -475,7 +488,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    appt.typeDisplay,
+                    LocalizationHelper.translateAppointmentType(
+                      appt.type,
+                      l10n,
+                    ),
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -512,7 +528,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   // ---- skeleton ----
   Widget _buildSkeleton() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+      padding: EdgeInsets.fromLTRB(
+          20, 8, 20, UhcResponsive.scrollBottomPadding(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -555,8 +572,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                size: 48, color: AppColors.error),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: AppColors.error,
+            ),
             const SizedBox(height: 16),
             Text(
               l10n.failedToLoadPatientData,
@@ -567,7 +587,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              _error ?? '',
+              AppMessages.error(context, _error),
               textAlign: TextAlign.center,
               style: GoogleFonts.roboto(
                 fontSize: 13,

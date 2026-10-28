@@ -237,7 +237,7 @@ class AssistantStatusBanner extends StatelessWidget {
       AssistantFailureKind.disabled => l10n.assistantDisabledNotice,
       AssistantFailureKind.unavailable => l10n.assistantUnavailableNotice,
       AssistantFailureKind.staleOffer => l10n.assistantStaleOffer,
-      _ => provider.errorMessage!,
+      _ => l10n.requestFailed,
     };
   }
 

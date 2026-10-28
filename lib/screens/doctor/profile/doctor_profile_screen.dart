@@ -1,3 +1,6 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../shared/language_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -73,7 +76,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           icon: Icons.language_rounded,
           title: l10n.language,
           subtitle: locale.languageName,
-          onTap: () => _showLanguageDialog(context, l10n),
+          onTap: () => _openLanguageScreen(context, l10n),
           isDark: isDark,
         ),
       ],
@@ -226,7 +229,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         bottom: false,
         child: ResponsivePage(
           maxWidth: isWide ? 1080 : 980,
-          bottomPadding: isWide ? 32 : 100,
+          bottomPadding: UhcResponsive.scrollBottomPadding(context),
           alignment: isWide
               ? AlignmentDirectional.topStart
               : AlignmentDirectional.topCenter,
@@ -333,8 +336,8 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 ),
                 child: ClipOval(
                   child: photoUrl != null && photoUrl.isNotEmpty
-                      ? Image.network(
-                          photoUrl,
+                      ? Image(
+                          image: CachedNetworkImageProvider(photoUrl),
                           width: 100,
                           height: 100,
                           fit: BoxFit.cover,
@@ -473,44 +476,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   }
 
   // ───────────────────── DIALOGS / SHEETS ─────────────────────
-  void _showLanguageDialog(BuildContext context, AppLocalizations l10n) {
-    final locale = context.read<LocaleProvider>();
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(l10n.language,
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _langTile('English', 'en', locale),
-            _langTile('کوردی', 'ku', locale),
-            _langTile('العربية', 'ar', locale),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _langTile(String label, String code, LocaleProvider lp) {
-    final selected = lp.locale.languageCode == code;
-    return ListTile(
-      title: Text(label),
-      trailing:
-          selected ? const Icon(Icons.check, color: AppColors.primary) : null,
-      onTap: () => _applyLanguageChange(code),
-    );
-  }
-
-  Future<void> _applyLanguageChange(String languageCode) async {
-    final localeProvider = context.read<LocaleProvider>();
-    final authProvider = context.read<AuthProvider>();
-
-    await localeProvider.setLocaleByCode(languageCode);
-    await authProvider.updateLanguage(languageCode);
-
-    if (!mounted) return;
-    Navigator.pop(context);
+  void _openLanguageScreen(BuildContext context, AppLocalizations l10n) {
+    Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const LanguageScreen()));
   }
 
   Future<void> _applyThemeChange(
@@ -549,9 +517,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 );
               } catch (_) {
                 if (!ctx.mounted) return;
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('Logout failed. Please try again.'),
+                AppMessages.show(
+                  ctx,
+                  SnackBar(
+                    content: Text(AppMessages.localizations(ctx).logoutFailed),
                     backgroundColor: AppColors.error,
                   ),
                 );

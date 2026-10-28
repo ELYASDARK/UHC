@@ -1,3 +1,6 @@
+import 'package:uhc/core/utils/app_messages.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../shared/language_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -152,8 +155,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               contentPadding: EdgeInsets.zero,
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening email client...')),
+                AppMessages.show(
+                  context,
+                  SnackBar(
+                      content: Text(AppMessages.localizations(context)
+                          .openingEmailClient)),
                 );
                 // In real app: launchUrl(Uri.parse('mailto:support@uhc.edu'));
               },
@@ -168,8 +174,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               contentPadding: EdgeInsets.zero,
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening dialer...')),
+                AppMessages.show(
+                  context,
+                  SnackBar(
+                      content: Text(
+                          AppMessages.localizations(context).openingDialer)),
                 );
                 // In real app: launchUrl(Uri.parse('tel:+15551234567'));
               },
@@ -272,9 +281,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: ResponsivePage(
         maxWidth: UhcResponsive.isWide(context) ? 1080 : 980,
-        bottomPadding: UhcResponsive.isWide(context)
-            ? 32
-            : (isSuperAdmin ? 32 : 100),
+        bottomPadding: UhcResponsive.scrollBottomPadding(context),
         alignment: UhcResponsive.isWide(context)
             ? AlignmentDirectional.topStart
             : Alignment.topCenter,
@@ -343,7 +350,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.language_rounded,
             title: l10n.language,
             subtitle: localeProvider.languageName,
-            onTap: () => _showLanguageDialog(context, l10n),
+            onTap: () => _openLanguageScreen(context, l10n),
             isDark: isDark,
             accentColor: accentColor,
           ),
@@ -581,68 +588,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showLanguageDialog(BuildContext context, AppLocalizations l10n) {
-    final localeProvider = context.read<LocaleProvider>();
-    final currentLocale = localeProvider.locale.languageCode;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.selectLanguage),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('English'),
-              trailing: currentLocale == 'en'
-                  ? const Icon(Icons.check, color: AppColors.primary)
-                  : null,
-              onTap: () {
-                _applyLanguageChange(dialogContext, 'en');
-              },
-            ),
-            ListTile(
-              title: const Text('العربية'),
-              trailing: currentLocale == 'ar'
-                  ? const Icon(Icons.check, color: AppColors.primary)
-                  : null,
-              onTap: () {
-                _applyLanguageChange(dialogContext, 'ar');
-              },
-            ),
-            ListTile(
-              title: const Text('کوردی'),
-              trailing: currentLocale == 'ku'
-                  ? const Icon(Icons.check, color: AppColors.primary)
-                  : null,
-              onTap: () {
-                _applyLanguageChange(dialogContext, 'ku');
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(l10n.cancel),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _applyLanguageChange(
-    BuildContext dialogContext,
-    String languageCode,
-  ) async {
-    final localeProvider = context.read<LocaleProvider>();
-    final authProvider = context.read<AuthProvider>();
-
-    await localeProvider.setLocaleByCode(languageCode);
-    await authProvider.updateLanguage(languageCode);
-
-    if (!dialogContext.mounted) return;
-    Navigator.pop(dialogContext);
+  void _openLanguageScreen(BuildContext context, AppLocalizations l10n) {
+    Navigator.push(
+        context, MaterialPageRoute(builder: (_) => const LanguageScreen()));
   }
 
   Future<void> _applyThemeChange(
@@ -703,8 +651,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: ClipOval(
                   child: photoUrl != null && photoUrl.isNotEmpty
                       ? (photoUrl.startsWith('http')
-                          ? Image.network(
-                              photoUrl,
+                          ? Image(
+                              image: CachedNetworkImageProvider(photoUrl),
                               width: 100,
                               height: 100,
                               fit: BoxFit.cover,
@@ -891,9 +839,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               } catch (_) {
                 if (!outerContext.mounted) return;
-                ScaffoldMessenger.of(outerContext).showSnackBar(
-                  const SnackBar(
-                    content: Text('Logout failed. Please try again.'),
+                AppMessages.show(
+                  outerContext,
+                  SnackBar(
+                    content: Text(
+                        AppMessages.localizations(outerContext).logoutFailed),
                     backgroundColor: AppColors.error,
                   ),
                 );

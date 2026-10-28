@@ -117,7 +117,8 @@ class AuthService {
     if (EmulatorConfig.isEmulatorEnabled) {
       throw const AuthException(
         code: 'emulator-external-auth-disabled',
-        message: 'External Google Sign-In is disabled in emulator mode. Use local demo patient sign-in.',
+        message:
+            'External Google Sign-In is disabled in emulator mode. Use local demo patient sign-in.',
       );
     }
 
@@ -627,7 +628,10 @@ class AuthService {
 
       await ref.putData(data, metadata);
       final downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
+      return Uri.parse(downloadUrl).replace(queryParameters: {
+        ...Uri.parse(downloadUrl).queryParameters,
+        'v': DateTime.now().microsecondsSinceEpoch.toString(),
+      }).toString();
     } catch (e) {
       throw Exception('Failed to upload image: $e');
     }
@@ -655,7 +659,10 @@ class AuthService {
 
       await ref.putData(data, metadata);
       final downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
+      return Uri.parse(downloadUrl).replace(queryParameters: {
+        ...Uri.parse(downloadUrl).queryParameters,
+        'v': DateTime.now().microsecondsSinceEpoch.toString(),
+      }).toString();
     } catch (e) {
       throw Exception('Failed to upload image bytes: $e');
     }

@@ -695,7 +695,7 @@
   "notificationsSend": "Send Notifications",
   "permissionRequired": "Permission Required",
   "exportPermissionRequired": "Export Permission Required",
-  "noPermissionForAction": "You do not have permission for this action",
+  "noPermissionForAction": "مۆڵەتت نییە بۆ ئەنجامدانی ئەم کردارە",
   "generateReport": "Generate Report",
   "generating": "Generating...",
   "addDoctor": "Add Doctor",
@@ -719,7 +719,6 @@
   "createFirstAdmin": "Create your first admin account",
   "bootstrapSuperAdmin": "Bootstrap Super Admin",
   "migrationRunbook": "Migration Runbook",
-
   "assistantTitle": "یاریدەدەری زیرەکی نۆرەگرتن",
   "assistantSubtitle": "بە گفتوگۆیەکی ئاسان نۆرەکان بدۆزەرەوە و بییانگرە",
   "assistantDailyLimitHeading": "یاریدەدەر گەیشتووەتە سنووری ڕۆژانەی ئەمڕۆ.",
@@ -777,5 +776,95 @@
   "assistantInfoTooltip": "زانیاری دەربارەی یاریدەدەر",
   "assistantClearChatFailed": "سڕینەوەی مێژووی گفتوگۆ لەسەر سێرڤەر سەرکەوتوو نەبوو.",
   "assistantHistoryLoadFailed": "بارکردنی مێژووی گفتوگۆ سەرکەوتوو نەبوو. هێڵی ئینتەرنێتەکەت بپشکنە.",
-  "assistantBadge": "یاریدەدەری زیرەک"
+  "assistantBadge": "یاریدەدەری زیرەک",
+  "resetZoom": "گەڕاندنەوەی گەورەکردن",
+  "imageNotAvailable": "وێنە بەردەست نییە",
+  "medicalImageLoadError": "نەتوانرا وێنە باربکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
+  "scheduleLoadFailed": "نەتوانرا خشتە باربکرێت. دووبارە هەوڵ بدەوە.",
+  "loadingAvailability": "پشکنینی کاتە بەردەستەکان...",
+  "requestFailed": "نەتوانرا داواکارییەکە تەواوبکرێت. دووبارە هەوڵ بدەوە.",
+  "requestNetworkError": "پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
+  "requestConflict": "ئەم زانیارییانە گۆڕاون. نوێی بکەرەوە و دووبارە هەوڵ بدەوە.",
+  "requestLimitReached": "هەوڵەکان زۆرن. دواتر دووبارە هەوڵ بدەوە.",
+  "requestInvalid": "زانیارییە نووسراوەکان بپشکنە و دووبارە هەوڵ بدەوە.",
+  "requestNotFound": "ئەم بڕگەیە چیتر بەردەست نییە. نوێی بکەرەوە و دووبارە هەوڵ بدەوە.",
+  "authInvalidCredentials": "ئیمەیڵ یان تێپەڕەوشە هەڵەیە. دووبارە هەوڵ بدەوە.",
+  "authEmailUsed": "ئەم ئیمەیڵە پێشتر تۆمارکراوە.",
+  "authAccountDisabled": "ئەم هەژمارە ناچالاک کراوە. پەیوەندی بە پشتگیرییەوە بکە.",
+  "operationCompleted": "بە سەرکەوتوویی تەواو بوو",
+  "logoutFailed": "نەتوانرا بچیتە دەرەوە. دووبارە هەوڵ بدەوە.",
+  "notesSaved": "تێبینییەکان پاشەکەوت کران",
+  "googleAccountLinked": "هەژماری گووگڵ بەسترایەوە",
+  "googleAccountUnlinked": "بەستەری هەژماری گووگڵ لابرا",
+  "availabilityRequestSent": "داواکاری نێردرا. تا پەسەندکردنی بەڕێوەبەر بەردەست دەمێنیتەوە.",
+  "imageTooLargeLimit": "وێنە زۆر گەورەیە. زۆرترین قەبارە {limit} مێگابایتە.",
+  "@imageTooLargeLimit": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "couldNotOpenMaps": "نەتوانرا نەخشە بکرێتەوە",
+  "couldNotOpenDirections": "نەتوانرا ڕێنیشاندەر بکرێتەوە",
+  "couldNotMakeCall": "نەتوانرا پەیوەندی بکرێت",
+  "couldNotOpenEmail": "نەتوانرا ئیمەیڵ بکرێتەوە",
+  "openingEmailClient": "کردنەوەی ئیمەیڵ...",
+  "openingDialer": "کردنەوەی تەلەفۆن...",
+  "departmentUpdatedSuccess": "بەش بە سەرکەوتوویی نوێکرایەوە",
+  "departmentCreatedSuccess": "بەش بە سەرکەوتوویی دروستکرا",
+  "departmentActivatedMessage": "بەش چالاک کرا",
+  "departmentDeactivatedMessage": "بەش ناچالاک کرا",
+  "departmentDeletedSuccess": "بەش بە سەرکەوتوویی سڕایەوە",
+  "imageUploadedSuccess": "وێنە بە سەرکەوتوویی بارکرا",
+  "doctorUpdatedSuccess": "پزیشک بە سەرکەوتوویی نوێکرایەوە",
+  "doctorDeletedSuccess": "پزیشک بە سەرکەوتوویی سڕایەوە",
+  "doctorActivatedMessage": "پزیشک چالاک کرا",
+  "doctorDeactivatedMessage": "پزیشک ناچالاک کرا",
+  "doctorAvailableMessage": "پزیشک بەردەست کرا",
+  "doctorUnavailableMessage": "پزیشک نابەردەست کرا",
+  "scheduleSavedSuccess": "خشتە بە سەرکەوتوویی پاشەکەوت کرا",
+  "reportGeneratedSuccess": "ڕاپۆرت بە سەرکەوتوویی دروستکرا",
+  "userUpdatedSuccess": "بەکارهێنەر بە سەرکەوتوویی نوێکرایەوە",
+  "userDeletedSuccess": "بەکارهێنەر بە سەرکەوتوویی سڕایەوە",
+  "uidCopiedMessage": "ناسنامەی بەکارهێنەر کۆپی کرا",
+  "userActivatedMessage": "بەکارهێنەر چالاک کرا",
+  "userDeactivatedMessage": "بەکارهێنەر ناچالاک کرا",
+  "roleUpdatedMessage": "ڕۆڵ نوێکرایەوە",
+  "patientRoleChangeOnly": "تەنها ڕۆڵی خوێندکار و کارمەند لێرە دەگۆڕدرێت.",
+  "notificationRecipientsSent": "بۆ {count} وەرگر نێردرا.",
+  "@notificationRecipientsSent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "availabilityApprovedCleanup": "پەسەندکرا. هەڵوەشاندنەوەی نۆرەکان پێویستی بە پێداچوونەوەیە.",
+  "availabilityApprovedCount": "پەسەندکرا. {count} نۆرە هەڵوەشایەوە.",
+  "@availabilityApprovedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "availabilityRejected": "داواکاری ڕەتکرایەوە.",
+  "emulatorGoogleSignInNotice": "چوونەژوورەوەی دەرەکی گووگڵ لە دۆخی تاقیکردنەوە ناچالاکە. چوونەژوورەوەی تاقیکردنەوەی ناوخۆ بەکاربهێنە.",
+  "scheduleTimeWithinHours": "کاتێک لە نێوان {start} و {end} هەڵبژێرە.",
+  "@scheduleTimeWithinHours": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduleEndAfterStart": "کاتی کۆتایی دەبێت دوای کاتی دەستپێک بێت.",
+  "scheduleTimeOverlaps": "ئەم کاتە لەگەڵ کاتێکی تۆمارکراو تێکدەچێت.",
+  "selectRecipientFirst": "پێش ناردن وەرگرێک هەڵبژێرە.",
+  "noActiveRecipients": "هیچ وەرگرێکی چالاک بۆ ئەم ئامانجە نییە.",
+  "notesSaveFailed": "نەتوانرا تێبینییە پزیشکییەکان پاشەکەوت بکرێن. دووبارە هەوڵ بدەوە."
 }

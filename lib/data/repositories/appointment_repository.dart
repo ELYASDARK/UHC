@@ -122,6 +122,7 @@ class AppointmentRepository {
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchAllPages(
     Query<Map<String, dynamic>> query, {
     int batchSize = _queryBatchSize,
+    bool requireServer = false,
   }) async {
     final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
     DocumentSnapshot<Map<String, dynamic>>? lastDoc;
@@ -132,7 +133,9 @@ class AppointmentRepository {
         pageQuery = pageQuery.startAfterDocument(lastDoc);
       }
 
-      final snapshot = await pageQuery.get();
+      final snapshot = await pageQuery.get(
+        requireServer ? const GetOptions(source: Source.server) : null,
+      );
       docs.addAll(snapshot.docs);
 
       if (snapshot.docs.length < batchSize) break;
@@ -259,23 +262,26 @@ class AppointmentRepository {
   /// Get doctor's appointments for a specific date
   Future<List<AppointmentModel>> getDoctorAppointments(
     String doctorId,
-    DateTime date,
-  ) async {
+    DateTime date, {
+    bool requireServer = false,
+  }) async {
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     try {
-      final docs = await _fetchAllPages(_appointmentsRef
-          .where('doctorId', isEqualTo: doctorId)
-          .where(
-            'appointmentDate',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-          )
-          .where(
-            'appointmentDate',
-            isLessThan: Timestamp.fromDate(endOfDay),
-          )
-          .orderBy('appointmentDate', descending: true));
+      final docs = await _fetchAllPages(
+          _appointmentsRef
+              .where('doctorId', isEqualTo: doctorId)
+              .where(
+                'appointmentDate',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+              )
+              .where(
+                'appointmentDate',
+                isLessThan: Timestamp.fromDate(endOfDay),
+              )
+              .orderBy('appointmentDate', descending: true),
+          requireServer: requireServer);
 
       // Filter by date and status in-memory
       return docs
@@ -291,6 +297,7 @@ class AppointmentRepository {
       }).toList()
         ..sort((a, b) => a.appointmentDate.compareTo(b.appointmentDate));
     } catch (e) {
+      if (requireServer) rethrow;
       debugPrint('Error getting doctor appointments: $e');
       return [];
     }

@@ -33,6 +33,37 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local-only plans, timing notes and QA reports.
+/docs/local-reports/
+
+# Generated testing output and local deployment caches.
+test-results/
+playwright-report/
+*.lcov
+/.firebase/
+/.wrangler/
+
+# Local credentials and signing material. Example templates may be versioned.
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.secret.local
+.secret.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+key.properties
+service-account*.json
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+credentials.json
+application_default_credentials.json
+
 # Symbolication related
 app.*.symbols
 
