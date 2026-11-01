@@ -57,9 +57,13 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
       vsync: this,
       initialIndex: widget.initialTabIndex,
     );
+    _tabController.addListener(_onTabChanged);
     // Defer loading to avoid setState during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadAppointments();
+      if (mounted) {
+        _loadAppointments(forceRefresh: false);
+        _onTabChanged();
+      }
     });
   }
 
@@ -78,7 +82,18 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
     super.dispose();
   }
 
-  Future<void> _loadAppointments() async {
+  void _onTabChanged() {
+    if (_tabController.index == 1 && mounted) _loadHistory();
+  }
+
+  Future<void> _loadHistory({bool forceRefresh = false}) async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+    await context.read<AppointmentProvider>().loadPastAppointments(user.id,
+        email: user.email, forceRefresh: forceRefresh);
+  }
+
+  Future<void> _loadAppointments({bool forceRefresh = true}) async {
     final authProvider = context.read<AuthProvider>();
     final appointmentProvider = context.read<AppointmentProvider>();
 
@@ -86,9 +101,15 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
       await appointmentProvider.loadAppointments(
         authProvider.user!.id,
         email: authProvider.user!.email,
+        forceRefresh: forceRefresh,
       );
     }
-    if (mounted) setState(() => _initialLoad = false);
+    if (mounted) {
+      setState(() => _initialLoad = false);
+      if (_tabController.index == 1) {
+        await _loadHistory(forceRefresh: forceRefresh);
+      }
+    }
   }
 
   @override
@@ -100,7 +121,8 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
       builder: (context, appointmentProvider, child) {
         final upcomingAppointments = appointmentProvider.upcomingAppointments;
         final pastAppointments = appointmentProvider.pastAppointments;
-        final isLoading = _initialLoad || appointmentProvider.isLoading;
+        final isLoading = !appointmentProvider.hasLoadedUpcoming &&
+            (_initialLoad || appointmentProvider.isLoading);
 
         return Scaffold(
           appBar: AppBar(
@@ -125,7 +147,12 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
                 isDark,
                 isLoading,
               ),
-              _buildAppointmentList(pastAppointments, false, isDark, isLoading),
+              _buildAppointmentList(
+                  pastAppointments,
+                  false,
+                  isDark,
+                  !appointmentProvider.hasLoadedHistory &&
+                      appointmentProvider.isLoadingHistory),
             ],
           ),
         );
@@ -141,7 +168,7 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
   ) {
     final l10n = AppLocalizations.of(context);
 
-    if (isLoading && (appointments.isEmpty || _initialLoad)) {
+    if (isLoading) {
       return ResponsiveListView(
         padding: UhcResponsive.pagePadding(
           context,
@@ -157,14 +184,20 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
       );
     }
 
-    if (context.read<AppointmentProvider>().error != null) {
+    final provider = context.read<AppointmentProvider>();
+    final error = isUpcoming ? provider.error : provider.historyError;
+    if (error != null && appointments.isEmpty) {
       return Center(
         child: TextButton.icon(
-          onPressed: _loadAppointments,
+          onPressed: isUpcoming ? _loadAppointments : provider.retryHistory,
           icon: const Icon(Icons.refresh),
           label: Text(l10n.tryAgain),
         ),
       );
+    }
+
+    if (!isUpcoming && appointments.isEmpty && provider.hasMoreHistory) {
+      return Center(child: _buildHistoryFooter(provider));
     }
 
     if (appointments.isEmpty) {
@@ -221,37 +254,77 @@ class MyAppointmentsScreenState extends State<MyAppointmentsScreen>
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadAppointments,
-      child: ResponsiveListView(
-        padding: UhcResponsive.pagePadding(
-          context,
-          bottom: UhcResponsive.scrollBottomPadding(context),
+    return Column(children: [
+      if (error != null)
+        TextButton.icon(
+            onPressed: isUpcoming
+                ? _loadAppointments
+                : () => _loadHistory(forceRefresh: true),
+            icon: const Icon(Icons.refresh),
+            label: Text(l10n.connectionError)),
+      Expanded(
+          child: RefreshIndicator(
+        onRefresh: _loadAppointments,
+        child: ResponsiveListView(
+          padding: UhcResponsive.pagePadding(
+            context,
+            bottom: UhcResponsive.scrollBottomPadding(context),
+          ),
+          maxWidth: 1320,
+          gridOnWide: true,
+          laptopColumns: 2,
+          desktopColumns: 3,
+          childAspectRatio: isUpcoming ? 1.9 : 2.65,
+          itemCount: appointments.length +
+              (!isUpcoming &&
+                      (provider.hasMoreHistory ||
+                          provider.historyError != null ||
+                          provider.isLoadingHistory)
+                  ? 1
+                  : 0) +
+              (isUpcoming && error != null ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == appointments.length) {
+              return isUpcoming
+                  ? TextButton.icon(
+                      onPressed: _loadAppointments,
+                      icon: const Icon(Icons.refresh),
+                      label: Text(l10n.tryAgain))
+                  : _buildHistoryFooter(provider);
+            }
+            final appointment = appointments[index];
+            final doctorPhoto = context
+                .read<AppointmentProvider>()
+                .doctorPhotos[appointment.doctorId];
+            return _AppointmentCard(
+              appointment: appointment,
+              isDark: isDark,
+              photoUrl: doctorPhoto,
+              onTap: () => _showAppointmentDetail(appointment),
+              onCancel: () => _showCancelDialog(appointment),
+              onReschedule: () => _showRescheduleDialog(appointment),
+            ).animate().fadeIn(duration: 180.ms).slideX(begin: 0.05);
+          },
         ),
-        maxWidth: 1320,
-        gridOnWide: true,
-        laptopColumns: 2,
-        desktopColumns: 3,
-        childAspectRatio: isUpcoming ? 1.9 : 2.65,
-        itemCount: appointments.length,
-        itemBuilder: (context, index) {
-          final appointment = appointments[index];
-          final doctorPhoto = context
-              .read<AppointmentProvider>()
-              .doctorPhotos[appointment.doctorId];
-          return _AppointmentCard(
-            appointment: appointment,
-            isDark: isDark,
-            photoUrl: doctorPhoto,
-            onTap: () => _showAppointmentDetail(appointment),
-            onCancel: () => _showCancelDialog(appointment),
-            onReschedule: () => _showRescheduleDialog(appointment),
-          )
-              .animate(delay: Duration(milliseconds: index * 100))
-              .fadeIn(duration: 400.ms)
-              .slideX(begin: 0.05);
-        },
-      ),
+      )),
+    ]);
+  }
+
+  Widget _buildHistoryFooter(AppointmentProvider provider) {
+    final l10n = AppLocalizations.of(context);
+    if (provider.isLoadingHistory) {
+      return const Center(
+          child: Padding(
+              padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
+    }
+    return TextButton.icon(
+      onPressed: provider.historyError != null
+          ? provider.retryHistory
+          : provider.loadMoreHistory,
+      icon: Icon(
+          provider.historyError != null ? Icons.refresh : Icons.expand_more),
+      label:
+          Text(provider.historyError != null ? l10n.tryAgain : l10n.loadMore),
     );
   }
 

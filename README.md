@@ -410,8 +410,8 @@ flutter build web --release
 | File | Purpose |
 |:---|:---|
 | `lib/core/constants/app_colors.dart` | Color scheme & palette |
-| `lib/core/constants/app_strings.dart` | App-wide string constants |
-| `lib/core/constants/app_assets.dart` | Asset path references |
+| `lib/l10n/app_*.arb` | English, Arabic and Kurdish UI text |
+| `pubspec.yaml` | Bundled assets and app icon configuration |
 | `lib/core/theme/` | Material 3 light & dark theme definitions |
 | `functions/src/assistant/config.ts` | AI Assistant configuration, models, quota caps, and timezone rules |
 | `l10n.yaml` | Localization generation config |

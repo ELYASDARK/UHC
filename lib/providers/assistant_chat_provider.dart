@@ -9,6 +9,11 @@ import '../services/assistant_functions_service.dart';
 /// Guarantees account isolation, prevents late async repopulation after clear/dispose,
 /// and manages slot offer validation, idempotency, and quota states.
 class AssistantChatProvider extends ChangeNotifier {
+  static bool supportsRole(UserRole? role) =>
+      role == UserRole.student ||
+      role == UserRole.staff ||
+      role == UserRole.admin;
+
   String? _patientId;
   final AssistantFunctionsService _functionsService;
   final Uuid _uuid = const Uuid();
@@ -107,15 +112,17 @@ class AssistantChatProvider extends ChangeNotifier {
   }
 
   /// Account switch or logout: wipe sensitive state, cancel in-flight, and re-initialize if new valid patient.
-  void updateActiveUser({required String? userId, required UserRole? role}) {
+  void updateActiveUser(
+      {required String? userId,
+      required UserRole? role,
+      bool forceReset = false}) {
     if (_isDisposed) return;
 
-    final isAuthorizedPatient = userId != null &&
-        userId.isNotEmpty &&
-        (role == UserRole.student || role == UserRole.staff);
+    final isAuthorizedPatient =
+        userId != null && userId.isNotEmpty && supportsRole(role);
     final sanitizedId = isAuthorizedPatient ? userId : null;
 
-    if (_patientId == sanitizedId) return;
+    if (_patientId == sanitizedId && !forceReset) return;
 
     _quotaResetTimer?.cancel();
     _patientId = sanitizedId;

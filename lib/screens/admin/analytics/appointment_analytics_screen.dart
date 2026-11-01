@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../services/admin_statistics_service.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/widgets/role_english_ltr_scope.dart';
 
+enum _AnalyticsError { noAccess, pending, unavailable, cancelled }
+
 /// Appointment analytics screen for admin
 class AppointmentAnalyticsScreen extends StatefulWidget {
-  const AppointmentAnalyticsScreen({super.key});
+  const AppointmentAnalyticsScreen({super.key, this.statistics});
+
+  final AdminStatisticsService? statistics;
 
   @override
   State<AppointmentAnalyticsScreen> createState() =>
@@ -17,9 +22,23 @@ class AppointmentAnalyticsScreen extends StatefulWidget {
 
 class _AppointmentAnalyticsScreenState
     extends State<AppointmentAnalyticsScreen> {
-  final _firestore = FirebaseFirestore.instance;
   bool _isLoading = true;
   String _selectedPeriod = 'week';
+  late AdminStatisticsService _statistics;
+  String? _session;
+  bool _initialized = false;
+  bool _canRead = true;
+  _AnalyticsError? _error;
+  bool _truncated = false;
+  int _generation = 0;
+  AnalyticsLoad? _load;
+  String? _asOf;
+
+  @override
+  void dispose() {
+    _load?.cancelled = true;
+    super.dispose();
+  }
 
   // Analytics data
   Map<String, int> _statusDistribution = {};
@@ -29,97 +48,76 @@ class _AppointmentAnalyticsScreenState
   int _completedAppointments = 0;
   int _cancelledAppointments = 0;
   double _completionRate = 0;
-  static const int _analyticsBatchSize = 500;
-  static const int _analyticsMaxDocs = 5000;
 
   @override
-  void initState() {
-    super.initState();
-    _loadAnalytics();
-  }
-
-  Future<void> _loadAnalytics() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final now = DateTime.now();
-      DateTime startDate;
-
-      switch (_selectedPeriod) {
-        case 'week':
-          startDate = now.subtract(const Duration(days: 7));
-          break;
-        case 'month':
-          startDate = DateTime(now.year, now.month - 1, now.day);
-          break;
-        case 'year':
-          startDate = DateTime(now.year - 1, now.month, now.day);
-          break;
-        default:
-          startDate = now.subtract(const Duration(days: 7));
-      }
-
-      // Paginate through all results in batches of 5000
-      final baseQuery = _firestore
-          .collection('appointments')
-          .where(
-            'createdAt',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
-          )
-          .orderBy('createdAt');
-
-      final allDocs = <QueryDocumentSnapshot>[];
-      DocumentSnapshot? lastDoc;
-      const batchSize = _analyticsBatchSize;
-
-      while (allDocs.length < _analyticsMaxDocs) {
-        Query batchQuery = baseQuery.limit(batchSize);
-        if (lastDoc != null) {
-          batchQuery = batchQuery.startAfterDocument(lastDoc);
-        }
-        final snapshot = await batchQuery.get();
-        allDocs.addAll(snapshot.docs);
-        if (snapshot.docs.length < batchSize) break;
-        lastDoc = snapshot.docs.last;
-      }
-
-      _totalAppointments = allDocs.length;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = context.watch<AuthProvider?>();
+    final user = auth?.user;
+    final allowed = auth == null ||
+        (user != null &&
+            user.isActive &&
+            auth.isGoogleLinked &&
+            ['analytics.view', 'appointments.view', 'reports.view']
+                .any(user.hasPermission));
+    final session = '${user?.id}:$allowed';
+    if (!_initialized || _session != session) {
+      _initialized = true;
+      _session = session;
+      _canRead = allowed;
+      _load?.cancelled = true;
+      _generation++;
+      _statistics = widget.statistics ?? AdminStatisticsService();
       _statusDistribution = {};
       _departmentDistribution = {};
       _dailyAppointments = {};
-      _completedAppointments = 0;
-      _cancelledAppointments = 0;
-
-      for (final doc in allDocs) {
-        final data = doc.data() as Map<String, dynamic>;
-
-        // Status distribution
-        final status = data['status'] ?? 'pending';
-        _statusDistribution[status] = (_statusDistribution[status] ?? 0) + 1;
-        if (status == 'completed') _completedAppointments++;
-        if (status == 'cancelled') _cancelledAppointments++;
-
-        // Department distribution
-        final department = data['department'] ?? 'Unknown';
-        _departmentDistribution[department] =
-            (_departmentDistribution[department] ?? 0) + 1;
-
-        // Daily appointments
-        final date = (data['appointmentDate'] as Timestamp?)?.toDate();
-        if (date != null) {
-          // Use DateFormat for consistent "MM/dd" format
-          final dayKey = DateFormat('MM/dd').format(date);
-          _dailyAppointments[dayKey] = (_dailyAppointments[dayKey] ?? 0) + 1;
-        }
+      _totalAppointments = 0;
+      if (allowed) {
+        _loadAnalytics();
+      } else {
+        _isLoading = false;
+        _error = _AnalyticsError.noAccess;
       }
+    }
+  }
 
+  Future<void> _loadAnalytics() async {
+    if (!_canRead) return;
+    _load?.cancelled = true;
+    final load = AnalyticsLoad();
+    _load = load;
+    _statistics.activeLoad = load;
+    final generation = ++_generation;
+    final period = _selectedPeriod;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final response = await _statistics.analytics(period);
+      if (!mounted || generation != _generation) return;
+      Map<String, int> counts(String key) =>
+          Map<String, dynamic>.from(response[key] as Map)
+              .map((key, value) => MapEntry(key, (value as num).toInt()));
+      _totalAppointments = (response['total'] as num).toInt();
+      _truncated = response['truncated'] == true;
+      _asOf = response['asOf'] as String?;
+      _statusDistribution = counts('statuses');
+      _departmentDistribution = counts('departments');
+      _dailyAppointments = counts('days');
+      _completedAppointments = _statusDistribution['completed'] ?? 0;
+      _cancelledAppointments = _statusDistribution['cancelled'] ?? 0;
       _completionRate = _totalAppointments > 0
           ? (_completedAppointments / _totalAppointments) * 100
           : 0;
-    } catch (e) {
-      debugPrint('Error loading analytics: $e');
+    } catch (error) {
+      if (!mounted || generation != _generation) return;
+      _error = error is StatisticsRequestsPending
+          ? _AnalyticsError.pending
+          : _AnalyticsError.unavailable;
     } finally {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() => _isLoading = false);
       }
     }
@@ -137,59 +135,152 @@ class _AppointmentAnalyticsScreenState
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: _loadAnalytics,
+              tooltip: 'Refresh',
+              onPressed: _isLoading || !_canRead ? null : _loadAnalytics,
             ),
           ],
         ),
-        body: _isLoading
-            ? _buildAnalyticsSkeleton(isDark)
-            : ResponsivePage(
-                maxWidth: 1120,
+        body: ResponsivePage(
+          maxWidth: 1120,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Period Selector
+              _buildPeriodSelector(isDark),
+              const SizedBox(height: 20),
+
+              if (_isLoading)
+                Column(children: [
+                  const LinearProgressIndicator(),
+                  const SizedBox(height: 12),
+                  const Text('Updating…'),
+                  TextButton(
+                      onPressed: () {
+                        _load?.cancelled = true;
+                        _generation++;
+                        setState(() {
+                          _isLoading = false;
+                          _error = _AnalyticsError.cancelled;
+                        });
+                      },
+                      child: const Text('Cancel')),
+                ])
+              else if (_error != null)
+                Column(children: [
+                  Text(switch (_error!) {
+                    _AnalyticsError.noAccess =>
+                      "You don't have access to this summary.",
+                    _AnalyticsError.pending =>
+                      'This is taking longer than usual. Check your connection and try again.',
+                    _AnalyticsError.unavailable =>
+                      "Couldn't load the summary. Try again.",
+                    _AnalyticsError.cancelled =>
+                      'Update cancelled. You can try again.',
+                  }),
+                  TextButton(
+                      onPressed: _canRead ? _loadAnalytics : null,
+                      child: const Text('Try again')),
+                ])
+              else ...[
+                _buildSnapshotHeader(),
+                if (_truncated)
+                  const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                          'Showing the 5,000 most recently added appointments. '
+                          'Totals, charts and percentages apply only to those shown. '
+                          'Try a shorter period to see all appointments.'),
+                    ),
+                  ),
+                if (_totalAppointments == 0)
+                  const Text('No appointments in this period.'),
+
+                // Summary Cards
+                _buildSummaryCards(isDark),
+                const SizedBox(height: 20),
+
+                // Status Distribution
+                Text(
+                  'Status Distribution',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                _buildStatusChart(isDark),
+                const SizedBox(height: 20),
+
+                // Department Distribution
+                Text(
+                  'By Department',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                _buildDepartmentChart(isDark),
+                const SizedBox(height: 20),
+
+                // Daily Trend
+                Text(
+                  'Daily Trend',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                _buildDailyTrend(isDark),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSnapshotHeader() {
+    final theme = Theme.of(context);
+    final snapshot = DateTime.tryParse(_asOf ?? '')?.toLocal();
+    final dateFormat = DateFormat.yMMMd('en');
+    if (MediaQuery.alwaysUse24HourFormatOf(context)) {
+      dateFormat.add_Hm();
+    } else {
+      dateFormat.add_jm();
+    }
+    final label = snapshot == null
+        ? 'Update time unavailable'
+        : 'Last updated: ${dateFormat.format(snapshot)}';
+    final secondary = theme.textTheme.bodySmall
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.4);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(Icons.schedule_outlined,
+                    size: 16, color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Period Selector
-                    _buildPeriodSelector(isDark),
-                    const SizedBox(height: 20),
-
-                    // Summary Cards
-                    _buildSummaryCards(isDark),
-                    const SizedBox(height: 20),
-
-                    // Status Distribution
-                    Text(
-                      'Status Distribution',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildStatusChart(isDark),
-                    const SizedBox(height: 20),
-
-                    // Department Distribution
-                    Text(
-                      'By Department',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDepartmentChart(isDark),
-                    const SizedBox(height: 20),
-
-                    // Daily Trend
-                    Text(
-                      'Daily Trend',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDailyTrend(isDark),
+                    Text(label, style: theme.textTheme.labelMedium),
+                    const SizedBox(height: 2),
+                    Text('Refresh to see the latest changes.',
+                        style: secondary),
                   ],
                 ),
               ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -216,6 +307,8 @@ class _AppointmentAnalyticsScreenState
     return Expanded(
       child: GestureDetector(
         onTap: () {
+          if (!_canRead) return;
+          if (_selectedPeriod == value) return;
           setState(() => _selectedPeriod = value);
           _loadAnalytics();
         },
@@ -239,43 +332,55 @@ class _AppointmentAnalyticsScreenState
   }
 
   Widget _buildSummaryCards(bool isDark) {
-    return ResponsiveGrid(
-      phoneColumns: 2,
-      tabletColumns: 2,
-      laptopColumns: 4,
-      desktopColumns: 4,
-      childAspectRatio: UhcResponsive.isWide(context) ? 2.9 : 1.6,
-      children: [
-        _buildSummaryCard(
-          isDark: isDark,
-          title: 'Total',
-          value: _totalAppointments.toString(),
-          icon: Icons.calendar_today,
-          color: AppColors.primary,
-        ),
-        _buildSummaryCard(
-          isDark: isDark,
-          title: 'Completed',
-          value: _completedAppointments.toString(),
-          icon: Icons.check_circle,
-          color: AppColors.success,
-        ),
-        _buildSummaryCard(
-          isDark: isDark,
-          title: 'Cancelled',
-          value: _cancelledAppointments.toString(),
-          icon: Icons.cancel,
-          color: AppColors.error,
-        ),
-        _buildSummaryCard(
-          isDark: isDark,
-          title: 'Rate',
-          value: '${_completionRate.toStringAsFixed(0)}%',
-          icon: Icons.trending_up,
-          color: AppColors.info,
-        ),
-      ],
-    );
+    final cards = <Widget>[
+      _buildSummaryCard(
+        isDark: isDark,
+        title: _truncated ? 'Shown' : 'Total',
+        value: _totalAppointments.toString(),
+        icon: Icons.calendar_today,
+        color: AppColors.primary,
+      ),
+      _buildSummaryCard(
+        isDark: isDark,
+        title: 'Completed',
+        value: _completedAppointments.toString(),
+        icon: Icons.check_circle,
+        color: AppColors.success,
+      ),
+      _buildSummaryCard(
+        isDark: isDark,
+        title: 'Cancelled',
+        value: _cancelledAppointments.toString(),
+        icon: Icons.cancel,
+        color: AppColors.error,
+      ),
+      _buildSummaryCard(
+        isDark: isDark,
+        title: _truncated ? 'Completion rate' : 'Rate',
+        value: '${_completionRate.toStringAsFixed(0)}%',
+        icon: Icons.trending_up,
+        color: AppColors.info,
+      ),
+    ];
+    final columns = UhcResponsive.columnsFor(context,
+        phone: 2, tablet: 2, laptop: 4, desktop: 4);
+    return Column(children: [
+      for (var offset = 0; offset < cards.length; offset += columns)
+        Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: IntrinsicHeight(
+              child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var column = 0;
+                        column < columns && offset + column < cards.length;
+                        column++) ...[
+                      if (column > 0) const SizedBox(width: 12),
+                      Expanded(child: cards[offset + column]),
+                    ],
+                  ]),
+            )),
+    ]);
   }
 
   Widget _buildSummaryCard({
@@ -394,17 +499,23 @@ class _AppointmentAnalyticsScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      entry.key == 'pending'
-                          ? 'BOOKED'
-                          : entry.key.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    Text('${entry.value} (${percentage.toStringAsFixed(0)}%)'),
-                  ],
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        entry.key == 'pending'
+                            ? 'BOOKED'
+                            : entry.key.toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      Text(
+                          '${entry.value} (${percentage.toStringAsFixed(0)}%)'),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 4),
                 ClipRRect(
@@ -457,9 +568,16 @@ class _AppointmentAnalyticsScreenState
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  entry.key,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                Flexible(
+                  child: Tooltip(
+                    message: entry.key,
+                    child: Text(
+                      entry.key,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Container(
@@ -502,7 +620,7 @@ class _AppointmentAnalyticsScreenState
       ..sort((a, b) => a.key.compareTo(b.key));
 
     return Container(
-      height: 200,
+      constraints: const BoxConstraints(minHeight: 200),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -595,54 +713,5 @@ class _AppointmentAnalyticsScreenState
       default:
         return Colors.grey;
     }
-  }
-
-  Widget _buildAnalyticsSkeleton(bool isDark) {
-    final width = MediaQuery.of(context).size.width;
-    final crossAxisCount = width > 900 ? 4 : 2;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Period selector skeleton
-          LoadingSkeleton(height: 48, borderRadius: 12),
-          const SizedBox(height: 24),
-
-          // Summary cards skeleton
-          GridView.count(
-            crossAxisCount: crossAxisCount,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.6,
-            children: List.generate(
-              4,
-              (index) => LoadingSkeleton(height: 100, borderRadius: 16),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Status distribution skeleton
-          const LoadingSkeleton(width: 160, height: 22),
-          const SizedBox(height: 12),
-          LoadingSkeleton(height: 140, borderRadius: 16),
-          const SizedBox(height: 24),
-
-          // Department skeleton
-          const LoadingSkeleton(width: 130, height: 22),
-          const SizedBox(height: 12),
-          LoadingSkeleton(height: 80, borderRadius: 16),
-          const SizedBox(height: 24),
-
-          // Daily trend skeleton
-          const LoadingSkeleton(width: 110, height: 22),
-          const SizedBox(height: 12),
-          LoadingSkeleton(height: 200, borderRadius: 16),
-        ],
-      ),
-    );
   }
 }

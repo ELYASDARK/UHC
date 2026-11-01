@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../data/repositories/document_repository.dart';
@@ -21,9 +20,6 @@ class DocumentProvider extends ChangeNotifier {
   bool _isUploading = false;
   double _uploadProgress = 0;
   String? _error;
-
-  // Track upload subscription to cancel on dispose
-  StreamSubscription? _uploadSubscription;
 
   bool get isUploading => _isUploading;
   double get uploadProgress => _uploadProgress;
@@ -55,43 +51,14 @@ class DocumentProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // Upload with progress tracking
-      final upload = _repo.uploadFileWithProgress(
-        userId,
-        bytes,
-        fileName,
-        appointmentId: appointmentId,
-      );
-
-      // Listen to progress
-      _uploadSubscription?.cancel();
-      _uploadSubscription = upload.task.snapshotEvents.listen((event) {
-        _uploadProgress = event.bytesTransferred / event.totalBytes;
-        notifyListeners();
-      });
-
-      // Wait for upload to complete
-      await upload.task;
-      _uploadSubscription = null;
-      final url = await upload.task.snapshot.ref.getDownloadURL();
-
-      // Create Firestore document
-      final doc = MedicalDocumentModel(
-        id: '',
-        userId: userId,
-        name: name,
-        type: type,
-        notes: notes,
-        fileName: fileName,
-        url: url,
-        storagePath: upload.storagePath,
-        addedBy: addedBy,
-        addedByRole: addedByRole,
-        addedByName: addedByName,
-        appointmentId: appointmentId,
-      );
-
-      await _repo.addDocument(doc);
+      await _repo.createDocument(
+          userId: userId,
+          name: name,
+          type: type,
+          notes: notes,
+          bytes: bytes,
+          fileName: fileName,
+          appointmentId: appointmentId);
 
       _isUploading = false;
       _uploadProgress = 0;
@@ -180,7 +147,6 @@ class DocumentProvider extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _uploadSubscription?.cancel();
     super.dispose();
   }
 }

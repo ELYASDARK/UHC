@@ -1,3 +1,4 @@
+import '../../../core/widgets/session_stream_builder.dart';
 import 'package:uhc/core/utils/app_messages.dart';
 import 'dart:async';
 
@@ -12,6 +13,7 @@ import '../../../core/widgets/loading_skeleton.dart';
 import '../../../services/department_functions_service.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/widgets/role_english_ltr_scope.dart';
+import '../../../core/widgets/management_action_footer.dart';
 
 /// Department management screen for admin
 class DepartmentManagementScreen extends StatefulWidget {
@@ -170,7 +172,8 @@ class _DepartmentManagementScreenState
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
+        bottomNavigationBar: ManagementActionFooter(
+            child: FloatingActionButton.extended(
           onPressed: _canManage
               ? () {
                   showDialog(
@@ -191,7 +194,7 @@ class _DepartmentManagementScreenState
               ? AppColors.primary
               : AppColors.primary.withValues(alpha: 0.55),
           shape: const StadiumBorder(),
-        ),
+        )),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -302,10 +305,13 @@ class _DepartmentManagementScreenState
 
             // Departments List
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _getDepartmentsStream(),
+              child: SessionStreamBuilder<QuerySnapshot>(
+                permission: 'departments.view',
+                queryKey: 'departments',
+                createStream: () => _getDepartmentsStream(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
                     return SkeletonList(
                       itemBuilder: (context, index) =>
                           const CardSkeleton(height: 100),
@@ -430,7 +436,7 @@ class _DepartmentManagementScreenState
                     padding: UhcResponsive.pagePadding(
                       context,
                       top: 8,
-                      bottom: UhcResponsive.isWide(context) ? 32 : 88,
+                      bottom: 0,
                     ),
                     itemCount: docs.length,
                     itemBuilder: (context, index) {

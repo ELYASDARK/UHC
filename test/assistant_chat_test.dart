@@ -129,6 +129,13 @@ class FakeAssistantFunctionsService implements AssistantFunctionsService {
 
 class MockAuthProvider extends ChangeNotifier implements AuthProvider {
   UserModel? _mockUser;
+  bool googleLinked = true;
+
+  @override
+  bool get isGoogleLinked => googleLinked;
+
+  @override
+  Future<void> refreshCurrentUser() async {}
 
   void setMockUser(UserModel? user) {
     _mockUser = user;
@@ -202,7 +209,12 @@ Widget createAssistantTestApp({
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
-      home: child,
+      home: child is AssistantChatScreen
+          ? AssistantChatScreen(
+              key: child.key,
+              provider: child.provider,
+              profileChanges: child.profileChanges ?? const Stream.empty())
+          : child,
     ),
   );
 }
@@ -1325,6 +1337,72 @@ void main() {
   });
 
   group('AssistantChatScreen Widget Tests', () {
+    for (final change in [
+      'Google unlink',
+      'promotion to super-admin',
+      'server profile promotion',
+      'profile verification error'
+    ]) {
+      testWidgets(
+          'admin self session clears on $change and ignores a late history response',
+          (tester) async {
+        final user = UserModel(
+            id: 'synthetic-admin-self',
+            email: 'admin@example.test',
+            fullName: 'Synthetic Admin',
+            role: UserRole.admin,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now());
+        final auth = MockAuthProvider()..setMockUser(user);
+        final history = GetAssistantHistoryResult(
+            success: true,
+            messages: [
+              AssistantChatMessage(
+                  id: 'synthetic-private-message',
+                  sender: 'patient',
+                  text: 'Synthetic own history',
+                  createdAt: DateTime.now())
+            ],
+            offers: const [],
+            revision: 1);
+        final service = FakeAssistantFunctionsService()
+          ..historyResult = history;
+        final profiles = StreamController<UserModel?>();
+        addTearDown(profiles.close);
+        final provider = AssistantChatProvider(
+            patientId: user.id, functionsService: service);
+        await tester.pumpWidget(createAssistantTestApp(
+            child: AssistantChatScreen(
+                provider: provider, profileChanges: profiles.stream),
+            authProvider: auth));
+        await tester.pumpAndSettle();
+        expect(provider.canSendMessage, isTrue);
+        expect(find.text('Synthetic own history'), findsOneWidget);
+        service.historyCompleter = Completer<GetAssistantHistoryResult>();
+        final pending = provider.refreshHistory();
+        if (change == 'Google unlink') {
+          auth.googleLinked = false;
+          auth.setMockUser(user);
+        } else if (change == 'promotion to super-admin') {
+          auth.setMockUser(user.copyWith(role: UserRole.superAdmin));
+        } else if (change == 'server profile promotion') {
+          profiles.add(user.copyWith(role: UserRole.superAdmin));
+        } else {
+          profiles
+              .addError(StateError('Synthetic profile verification failure'));
+        }
+        await tester.pump();
+        service.historyCompleter!.complete(history);
+        await pending;
+        await tester.pumpAndSettle();
+        expect(provider.messages, isEmpty);
+        expect(provider.canSendMessage, isFalse);
+        expect(await provider.sendMessage('Please book', localeCode: 'en'),
+            isFalse);
+        expect(find.text('Synthetic own history'), findsNothing);
+        provider.dispose();
+      });
+    }
     for (final reason in ['assistant_disabled', 'assistant_unconfigured']) {
       testWidgets('Disabled assistant does not claim a daily limit: $reason',
           (tester) async {

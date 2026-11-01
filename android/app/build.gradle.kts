@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,6 +9,12 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val releaseSigningProperties = System.getenv("UHC_SIGNING_PROPERTIES_FILE")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { location ->
+        Properties().apply { file(location).inputStream().use { load(it) } }
+    }
 
 android {
     namespace = "com.example.uhc"
@@ -32,11 +40,23 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        releaseSigningProperties?.let { signing ->
+            create("privateRelease") {
+                storeFile = file(requireNotNull(signing.getProperty("storeFile")))
+                storePassword = requireNotNull(signing.getProperty("storePassword"))
+                keyAlias = requireNotNull(signing.getProperty("keyAlias"))
+                keyPassword = requireNotNull(signing.getProperty("keyPassword"))
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("privateRelease")
+                ?: if (System.getenv("UHC_ALLOW_DEBUG_SIGNED_LOCAL_RELEASE") == "true") {
+                    signingConfigs.getByName("debug")
+                } else null
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

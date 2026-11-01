@@ -1,3 +1,4 @@
+import '../data/repositories/department_repository.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
@@ -23,6 +24,7 @@ class DepartmentFunctionsService {
         'colorHex': colorHex,
         'workingHours': workingHours,
       });
+      DepartmentRepository.invalidateCache();
       return Map<String, dynamic>.from(result.data);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('Error creating department: ${e.code} - ${e.message}');
@@ -53,6 +55,7 @@ class DepartmentFunctionsService {
         'colorHex': colorHex,
         'workingHours': workingHours,
       });
+      DepartmentRepository.invalidateCache();
       return Map<String, dynamic>.from(result.data);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('Error updating department: ${e.code} - ${e.message}');
@@ -73,6 +76,7 @@ class DepartmentFunctionsService {
         'departmentId': departmentId,
         'isActive': isActive,
       });
+      DepartmentRepository.invalidateCache();
       return Map<String, dynamic>.from(result.data);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('Error setting department status: ${e.code} - ${e.message}');
@@ -91,6 +95,7 @@ class DepartmentFunctionsService {
       final result = await callable.call<Map<String, dynamic>>({
         'departmentId': departmentId,
       });
+      DepartmentRepository.invalidateCache();
       return Map<String, dynamic>.from(result.data);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('Error deleting department: ${e.code} - ${e.message}');

@@ -277,7 +277,7 @@ export function isAdminWithAppointmentAccess(data: FirebaseFirestore.DocumentDat
     if (data.role === 'superAdmin') return true;
     if (data.role !== 'admin') return false;
     const perms = data.adminPermissions as Record<string, boolean> | undefined;
-    return !!(perms?.['appointments.view'] || perms?.['analytics.view'] || perms?.['reports.view']);
+    return !!(perms?.['appointments.view'] || perms?.['reports.view']);
 }
 
 export function isAdminWithAppointmentMutationAccess(data: FirebaseFirestore.DocumentData): boolean {
@@ -478,12 +478,12 @@ export function resolveTrustedSlotFromSchedule(
         if (explicitRange.startTime !== schedStart) {
             throw new functions.https.HttpsError('failed-precondition', 'Slot start time does not match doctor schedule.');
         }
-        if (schedEnd && explicitRange.endTime !== schedEnd) {
+        if (!schedEnd || explicitRange.endTime !== schedEnd) {
             throw new functions.https.HttpsError('invalid-argument', 'Invalid slot duration: end time does not match doctor schedule.');
         }
     }
 
-    const resolvedEnd = schedEnd || (explicitRange ? explicitRange.endTime : '');
+    const resolvedEnd = schedEnd || '';
     const canonicalSlot = resolvedEnd ? `${schedStart} - ${resolvedEnd}` : schedStart;
 
     return {

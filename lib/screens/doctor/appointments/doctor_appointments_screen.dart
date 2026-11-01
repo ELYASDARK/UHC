@@ -41,7 +41,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadAppointments();
+      if (mounted) _loadAppointments(forceRefresh: false);
     });
   }
 
@@ -51,9 +51,10 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
     super.dispose();
   }
 
-  Future<void> _loadAppointments() async {
+  Future<void> _loadAppointments({bool forceRefresh = true}) async {
     final provider = context.read<DoctorAppointmentProvider>();
-    await provider.loadAppointments(widget.doctor.id);
+    await provider.loadAppointments(widget.doctor.id,
+        forceRefresh: forceRefresh);
     if (mounted) setState(() => _initialLoad = false);
   }
 
@@ -85,7 +86,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
                 provider.upcomingAppointments,
                 true,
                 isDark,
-                _initialLoad || provider.isLoading,
+                !provider.hasLoaded && (_initialLoad || provider.isLoading),
                 l10n,
                 provider,
               ),
@@ -93,7 +94,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
                 provider.pastAppointments,
                 false,
                 isDark,
-                _initialLoad || provider.isLoading,
+                !provider.hasLoadedFull && (_initialLoad || provider.isLoading),
                 l10n,
                 provider,
               ),
@@ -112,7 +113,7 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
     AppLocalizations l10n,
     DoctorAppointmentProvider provider,
   ) {
-    if (isLoading && (_initialLoad || appointments.isEmpty)) {
+    if (isLoading) {
       return ResponsiveListView(
         padding: UhcResponsive.pagePadding(
           context,
@@ -128,6 +129,13 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
       );
     }
 
+    if (provider.error != null && appointments.isEmpty) {
+      return Center(
+          child: TextButton.icon(
+              onPressed: _loadAppointments,
+              icon: const Icon(Icons.refresh),
+              label: Text(l10n.tryAgain)));
+    }
     if (appointments.isEmpty) {
       return SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -177,35 +185,46 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen>
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadAppointments,
-      child: ResponsiveListView(
-        padding: UhcResponsive.pagePadding(
-          context,
-          bottom: UhcResponsive.scrollBottomPadding(context),
+    return Column(children: [
+      if (provider.error != null)
+        TextButton.icon(
+            onPressed: _loadAppointments,
+            icon: const Icon(Icons.refresh),
+            label: Text(l10n.connectionError)),
+      Expanded(
+          child: RefreshIndicator(
+        onRefresh: _loadAppointments,
+        child: ResponsiveListView(
+          padding: UhcResponsive.pagePadding(
+            context,
+            bottom: UhcResponsive.scrollBottomPadding(context),
+          ),
+          maxWidth: 1320,
+          gridOnWide: true,
+          laptopColumns: 2,
+          desktopColumns: 3,
+          childAspectRatio: 2.75,
+          itemCount: appointments.length + (provider.error != null ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == appointments.length) {
+              return TextButton.icon(
+                  onPressed: _loadAppointments,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(l10n.tryAgain));
+            }
+            final appointment = appointments[index];
+            final patientPhoto = provider.patientPhotos[appointment.patientId];
+            return _DoctorAppointmentCard(
+              appointment: appointment,
+              isDark: isDark,
+              photoUrl: patientPhoto,
+              referenceTime: widget.referenceTime,
+              onTap: () => _openDetail(appointment),
+            ).animate().fadeIn(duration: 180.ms).slideX(begin: 0.05);
+          },
         ),
-        maxWidth: 1320,
-        gridOnWide: true,
-        laptopColumns: 2,
-        desktopColumns: 3,
-        childAspectRatio: 2.75,
-        itemCount: appointments.length,
-        itemBuilder: (context, index) {
-          final appointment = appointments[index];
-          final patientPhoto = provider.patientPhotos[appointment.patientId];
-          return _DoctorAppointmentCard(
-            appointment: appointment,
-            isDark: isDark,
-            photoUrl: patientPhoto,
-            referenceTime: widget.referenceTime,
-            onTap: () => _openDetail(appointment),
-          )
-              .animate(delay: Duration(milliseconds: index * 100))
-              .fadeIn(duration: 400.ms)
-              .slideX(begin: 0.05);
-        },
-      ),
-    );
+      )),
+    ]);
   }
 
   void _openDetail(AppointmentModel appointment) {

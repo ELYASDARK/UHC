@@ -27,20 +27,42 @@ class DepartmentBrowsingScreen extends StatefulWidget {
 class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
   final _departmentRepository = DepartmentRepository();
   List<DepartmentModel> _departments = [];
+  int _departmentRequestGeneration = 0;
   bool _isLoading = true;
+  bool _hasLoadedDepartments = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    DepartmentRepository.cacheChanges.addListener(_directoryChanged);
+    final cached = DepartmentRepository.cachedDepartments;
+    if (cached != null) {
+      _departments = cached;
+      _hasLoadedDepartments = true;
+      _isLoading = false;
+    }
     if (widget.captureState == DepartmentCaptureState.live) {
-      _loadDepartments();
+      _loadDepartments(forceRefresh: false);
     } else {
       _isLoading = false;
     }
   }
 
-  Future<void> _loadDepartments() async {
+  void _directoryChanged() {
+    if (mounted && widget.captureState == DepartmentCaptureState.live) {
+      _loadDepartments(forceRefresh: false);
+    }
+  }
+
+  @override
+  void dispose() {
+    DepartmentRepository.cacheChanges.removeListener(_directoryChanged);
+    super.dispose();
+  }
+
+  Future<void> _loadDepartments({bool forceRefresh = true}) async {
+    final generation = ++_departmentRequestGeneration;
     if (widget.captureState != DepartmentCaptureState.live) {
       setState(() {
         _isLoading = false;
@@ -55,21 +77,24 @@ class _DepartmentBrowsingScreenState extends State<DepartmentBrowsingScreen> {
     // Only set loading to true if we don't have data yet
     if (_departments.isEmpty) {
       setState(() {
-        _isLoading = true;
+        _isLoading = !_hasLoadedDepartments;
         _error = null;
       });
     }
 
     try {
-      final departments = await _departmentRepository.getAllDepartments();
-      if (mounted) {
+      final departments = await _departmentRepository.getAllDepartments(
+          forceRefresh: forceRefresh);
+      if (mounted && generation == _departmentRequestGeneration) {
         setState(() {
           _departments = departments;
+          _error = null;
           _isLoading = false;
+          _hasLoadedDepartments = true;
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && generation == _departmentRequestGeneration) {
         setState(() {
           _isLoading = false;
           _error = AppLocalizations.of(context).connectionError;

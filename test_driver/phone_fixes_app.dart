@@ -1,3 +1,5 @@
+import 'package:uhc/screens/admin/analytics/appointment_analytics_screen.dart';
+import 'package:uhc/services/medical_document_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
@@ -6,7 +8,6 @@ import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -216,9 +217,7 @@ void main() {
           final doc = docs.docs.single;
           final oldPath = doc.data()['storagePath'] as String;
           if (parameters['replace'] == 'false') {
-            final downloaded = await FirebaseStorage.instance
-                .ref(oldPath)
-                .getData(20 * 1024 * 1024);
+            final downloaded = await MedicalDocumentService.read(doc.id);
             if (!listEquals(downloaded, first)) {
               throw StateError('Synthetic upload bytes differ');
             }
@@ -245,9 +244,7 @@ void main() {
           final finalDoc =
               await doc.reference.get(const GetOptions(source: Source.server));
           final path = finalDoc.data()!['storagePath'] as String;
-          final downloaded = await FirebaseStorage.instance
-              .ref(path)
-              .getData(20 * 1024 * 1024);
+          final downloaded = await MedicalDocumentService.read(doc.id);
           if (!listEquals(downloaded, replacement) || oldPath == path) {
             throw StateError('Synthetic native byte verification failed');
           }
@@ -373,6 +370,8 @@ void main() {
                 doctorId: 'qa-phone-doctor',
                 doctorName: 'QA Synthetic Doctor',
               );
+            case 'analytics':
+              page = const AppointmentAnalyticsScreen();
             case 'reports':
               page = const ReportsScreen();
             case 'language':

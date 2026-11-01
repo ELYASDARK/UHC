@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../../services/medical_document_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -5,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 
 /// A fitted document image with focal zoom and bounds based on the image itself.
 class MedicalDocumentViewerScreen extends StatefulWidget {
+  final String documentId;
   final String imageUrl;
   final String title;
   final Widget? captureContent;
@@ -12,6 +15,7 @@ class MedicalDocumentViewerScreen extends StatefulWidget {
 
   const MedicalDocumentViewerScreen({
     super.key,
+    this.documentId = '',
     required this.imageUrl,
     required this.title,
     this.captureContent,
@@ -28,7 +32,8 @@ class _MedicalDocumentViewerScreenState
     with SingleTickerProviderStateMixin {
   static const double _maxScale = 8;
   late final AnimationController _animationController;
-  late NetworkImage _provider;
+  ImageProvider? _provider;
+  int _generation = 0;
   ImageStream? _imageStream;
   ImageStreamListener? _imageListener;
   Size? _imageSize;
@@ -54,7 +59,7 @@ class _MedicalDocumentViewerScreenState
   @override
   void initState() {
     super.initState();
-    _provider = NetworkImage(widget.imageUrl);
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
@@ -80,11 +85,14 @@ class _MedicalDocumentViewerScreenState
   @override
   void didUpdateWidget(covariant MedicalDocumentViewerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl ||
+    if (oldWidget.documentId != widget.documentId ||
+        oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.captureContent != widget.captureContent ||
         oldWidget.captureImageSize != widget.captureImageSize) {
       _animationController.stop();
-      _provider = NetworkImage(widget.imageUrl);
+
+      _provider?.evict();
+      _provider = null;
       _imageSize = null;
       _failed = false;
       _viewport = Size.zero;
@@ -92,10 +100,20 @@ class _MedicalDocumentViewerScreenState
     }
   }
 
-  void _resolveImage() {
+  Future<void> _resolveImage() async {
+    final generation = ++_generation;
     _detachImageListener();
     if (widget.captureContent != null) return;
-    final stream = _provider.resolve(createLocalImageConfiguration(context));
+    try {
+      final bytes = await MedicalDocumentService.read(widget.documentId);
+      if (!mounted || generation != _generation) return;
+      _provider = MemoryImage(bytes);
+    } catch (_) {
+      if (mounted && generation == _generation) setState(() => _failed = true);
+      return;
+    }
+    if (!mounted || generation != _generation) return;
+    final stream = _provider!.resolve(createLocalImageConfiguration(context));
     _imageStream = stream;
     final listener = ImageStreamListener(
       (info, synchronousCall) {
@@ -129,7 +147,9 @@ class _MedicalDocumentViewerScreenState
 
   @override
   void dispose() {
+    _generation++;
     _detachImageListener();
+    unawaited(_provider?.evict());
     _animationController.dispose();
     super.dispose();
   }
@@ -237,7 +257,7 @@ class _MedicalDocumentViewerScreenState
       _imageSize = null;
       _viewport = Size.zero;
     });
-    await _provider.evict();
+    await _provider?.evict();
     if (mounted) _resolveImage();
   }
 
@@ -307,7 +327,7 @@ class _MedicalDocumentViewerScreenState
                       height: _fitted.height,
                       child: widget.captureContent ??
                           Image(
-                              image: _provider,
+                              image: _provider!,
                               fit: BoxFit.fill,
                               errorBuilder: (_, error, stack) =>
                                   const SizedBox.shrink()),

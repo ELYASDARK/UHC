@@ -475,7 +475,7 @@ for (const preferredDoctor of [false, true]) {
         assert.equal((await db.collection('appointment_day_coordination').get()).size, 0);
         if (preferredDoctor) {
             assert.equal((await db.collection('doctor_patient_access').doc('emergency_doctor_user')
-                .collection('patients').doc(patientId).get()).data().appointmentId, result.appointmentId);
+                .collection('patients').doc(patientId).get()).data().activeAppointmentCount, 1);
         }
         const retry = await createAppointmentCore(patientId, { fullName: 'Patient' }, data);
         assert.equal(retry.appointmentId, result.appointmentId);
@@ -1364,7 +1364,7 @@ test('check-in commits confirmed appointment and owned lock together; cancelled 
     assert.equal(confirmedLock.appointmentId, ref.id);
     assert.equal(confirmedLock.status, 'confirmed');
 
-    await cancelAppointment.run({ auth: { uid: 'checkin_patient' }, data: { appointmentId: ref.id } });
+    await cancelAppointment.run({ auth: { uid: 'checkin_doctor' }, data: { appointmentId: ref.id } });
     await assert.rejects(confirmAppointmentCheckIn.run(request), (error) => error.code === 'failed-precondition');
     assert.equal((await ref.get()).data().status, 'cancelled');
     assert.equal((await lock.get()).exists, false);
@@ -1374,7 +1374,7 @@ test('concurrent check-in and cancellation cannot leave a confirmed appointment 
     const { ref, lock, request } = await seedCheckInBooking();
     const [checkIn, cancellation] = await Promise.allSettled([
         confirmAppointmentCheckIn.run(request),
-        cancelAppointment.run({ auth: { uid: 'checkin_patient' }, data: { appointmentId: ref.id } }),
+        cancelAppointment.run({ auth: { uid: 'checkin_doctor' }, data: { appointmentId: ref.id } }),
     ]);
     assert.equal(cancellation.status, 'fulfilled', String(cancellation.reason));
     if (checkIn.status === 'rejected') {
@@ -1466,7 +1466,7 @@ test('check-in retry re-reads cancellation after its pending snapshot is rolled 
                     assert.deepEqual(events, ['check-in-read-pending']);
                     events.push('cancellation-started');
                     cancellation = cancelAppointment.run({
-                        auth: { uid: 'checkin_patient' },
+                        auth: { uid: 'checkin_doctor' },
                         data: { appointmentId: ref.id },
                     }).then((result) => {
                         events.push('cancellation-committed');
@@ -1533,7 +1533,7 @@ test('aborted transactional query restarts the transaction instead of replaying 
 test('cancellation before check-in leaves the pending visit unchecked and unreserved', async () => {
     const { ref, lock, request } = await seedCheckInBooking();
     await cancelAppointment.run({
-        auth: { uid: 'checkin_patient' }, data: { appointmentId: ref.id },
+        auth: { uid: 'checkin_doctor' }, data: { appointmentId: ref.id },
     });
     await assert.rejects(confirmAppointmentCheckIn.run(request),
         (error) => error.code === 'failed-precondition');
@@ -1542,4 +1542,32 @@ test('cancellation before check-in leaves the pending visit unchecked and unrese
     assert.equal(appointment.isCheckedIn, false);
     assert.equal(appointment.checkedInAt, undefined);
     assert.equal((await lock.get()).exists, false);
+});
+
+// Patient notice is enforced on the server; clinic actors retain check-in cancellation.
+test('patient cancellation inside notice window is rejected without changing the visit or lock', async () => {
+    const { ref, lock } = await seedCheckInBooking();
+    await assert.rejects(cancelAppointment.run({ auth: { uid: 'checkin_patient' }, data: { appointmentId: ref.id } }),
+        error => error.code === 'failed-precondition');
+    assert.equal((await ref.get()).data().status, 'pending');
+    assert.equal((await lock.get()).exists, true);
+});
+
+
+test('patient cancellation outside notice window succeeds and derives actor from auth', async () => {
+    const { ref, lock } = await seedCheckInBooking();
+    const date = new Date(Date.now() + 3 * 86400000);
+    const dateKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baghdad', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+    const futureDate = new Date(dateKey + 'T00:00:00Z');
+    const doctorId = 'checkin_doctor_profile';
+    const timeSlot = '09:00';
+    await lock.delete();
+    await ref.update({ appointmentDate: admin.firestore.Timestamp.fromDate(futureDate), timeSlot });
+    const futureLock = canonicalAppointmentSlotLockRef(doctorId, futureDate, timeSlot, db);
+    await futureLock.set({ appointmentId: ref.id, status: 'pending', doctorId, appointmentDateKey: dateKey, timeSlot });
+    await cancelAppointment.run({ auth: { uid: 'checkin_patient' }, data: { appointmentId: ref.id, statusUpdatedBy: 'forged-actor' } });
+    const cancelled = (await ref.get()).data();
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(cancelled.statusUpdatedBy, 'checkin_patient');
+    assert.equal((await futureLock.get()).exists, false);
 });

@@ -1,7 +1,6 @@
-import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:uuid/uuid.dart';
 import '../../services/firebase_callable.dart';
@@ -11,7 +10,6 @@ import '../models/medical_document_model.dart';
 /// Repository for medical document Firestore + Storage operations
 class DocumentRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   static const String _collection = 'medical_documents';
 
   CollectionReference<Map<String, dynamic>> get _docsRef =>
@@ -40,11 +38,30 @@ class DocumentRepository {
             }).toList());
   }
 
-  /// Create the record with its ID in a single write.
-  Future<String> addDocument(MedicalDocumentModel doc) async {
-    final docRef = _docsRef.doc();
-    await docRef.set({...doc.toFirestore(), 'id': docRef.id});
-    return docRef.id;
+  Future<String> createDocument(
+      {required String userId,
+      required String name,
+      required DocumentType type,
+      required String notes,
+      required Uint8List bytes,
+      required String fileName,
+      String? appointmentId}) async {
+    final id = const Uuid().v4();
+    await invokeFirebaseCallable(
+        FirebaseFunctions.instance, 'uploadMedicalDocument', {
+      'action': 'create',
+      'documentId': id,
+      'patientId': userId,
+      'metadata': {
+        'name': name,
+        'type': type.toFirestoreString(),
+        'notes': notes
+      },
+      'fileName': fileName,
+      'appointmentId': appointmentId,
+      'bytes': base64Encode(bytes),
+    });
+    return id;
   }
 
   /// Update document metadata + set updatedAt
@@ -79,17 +96,13 @@ class DocumentRepository {
       'fileName': fileName,
     }) as Map);
     final operationId = operation['operationId'] as String;
-    StreamSubscription<TaskSnapshot>? progress;
     try {
-      final task = _storage
-          .ref(operation['storagePath'] as String)
-          .putData(bytes, _metadataFor(fileName));
-      progress = task.snapshotEvents.listen((snapshot) {
-        if (snapshot.totalBytes > 0) {
-          onProgress(snapshot.bytesTransferred / snapshot.totalBytes);
-        }
+      await invokeFirebaseCallable(
+          FirebaseFunctions.instance, 'uploadMedicalDocument', {
+        'action': 'stageReplacement',
+        'operationId': operationId,
+        'bytes': base64Encode(bytes),
       });
-      await task;
       await invoke({'action': 'finish', 'operationId': operationId});
     } catch (_) {
       // A timeout can follow a committed transaction. The server serializes
@@ -97,80 +110,12 @@ class DocumentRepository {
       final result =
           await invoke({'action': 'cancel', 'operationId': operationId});
       if ((result as Map)['committed'] != true) rethrow;
-    } finally {
-      await progress?.cancel();
     }
+    onProgress(1);
   }
 
-  /// Delete Firestore doc + Storage file
   Future<void> deleteDocument(String docId, String storagePath) async {
-    // Delete from Storage (ignore errors if file already missing)
-    if (storagePath.isNotEmpty) {
-      try {
-        await _storage.ref().child(storagePath).delete();
-      } catch (_) {
-        // File may already be deleted from storage
-      }
-    }
-    // Delete from Firestore
-    await _docsRef.doc(docId).delete();
-  }
-
-  /// Delete only the Storage file (no Firestore delete)
-  Future<void> deleteStorageFile(String storagePath) async {
-    if (storagePath.isNotEmpty) {
-      try {
-        await _storage.ref().child(storagePath).delete();
-      } catch (_) {
-        // File may already be deleted from storage
-      }
-    }
-  }
-
-  /// Upload file bytes to Firebase Storage
-  /// Returns {'url': downloadUrl, 'storagePath': path}
-  Future<Map<String, String>> uploadFile(
-      String userId, Uint8List bytes, String fileName,
-      {String? appointmentId}) async {
-    final extension = fileName.split('.').last;
-    final scope = appointmentId?.isNotEmpty == true ? appointmentId! : 'self';
-    final storagePath =
-        'medical_documents/$userId/$scope/${const Uuid().v4()}.$extension';
-
-    final ref = _storage.ref().child(storagePath);
-    await ref.putData(bytes, _metadataFor(fileName));
-    final url = await ref.getDownloadURL();
-
-    return {'url': url, 'storagePath': storagePath};
-  }
-
-  /// Upload file bytes with progress tracking
-  /// Returns UploadTask for progress listening + storagePath for Firestore
-  ({UploadTask task, String storagePath}) uploadFileWithProgress(
-      String userId, Uint8List bytes, String fileName,
-      {String? appointmentId}) {
-    final extension = fileName.split('.').last;
-    final scope = appointmentId?.isNotEmpty == true ? appointmentId! : 'self';
-    final storagePath =
-        'medical_documents/$userId/$scope/${const Uuid().v4()}.$extension';
-    final ref = _storage.ref().child(storagePath);
-    return (
-      task: ref.putData(bytes, _metadataFor(fileName)),
-      storagePath: storagePath
-    );
-  }
-
-  SettableMetadata _metadataFor(String fileName) {
-    final extension = fileName.split('.').last.toLowerCase();
-    final contentType = switch (extension) {
-      'pdf' => 'application/pdf',
-      'jpg' || 'jpeg' => 'image/jpeg',
-      'png' => 'image/png',
-      'doc' => 'application/msword',
-      'docx' =>
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      _ => 'application/octet-stream',
-    };
-    return SettableMetadata(contentType: contentType);
+    await invokeFirebaseCallable(FirebaseFunctions.instance,
+        'deleteMedicalDocument', {'documentId': docId});
   }
 }

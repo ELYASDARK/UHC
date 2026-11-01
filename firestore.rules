@@ -74,19 +74,21 @@ service cloud.firestore {
 
     function hasDoctorPatientAccess(patientId) {
       return isDoctor() &&
-        exists(/databases/$(database)/documents/doctor_patient_access/$(request.auth.uid)/patients/$(patientId));
+        get(/databases/$(database)/documents/doctor_patient_access/$(request.auth.uid)/patients/$(patientId)).data.schemaVersion == 2 &&
+        get(/databases/$(database)/documents/doctor_patient_access/$(request.auth.uid)/patients/$(patientId)).data.activeAppointmentCount is int &&
+        get(/databases/$(database)/documents/doctor_patient_access/$(request.auth.uid)/patients/$(patientId)).data.activeAppointmentCount > 0;
     }
 
     function canReadAppointment(data) {
       return isOwner(data.patientId) ||
         isDoctorForAppointment(data.doctorId) ||
-        hasAnyRolePermission(['appointments.view', 'analytics.view', 'reports.view']);
+        hasAnyRolePermission(['appointments.view', 'reports.view']);
     }
 
     function canReadMedicalDocument(data) {
       return (isGoogleLinkedAccount() && request.auth.uid == data.userId) ||
         hasDoctorPatientAccess(data.userId) ||
-        hasAnyRolePermission(['reports.view', 'appointments.view', 'analytics.view']);
+        hasAnyRolePermission(['reports.view', 'appointments.view']);
     }
 
     match /users/{userId} {
@@ -183,22 +185,19 @@ service cloud.firestore {
     match /doctors/{doctorId} {
       allow read: if isGoogleLinkedAccount();
       allow update: if isGoogleLinkedAccount() &&
+        isDoctor() &&
         resource.data.userId == request.auth.uid &&
-        !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny([
-            'userId',
-            'email',
-            'isActive',
-            'isAvailable',
-            'availabilityRequestStatus',
-            'pendingAvailabilityRequestId',
-            'availabilityRequestReason',
-            'availabilityRequestedAt',
-            'lastUnavailableApprovedAt',
-            'lastAvailabilityRequestId',
-            'lastAvailabilityRequestReason',
-            'availabilityUsageMonth'
-          ]);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'specialization', 'bio', 'experienceYears',
+          'qualifications', 'photoUrl', 'dailyNotificationTime', 'updatedAt'
+        ]) &&
+        request.resource.data.name is string &&
+        request.resource.data.specialization is string &&
+        request.resource.data.experienceYears is int &&
+        request.resource.data.qualifications is list &&
+        (!('bio' in request.resource.data) || request.resource.data.bio == null || request.resource.data.bio is string) &&
+        (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl == null || request.resource.data.photoUrl is string) &&
+        (!('dailyNotificationTime' in request.resource.data) || request.resource.data.dailyNotificationTime is string);
       allow create, delete: if false;
     }
 
@@ -214,47 +213,7 @@ service cloud.firestore {
 
     match /medical_documents/{docId} {
       allow read: if isGoogleLinkedAccount() && canReadMedicalDocument(resource.data);
-      allow create: if isGoogleLinkedAccount() &&
-        request.resource.data.userId is string &&
-        request.resource.data.addedBy == request.auth.uid &&
-        request.resource.data.keys().hasOnly([
-          'id',
-          'userId',
-          'name',
-          'type',
-          'notes',
-          'fileName',
-          'url',
-          'storagePath',
-          'uploadedAt',
-          'updatedAt',
-          'addedBy',
-          'addedByRole',
-          'addedByName',
-          'appointmentId'
-        ]) &&
-        request.resource.data.keys().hasAll([
-          'userId',
-          'name',
-          'type',
-          'fileName',
-          'url',
-          'storagePath',
-          'addedBy',
-          'addedByRole'
-        ]) &&
-        request.resource.data.storagePath is string &&
-        request.resource.data.storagePath.matches('medical_documents/' + request.resource.data.userId + '/[^/]+/[^/]+') &&
-        (
-          (request.resource.data.userId == request.auth.uid &&
-            request.resource.data.addedByRole == 'patient') ||
-          (request.resource.data.userId != request.auth.uid &&
-            request.resource.data.addedByRole == 'doctor')
-        ) &&
-        (
-          request.resource.data.userId == request.auth.uid ||
-          hasDoctorPatientAccess(request.resource.data.userId)
-        );
+      allow create: if false; // Server upload creates authoritative file references.
       allow update: if isGoogleLinkedAccount() &&
         canReadMedicalDocument(resource.data) &&
         resource.data.addedBy == request.auth.uid &&

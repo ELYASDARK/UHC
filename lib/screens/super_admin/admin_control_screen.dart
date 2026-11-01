@@ -1,3 +1,4 @@
+import '../../core/widgets/session_stream_builder.dart';
 import 'package:uhc/core/utils/app_messages.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -185,14 +186,17 @@ class _AdminControlScreenState extends State<AdminControlScreen>
   Widget _buildAdminListTab(bool isDark, bool actorIsSuperAdmin) {
     final l10n = AppLocalizations.of(context);
     // Fix #3: Query both admin and superAdmin roles
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
+    return SessionStreamBuilder<QuerySnapshot>(
+      permission: 'users.view',
+      queryKey: _adminListLimit,
+      createStream: () => _firestore
           .collection('users')
           .where('role', whereIn: ['admin', 'superAdmin'])
           .limit(_adminListLimit)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final docs = snapshot.data?.docs ?? [];
@@ -350,14 +354,17 @@ class _AdminControlScreenState extends State<AdminControlScreen>
   Widget _buildPermissionsTab(bool isDark, bool actorIsSuperAdmin) {
     final l10n = AppLocalizations.of(context);
     // Only admin accounts have editable permissions (superAdmin bypasses all)
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
+    return SessionStreamBuilder<QuerySnapshot>(
+      permission: 'users.view',
+      queryKey: _permissionsListLimit,
+      createStream: () => _firestore
           .collection('users')
           .where('role', isEqualTo: 'admin')
           .limit(_permissionsListLimit)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final docs = snapshot.data?.docs ?? [];
@@ -684,13 +691,16 @@ class _AdminControlScreenState extends State<AdminControlScreen>
 
   Widget _buildSlotsTab(bool isDark, bool actorIsSuperAdmin) {
     final l10n = AppLocalizations.of(context);
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
+    return SessionStreamBuilder<QuerySnapshot>(
+      permission: 'users.view',
+      queryKey: 'super-admin-slots',
+      createStream: () => _firestore
           .collection('users')
           .where('role', isEqualTo: 'superAdmin')
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         final docs = snapshot.data?.docs ?? [];

@@ -530,7 +530,12 @@ class AuthService {
 
   /// Get user data from Firestore
   Future<UserModel?> getUserData(String uid) async {
-    final doc = await _firestore.collection('users').doc(uid).get();
+    // Revalidate role and account gates before admitting a session's record cache.
+    final doc = await _firestore
+        .collection('users')
+        .doc(uid)
+        .get(const GetOptions(source: Source.server))
+        .timeout(const Duration(seconds: 12));
     if (doc.exists) {
       return UserModel.fromFirestore(doc);
     }

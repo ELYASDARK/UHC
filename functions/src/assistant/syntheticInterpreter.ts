@@ -1,5 +1,6 @@
 import { CallGeminiParams } from './geminiClient';
 import { StructuredIntent } from './types';
+import { messageLanguage } from './language';
 
 /**
  * Deterministic offline scheduling interpreter for local test execution.
@@ -15,17 +16,7 @@ export class SyntheticSchedulingInterpreter {
         const fallbackLocale = params.clientLocale || 'en';
 
         // 1. Language detection
-        let replyLanguage: 'en' | 'ar' | 'ckb' = fallbackLocale;
-        if (/[\u0600-\u06FF\u0750-\u077F]/.test(text)) {
-            // Kurdish-specific Sorani characters: ێ, ۆ, ڕ, ڵ, ژ, ڤ, پ, چ, گ
-            if (/[ێۆڕڵژڤپچگ]/.test(text)) {
-                replyLanguage = 'ckb';
-            } else if (fallbackLocale === 'ckb') {
-                replyLanguage = 'ckb';
-            } else {
-                replyLanguage = 'ar';
-            }
-        }
+        const replyLanguage = messageLanguage(text, fallbackLocale);
 
         // 2. Safety / Out of Scope checks
         // Explicitly rejects medical advice, symptom diagnosis, prescriptions, and emergencies

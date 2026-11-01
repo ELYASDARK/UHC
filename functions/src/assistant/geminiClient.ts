@@ -22,8 +22,16 @@ export interface CallGeminiParams {
 export interface GeminiCallResult {
     parsedIntent?: StructuredIntent;
     httpStatus?: number;
+    upstreamStatus?: number;
     errorBody?: unknown;
     networkError?: Error;
+    failureReason?: 'upstream_invalid_json' | 'upstream_empty_response' |
+        'upstream_invalid_intent' | 'upstream_response_too_large' |
+        'upstream_timeout' | 'upstream_network';
+}
+
+function invalidModelResponse(failureReason: NonNullable<GeminiCallResult['failureReason']>): GeminiCallResult {
+    return { httpStatus: 502, upstreamStatus: 200, failureReason };
 }
 
 const SYSTEM_PROMPT = `You are the scheduling interpreter for the UHC (University Health Center) appointment assistant.
@@ -33,7 +41,8 @@ SAFETY RULES:
 1. You are NOT a medical doctor. You CANNOT give medical advice, triage, diagnose illnesses, or recommend medications.
 2. If the user asks for medical advice, diagnose symptoms, or emergency help, set intent="out_of_scope" and outOfScopeReason appropriately.
 3. You do NOT generate appointment confirmations or conversational prose. You only extract structured search filters.
-4. Do NOT execute bookings. Only extract desired departmentKey, doctorId, doctorName, preferredDate (YYYY-MM-DD), preferredTimeSlot, timeFilter, and replyLanguage.`;
+4. Do NOT execute bookings. Only extract desired departmentKey, doctorId, doctorName, preferredDate (YYYY-MM-DD), preferredTimeSlot, timeFilter, and replyLanguage.
+5. Choose replyLanguage from the CURRENT request's sentence language, independently of interface language and older turns. A doctor name, quoted name, catalog label, number or initial script does not determine sentence language. Arabic requests can contain Kurdish names and Sorani requests can use letters shared with Arabic. For genuinely ambiguous short input use the supplied replyLanguageFallback. History can resolve scheduling references, but must not override an explicit language switch.`;
 
 const RESPONSE_SCHEMA = {
     type: 'OBJECT',
@@ -261,6 +270,7 @@ export class GeminiAssistantClient {
         const endpoint = `${ASSISTANT_CONFIG.API_ENDPOINT_BASE}/${ASSISTANT_CONFIG.MODEL_NAME}:generateContent`;
 
         const catalogContext = {
+            replyLanguageFallback: params.clientLocale || 'en',
             todayInBaghdad: params.baghdadDateString,
             clinicTimeZone: ASSISTANT_CONFIG.CLINIC_TIME_ZONE,
             departments: params.departments.map((d) => ({ key: d.key, name: d.name })),
@@ -330,6 +340,8 @@ export class GeminiAssistantClient {
                             await reader.cancel();
                             return {
                                 httpStatus: 500,
+                                upstreamStatus: response.status,
+                                failureReason: 'upstream_response_too_large',
                                 errorBody: { error: { message: 'Model response exceeded size limit' } },
                             };
                         }
@@ -342,6 +354,8 @@ export class GeminiAssistantClient {
                 if (rawText.length > maxResponseBytes) {
                     return {
                         httpStatus: 500,
+                        upstreamStatus: response.status,
+                        failureReason: 'upstream_response_too_large',
                         errorBody: { error: { message: 'Model response exceeded size limit' } },
                     };
                 }
@@ -357,6 +371,7 @@ export class GeminiAssistantClient {
                 console.error('[GeminiAssistantClient] HTTP Error status:', response.status);
                 return {
                     httpStatus: response.status,
+                    upstreamStatus: response.status,
                     errorBody,
                 };
             }
@@ -372,49 +387,27 @@ export class GeminiAssistantClient {
             try {
                 parsedBody = JSON.parse(rawText);
             } catch {
-                return {
-                    parsedIntent: {
-                        intent: 'clarify',
-                        clarificationReason: 'general',
-                        replyLanguage: fallbackLocale,
-                    },
-                };
+                return invalidModelResponse('upstream_invalid_json');
             }
 
             const candidateText = parsedBody?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!candidateText) {
-                return {
-                    parsedIntent: {
-                        intent: 'clarify',
-                        clarificationReason: 'general',
-                        replyLanguage: fallbackLocale,
-                    },
-                };
+                return invalidModelResponse('upstream_empty_response');
             }
 
             try {
                 const intentObj = extractAndParseJson(candidateText);
                 const validated = validateStructuredIntent(intentObj, fallbackLocale);
-                return {
-                    parsedIntent: validated || {
-                        intent: 'clarify',
-                        clarificationReason: 'general',
-                        replyLanguage: fallbackLocale,
-                    },
-                };
+                return validated ? { parsedIntent: validated } : invalidModelResponse('upstream_invalid_intent');
             } catch {
-                return {
-                    parsedIntent: {
-                        intent: 'clarify',
-                        clarificationReason: 'general',
-                        replyLanguage: fallbackLocale,
-                    },
-                };
+                return invalidModelResponse('upstream_invalid_json');
             }
         } catch (err: unknown) {
-            console.error('[GeminiAssistantClient] Exception/Network Error:', err);
+            const failureReason = controller.signal.aborted ? 'upstream_timeout' : 'upstream_network';
+            console.error(JSON.stringify({ event: 'assistant_provider_failure', reasonCode: failureReason }));
             return {
-                networkError: err instanceof Error ? err : new Error(String(err)),
+                networkError: err instanceof Error ? err : new Error('Provider request failed'),
+                failureReason,
             };
         } finally {
             clearTimeout(timeoutId);

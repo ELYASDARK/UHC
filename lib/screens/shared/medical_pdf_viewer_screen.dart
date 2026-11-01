@@ -1,24 +1,24 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdfx/pdfx.dart';
 
-import '../../core/utils/medical_document_url.dart';
+import '../../services/medical_document_service.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Native rendering, using authenticated Storage reads rather than bearer URLs
 /// or a remote PDF conversion service. Each opening fetches the current bytes.
 class MedicalPdfViewerScreen extends StatefulWidget {
+  final String documentId;
   final String url;
   final String storagePath;
   final String title;
 
   const MedicalPdfViewerScreen({
     super.key,
+    this.documentId = '',
     required this.url,
     required this.storagePath,
     required this.title,
@@ -47,16 +47,8 @@ class _MedicalPdfViewerScreenState extends State<MedicalPdfViewerScreen> {
     Directory? directory;
     PdfDocument? document;
     try {
-      final uri = Uri.parse(widget.url);
-      if (!isTrustedMedicalDocumentUrl(uri, Firebase.app().options) ||
-          uri.pathSegments.last != widget.storagePath) {
-        throw const FormatException('Untrusted medical document');
-      }
-      final bytes = await FirebaseStorage.instance
-          .ref(widget.storagePath)
-          .getData(20 * 1024 * 1024)
-          .timeout(const Duration(seconds: 30));
-      if (bytes == null || bytes.isEmpty) {
+      final bytes = await MedicalDocumentService.read(widget.documentId);
+      if (bytes.isEmpty) {
         throw const FormatException('Empty document');
       }
       // Own the private temporary file so it can be removed on close/error.

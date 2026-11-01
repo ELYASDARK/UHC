@@ -49,28 +49,50 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _departmentRepository = DepartmentRepository();
   List<DepartmentModel> _departments = [];
+  int _departmentRequestGeneration = 0;
   bool _isLoading = true;
+  bool _hasLoadedDepartments = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    DepartmentRepository.cacheChanges.addListener(_directoryChanged);
+    final cached = DepartmentRepository.cachedDepartments;
+    if (cached != null) {
+      _departments = cached;
+      _hasLoadedDepartments = true;
+      _isLoading = false;
+    }
     // Defer loading to after first frame is rendered
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadDepartments();
+      _loadDepartments(forceRefresh: false);
     });
   }
 
-  Future<void> _loadDepartments() async {
-    if (mounted) {
+  void _directoryChanged() {
+    if (mounted && !widget.captureDepartmentsError) {
+      _loadDepartments(forceRefresh: false);
+    }
+  }
+
+  @override
+  void dispose() {
+    DepartmentRepository.cacheChanges.removeListener(_directoryChanged);
+    super.dispose();
+  }
+
+  Future<void> _loadDepartments({bool forceRefresh = true}) async {
+    final generation = ++_departmentRequestGeneration;
+    if (mounted && generation == _departmentRequestGeneration) {
       setState(() {
-        _isLoading = true;
+        _isLoading = !_hasLoadedDepartments;
         _error = null;
       });
     }
 
     if (widget.captureDepartmentsError) {
-      if (mounted) {
+      if (mounted && generation == _departmentRequestGeneration) {
         setState(() {
           _isLoading = false;
           _error = AppLocalizations.of(context).connectionError;
@@ -80,8 +102,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      final departments = await _departmentRepository.getAllDepartments();
-      if (mounted) {
+      final departments = await _departmentRepository.getAllDepartments(
+          forceRefresh: forceRefresh);
+      if (mounted && generation == _departmentRequestGeneration) {
         // Sort departments in specific order for home screen
         final orderedKeys = [
           'generalMedicine',
@@ -110,11 +133,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
         setState(() {
           _departments = sortedDepartments;
+          _hasLoadedDepartments = true;
+          _error = null;
           _isLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && generation == _departmentRequestGeneration) {
         setState(() {
           _isLoading = false;
           _error = AppLocalizations.of(context).connectionError;
@@ -278,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
           ),
-        ).animate().scale(duration: 500.ms, curve: Curves.easeOutBack),
+        ).animate().scale(duration: 180.ms, curve: Curves.easeOutBack),
 
         const SizedBox(width: 16),
 
@@ -299,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.2),
+              ).animate().fadeIn(duration: 180.ms).slideX(begin: -0.2),
               const SizedBox(height: 4),
               Text(
                 AppLocalizations.of(context).howAreYouFeeling,
@@ -312,10 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-              )
-                  .animate(delay: 200.ms)
-                  .fadeIn(duration: 400.ms)
-                  .slideX(begin: -0.2),
+              ).animate().fadeIn(duration: 180.ms).slideX(begin: -0.2),
             ],
           ),
         ),
@@ -375,10 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                 ],
               ),
-            )
-                .animate(delay: 300.ms)
-                .fadeIn()
-                .scale(begin: const Offset(0.8, 0.8));
+            ).animate().fadeIn().scale(begin: const Offset(0.8, 0.8));
           },
         ),
       ],
@@ -508,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    ).animate(delay: 350.ms).fadeIn(duration: 500.ms).slideY(begin: 0.1);
+    ).animate().fadeIn(duration: 180.ms).slideY(begin: 0.1);
   }
 
   Widget _buildEmergencyButton(BuildContext context, bool isDark) {
@@ -584,7 +603,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-    ).animate(delay: 450.ms).fadeIn(duration: 500.ms).slideY(begin: 0.2);
+    ).animate().fadeIn(duration: 180.ms).slideY(begin: 0.2);
   }
 
   Widget _buildDepartmentsSection(BuildContext context, bool isDark) {
@@ -592,6 +611,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_error != null && _departments.isNotEmpty)
+          TextButton.icon(
+              onPressed: _loadDepartments,
+              icon: const Icon(Icons.refresh),
+              label: Text(AppLocalizations.of(context).tryAgain)),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -620,12 +644,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        if (_isLoading)
+        if (_isLoading && _departments.isEmpty)
           const SizedBox(
             height: 110,
             child: Center(child: CircularProgressIndicator()),
           )
-        else if (_error != null)
+        else if (_error != null && _departments.isEmpty)
           SizedBox(
             height: 110,
             child: Center(
@@ -695,7 +719,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
       ],
-    ).animate(delay: 500.ms).fadeIn(duration: 500.ms);
+    ).animate().fadeIn(duration: 180.ms);
   }
 
   IconData _getIconFromName(String iconName) {
@@ -838,7 +862,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
       ],
-    ).animate(delay: 600.ms).fadeIn(duration: 500.ms);
+    ).animate().fadeIn(duration: 180.ms);
   }
 
   Widget _buildHealthTipCard(

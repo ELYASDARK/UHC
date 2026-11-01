@@ -1,5 +1,7 @@
 import 'package:uhc/core/utils/app_messages.dart';
-import 'dart:async' show unawaited;
+import 'package:uhc/core/utils/content_direction.dart';
+import 'package:uhc/core/widgets/content_text.dart';
+import 'dart:async' show unawaited, Stream, StreamSubscription;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -8,6 +10,8 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../data/models/appointment_model.dart';
+import '../../../data/models/user_model.dart';
+import '../../../data/repositories/user_repository.dart';
 import '../../../data/models/assistant_chat_model.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../main.dart' show AppNavigator;
@@ -25,10 +29,12 @@ import 'assistant_status_banner.dart';
 /// multi-lingual RTL support, quota and policy fallback routing to standard booking.
 class AssistantChatScreen extends StatefulWidget {
   final AssistantChatProvider? provider;
+  final Stream<UserModel?>? profileChanges;
 
   const AssistantChatScreen({
     super.key,
     this.provider,
+    this.profileChanges,
   });
 
   @override
@@ -43,24 +49,69 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
   final FocusNode _focusNode = FocusNode();
   bool _ownsProvider = false;
   int _charCount = 0;
-  String? _lastObservedUserId;
+  String _lastDraftText = '';
+  String? _lastObservedSession;
+  StreamSubscription<UserModel?>? _profileSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    final user = context.read<AuthProvider>().currentUser;
-    _lastObservedUserId = user?.id;
+    final auth = context.read<AuthProvider>();
+    final user = auth.currentUser;
+    _lastObservedSession =
+        '${user?.id}:${user?.role}:${user?.isActive}:${auth.isGoogleLinked}';
 
     if (widget.provider != null) {
       _provider = widget.provider!;
       _ownsProvider = false;
+      if (user == null ||
+          !user.isActive ||
+          !auth.isGoogleLinked ||
+          !AssistantChatProvider.supportsRole(user.role)) {
+        _provider.updateActiveUser(
+            userId: null, role: user?.role, forceReset: true);
+      }
     } else {
       _provider = AssistantChatProvider(
-        patientId: user?.id,
+        patientId: user != null &&
+                user.isActive &&
+                auth.isGoogleLinked &&
+                AssistantChatProvider.supportsRole(user.role)
+            ? user.id
+            : null,
       );
       _ownsProvider = true;
+    }
+
+    if (user != null &&
+        user.isActive &&
+        auth.isGoogleLinked &&
+        AssistantChatProvider.supportsRole(user.role)) {
+      // Firebase Auth's stream does not emit when another admin changes this role.
+      _profileSubscription =
+          (widget.profileChanges ?? UserRepository().streamUser(user.id))
+              .listen((profile) {
+        if (!mounted || context.read<AuthProvider>().currentUser?.id != user.id) {
+          return;
+        }
+        if (profile?.role == user.role &&
+            profile?.isActive == user.isActive &&
+            profile?.googleEmail == user.googleEmail) {
+          return;
+        }
+        _provider.updateActiveUser(userId: null, role: null, forceReset: true);
+        _textController.clear();
+        unawaited(context.read<AuthProvider>().refreshCurrentUser());
+        _leaveAssistant();
+      }, onError: (Object _) {
+        // An unverifiable role must not leave the cached session authorized.
+        if (!mounted) return;
+        _provider.updateActiveUser(userId: null, role: null, forceReset: true);
+        _textController.clear();
+        _leaveAssistant();
+      });
     }
 
     _textController.addListener(_onTextChanged);
@@ -75,24 +126,31 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
     super.didChangeDependencies();
     final auth = Provider.of<AuthProvider>(context, listen: true);
     final user = auth.currentUser;
-    final currentUserId = user?.id;
+    final currentUserId =
+        '${user?.id}:${user?.role}:${user?.isActive}:${auth.isGoogleLinked}';
 
-    if (currentUserId != _lastObservedUserId) {
-      _lastObservedUserId = currentUserId;
+    if (currentUserId != _lastObservedSession) {
+      _lastObservedSession = currentUserId;
       _textController.clear();
       if (mounted) {
         setState(() {
           _charCount = 0;
         });
       }
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).maybePop();
-      }
       _provider.updateActiveUser(
-        userId: user?.id,
+        userId: user?.isActive == true && auth.isGoogleLinked ? user?.id : null,
         role: user?.role,
+        forceReset: true,
       );
+      _leaveAssistant();
     }
+  }
+
+  void _leaveAssistant() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    });
   }
 
   @override
@@ -106,6 +164,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_profileSubscription?.cancel());
     _textController.removeListener(_onTextChanged);
     _textController.dispose();
     _scrollController.dispose();
@@ -118,7 +177,8 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
 
   void _onTextChanged() {
     final text = _textController.text;
-    if (_charCount != text.length) {
+    if (_lastDraftText != text) {
+      _lastDraftText = text;
       setState(() {
         _charCount = text.length;
       });
@@ -686,11 +746,11 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
               color: isPatient
                   ? AppColors.primary
                   : (isDark ? AppColors.surfaceDark : Colors.white),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isPatient ? 16 : 4),
-                bottomRight: Radius.circular(isPatient ? 4 : 16),
+              borderRadius: BorderRadiusDirectional.only(
+                topStart: const Radius.circular(16),
+                topEnd: const Radius.circular(16),
+                bottomStart: Radius.circular(isPatient ? 16 : 4),
+                bottomEnd: Radius.circular(isPatient ? 4 : 16),
               ),
               boxShadow: [
                 BoxShadow(
@@ -707,7 +767,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
                     )
                   : null,
             ),
-            child: Text(
+            child: ContentText(
               message.text,
               style: GoogleFonts.roboto(
                 fontSize: 14,
@@ -739,8 +799,10 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
 
     return ListTile(
       leading: const Icon(Icons.receipt_long, color: AppColors.warning),
-      title: Text(pendingOffer.doctorName),
-      subtitle: Text(pendingOffer.timeSlot),
+      title: Text(pendingOffer.doctorName,
+          textDirection: contentDirection(
+              pendingOffer.doctorName, Directionality.of(context))),
+      subtitle: Text(pendingOffer.timeSlot, textDirection: TextDirection.ltr),
       trailing: TextButton(
         onPressed: provider.canConfirmOffer(pendingOffer)
             ? () => _handleOfferSelection(pendingOffer)
@@ -822,6 +884,9 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
               Expanded(
                 child: TextField(
                   controller: _textController,
+                  textDirection: contentDirection(
+                      _textController.text, Directionality.of(context)),
+                  textAlign: TextAlign.start,
                   focusNode: _focusNode,
                   enabled: !provider.isSending && !isLimitReached,
                   maxLines: 4,
@@ -865,6 +930,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen>
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
+                  key: const ValueKey('assistant-send'),
                   icon: provider.isSending
                       ? const SizedBox(
                           width: 20,

@@ -1,10 +1,7 @@
+import '../../shared/open_medical_document.dart';
 import 'package:uhc/core/utils/app_messages.dart';
-import '../../../core/utils/medical_document_url.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -14,8 +11,6 @@ import '../../../providers/document_provider.dart';
 import '../../../data/models/medical_document_model.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/widgets/responsive_layout.dart';
-import '../../shared/medical_document_viewer_screen.dart';
-import '../../shared/medical_pdf_viewer_screen.dart';
 
 /// Screen for doctors to view and manage a patient's medical documents
 class DoctorPatientDocumentsScreen extends StatefulWidget {
@@ -114,7 +109,9 @@ class _DoctorPatientDocumentsScreenState
           // Upload Progress
           if (docProvider.isUploading)
             LinearProgressIndicator(
-              value: docProvider.uploadProgress,
+              value: docProvider.uploadProgress > 0
+                  ? docProvider.uploadProgress
+                  : null,
               backgroundColor: AppColors.primary.withValues(alpha: 0.2),
             ),
 
@@ -852,68 +849,14 @@ class _DoctorPatientDocumentsScreenState
     }
   }
 
-  bool _isImageDocument(MedicalDocumentModel doc) {
-    final fileName = doc.fileName.toLowerCase();
-    return fileName.endsWith('.jpg') ||
-        fileName.endsWith('.jpeg') ||
-        fileName.endsWith('.png') ||
-        fileName.endsWith('.webp');
-  }
-
   Future<void> _viewDocument(
-    BuildContext context,
-    MedicalDocumentModel doc,
-  ) async {
-    final url = doc.url;
-    if (url.isEmpty) {
-      AppMessages.show(
-        context,
-        SnackBar(
-          content: Text(AppMessages.localizations(context).noURLProvided),
-        ),
-      );
-      return;
-    }
-
+      BuildContext context, MedicalDocumentModel doc) async {
     try {
-      final uri = Uri.parse(url);
-      final isPdf = doc.fileName.toLowerCase().endsWith('.pdf');
-      if (_isImageDocument(doc) || isPdf || await canLaunchUrl(uri)) {
-        if (!isTrustedMedicalDocumentUrl(uri, Firebase.app().options)) {
-          throw Exception('Document URL is not trusted.');
-        }
-        if (!kIsWeb && (isPdf || _isImageDocument(doc))) {
-          if (!context.mounted) return;
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => isPdf
-                  ? MedicalPdfViewerScreen(
-                      url: url, storagePath: doc.storagePath, title: doc.name)
-                  : MedicalDocumentViewerScreen(imageUrl: url, title: doc.name),
-            ),
-          );
-          return;
-        }
-        await launchUrl(uri, mode: LaunchMode.inAppWebView);
-      } else {
-        if (context.mounted) {
-          AppMessages.show(
-            context,
-            SnackBar(
-              content: Text(
-                AppMessages.localizations(context).couldNotOpenDocument,
-              ),
-            ),
-          );
-        }
-      }
+      await openMedicalDocument(context, doc);
     } catch (e) {
       if (context.mounted) {
         AppMessages.show(
-          context,
-          SnackBar(content: Text(AppMessages.error(context, e))),
-        );
+            context, SnackBar(content: Text(AppMessages.error(context, e))));
       }
     }
   }

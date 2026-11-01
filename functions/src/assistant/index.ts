@@ -4,7 +4,9 @@ import { admin, db } from '../firebase';
 import {
     appointmentDateKey,
 } from '../shared/appointmentHelpers';
-import { getCallerUserDoc, requireAuth, requirePatientRole } from '../shared/auth';
+import { getCallerUserDoc, requireAuth } from '../shared/auth';
+import { requireAssistantUser } from './auth';
+import { messageLanguage } from './language';
 import { createAppointmentCore } from '../appointments';
 import { ASSISTANT_CONFIG, evaluateTransmissionGate, checkSyntheticTestingConditions } from './config';
 import { getLocalizedMessage, normalizeLocale } from './localization';
@@ -15,7 +17,7 @@ import {
     getNextPacificMidnightUtc,
     getPacificDateKey,
 } from './quota';
-import { GeminiAssistantClient } from './geminiClient';
+import { GeminiAssistantClient, GeminiCallResult } from './geminiClient';
 import { SyntheticSchedulingInterpreter } from './syntheticInterpreter';
 export { seedSyntheticEmulatorData, SeedEmulatorDataResult } from './seedEmulatorData';
 import {
@@ -42,7 +44,6 @@ import {
     GetAssistantHistoryResult,
     SendAssistantMessageData,
     SendAssistantMessageResult,
-    StructuredIntent,
 } from './types';
 
 /**
@@ -79,7 +80,7 @@ export const sendAssistantMessage = functions.https.onCall(
 
         const callerUid = requireAuth(request);
         const callerDoc = await getCallerUserDoc(callerUid);
-        requirePatientRole(callerDoc);
+        requireAssistantUser(callerDoc);
 
         const data = request.data || ({} as SendAssistantMessageData);
         const rawMessage = typeof data.message === 'string' ? data.message.trim() : '';
@@ -102,7 +103,7 @@ export const sendAssistantMessage = functions.https.onCall(
         }
 
         const sanitizedMessage = rawMessage;
-        const clientLocale = normalizeLocale(data.locale);
+        const clientLocale = messageLanguage(rawMessage, data.locale);
         const now = new Date();
 
         // 1. Check transmission gate (DISABLED BY DEFAULT). Do not perform database writes when disabled.
@@ -233,18 +234,15 @@ export const sendAssistantMessage = functions.https.onCall(
             });
 
             // 6. Interpret request: Offline Synthetic Interpreter (if in synthetic test mode) or Gemini Client
-            let callResult: {
-                parsedIntent?: StructuredIntent;
-                httpStatus?: number;
-                errorBody?: unknown;
-                networkError?: Error;
-            };
+            let callResult: GeminiCallResult;
+            // Reservation history includes this turn; the interpreter receives it separately.
+            const priorHistory = reservation.history.slice(0, -1).map((m) => ({ sender: m.sender, text: m.text }));
 
             if (gate.isSynthetic) {
                 const syntheticInterpreter = new SyntheticSchedulingInterpreter();
                 const parsedIntent = await syntheticInterpreter.interpretSchedulingRequest({
                     userMessage: sanitizedMessage,
-                    chatHistory: reservation.history.map((m) => ({ sender: m.sender, text: m.text })),
+                    chatHistory: priorHistory,
                     baghdadDateString: appointmentDateKey(now),
                     departments: departmentsCatalog,
                     doctors: doctorsCatalog,
@@ -258,7 +256,7 @@ export const sendAssistantMessage = functions.https.onCall(
 
                 callResult = await geminiClient.interpretSchedulingRequest({
                     userMessage: sanitizedMessage,
-                    chatHistory: reservation.history.map((m) => ({ sender: m.sender, text: m.text })),
+                    chatHistory: priorHistory,
                     baghdadDateString: appointmentDateKey(now),
                     departments: departmentsCatalog,
                     doctors: doctorsCatalog,
@@ -266,13 +264,18 @@ export const sendAssistantMessage = functions.https.onCall(
                 });
             }
 
-            if (callResult.networkError || (callResult.httpStatus && callResult.httpStatus !== 200)) {
+            if (callResult.networkError || (callResult.httpStatus && callResult.httpStatus !== 200) || !callResult.parsedIntent) {
                 const classification = classifyGeminiError(
                     callResult.httpStatus || 500,
                     callResult.errorBody,
                     now,
                     clientLocale
                 );
+                console.warn(JSON.stringify({
+                    event: 'assistant_provider_result',
+                    reasonCode: callResult.failureReason || classification.reasonCode,
+                    upstreamStatus: callResult.upstreamStatus ?? callResult.httpStatus ?? null,
+                }));
 
                 if (classification.status === 'daily_limit') {
                     await markDailyQuotaExhausted(db, now);
@@ -285,7 +288,7 @@ export const sendAssistantMessage = functions.https.onCall(
                     turnId: reservation.turnId,
                     assistantMessage: classification.message,
                     status: classification.status,
-                    reasonCode: classification.reasonCode,
+                    reasonCode: callResult.failureReason || classification.reasonCode,
                     replyLanguage: clientLocale,
                     offers: [],
                     resetAt: classification.resetAt || null,
@@ -308,13 +311,10 @@ export const sendAssistantMessage = functions.https.onCall(
                 return commitResult.result!;
             }
 
-            const structuredIntent: StructuredIntent = callResult.parsedIntent || {
-                intent: 'clarify',
-                clarificationReason: 'general',
-                replyLanguage: clientLocale,
-            };
+            const structuredIntent = callResult.parsedIntent;
 
-            const targetLang = structuredIntent.replyLanguage || clientLocale;
+            // A validated model classification is stronger than local fallback vocabulary.
+            const targetLang = structuredIntent.replyLanguage;
 
             // 7. Match schedules & generate real expiring offers
             const doctorCandidates: DoctorCandidate[] = doctorsSnap.docs.map((d) => ({
@@ -332,8 +332,8 @@ export const sendAssistantMessage = functions.https.onCall(
                     doctorCandidates,
                     now
                 );
-            } catch (scheduleErr) {
-                console.error('[sendAssistantMessage] Schedule match error:', scheduleErr);
+            } catch {
+                console.error(JSON.stringify({ event: 'assistant_schedule_failure', reasonCode: 'schedule_match_error' }));
                 matchResult = {
                     status: 'unavailable',
                     reasonCode: 'schedule_match_error',
@@ -383,8 +383,8 @@ export const sendAssistantMessage = functions.https.onCall(
             if (!committed) {
                 try {
                     await releaseAssistantTurn(db, callerUid, reservation.turnId);
-                } catch (releaseErr) {
-                    console.error('[sendAssistantMessage] Failed to release turn reservation:', releaseErr);
+                } catch {
+                    console.error(JSON.stringify({ event: 'assistant_reservation_release_failure' }));
                 }
             }
         }
@@ -413,7 +413,7 @@ export const getAssistantHistory = functions.https.onCall(
 
         const callerUid = requireAuth(request);
         const callerDoc = await getCallerUserDoc(callerUid);
-        requirePatientRole(callerDoc);
+        requireAssistantUser(callerDoc);
 
         const now = new Date();
         const gate = evaluateTransmissionGate(adminProjectId);
@@ -521,7 +521,7 @@ export const clearAssistantHistory = functions.https.onCall(
 
         const callerUid = requireAuth(request);
         const callerDoc = await getCallerUserDoc(callerUid);
-        requirePatientRole(callerDoc);
+        requireAssistantUser(callerDoc);
 
         await clearPatientChat(db, callerUid, new Date());
 
@@ -555,7 +555,7 @@ export const confirmAssistantAppointment = functions.https.onCall(
 
         const callerUid = requireAuth(request);
         const callerDoc = await getCallerUserDoc(callerUid);
-        requirePatientRole(callerDoc);
+        requireAssistantUser(callerDoc);
 
         const data = request.data;
         if (!data || typeof data.offerId !== 'string' || !data.offerId.trim()) {

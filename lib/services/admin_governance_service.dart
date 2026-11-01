@@ -1,3 +1,4 @@
+import 'firebase_callable.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
@@ -139,9 +140,8 @@ class AdminGovernanceService {
     Map<String, dynamic> data,
   ) async {
     try {
-      final callable = _functions.httpsCallable(functionName);
-      final result = await callable.call<Map<String, dynamic>>(data);
-      return Map<String, dynamic>.from(result.data);
+      return Map<String, dynamic>.from(
+          await invokeFirebaseCallable(_functions, functionName, data));
     } on FirebaseFunctionsException catch (e) {
       debugPrint(
         '[$functionName] Firebase Functions Error: ${e.code} - ${e.message}',

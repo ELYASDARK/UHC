@@ -2575,4 +2575,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notesSaveFailed =>
       'Could not save medical notes. Please try again.';
+
+  @override
+  String get accountManagementLocked =>
+      'Account management is locked. Contact a Super Admin to reconcile the account before trying again.';
+
+  @override
+  String get loadMore => 'Load more';
 }

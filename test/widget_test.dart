@@ -12,6 +12,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uhc/l10n/app_localizations.dart';
+import 'package:uhc/data/models/user_model.dart';
+import 'package:uhc/data/repositories/department_repository.dart';
 import 'package:uhc/providers/auth_provider.dart';
 import 'package:uhc/providers/notification_provider.dart';
 import 'package:uhc/screens/patient/browse_doctors/doctor_list_screen.dart';
@@ -81,8 +83,10 @@ void main() {
       messenger.setMockDecodedMessageHandler<Object?>(query, null);
       messenger.setMockDecodedMessageHandler<Object?>(snapshots, null);
     });
-    final auth = AuthProvider();
-    final notifications = NotificationProvider();
+    final auth = _NavigationAuth();
+    DepartmentRepository.bindSession(auth.cacheSessionKey);
+    addTearDown(() => DepartmentRepository.bindSession(null));
+    final notifications = _NavigationNotifications();
     addTearDown(auth.dispose);
     addTearDown(notifications.dispose);
     await tester.pumpWidget(MultiProvider(
@@ -161,4 +165,29 @@ class _FirebaseCoreWithStorage extends MockFirebaseApp {
     apps.single.options.storageBucket = 'demo-uhc-test.appspot.com';
     return apps;
   }
+}
+
+// The patient shell requires an authenticated owner for its session directory cache.
+class _NavigationAuth extends AuthProvider {
+  _NavigationAuth()
+      : super(googleLinkedOverride: true, passwordLinkedOverride: true);
+  @override
+  bool get isAuthenticated => true;
+  @override
+  String get cacheSessionKey => 'synthetic-navigation-session';
+  @override
+  UserModel get user => UserModel(
+      id: 'synthetic-navigation-patient',
+      email: 'synthetic@example.test',
+      googleEmail: 'synthetic@example.test',
+      fullName: 'Synthetic Patient',
+      role: UserRole.student,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026));
+}
+
+// Notification transport is outside this navigation/layout regression.
+class _NavigationNotifications extends NotificationProvider {
+  @override
+  void startListening(String userId) {}
 }

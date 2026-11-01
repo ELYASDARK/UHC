@@ -31,11 +31,23 @@ function deletionFixture(t, authErrorCode) {
         assert.equal(name, 'users');
         return {
             doc: (uid) => ({
+                id: uid,
                 get: async () => ({ exists: profiles.has(uid), data: () => profiles.get(uid) }),
                 delete: async () => profiles.delete(uid),
             }),
         };
     });
+    t.mock.method(db, 'runTransaction', async callback => callback({
+        get: ref => ref.get(),
+        update: (ref, changes) => {
+            const next = { ...profiles.get(ref.id) };
+            for (const [key, value] of Object.entries(changes)) {
+                if (value?.isEqual?.(admin.firestore.FieldValue.delete())) delete next[key];
+                else next[key] = value;
+            }
+            profiles.set(ref.id, next);
+        },
+    }));
     t.mock.method(admin.storage(), 'bucket', () => ({
         file: (path) => ({ delete: async () => deletedPhotos.push(path) }),
     }));
@@ -54,6 +66,7 @@ for (const code of ['auth/internal-error', 'auth/insufficient-permission']) {
 
         assert.ok(state.authUsers.has('target'));
         assert.ok(state.profiles.has('target'));
+        assert.equal(typeof state.profiles.get('target').accountMutationId, 'string');
         assert.deepEqual(state.deletedPhotos, []);
         assert.deepEqual(state.auditEntries, []);
     });

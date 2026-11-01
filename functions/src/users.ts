@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions';
 
 import { admin, auth, db } from './firebase';
 import { writeAdminAuditLog } from './shared/audit';
+import { withAccountMutation } from './shared/accountMutation';
 import {
     getCallerUserDoc,
     requireAuth,
@@ -27,39 +28,44 @@ export const completeInitialPasswordChange = functions.https.onCall(
             );
         }
 
-        const userRef = db.collection('users').doc(callerUid);
-        const userDoc = await userRef.get();
+        return withAccountMutation({ userId: callerUid, roles: ['doctor', 'student', 'staff'], mutate: async (_, userData) => {
+            const userRef = db.collection('users').doc(callerUid);
+            if (userData.isActive !== true) {
+                throw new functions.https.HttpsError('permission-denied', 'Your account is inactive.');
+            }
 
-        if (!userDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'User profile not found.');
-        }
+            if (userData.requiresInitialPasswordChange !== true) {
+                return { success: true, message: 'No initial password change required.' };
+            }
 
-        const userData = userDoc.data()!;
-        if (userData.isActive !== true) {
-            throw new functions.https.HttpsError('permission-denied', 'Your account is inactive.');
-        }
+            // Refreshing an old session changes iat, but never auth_time. Strictly
+            // exclude the reset's whole second so same-second stale sessions fail.
+            const authTime = request.auth?.token.auth_time;
+            if (typeof userData.passwordResetAfter === 'number' &&
+                (typeof authTime !== 'number' || authTime <= userData.passwordResetAfter)) {
+                throw new functions.https.HttpsError('unauthenticated', 'Sign in again after the password reset.');
+            }
+            const authorization = request.rawRequest?.headers.authorization;
+            if (!authorization?.startsWith('Bearer ')) {
+                throw new functions.https.HttpsError('unauthenticated', 'A current sign-in token is required.');
+            }
+            try {
+                const verified = await auth.verifyIdToken(authorization.slice(7), true);
+                if (verified.uid !== callerUid) throw new Error('Token user mismatch');
+            } catch {
+                throw new functions.https.HttpsError('unauthenticated', 'Sign in again before changing your password.');
+            }
 
-        const role = userData.role as string | undefined;
-        if (!['doctor', 'student', 'staff'].includes(role ?? '')) {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Initial password change is only available for doctor and patient accounts.'
-            );
-        }
+            const now = admin.firestore.Timestamp.now();
+            await auth.updateUser(callerUid, { password: data.newPassword });
+            await userRef.update({
+                requiresInitialPasswordChange: false,
+                initialPasswordChangedAt: now,
+                updatedAt: now,
+            });
 
-        if (userData.requiresInitialPasswordChange !== true) {
-            return { success: true, message: 'No initial password change required.' };
-        }
-
-        const now = admin.firestore.Timestamp.now();
-        await auth.updateUser(callerUid, { password: data.newPassword });
-        await userRef.update({
-            requiresInitialPasswordChange: false,
-            initialPasswordChangedAt: now,
-            updatedAt: now,
-        });
-
-        return { success: true, message: 'Initial password change completed.' };
+            return { success: true, message: 'Initial password change completed.' };
+        } });
     }
 );
 
@@ -416,50 +422,52 @@ export const setUserActiveStatus = functions.https.onCall(
             );
         }
 
-        const callerRole = callerDoc.data()!.role;
-        const targetDoc = await db.collection('users').doc(targetUid).get();
-        if (!targetDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Target user not found.');
-        }
+        return withAccountMutation({ userId: targetUid, roles: ['student', 'staff'], mutate: async () => {
+            const callerRole = callerDoc.data()!.role;
+            const targetDoc = await db.collection('users').doc(targetUid).get();
+            if (!targetDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Target user not found.');
+            }
 
-        const targetRole = targetDoc.data()!.role;
-        if (targetRole === 'superAdmin') {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Cannot modify Super Admin status via this function.'
-            );
-        }
-        if (targetRole === 'admin') {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Use setAdminActiveStatus for admin accounts.'
-            );
-        }
-        if (targetRole === 'doctor') {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Doctor accounts must be managed from Doctor Management.'
-            );
-        }
-        if (callerRole === 'admin' && targetRole === 'admin') {
-            throw new functions.https.HttpsError(
-                'permission-denied',
-                'Admins cannot modify admin accounts.'
-            );
-        }
+            const targetRole = targetDoc.data()!.role;
+            if (targetRole === 'superAdmin') {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Cannot modify Super Admin status via this function.'
+                );
+            }
+            if (targetRole === 'admin') {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Use setAdminActiveStatus for admin accounts.'
+                );
+            }
+            if (targetRole === 'doctor') {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Doctor accounts must be managed from Doctor Management.'
+                );
+            }
+            if (callerRole === 'admin' && targetRole === 'admin') {
+                throw new functions.https.HttpsError(
+                    'permission-denied',
+                    'Admins cannot modify admin accounts.'
+                );
+            }
 
-        await db.collection('users').doc(targetUid).update({
-            isActive,
-            updatedAt: admin.firestore.Timestamp.now(),
-        });
-        if (!isActive) {
-            await revokeSessionsAndClearFcm(targetUid);
-        }
+            await db.collection('users').doc(targetUid).update({
+                isActive,
+                updatedAt: admin.firestore.Timestamp.now(),
+            });
+            if (!isActive) {
+                await revokeSessionsAndClearFcm(targetUid);
+            }
 
-        return {
-            success: true,
-            message: isActive ? 'User activated successfully.' : 'User deactivated successfully.',
-        };
+            return {
+                success: true,
+                message: isActive ? 'User activated successfully.' : 'User deactivated successfully.',
+            };
+        } });
     }
 );
 
@@ -497,58 +505,60 @@ export const changeUserRoleByAdmin = functions.https.onCall(
             );
         }
 
-        const callerRole = callerDoc.data()!.role;
-        const targetRef = db.collection('users').doc(targetUid);
-        const targetDoc = await targetRef.get();
-        if (!targetDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Target user not found.');
-        }
-        const targetData = targetDoc.data()!;
-        const oldRole = targetData.role as string;
+        return withAccountMutation({ userId: targetUid, roles: ['student', 'staff'], mutate: async () => {
+            const callerRole = callerDoc.data()!.role;
+            const targetRef = db.collection('users').doc(targetUid);
+            const targetDoc = await targetRef.get();
+            if (!targetDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Target user not found.');
+            }
+            const targetData = targetDoc.data()!;
+            const oldRole = targetData.role as string;
 
-        if (!['student', 'staff'].includes(oldRole)) {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Only student and staff roles can be changed here.',
-            );
-        }
-        if (callerRole === 'admin' && (oldRole === 'admin' || oldRole === 'superAdmin')) {
-            throw new functions.https.HttpsError(
-                'permission-denied',
-                'Admins cannot modify admin/superAdmin accounts.',
-            );
-        }
+            if (!['student', 'staff'].includes(oldRole)) {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Only student and staff roles can be changed here.',
+                );
+            }
+            if (callerRole === 'admin' && (oldRole === 'admin' || oldRole === 'superAdmin')) {
+                throw new functions.https.HttpsError(
+                    'permission-denied',
+                    'Admins cannot modify admin/superAdmin accounts.',
+                );
+            }
 
-        if (oldRole === newRole) {
+            if (oldRole === newRole) {
+                return {
+                    success: true,
+                    message: 'Role already set.',
+                };
+            }
+
+            const updates: Record<string, unknown> = {
+                role: newRole,
+                updatedAt: admin.firestore.Timestamp.now(),
+                studentId: newRole === 'student' ? targetUid : null,
+                staffId: newRole === 'staff' ? targetUid : null,
+            };
+            await targetRef.update(updates);
+
+            await writeAdminAuditLog({
+                actorUid: callerUid,
+                actorRole: callerRole,
+                actorName: callerDoc.data()!.fullName,
+                targetUid,
+                targetName: targetData.fullName,
+                targetRoleBefore: oldRole,
+                targetRoleAfter: newRole,
+                action: oldRole === 'student' ? 'user.promoteToStaff' : 'user.demoteToStudent',
+            });
+
             return {
                 success: true,
-                message: 'Role already set.',
+                message: `Role changed from ${oldRole} to ${newRole}.`,
             };
-        }
-
-        const updates: Record<string, unknown> = {
-            role: newRole,
-            updatedAt: admin.firestore.Timestamp.now(),
-            studentId: newRole === 'student' ? targetUid : null,
-            staffId: newRole === 'staff' ? targetUid : null,
-        };
-        await targetRef.update(updates);
-
-        await writeAdminAuditLog({
-            actorUid: callerUid,
-            actorRole: callerRole,
-            actorName: callerDoc.data()!.fullName,
-            targetUid,
-            targetName: targetData.fullName,
-            targetRoleBefore: oldRole,
-            targetRoleAfter: newRole,
-            action: oldRole === 'student' ? 'user.promoteToStaff' : 'user.demoteToStudent',
-        });
-
-        return {
-            success: true,
-            message: `Role changed from ${oldRole} to ${newRole}.`,
-        };
+        } });
     }
 );
 
@@ -572,79 +582,81 @@ export const unlinkGoogleProviderByAdmin = functions.https.onCall(
         }
 
         const callerData = callerDoc.data()!;
-        const callerRole = callerData.role;
-        const targetRef = db.collection('users').doc(targetUid);
-        const targetDoc = await targetRef.get();
-        if (!targetDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Target user not found.');
-        }
+        return withAccountMutation({ userId: targetUid, roles: ['student', 'staff'], mutate: async () => {
+            const callerRole = callerData.role;
+            const targetRef = db.collection('users').doc(targetUid);
+            const targetDoc = await targetRef.get();
+            if (!targetDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Target user not found.');
+            }
 
-        const targetData = targetDoc.data()!;
-        const targetRole = targetData.role;
-        if (targetRole === 'superAdmin') {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Cannot unlink Google for Super Admin accounts via this function.',
-            );
-        }
-        if (targetRole === 'admin') {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Use governance flow for admin account provider management.',
-            );
-        }
-        if (targetRole === 'doctor') {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Doctor accounts must be managed from Doctor Management.',
-            );
-        }
-        if (callerRole === 'admin' && (targetRole === 'admin' || targetRole === 'superAdmin')) {
-            throw new functions.https.HttpsError(
-                'permission-denied',
-                'Admins cannot modify admin/superAdmin accounts.',
-            );
-        }
+            const targetData = targetDoc.data()!;
+            const targetRole = targetData.role;
+            if (targetRole === 'superAdmin') {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Cannot unlink Google for Super Admin accounts via this function.',
+                );
+            }
+            if (targetRole === 'admin') {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Use governance flow for admin account provider management.',
+                );
+            }
+            if (targetRole === 'doctor') {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Doctor accounts must be managed from Doctor Management.',
+                );
+            }
+            if (callerRole === 'admin' && (targetRole === 'admin' || targetRole === 'superAdmin')) {
+                throw new functions.https.HttpsError(
+                    'permission-denied',
+                    'Admins cannot modify admin/superAdmin accounts.',
+                );
+            }
 
-        const authUser = await auth.getUser(targetUid);
-        const providerIds = new Set(authUser.providerData.map((p) => p.providerId));
-        if (!providerIds.has('google.com')) {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Target user does not have Google linked.',
-            );
-        }
-        if (!providerIds.has('password')) {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Cannot unlink Google: user has no email/password sign-in linked.',
-            );
-        }
+            const authUser = await auth.getUser(targetUid);
+            const providerIds = new Set(authUser.providerData.map((p) => p.providerId));
+            if (!providerIds.has('google.com')) {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Target user does not have Google linked.',
+                );
+            }
+            if (!providerIds.has('password')) {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Cannot unlink Google: user has no email/password sign-in linked.',
+                );
+            }
 
-        await auth.updateUser(targetUid, {
-            providersToUnlink: ['google.com'],
-        });
+            await auth.updateUser(targetUid, {
+                providersToUnlink: ['google.com'],
+            });
 
-        await targetRef.update({
-            googleEmail: null,
-            updatedAt: admin.firestore.Timestamp.now(),
-        });
+            await targetRef.update({
+                googleEmail: null,
+                updatedAt: admin.firestore.Timestamp.now(),
+            });
 
-        await writeAdminAuditLog({
-            actorUid: callerUid,
-            actorRole: callerRole,
-            actorName: callerData.fullName,
-            targetUid,
-            targetName: targetData.fullName,
-            targetRoleBefore: targetRole,
-            targetRoleAfter: targetRole,
-            action: 'user.googleUnlink',
-        });
+            await writeAdminAuditLog({
+                actorUid: callerUid,
+                actorRole: callerRole,
+                actorName: callerData.fullName,
+                targetUid,
+                targetName: targetData.fullName,
+                targetRoleBefore: targetRole,
+                targetRoleAfter: targetRole,
+                action: 'user.googleUnlink',
+            });
 
-        return {
-            success: true,
-            message: 'Google provider unlinked successfully.',
-        };
+            return {
+                success: true,
+                message: 'Google provider unlinked successfully.',
+            };
+        } });
     }
 );
 
@@ -675,70 +687,72 @@ export const updateUserProfileByAdmin = functions.https.onCall(
             throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
         }
 
-        const callerRole = callerDoc.data()!.role;
-        const targetRef = db.collection('users').doc(data.targetUid);
-        const targetDoc = await targetRef.get();
-        if (!targetDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Target user not found.');
-        }
+        return withAccountMutation({ userId: data.targetUid, roles: callerDoc.data()!.role === 'superAdmin' ? ['student', 'staff', 'admin', 'superAdmin'] : ['student', 'staff'], mutate: async () => {
+            const callerRole = callerDoc.data()!.role;
+            const targetRef = db.collection('users').doc(data.targetUid);
+            const targetDoc = await targetRef.get();
+            if (!targetDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Target user not found.');
+            }
 
-        const targetRole = targetDoc.data()!.role;
-        if (targetRole === 'superAdmin' && callerRole !== 'superAdmin') {
-            throw new functions.https.HttpsError(
-                'permission-denied',
-                'Only Super Admin can edit Super Admin profile.'
-            );
-        }
-        if (callerRole === 'admin' && targetRole === 'admin') {
-            throw new functions.https.HttpsError(
-                'permission-denied',
-                'Admins cannot edit admin accounts.'
-            );
-        }
-        if (targetRole === 'doctor') {
-            throw new functions.https.HttpsError(
-                'failed-precondition',
-                'Doctor accounts must be edited from Doctor Management.'
-            );
-        }
-
-        const updates: Record<string, unknown> = {
-            updatedAt: admin.firestore.Timestamp.now(),
-        };
-
-        if (data.fullName !== undefined) {
-            const trimmed = data.fullName.trim();
-            if (!trimmed) {
+            const targetRole = targetDoc.data()!.role;
+            if (targetRole === 'superAdmin' && callerRole !== 'superAdmin') {
                 throw new functions.https.HttpsError(
-                    'invalid-argument',
-                    'fullName cannot be empty.'
+                    'permission-denied',
+                    'Only Super Admin can edit Super Admin profile.'
                 );
             }
-            updates.fullName = trimmed;
-        }
-        if (data.phoneNumber !== undefined) updates.phoneNumber = data.phoneNumber;
-        if (data.photoUpload !== undefined && data.photoUpload !== null) {
-            updates.photoUrl = await uploadProfilePhoto(data.targetUid, data.photoUpload);
-        } else if (data.photoUrl !== undefined) {
-            if (data.photoUrl === null || data.photoUrl.trim() === '') {
-                await deleteProfilePhotos(data.targetUid);
+            if (callerRole === 'admin' && targetRole === 'admin') {
+                throw new functions.https.HttpsError(
+                    'permission-denied',
+                    'Admins cannot edit admin accounts.'
+                );
             }
-            updates.photoUrl = data.photoUrl;
-        }
-        if (data.studentId !== undefined) updates.studentId = data.studentId;
-        if (data.staffId !== undefined) updates.staffId = data.staffId;
-        if (data.dateOfBirth !== undefined) {
-            updates.dateOfBirth = data.dateOfBirth
-                ? admin.firestore.Timestamp.fromDate(new Date(data.dateOfBirth))
-                : null;
-        }
+            if (targetRole === 'doctor') {
+                throw new functions.https.HttpsError(
+                    'failed-precondition',
+                    'Doctor accounts must be edited from Doctor Management.'
+                );
+            }
 
-        await targetRef.update(updates);
+            const updates: Record<string, unknown> = {
+                updatedAt: admin.firestore.Timestamp.now(),
+            };
 
-        return {
-            success: true,
-            message: 'User profile updated successfully.',
-        };
+            if (data.fullName !== undefined) {
+                const trimmed = data.fullName.trim();
+                if (!trimmed) {
+                    throw new functions.https.HttpsError(
+                        'invalid-argument',
+                        'fullName cannot be empty.'
+                    );
+                }
+                updates.fullName = trimmed;
+            }
+            if (data.phoneNumber !== undefined) updates.phoneNumber = data.phoneNumber;
+            if (data.photoUpload !== undefined && data.photoUpload !== null) {
+                updates.photoUrl = await uploadProfilePhoto(data.targetUid, data.photoUpload);
+            } else if (data.photoUrl !== undefined) {
+                if (data.photoUrl === null || data.photoUrl.trim() === '') {
+                    await deleteProfilePhotos(data.targetUid);
+                }
+                updates.photoUrl = data.photoUrl;
+            }
+            if (data.studentId !== undefined) updates.studentId = data.studentId;
+            if (data.staffId !== undefined) updates.staffId = data.staffId;
+            if (data.dateOfBirth !== undefined) {
+                updates.dateOfBirth = data.dateOfBirth
+                    ? admin.firestore.Timestamp.fromDate(new Date(data.dateOfBirth))
+                    : null;
+            }
+
+            await targetRef.update(updates);
+
+            return {
+                success: true,
+                message: 'User profile updated successfully.',
+            };
+        } });
     }
 );
 
@@ -802,19 +816,21 @@ export const deleteUserAccount = functions.https.onCall(
         }
 
         try {
-            await revokeSessionsAndClearFcm(data.targetUid);
-            await auth.deleteUser(data.targetUid).catch((error) => {
-                if ((error as { code?: string })?.code !== 'auth/user-not-found') {
-                    throw error;
-                }
-            });
-            await deleteProfilePhotos(data.targetUid);
-            await targetRef.delete();
+            return await withAccountMutation({ userId: data.targetUid, roles: ['student', 'staff'], mutate: async () => {
+                await revokeSessionsAndClearFcm(data.targetUid);
+                await auth.deleteUser(data.targetUid).catch((error) => {
+                    if ((error as { code?: string })?.code !== 'auth/user-not-found') {
+                        throw error;
+                    }
+                });
+                await deleteProfilePhotos(data.targetUid);
+                await targetRef.delete();
 
-            return {
-                success: true,
-                message: 'User account deleted successfully.',
-            };
+                return {
+                    success: true,
+                    message: 'User account deleted successfully.',
+                };
+            } });
         } catch (error) {
             console.error('Error deleting user account:', error);
             throw toHttpsError(error, 'Failed to delete user account.');

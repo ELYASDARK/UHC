@@ -17,6 +17,8 @@ import {
     releaseAppointmentSlot,
 } from './shared/appointmentHelpers';
 import { getCallerUserDoc, requireAuth } from './shared/auth';
+import { requireAssistantUser } from './assistant/auth';
+import { readPatientAccessChange, writePatientAccessChange } from './shared/patientAccess';
 import {
     createAppointmentNotifications,
     createAppointmentStatusNotification,
@@ -114,14 +116,10 @@ async function handlePostBookingNotifications(params: {
             appointmentDate: params.appointmentDate,
             timeSlot: params.timeSlot,
         });
-    } catch (notifErr: unknown) {
-        const errMessage = notifErr instanceof Error ? notifErr.message : String(notifErr);
-        // Safe logging: never log patient identifiers
+    } catch {
+        // Delivery diagnostics must not contain receipt values or SDK error payloads.
         console.error(JSON.stringify({
             event: 'post_commit_notification_failed',
-            appointmentId: params.appointmentId,
-            bookingReference: params.bookingReference,
-            error: errMessage,
         }));
 
         try {
@@ -141,6 +139,10 @@ export async function createAppointmentCore(
     data: CreateAppointmentData
 ): Promise<CreateAppointmentResult> {
     const booking = prepareBookingRequest(callerUid, data);
+    if (booking.kind === 'assistant') {
+        // The shared core also enforces Google linking, regardless of its entry point.
+        await getCallerUserDoc(callerUid);
+    }
     const { idempotencyDocId, payloadHash } = booking;
     const now = Timestamp.now();
 
@@ -149,6 +151,11 @@ export async function createAppointmentCore(
     const qrCode = `UHC_APPOINTMENT:${ref.id}:${randomUUID()}`;
 
     const txResult = await db.runTransaction(async (transaction) => {
+        if (booking.kind === 'assistant') {
+            // Serialize role/active changes with consumption, including receipt replays.
+            const currentCaller = await transaction.get(db.collection('users').doc(callerUid));
+            requireAssistantUser(currentCaller);
+        }
         // Lost-response retries must resolve before reading a consumed offer or checking current availability.
         if (idempotencyDocId) {
             const idempotencyRef = db.collection('appointment_idempotency').doc(idempotencyDocId);
@@ -197,7 +204,9 @@ export async function createAppointmentCore(
         const resolvedDepartment = bookingDoctor?.department || resolved.department;
         const resolvedDate = resolved.appointmentDate;
         const finalCanonicalSlot = reservation?.slot.canonicalSlot || resolved.timeSlot;
-        const doctorUserId = bookingDoctor?.doctorUserId;
+        const accessChange = await readPatientAccessChange(transaction, {
+            doctorId: resolvedDoctorId || '', patientId: callerUid, appointmentId: ref.id, nextStatus: 'pending',
+        });
 
         // Offer, receipt, access and booking writes share the transaction with the slot reservation.
         if (reservation) writeDoctorSlotReservation(transaction, reservation, { appointmentId: ref.id, status: 'pending', now });
@@ -244,17 +253,7 @@ export async function createAppointmentCore(
             });
         }
 
-        if (doctorUserId && resolvedDoctorId) {
-            const accessRef = db.collection('doctor_patient_access').doc(doctorUserId)
-                .collection('patients').doc(callerUid);
-            transaction.set(accessRef, {
-                doctorUserId,
-                doctorId: resolvedDoctorId,
-                patientId: callerUid,
-                appointmentId: ref.id,
-                updatedAt: now,
-            }, { merge: true });
-        }
+        writePatientAccessChange(transaction, accessChange);
 
         if (resolved.offerConsumption) consumeAssistantOffer(transaction, resolved.offerConsumption, now);
 
@@ -404,7 +403,7 @@ export const cancelAppointment = functions.https.onCall(
     async (request: functions.https.CallableRequest<CancelAppointmentData>) => {
         const callerUid = requireAuth(request);
         const callerDoc = await getCallerUserDoc(callerUid);
-        const { appointmentId, reason, statusUpdatedBy } = request.data;
+        const { appointmentId, reason } = request.data;
         if (!appointmentId) throw new functions.https.HttpsError('invalid-argument', 'appointmentId is required.');
 
         const ref = db.collection('appointments').doc(appointmentId);
@@ -421,11 +420,22 @@ export const cancelAppointment = functions.https.onCall(
                 throw new functions.https.HttpsError('not-found', 'Appointment not found.');
             }
             const currentAppointment = transactionSnap.data()!;
+            if (!ACTIVE_APPOINTMENT_STATUSES.includes(currentAppointment.status)) {
+                throw new functions.https.HttpsError('failed-precondition', 'Only active appointments can be cancelled.');
+            }
+            if (currentAppointment.patientId === callerUid && !isUnscheduledEmergencyRequest(currentAppointment as { type: string; timeSlot: string }) &&
+                appointmentExactUtcTime(appointmentDateKey(currentAppointment.appointmentDate.toDate()), currentAppointment.timeSlot).getTime() - Date.now() < 24 * 3600000) {
+                throw new functions.https.HttpsError('failed-precondition', 'Cancel at least 24 hours before the appointment.');
+            }
+            const accessChange = await readPatientAccessChange(transaction, {
+                doctorId: currentAppointment.doctorId, patientId: currentAppointment.patientId, appointmentId, nextStatus: 'cancelled',
+            });
             await releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
+            writePatientAccessChange(transaction, accessChange);
             transaction.update(ref, {
                 status: 'cancelled',
                 cancelReason: reason || null,
-                statusUpdatedBy: statusUpdatedBy || callerUid,
+                statusUpdatedBy: callerUid,
                 updatedAt: Timestamp.now(),
             });
         });
@@ -448,7 +458,7 @@ export const updateAppointmentStatus = functions.https.onCall(
     async (request: functions.https.CallableRequest<UpdateAppointmentStatusData>) => {
         const callerUid = requireAuth(request);
         const callerDoc = await getCallerUserDoc(callerUid);
-        const { appointmentId, status, statusUpdatedBy } = request.data;
+        const { appointmentId, status } = request.data;
         if (!appointmentId || !APPOINTMENT_STATUSES.includes(status)) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing or invalid appointment status.');
         }
@@ -511,6 +521,9 @@ export const updateAppointmentStatus = functions.https.onCall(
                 );
             }
             updatedAppointment = { ...currentAppointment, status };
+            const accessChange = await readPatientAccessChange(transaction, {
+                doctorId: currentAppointment.doctorId, patientId: currentAppointment.patientId, appointmentId, nextStatus: status,
+            });
             const appointmentDateForLock = firestoreDateToDate(currentAppointment.appointmentDate);
             if (
                 ACTIVE_APPOINTMENT_STATUSES.includes(status) &&
@@ -530,9 +543,10 @@ export const updateAppointmentStatus = functions.https.onCall(
                 await releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
             }
 
+            writePatientAccessChange(transaction, accessChange);
             transaction.update(ref, {
                 status,
-                statusUpdatedBy: statusUpdatedBy || callerUid,
+                statusUpdatedBy: callerUid,
                 updatedAt: Timestamp.now(),
             });
         });
@@ -662,7 +676,12 @@ export const deleteAppointment = functions.https.onCall(
             if (!transactionSnap.exists) {
                 throw new functions.https.HttpsError('not-found', 'Appointment not found.');
             }
-            await releaseAppointmentSlot(transaction, appointmentId, transactionSnap.data()!);
+            const currentAppointment = transactionSnap.data()!;
+            const accessChange = await readPatientAccessChange(transaction, {
+                doctorId: currentAppointment.doctorId, patientId: currentAppointment.patientId, appointmentId,
+            });
+            await releaseAppointmentSlot(transaction, appointmentId, currentAppointment);
+            writePatientAccessChange(transaction, accessChange);
             transaction.delete(ref);
         });
         await deleteAppointmentNotifications(appointmentId);
