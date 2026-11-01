@@ -101,7 +101,7 @@ UHC is a Flutter application for university health centers. Students and staff c
 - **Permission-Aware UI**. Admin actions are gated by granular permission keys (`users.manageNonAdmin`, `doctors.manage`, `departments.manage`, etc.)
 - **Analytics**. Interactive charts for appointment trends and department performance
 - **Reports**. Export XLSX reports for appointments, doctors, users, and departments (permission-gated)
-- **Permission-Safe Dashboard**. KPI stats display zero when the admin lacks the corresponding view permission
+- **Permission-Safe Dashboard**. Statistics show “No access” for missing permissions and “Unavailable” for failed requests, rather than misleading zero counts
 </details>
 
 <details>
@@ -175,7 +175,8 @@ flowchart TB
     firestore[(Cloud Firestore)]
     push["Firebase Cloud<br/>Messaging"]
 
-    data -->|File access| storage
+    data -->|Profile photos| storage
+    functions -->|Authorized medical files| storage
     data -->|"Sign-in and<br/>account linking"| auth
     data -->|"Appointment and<br/>assistant operations"| functions
     data -->|"Permitted<br/>reads and writes"| firestore
@@ -190,6 +191,12 @@ flowchart TB
 Firestore and Storage rules control direct client access. Cloud Functions validate callers and permissions for privileged operations. Mobile reminders are scheduled locally by the app; web uses push and in-app notifications.
 
 ---
+
+### Loading and caching
+
+Visited tabs retain their state, and selected repositories reuse short-lived, account-scoped data while combining duplicate requests. Local changes invalidate relevant entries; account changes clear session data. Cached information can briefly lag behind server changes, so booking and document access still require backend validation.
+
+Firestore persistent disk caching remains disabled to avoid the startup/logout problems covered by regression tests. This does not disable the app’s in-memory data caches or profile-image caching. Medical files are fetched through an authenticated endpoint with `no-store` responses.
 
 ## Project Structure
 
@@ -218,6 +225,8 @@ uhc/
 │   ├── appointments.ts             # Appointment lifecycle
 │   ├── assistant/                  # Gemini client, intent parsing, schedule matcher, quota
 │   ├── doctors.ts                  # Doctor accounts, profiles, schedules
+│   ├── analytics.ts                # Permission-checked appointment aggregates
+│   ├── medicalFiles.ts             # Authenticated medical-file operations
 │   ├── documentReplacement.ts      # Authorized replacement and bounded file cleanup
 │   ├── users.ts                    # Student/staff accounts and setup
 │   ├── departments.ts              # Department operations
@@ -226,6 +235,8 @@ uhc/
 │   ├── notifications/              # Delivery, admin sends, scheduled jobs
 │   └── shared/                     # Auth guards, audit logs, validation
 ├── test/                           # Widget, security regression, notification theme tests
+├── functions/test/                 # Backend unit and emulator regression tests
+├── test_driver/                    # Debug-only Android validation entry points
 ├── assets/                         # Images, animations, icons
 ├── android/                        # Android runner and configuration
 ├── ios/                            # iOS runner and configuration
@@ -250,7 +261,8 @@ uhc/
 | Flutter SDK | A stable release that satisfies both SDK constraints below |
 | Locked SDK constraints | Flutter >=3.47.0 and bundled Dart >=3.13.0, <4.0.0 |
 | Node.js | 24, matching the Functions runtime in `firebase.json` |
-| Firebase CLI | 15.19.0, the version used to check the deployment flags below |
+| Firebase CLI | 15.19.0 |
+| Java | JDK 21 for Gradle and Firebase emulators; update the local path in `android/gradle.properties` for your machine |
 | FlutterFire CLI | Required to generate the Firebase app configuration |
 | Android Studio / Xcode | Android tooling for Android builds; macOS and Xcode for iOS builds |
 
@@ -303,7 +315,7 @@ Follow the [Firebase setup guide](docs/FIREBASE_SETUP.md) for project selection,
 
 ## Cloud Functions
 
-Cloud Functions handle appointment operations, medical-document replacement and cleanup, the AI Appointment Assistant, account management, availability requests, notifications, and Super Admin governance. Protected operations require an active account with a linked Google provider and the relevant permissions.
+Cloud Functions handle appointment operations, authenticated medical-document upload, read, replacement, deletion, and cleanup, the AI Appointment Assistant, account management, availability requests, notifications, and Super Admin governance. Protected operations require an active account with a linked Google provider and the relevant permissions.
 
 Medical-document replacement uses `replaceMedicalDocument`, `queueMedicalDocumentCleanup`, and `cleanDocumentReplacements` in `functions/src/documentReplacement.ts`. These second-generation functions authorize replacements, queue obsolete files, and process bounded cleanup batches alongside the Storage access rules.
 
@@ -313,10 +325,10 @@ See the [Cloud Functions reference](docs/CLOUD_FUNCTIONS.md) for the full functi
 
 ## AI Appointment Assistant
 
-Patients can ask for an appointment in English, Arabic, or Kurdish Sorani. The backend uses Gemini `gemini-3.5-flash-lite` to extract the doctor, department, date, and time preferences. It then checks Firestore schedules and existing bookings in Baghdad time.
+Patients and regular admins can request their own appointments in English, Arabic, or Kurdish Sorani. Doctors and Super Admins cannot use the assistant. Reply language follows the message where detectable, with the app locale as a fallback. The backend uses Gemini `gemini-3.5-flash-lite` to extract the doctor, department, date, and time preferences. It then checks Firestore schedules and existing bookings in Baghdad time.
 
 - **Booking offers:** Up to six available slots, each valid for ten minutes. The patient selects a slot and confirms it before the backend creates the appointment. Slot locks and retry receipts protect against conflicting or duplicate bookings.
-- **Conversation history:** Up to 20 messages with seven-day retention. Resuming a conversation rechecks its offers; expired offers from the last successful search can be replaced without another Gemini call.
+- **Conversation history:** Up to 20 messages with a seven-day application expiry. Physical deletion requires a separately configured Firestore TTL policy. Resuming a conversation rechecks its offers; expired offers from the last successful search can be replaced without another Gemini call.
 - **Usage limits:** The app defaults to 500 requests per day and 15 per minute across the project, plus ten per minute per user. These are application limits, not a promise of Google's free allowance. When the daily limit is reached, patients can use manual booking or wait until the displayed reset time at midnight Pacific Time.
 - **Scheduling scope:** The model extracts scheduling intent. Replies come from application templates, and medical questions receive an out-of-scope response. It does not provide an assessment or diagnosis.
 
@@ -389,7 +401,7 @@ Run the checks above before compiling release artifacts.
 
 Use your production app identifiers, Firebase project, and signing configuration before creating a release build. The commands below compile release artifacts; they do not configure signing or publish to an app store.
 
-The checked-in Android release build currently uses the debug signing configuration in `android/app/build.gradle.kts`. Configure your own release signing before store distribution. Keep keystores and signing passwords out of Git.
+Android release signing reads a private properties file from `UHC_SIGNING_PROPERTIES_FILE`. It must provide `storeFile`, `storePassword`, `keyAlias`, and `keyPassword`; use an absolute keystore path. Without that file, a debug certificate is used only when `UHC_ALLOW_DEBUG_SIGNED_LOCAL_RELEASE=true` is explicitly set for local phone testing. Otherwise, release output is unsigned. Use a private release key for distribution and keep signing files and passwords outside Git.
 
 ```bash
 # Android

@@ -7,6 +7,20 @@ These are historical release notes, not a fresh verification of old builds or te
 <details open>
 <summary><b>Unreleased</b></summary>
 
+### Security, loading, and assistant updates
+
+- Route medical-file uploads, reads, and deletion through authenticated backend operations; enforce upload budgets and deny direct client access to medical-file Storage paths.
+- Guard account mutations against concurrent role changes and uncertain Auth results. Preserve transactional booking and retry checks.
+- Return permission-checked appointment aggregates for analytics without granting access to raw clinical records.
+- Reuse account-scoped data and visited tabs, combine duplicate reads, and improve loading errors and retries. Keep Firestore disk persistence disabled.
+- Preserve earlier appointment-history pages when loading more, and allow recovery after a failed request.
+- Improve Arabic and Kurdish assistant message direction and language detection independently of the app language.
+- Allow patients and regular admins to use the assistant; reject doctors and Super Admins, including offer-confirmation retries. Preserve separate appointment-management permissions.
+- Adjust admin list spacing and use plain English for analytics refresh status.
+- Add private Android release-signing configuration and require explicit opt-in for debug-signed local releases.
+- Remove unused files and assets, and stop tracking installed Node dependencies and compiled Functions output. Retain behavioral and security regression tests.
+
+
 ### Admin governance fixes
 
 - Admin deletion now returns an error and preserves the profile when Firebase Auth deletion fails. Cleanup still proceeds when the Auth account is already absent.

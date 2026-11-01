@@ -96,14 +96,30 @@ Source paths in this reference are relative to the repository root. For dependen
 | `rotateSuperAdminSlot` | Rotates slot holder atomically (demote + promote) | Super Admin |
 | `listAdminAuditLogs` | Returns filtered governance audit logs | Super Admin |
 
+## Medical documents and analytics
+
+| Function | Description | Access |
+|:---|:---|:---|
+| `uploadMedicalDocument` | Creates a document or stages replacement bytes; enforces upload budgets | Authorized caller for the target document/patient |
+| `readMedicalDocument` | HTTP GET with a Firebase bearer token; checks current access and returns bytes with no-store headers | Owner, doctor with current patient access, Super Admin, or admin with `reports.view` / `appointments.view`; legacy patient-only files remain owner-only |
+| `deleteMedicalDocument` | Removes document metadata after transactional authorization | Document author with current access to the target patient |
+| `replaceMedicalDocument` | Begins, finishes, or cancels an authorized replacement | Document author with current access to the target patient |
+| `queueMedicalDocumentCleanup` | Queues cleanup when document references change | Auto: Firestore trigger |
+| `cleanDocumentReplacements` | Processes bounded replacement cleanup | Auto: hourly job |
+| `getAppointmentAnalytics` | Returns dashboard counts or paged aggregate analytics without raw clinical records | Super Admin or admin with `analytics.view`, `appointments.view`, or `reports.view` |
+
+Medical-file operations live in `medicalFiles.ts` and `documentReplacement.ts`. Direct client Storage access to medical-file paths is denied; profile photos use separate rules.
+
 ## AI Appointment Assistant
 
 | Function | Description | Access |
 |:---|:---|:---|
-| `sendAssistantMessage` | Interprets patient scheduling requests in English, Arabic, and Kurdish Sorani using `gemini-3.5-flash-lite`, matches real doctor schedules in Baghdad time, returns expiring selectable offers (10-minute expiry), and saves bounded history | Active Patient (`student`, `staff`) with Google link |
-| `getAssistantHistory` | Returns the patient's saved conversation history and revalidates active offer availability against real doctor schedules without calling Gemini; resumes prior search preferences if offers have expired | Active Patient (`student`, `staff`) with Google link |
-| `clearAssistantHistory` | Clears conversation history and active offers immediately; increments revision and changes generation ID to prevent in-flight completions from resurrecting chat | Active Patient (`student`, `staff`) with Google link |
-| `confirmAssistantAppointment` | Explicitly confirms and books an assistant offer (`confirmed: true` required) through canonical appointment creation with slot locking and transaction idempotency | Active Patient (`student`, `staff`) with Google link |
+| `sendAssistantMessage` | Interprets patient scheduling requests in English, Arabic, and Kurdish Sorani using `gemini-3.5-flash-lite`, matches real doctor schedules in Baghdad time, returns expiring selectable offers (10-minute expiry), and saves bounded history | Active `student`, `staff`, or regular `admin` with Google link |
+| `getAssistantHistory` | Returns the patient's saved conversation history and revalidates active offer availability against real doctor schedules without calling Gemini; resumes prior search preferences if offers have expired | Active `student`, `staff`, or regular `admin` with Google link |
+| `clearAssistantHistory` | Clears conversation history and active offers immediately; increments revision and changes generation ID to prevent in-flight completions from resurrecting chat | Active `student`, `staff`, or regular `admin` with Google link |
+| `confirmAssistantAppointment` | Explicitly confirms and books an assistant offer (`confirmed: true` required) through canonical appointment creation with slot locking and transaction idempotency | Active `student`, `staff`, or regular `admin` with Google link |
+
+Doctors and Super Admins are excluded from all four assistant endpoints, including confirmation retries. This restriction does not change their separate appointment-management permissions.
 
 ### Callable API Contracts
 
@@ -231,71 +247,15 @@ The following indexes must be deployed via `firestore.indexes.json`:
 2. `appointment_slot_locks`:
    - `doctorId` ASC + `appointmentDateKey` ASC (Collection scope; supports date lock lookups)
 
-### Assistant Release Gate, Secret Manager & Privacy Architecture
+### Assistant configuration and retention
 
-Both `sendAssistantMessage` and `getAssistantHistory` declare the existing
-`GEMINI_API_KEY` secret binding. History checks the same readiness gate as sends,
-but never calls Gemini or consumes generation quota.
+The server selects `gemini-3.5-flash-lite`; clients cannot select the model. Live generation requires both `AI_ASSISTANT_ENABLED=true` and `AI_PRIVACY_RELEASE_GATE_ACCEPTED=true`, plus the `GEMINI_API_KEY` Secret Manager binding. Unset flags disable live generation. These defaults do not describe the current deployed environment.
 
-1. **Server-Side Model Enforcement**:
-   - The AI Assistant is locked exclusively to `gemini-3.5-flash-lite` on the server.
-   - Clients never select models or communicate directly with Gemini.
-2. **Transmission Gate (Disabled by Default)**:
-   - External transmission is disabled by default via `AI_ASSISTANT_ENABLED=false` and `AI_PRIVACY_RELEASE_GATE_ACCEPTED=false`.
-   - When disabled, `sendAssistantMessage` returns `status: 'disabled'`, `reasonCode: 'assistant_disabled'`, and performs zero database writes.
-   - Arbitrary production patient chat remains disabled pending an explicit institutional provider/data decision.
-3. **Secret Manager Key Binding**:
-   - The Gemini API key has already been configured by the project administrator into Google Cloud Secret Manager for the Firebase project (`uhca-20800`):
-     ```bash
-     firebase functions:secrets:set GEMINI_API_KEY
-     ```
-   - **No Key Handling Needed**: Developers do NOT need to set, read, print, fetch, or overwrite this key again. No API keys are tracked in source code, configuration files, client bundles, or database documents.
-4. **Factual Gemini API Terms (Effective March 23, 2026)**:
-   - The official [Gemini API Additional Terms of Service](https://ai.google.dev/gemini-api/terms) establish binding terms governing API usage:
-      - **Unpaid Services vs. Paid Services Distinction**:
-        - *Unpaid Services*: Prohibit submitting sensitive, confidential, or personal information. User content (prompts, inputs, and outputs) may be used by Google for product development and model improvement, and may be reviewed by human reviewers.
-        - *Paid Services*: User content is not used to train or improve Google models only when the Gemini API is enabled in a Google Cloud project with an active Cloud Billing account attached.
-      - **Request Project Billing vs. Firebase Project**: Key location alone does not decide paid/unpaid status. The key stored in Firebase `uhca-20800` belongs to a separate Gemini API project. The billing status of that specific Gemini API project (not the UHC Firebase project's Blaze plan) determines whether requests are treated as Paid or Unpaid under provider terms.
-      - **Universal Prohibitions & Restrictions (All Tiers)**:
-        - *Age / Access Restriction*: Prohibits using the Services in a manner that is targeted to or likely to be accessed by individuals under the age of 18.
-        - *Clinical Practice Clause*: Models must not be used for clinical practice, providing medical advice, patient care, or diagnostic decision-making.
-        - *Territory / Availability*: Services may only be accessed in authorized available regions.
-    - **Separation of Factual Terms from Architecture Gates**:
-      - *HIPAA Applicability*: HIPAA applicability is not established for this application (a university student/staff health clinic operating in international/educational contexts). Neither paying for API access nor executing a BAA automatically resolves all provider terms or acceptable use restrictions.
-      - *No Regex Illusion*: Redaction patterns, removing caller patient IDs, or superficial consent forms do not make raw natural-language patient messages free of sensitive or personal information. Therefore, production chat remains default-off.
- 5. **Controlled Local Offline Synthetic Testing**:
-    - For local development and CI testing, an explicit, fail-closed OFFLINE synthetic interpretation path is built into the backend:
-      - Enabled exclusively via:
-        ```bash
-        AI_OFFLINE_SYNTHETIC_TESTING=true
-        ```
-      - **Fixture Matching vs. Real AI Generation**: Synthetic mode uses deterministic keyword and catalog fixture parsing. It does **not** test real Gemini fluency, reasoning, or response latency, but verifies booking mechanics and pipeline plumbing safely offline.
-      - **Fail-Closed Preconditions**: Synthetic mode activates ONLY when:
-        1. `AI_OFFLINE_SYNTHETIC_TESTING=true`
-        2. `FUNCTIONS_EMULATOR=true` (running inside Firebase Functions emulator).
-        3. `FIRESTORE_EMULATOR_HOST` is configured to a strictly parsed loopback host & port (`127.0.0.1:8080`, `localhost:8080`, or `::1:8080`).
-        4. `FIREBASE_AUTH_EMULATOR_HOST` is configured to a strictly parsed loopback host & port (`127.0.0.1:9099`, `localhost:9099`, or `::1:9099`).
-        5. All project environment identifiers strictly match `demo-uhc-test`.
-      - **Anti-Bypass Guard**: Any mismatched or live project configuration (such as `uhca-20800`) is strictly rejected (`reasonCode: 'synthetic_mismatch_rejected'`). Synthetic mode can NEVER act as a production bypass, even if release flags or a real key are present.
-      - **Zero External Calls**: In synthetic mode, `SyntheticSchedulingInterpreter` parses requests deterministically from catalog fixtures without calling external APIs or `globalThis.fetch`.
-      - **Exercises Same Code**: Synthetic mode feeds directly into the exact same catalog validation, schedule matching (`matchScheduleAndGenerateOffers`), slot locking, idempotency hashing, and booking confirmation (`createAppointmentCore`) code.
-      - **Seeding Test Data**: Synthetic demo data can be populated in the emulator using `seedSyntheticEmulatorData()`, which seeds Auth emulator account `synthetic-patient-1` (with Google provider link), Firestore profile, and doctor schedule fixtures.
-6. **Physical TTL vs Application Retention**:
-   - Chat sessions, user rate limits, and quota documents define `expiresAt` timestamps (`functions/src/assistant/quota.ts` writes `expiresAt` on `assistant_user_limits` documents).
-   - For future operator setup (these are future release steps; policies were not deployed or verified in this task; "no TTL deployment" indicates deployment was not executed, not that cleanup is unnecessary), Cloud Firestore TTL policies can be configured via Google Cloud CLI for all three collection groups:
-      ```bash
-      gcloud firestore fields ttls update expiresAt --collection-group=assistant_chats --enable-ttl --project=uhca-20800
-      gcloud firestore fields ttls update expiresAt --collection-group=assistant_user_limits --enable-ttl --project=uhca-20800
-      gcloud firestore fields ttls update expiresAt --collection-group=assistant_project_quota --enable-ttl --project=uhca-20800
-      ```
-   - *Physical Deletion Delay*: Cloud Firestore physical TTL deletion is asynchronous and typically within 24 hours ([Firestore TTL documentation](https://firebase.google.com/docs/firestore/ttl)), not a hard maximum. `assistant_user_limits` records track per-minute usage.
-   - *Application-Level Cutoff*: To ensure deterministic privacy boundaries, application code enforces a strict 7-day cutoff filter (`pruneExpiredMessages`) on every read, discarding expired turns immediately.
-7. **Logging & Payload Audit**:
-   - Backend logging never prints raw patient message text, patient UIDs, API keys, or upstream error payloads.
-   - Structured logs record only high-level operational events (`appointmentId`, `bookingReference`, `reasonCode`).
-8. **No-Deploy Boundary**:
-   - All work in this repository is strictly local. No commands may deploy to production Firebase projects without explicit authorization.
+`getAssistantHistory` uses the same readiness gate and secret binding as sends, but does not call Gemini or consume generation quota. Message language detection is independent of the interface locale, which supplies a fallback.
 
+Free-text messages are not automatically redacted. Review provider terms and the intended data use before enabling live generation. See [assistant configuration and local testing](FIREBASE_SETUP.md#ai-assistant-configuration--privacy-gate) for setup and [Firestore TTL](FIREBASE_SETUP.md#firestore-ttl-time-to-live-policies) for physical cleanup. Logical expiry does not prove that expired documents have been deleted.
+
+Offline synthetic mode requires the isolated `demo-uhc-test` emulator configuration. It tests scheduling and booking behavior without contacting Gemini; it does not establish live AI quality or latency.
 
 ## Check-in behavior
 

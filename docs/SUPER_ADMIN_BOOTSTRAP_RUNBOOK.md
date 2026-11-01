@@ -55,7 +55,7 @@ The Super Admin system has two named slots:
 Governance rules:
 
 - Keep one primary and one backup Super Admin. Normal slot operations check occupancy; manual Firebase Console edits bypass those checks.
-- Super Admin bypasses the granular admin permission map. Authentication, active-account, Google-linking, and operation-specific checks still apply.
+- Super Admin bypasses the granular admin permission map. Authentication, active-account, Google-linking, and operation-specific checks still apply. The appointment assistant is limited to patients and regular admins; Super Admins cannot use it.
 - Normal admins require explicit `adminPermissions`.
 - New admins created from Super Admin governance start with the read-only permission preset.
 - Governance actions are performed through Cloud Functions, not direct client writes.
@@ -528,4 +528,4 @@ UI behavior:
 
 - `appointments.view` and `appointments.manage` remain in the backend permission schema.
 - The Super Admin permissions UI hides appointment permissions for now and sends both as `false`.
-- Appointment reads for admin workflows are currently covered by permissions such as `analytics.view` and `reports.view` in Firestore rules.
+- `analytics.view` grants aggregate analytics through `getAppointmentAnalytics`; it does not grant raw appointment reads. Firestore appointment reads require the applicable `reports.view` or `appointments.view` permission.
