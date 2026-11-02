@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -19,6 +20,14 @@ class AppMessages {
 
   static String error(BuildContext context, Object? error) {
     final l10n = localizations(context);
+    final details = switch (error) {
+      FirebaseFunctionsException e => e.details,
+      DoctorFunctionException e => e.details,
+      _ => null,
+    };
+    if (details is Map && details['reason'] == 'account-mutation-locked') {
+      return l10n.accountManagementLocked;
+    }
     final code = switch (error) {
       FirebaseException e => e.code,
       DoctorFunctionException e => e.code,

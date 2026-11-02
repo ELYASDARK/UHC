@@ -967,5 +967,7 @@
   "scheduleTimeOverlaps": "This time overlaps an existing slot.",
   "selectRecipientFirst": "Select a recipient before sending.",
   "noActiveRecipients": "No active recipients matched this target.",
-  "notesSaveFailed": "Could not save medical notes. Please try again."
+  "notesSaveFailed": "Could not save medical notes. Please try again.",
+  "accountManagementLocked": "Account management is locked. Contact a Super Admin to reconcile the account before trying again.",
+  "loadMore": "Load more"
 }

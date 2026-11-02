@@ -107,9 +107,11 @@ void main() async {
 
   // Load theme before running app so correct theme is applied on first frame
   final themeProvider = await ThemeProvider.create();
+  final localeProvider = LocaleProvider();
+  await localeProvider.ready;
 
   // Start app immediately - show UI first
-  runApp(UHCApp(themeProvider: themeProvider));
+  runApp(UHCApp(themeProvider: themeProvider, localeProvider: localeProvider));
 
   // Defer non-critical initialization after first frame is rendered
   // This prevents blocking the main thread during startup
@@ -254,8 +256,9 @@ Future<void> _recordNonFatalError(
 
 class UHCApp extends StatelessWidget {
   final ThemeProvider themeProvider;
+  final LocaleProvider? localeProvider;
 
-  const UHCApp({super.key, required this.themeProvider});
+  const UHCApp({super.key, required this.themeProvider, this.localeProvider});
 
   @override
   Widget build(BuildContext context) {
@@ -263,11 +266,36 @@ class UHCApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider.value(value: themeProvider),
-        ChangeNotifierProvider(create: (_) => LocaleProvider()),
-        ChangeNotifierProvider(create: (_) => AppointmentProvider()),
+        ChangeNotifierProvider(
+            create: (_) => localeProvider ?? LocaleProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, AppointmentProvider>(
+          create: (_) => AppointmentProvider(),
+          update: (_, auth, previous) {
+            final uid = auth.isAuthenticated ? auth.user?.id : null;
+            if (previous != null &&
+                previous.sessionUserId == uid &&
+                previous.sessionScope == auth.cacheSessionKey) {
+              return previous;
+            }
+            return AppointmentProvider(
+                sessionUserId: uid, sessionScope: auth.cacheSessionKey);
+          },
+        ),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => DoctorProvider()),
-        ChangeNotifierProvider(create: (_) => DoctorAppointmentProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, DoctorAppointmentProvider>(
+          create: (_) => DoctorAppointmentProvider(),
+          update: (_, auth, previous) {
+            final uid = auth.isAuthenticated ? auth.user?.id : null;
+            if (previous != null &&
+                previous.sessionUserId == uid &&
+                previous.sessionScope == auth.cacheSessionKey) {
+              return previous;
+            }
+            return DoctorAppointmentProvider(
+                sessionUserId: uid, sessionScope: auth.cacheSessionKey);
+          },
+        ),
         ChangeNotifierProvider(create: (_) => DocumentProvider()),
       ],
       child: Consumer2<ThemeProvider, LocaleProvider>(
@@ -400,9 +428,7 @@ class AppNavigatorState extends State<AppNavigator> {
   Future<void> _initializeBootState() async {
     final prefsFuture = SharedPreferences.getInstance();
 
-    // Keep a short minimum visual startup duration for smoothness.
     await Future.wait([
-      Future.delayed(const Duration(milliseconds: 900)),
       _warmupBootAssets(),
       prefsFuture,
     ]);
@@ -427,14 +453,22 @@ class AppNavigatorState extends State<AppNavigator> {
 
     try {
       final doc = await _doctorRepository.getDoctorByUserId(userId);
-      if (!mounted) return;
+      if (!mounted ||
+          _lastDoctorUserId != userId ||
+          context.read<AuthProvider>().currentUser?.id != userId) {
+        return;
+      }
       setState(() {
         _doctorModel = doc;
         _doctorLoading = false;
         _doctorFetchFailed = doc == null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted ||
+          _lastDoctorUserId != userId ||
+          context.read<AuthProvider>().currentUser?.id != userId) {
+        return;
+      }
       setState(() {
         _doctorLoading = false;
         _doctorFetchFailed = true;
@@ -568,14 +602,21 @@ class AppNavigatorState extends State<AppNavigator> {
           // Route superAdmin to dedicated governance shell
           screen = const SuperAdminShell();
         } else if (currentUser?.role == UserRole.doctor) {
+          final doctorUserId = currentUser!.id;
+          if (_lastDoctorUserId != doctorUserId) {
+            _doctorModel = null;
+            _doctorLoading = false;
+            _doctorFetchFailed = false;
+            _lastDoctorUserId = null;
+          }
           // Route doctor role to DoctorShell
           if (!_doctorLoading &&
               _doctorModel == null &&
               !_doctorFetchFailed &&
-              _lastDoctorUserId != currentUser!.id) {
+              _lastDoctorUserId != doctorUserId) {
             // Schedule fetch after this build frame
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              _fetchDoctorModel(currentUser.id);
+              _fetchDoctorModel(doctorUserId);
             });
             screen = const SplashScreen();
           } else if (_doctorLoading) {
@@ -626,10 +667,11 @@ class AppNavigatorState extends State<AppNavigator> {
                             );
                           } catch (_) {
                             if (!context.mounted) return;
-                            AppMessages.show(context,
+                            AppMessages.show(
+                              context,
                               SnackBar(
-                                content:
-                                    Text(AppMessages.localizations(context).logoutFailed),
+                                content: Text(AppMessages.localizations(context)
+                                    .logoutFailed),
                               ),
                             );
                           }
@@ -642,7 +684,8 @@ class AppNavigatorState extends State<AppNavigator> {
               ),
             );
           } else {
-            screen = DoctorShell(doctor: _doctorModel!);
+            screen =
+                DoctorShell(key: ValueKey(doctorUserId), doctor: _doctorModel!);
           }
         } else {
           screen = MainShell(

@@ -227,6 +227,7 @@ class FirebaseAssistantFunctionsService implements AssistantFunctionsService {
     Map<String, Object?> payload,
     T Function(Map<String, dynamic>) decode,
   ) async {
+    final elapsed = Stopwatch()..start();
     try {
       final response = await invokeFirebaseCallable(
         _functions,
@@ -242,6 +243,11 @@ class FirebaseAssistantFunctionsService implements AssistantFunctionsService {
       throw _unexpectedFailure(operation, failure);
     } on TypeError catch (failure) {
       throw _unexpectedFailure(operation, failure);
+    } finally {
+      if (kDebugMode) {
+        debugPrint(
+            'assistant_callable ${operation.callableName} elapsed_ms=${elapsed.elapsedMilliseconds}');
+      }
     }
   }
 

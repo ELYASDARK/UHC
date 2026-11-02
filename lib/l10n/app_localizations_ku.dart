@@ -2587,4 +2587,11 @@ class AppLocalizationsKu extends AppLocalizations {
   @override
   String get notesSaveFailed =>
       'نەتوانرا تێبینییە پزیشکییەکان پاشەکەوت بکرێن. دووبارە هەوڵ بدەوە.';
+
+  @override
+  String get accountManagementLocked =>
+      'بەڕێوەبردنی هەژمار قوفڵ کراوە. پێش هەوڵدانەوە پەیوەندی بە بەڕێوەبەری باڵا بکە بۆ پشکنینی دۆخی هەژمار.';
+
+  @override
+  String get loadMore => 'زیاتر پیشان بدە';
 }

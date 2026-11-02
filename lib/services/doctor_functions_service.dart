@@ -1,3 +1,4 @@
+import '../data/repositories/department_repository.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'firebase_callable.dart';
@@ -47,11 +48,13 @@ class DoctorFunctionsService {
         'dailyNotificationTime': dailyNotificationTime ?? '21:00',
       });
 
+      DepartmentRepository.invalidateCache();
       return Map<String, dynamic>.from(result.data);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('Error creating doctor account: ${e.code} - ${e.message}');
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to create doctor account',
       );
     } catch (e) {
@@ -80,6 +83,7 @@ class DoctorFunctionsService {
       debugPrint('Error updating doctor email: ${e.code} - ${e.message}');
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to update doctor email',
       );
     }
@@ -90,16 +94,18 @@ class DoctorFunctionsService {
     required String doctorId,
   }) async {
     try {
-      final callable = _functions.httpsCallable('deleteDoctorAccount');
-      final result = await callable.call<Map<String, dynamic>>({
+      final result =
+          await invokeFirebaseCallable(_functions, 'deleteDoctorAccount', {
         'doctorId': doctorId,
       });
 
-      return Map<String, dynamic>.from(result.data);
+      DepartmentRepository.invalidateCache();
+      return Map<String, dynamic>.from(result);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('Error deleting doctor account: ${e.code} - ${e.message}');
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to delete doctor account',
       );
     }
@@ -122,6 +128,7 @@ class DoctorFunctionsService {
       debugPrint('Error resetting doctor password: ${e.code} - ${e.message}');
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to reset doctor password',
       );
     }
@@ -158,11 +165,13 @@ class DoctorFunctionsService {
         if (isActive != null) 'isActive': isActive,
       });
 
+      DepartmentRepository.invalidateCache();
       return Map<String, dynamic>.from(result.data);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('Error updating doctor profile: ${e.code} - ${e.message}');
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to update doctor profile',
       );
     }
@@ -180,11 +189,13 @@ class DoctorFunctionsService {
         'isActive': isActive,
       });
 
+      DepartmentRepository.invalidateCache();
       return Map<String, dynamic>.from(result.data);
     } on FirebaseFunctionsException catch (e) {
       debugPrint('Error updating doctor status: ${e.code} - ${e.message}');
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to update doctor status',
       );
     }
@@ -207,6 +218,7 @@ class DoctorFunctionsService {
       debugPrint('Error updating doctor schedule: ${e.code}');
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to update doctor schedule',
       );
     }
@@ -229,6 +241,7 @@ class DoctorFunctionsService {
       );
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to submit availability request',
       );
     }
@@ -251,6 +264,7 @@ class DoctorFunctionsService {
       );
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to update availability',
       );
     }
@@ -275,6 +289,7 @@ class DoctorFunctionsService {
       );
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to update availability',
       );
     }
@@ -300,6 +315,7 @@ class DoctorFunctionsService {
       );
       throw DoctorFunctionException(
         code: e.code,
+        details: e.details,
         message: e.message ?? 'Failed to review availability request',
       );
     }
@@ -310,8 +326,10 @@ class DoctorFunctionsService {
 class DoctorFunctionException implements Exception {
   final String code;
   final String message;
+  final Object? details;
 
-  DoctorFunctionException({required this.code, required this.message});
+  DoctorFunctionException(
+      {required this.code, required this.message, this.details});
 
   @override
   String toString() => 'DoctorFunctionException: [$code] $message';

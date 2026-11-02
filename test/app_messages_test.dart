@@ -39,6 +39,19 @@ void main() {
         for (final error in [
           FirebaseFunctionsException(
               code: 'internal',
+              message: 'private server text',
+              details: {'reason': 'account-mutation-locked'}),
+          DoctorFunctionException(
+              code: 'aborted',
+              message: 'private server text',
+              details: {'reason': 'account-mutation-locked'}),
+        ]) {
+          expect(
+              AppMessages.error(context, error), l10n.accountManagementLocked);
+        }
+        for (final error in [
+          FirebaseFunctionsException(
+              code: 'internal',
               message: 'Private\n#0 package:secret/file.dart:9'),
           StateError(r'C:\private\patient-data.json'),
           'Exception: [firebase_functions/internal] private stack',

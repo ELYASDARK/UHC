@@ -2556,4 +2556,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get notesSaveFailed => 'تعذر حفظ الملاحظات الطبية. حاول مجددًا.';
+
+  @override
+  String get accountManagementLocked =>
+      'إدارة الحساب مقفلة. تواصل مع مسؤول أعلى لمراجعة حالة الحساب قبل المحاولة مجددًا.';
+
+  @override
+  String get loadMore => 'تحميل المزيد';
 }

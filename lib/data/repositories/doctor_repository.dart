@@ -1,3 +1,4 @@
+import 'department_repository.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,14 +16,29 @@ class DoctorRepository {
   CollectionReference<Map<String, dynamic>> get _doctorsRef =>
       _firestore.collection(_collection);
 
+  /// A malformed legacy record must not suppress other doctors in the directory.
+  static Iterable<DoctorModel> parseDoctors(
+      Iterable<DocumentSnapshot> documents) sync* {
+    for (final document in documents) {
+      DoctorModel doctor;
+      try {
+        doctor = DoctorModel.fromFirestore(document);
+      } on TypeError {
+        continue;
+      } on FormatException {
+        continue;
+      }
+      yield doctor;
+    }
+  }
+
   /// Get all doctors
   Future<List<DoctorModel>> getAllDoctors() async {
     try {
       // Try simple query without ordering to avoid index issues
       final snapshot =
           await _doctorsRef.get(_readOptions).timeout(_queryTimeout);
-      final doctors = snapshot.docs
-          .map((doc) => DoctorModel.fromFirestore(doc))
+      final doctors = parseDoctors(snapshot.docs)
           .where((d) => d.isActive) // Only show active doctors
           .toList();
       // Sort in-memory by name
@@ -30,7 +46,7 @@ class DoctorRepository {
       return doctors;
     } catch (e) {
       debugPrint('Error getting all doctors: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -48,7 +64,7 @@ class DoctorRepository {
       return null;
     } catch (e) {
       debugPrint('Error getting doctor by userId: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -69,7 +85,7 @@ class DoctorRepository {
       return null;
     } catch (e) {
       debugPrint('Error getting doctor by id: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -82,8 +98,7 @@ class DoctorRepository {
           .where('department', isEqualTo: department.name)
           .get(_readOptions)
           .timeout(_queryTimeout);
-      final doctors = snapshot.docs
-          .map((doc) => DoctorModel.fromFirestore(doc))
+      final doctors = parseDoctors(snapshot.docs)
           .where((d) => d.isActive) // Only show active doctors
           .toList();
       doctors.sort((a, b) => a.name.compareTo(b.name));
@@ -111,6 +126,7 @@ class DoctorRepository {
   /// Create doctor (admin)
   Future<String> createDoctor(DoctorModel doctor) async {
     final docRef = await _doctorsRef.add(doctor.toFirestore());
+    DepartmentRepository.invalidateCache();
     return docRef.id;
   }
 
@@ -118,11 +134,13 @@ class DoctorRepository {
   Future<void> updateDoctor(String doctorId, Map<String, dynamic> data) async {
     data['updatedAt'] = Timestamp.fromDate(DateTime.now());
     await _doctorsRef.doc(doctorId).update(data);
+    DepartmentRepository.invalidateCache();
   }
 
   /// Delete doctor (admin)
   Future<void> deleteDoctor(String doctorId) async {
     await _doctorsRef.doc(doctorId).delete();
+    DepartmentRepository.invalidateCache();
   }
 
   /// Toggle doctor availability (admin)
@@ -136,8 +154,7 @@ class DoctorRepository {
   /// Stream all doctors for real-time updates
   Stream<List<DoctorModel>> streamDoctors() {
     return _doctorsRef.snapshots().map((snapshot) {
-      final doctors = snapshot.docs
-          .map((doc) => DoctorModel.fromFirestore(doc))
+      final doctors = parseDoctors(snapshot.docs)
           .where((d) => d.isActive) // Only show active doctors
           .toList();
       doctors.sort((a, b) => a.name.compareTo(b.name));
@@ -163,8 +180,7 @@ class DoctorRepository {
         .where('department', isEqualTo: department.name)
         .snapshots()
         .map((snapshot) {
-      final doctors = snapshot.docs
-          .map((doc) => DoctorModel.fromFirestore(doc))
+      final doctors = parseDoctors(snapshot.docs)
           .where((d) => d.isActive) // Only show active doctors
           .toList();
       doctors.sort((a, b) => a.name.compareTo(b.name));

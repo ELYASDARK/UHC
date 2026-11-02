@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
 import '../services/local_notification_service.dart';
 import '../data/models/user_model.dart';
+import '../data/repositories/department_repository.dart';
 
 /// Authentication state
 enum AuthState { initial, loading, authenticated, unauthenticated, error }
@@ -29,6 +31,25 @@ class AuthProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _state == AuthState.authenticated;
   bool get isLoading => _state == AuthState.loading;
+  String? get cacheSessionKey {
+    final user = _currentUser;
+    if (!isAuthenticated || user == null || !user.isActive) return null;
+    return jsonEncode([
+      user.id,
+      user.email,
+      user.role.name,
+      user.googleEmail != null,
+      user.requiresInitialPasswordChange,
+      user.adminPermissions?.toMap(),
+    ]);
+  }
+
+  @override
+  void notifyListeners() {
+    DepartmentRepository.bindSession(cacheSessionKey);
+    super.notifyListeners();
+  }
+
   User? get firebaseUser => _authService.currentUser;
 
   AuthProvider({
@@ -83,12 +104,13 @@ class AuthProvider with ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
-      _currentUser = await _authService.getUserData(uid);
+      final loadedUser = await _authService.getUserData(uid);
 
       if (_isStaleAuthLoad(uid)) {
         return;
       }
 
+      _currentUser = loadedUser;
       if (_currentUser == null) {
         // Profile doc is missing for this auth UID.
         // Sign out to avoid falling back into a wrong shell.
@@ -363,10 +385,17 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Refresh user data without triggering loading state
+  Future<void> refreshCurrentUser() async {
+    final uid = _currentUser?.id;
+    if (uid != null) {
+      await _refreshUserData(uid);
+    }
+  }
+
   Future<void> _refreshUserData(String uid) async {
     try {
       final user = await _authService.getUserData(uid);
-      if (user != null) {
+      if (user != null && _currentUser?.id == uid) {
         _currentUser = user;
         notifyListeners();
       }

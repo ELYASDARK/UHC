@@ -13,6 +13,7 @@ import 'doctor_schedule_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/widgets/role_english_ltr_scope.dart';
+import '../../../core/widgets/management_action_footer.dart';
 
 /// Doctor management screen for admin
 class DoctorManagementScreen extends StatefulWidget {
@@ -77,7 +78,8 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
+        bottomNavigationBar: ManagementActionFooter(
+            child: FloatingActionButton.extended(
           onPressed: _canManage
               ? () {
                   showDialog(
@@ -92,7 +94,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
               ? AppColors.primary
               : AppColors.primary.withValues(alpha: 0.55),
           shape: const StadiumBorder(),
-        ),
+        )),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -267,7 +269,7 @@ class _DoctorManagementScreenState extends State<DoctorManagementScreen> {
                     padding: UhcResponsive.pagePadding(
                       context,
                       top: 8,
-                      bottom: UhcResponsive.isWide(context) ? 32 : 88,
+                      bottom: 0,
                     ),
                     itemCount: docs.length,
                     itemBuilder: (context, index) {

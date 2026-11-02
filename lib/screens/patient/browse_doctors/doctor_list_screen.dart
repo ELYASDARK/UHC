@@ -45,7 +45,9 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   bool _isLoading = true;
   List<DoctorModel> _doctors = [];
   List<DepartmentModel> _departments = [];
+  int _departmentRequestGeneration = 0;
   String? _error;
+  Future<void>? _refreshInFlight;
 
   // Stream subscriptions for real-time updates
   StreamSubscription<List<DoctorModel>>? _doctorsSubscription;
@@ -54,6 +56,8 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   @override
   void initState() {
     super.initState();
+    DepartmentRepository.cacheChanges.addListener(_directoryChanged);
+    _departments = DepartmentRepository.cachedDepartments ?? [];
     // Prefer initialDepartmentKey over initialDepartment (enum)
     if (widget.initialDepartmentKey != null) {
       _selectedDepartmentName = widget.initialDepartmentKey;
@@ -80,8 +84,15 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
     }
   }
 
+  void _directoryChanged() {
+    if (mounted && widget.captureState == DoctorListCaptureState.live) {
+      _loadDepartments(forceRefresh: false);
+    }
+  }
+
   @override
   void dispose() {
+    DepartmentRepository.cacheChanges.removeListener(_directoryChanged);
     _searchController.dispose();
     _doctorsSubscription?.cancel();
     _departmentsSubscription?.cancel();
@@ -121,10 +132,12 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
   }
 
   /// Load departments (one-time fetch, as they don't change often)
-  Future<void> _loadDepartments() async {
+  Future<void> _loadDepartments({bool forceRefresh = false}) async {
+    final generation = ++_departmentRequestGeneration;
     try {
-      final departments = await _departmentRepository.getAllDepartments();
-      if (mounted) {
+      final departments = await _departmentRepository.getAllDepartments(
+          forceRefresh: forceRefresh);
+      if (mounted && generation == _departmentRequestGeneration) {
         setState(() {
           _departments = departments;
         });
@@ -147,8 +160,26 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
       return;
     }
 
-    // Cancel existing subscription and resubscribe
-    _subscribeToData();
+    if (_refreshInFlight != null) return _refreshInFlight!;
+    return _refreshInFlight =
+        _readRefresh().whenComplete(() => _refreshInFlight = null);
+  }
+
+  Future<void> _readRefresh() async {
+    try {
+      final doctors = await _doctorRepository.getAllDoctors();
+      if (mounted) {
+        setState(() {
+          _doctors = doctors;
+          _error = null;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Failed to load doctors. Pull to retry.');
+      }
+    }
+    await _loadDepartments(forceRefresh: true);
   }
 
   List<DoctorModel> get _filteredDoctors {
@@ -365,10 +396,7 @@ class _DoctorListScreenState extends State<DoctorListScreen> {
           doctor: doctor,
           isDark: isDark,
           onTap: () => _navigateToDetail(doctor),
-        )
-            .animate(delay: Duration(milliseconds: index * 100))
-            .fadeIn(duration: 400.ms)
-            .slideX(begin: 0.05);
+        ).animate().fadeIn(duration: 180.ms).slideX(begin: 0.05);
       },
     );
   }

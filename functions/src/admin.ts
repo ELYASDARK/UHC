@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { requireIdleAccount, withAccountMutation } from './shared/accountMutation';
 
 import { admin, auth, db } from './firebase';
 import { writeAdminAuditLog } from './shared/audit';
@@ -103,15 +104,21 @@ export const changeAdminRole = functions.https.onCall(
         if (!['admin', 'student', 'staff'].includes(newRole))
             throw new functions.https.HttpsError('invalid-argument', 'Invalid role. Cannot assign doctor or superAdmin via this function.');
 
-        const targetDoc = await db.collection('users').doc(targetUid).get();
-        if (!targetDoc.exists) throw new functions.https.HttpsError('not-found', 'Target user not found.');
-        const targetData = targetDoc.data()!;
+        const targetRef = db.collection('users').doc(targetUid);
+        const targetData = await db.runTransaction(async tx => {
+            const targetDoc = await tx.get(targetRef);
+            if (!targetDoc.exists) throw new functions.https.HttpsError('not-found', 'Target user not found.');
+            const targetData = targetDoc.data()!;
+            requireIdleAccount(targetData);
+            const oldRole = targetData.role;
+
+            if (oldRole === 'superAdmin')
+                throw new functions.https.HttpsError('failed-precondition', 'Cannot change a Super Admin role via this function.');
+
+            tx.update(targetRef, { role: newRole, updatedAt: admin.firestore.Timestamp.now() });
+            return targetData;
+        });
         const oldRole = targetData.role;
-
-        if (oldRole === 'superAdmin')
-            throw new functions.https.HttpsError('failed-precondition', 'Cannot change a Super Admin role via this function.');
-
-        await db.collection('users').doc(targetUid).update({ role: newRole, updatedAt: admin.firestore.Timestamp.now() });
         await writeAdminAuditLog({
             actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data()!.fullName,
             targetUid, targetName: targetData.fullName,
@@ -212,20 +219,22 @@ export const deleteAdminAccount = functions.https.onCall(
             throw new functions.https.HttpsError('failed-precondition', 'This function can only target admin accounts.');
 
         try {
-            await auth.deleteUser(targetUid);
+            return await withAccountMutation({ userId: targetUid, roles: ['admin'], mutate: async () => {
+                await auth.deleteUser(targetUid).catch(error => {
+                    if ((error as { code?: string })?.code !== 'auth/user-not-found') throw error;
+                });
+                await deleteProfilePhotos(targetUid);
+                await db.collection('users').doc(targetUid).delete();
+                await writeAdminAuditLog({
+                    actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data()!.fullName,
+                    targetUid, targetName: targetData.fullName,
+                    targetRoleBefore: targetData.role, action: 'admin.delete',
+                });
+                return { success: true, message: 'Admin account deleted successfully' };
+            } });
         } catch (error) {
-            if ((error as { code?: string })?.code !== 'auth/user-not-found') {
-                throw toHttpsError(error, 'Failed to delete admin authentication account.');
-            }
+            throw toHttpsError(error, 'Failed to delete admin account.');
         }
-        await deleteProfilePhotos(targetUid);
-        await db.collection('users').doc(targetUid).delete();
-        await writeAdminAuditLog({
-            actorUid: callerUid, actorRole: 'superAdmin', actorName: callerDoc.data()!.fullName,
-            targetUid, targetName: targetData.fullName,
-            targetRoleBefore: targetData.role, action: 'admin.delete',
-        });
-        return { success: true, message: 'Admin account deleted successfully' };
     }
 );
 
@@ -384,6 +393,7 @@ export const assignSuperAdminSlot = functions.https.onCall(
             const targetSnap = await tx.get(targetRef);
             if (!targetSnap.exists) throw new functions.https.HttpsError('not-found', 'Target user not found.');
             const oldRole = targetSnap.data()!.role;
+            requireIdleAccount(targetSnap.data()!);
 
             // Block existing superAdmins from switching slots (would orphan the other slot)
             if (oldRole === 'superAdmin') {
@@ -450,6 +460,7 @@ export const rotateSuperAdminSlot = functions.https.onCall(
             const replacementRef = db.collection('users').doc(replacementUid);
             const replacementSnap = await tx.get(replacementRef);
             if (!replacementSnap.exists) throw new functions.https.HttpsError('not-found', 'Replacement user not found.');
+            requireIdleAccount(replacementSnap.data()!);
 
             // Block if replacement already holds the OTHER super admin slot
             if (replacementSnap.data()!.role === 'superAdmin') {

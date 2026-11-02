@@ -167,9 +167,9 @@ Use the project's actual results for handoff. The documentation review does not 
 | `appointment_slot_locks` | Transactional slot lock documents preventing double-booking (server-managed, client access denied) |
 | `appointment_day_coordination` | Transactional day coordination documents serializing booking and rescheduling across overlapping/differently-sized slot ranges (server-managed, client access denied) |
 | `appointment_idempotency` | Booking and assistant-confirmation idempotency receipts enabling safe lost-response retries (server-managed, client access denied) |
-| `assistant_chats` | Server-side conversational session state, turn leasing, and structured booking offers (server-managed, client access denied, TTL-managed) |
-| `assistant_user_limits` | Per-user rate-limiting records tracking per-minute turn usage (`USER_RPM` cap, keyed by `${patientId}_${minuteKey}`) per `functions/src/assistant/quota.ts` (server-managed, client access denied, TTL-managed) |
-| `assistant_project_quota` | Global daily upstream Gemini API quota tracker with midnight America/Los_Angeles reset (server-managed, client access denied, TTL-managed) |
+| `assistant_chats` | Server-side conversational session state, turn leasing, and structured booking offers (server-managed, client access denied, contains an expiry timestamp) |
+| `assistant_user_limits` | Per-user rate-limiting records tracking per-minute turn usage (`USER_RPM` cap, keyed by `${patientId}_${minuteKey}`) per `functions/src/assistant/quota.ts` (server-managed, client access denied, contains an expiry timestamp) |
+| `assistant_project_quota` | Project-wide minute and daily Gemini request counters, with daily reset at midnight America/Los_Angeles (server-managed, client access denied, contains an expiry timestamp) |
 | `notifications` | Per-user notification history |
 | `user_tokens/{uid}/tokens` | FCM token subcollection used by Cloud Functions for per-device push delivery |
 | `doctor_availability_requests` | Server-owned doctor unavailable requests with admin review status and request notes |
@@ -177,6 +177,12 @@ Use the project's actual results for handoff. The documentation review does not 
 | `admin_notification_sends` | Idempotency and audit records for admin-created notification sends |
 | `admin_notification_rate_limits` | Per-admin cooldown records for notification sending |
 | `medical_documents` | Uploaded file metadata and storage references |
+| `medical_document_replacements` | Replacement state, file ownership, and cleanup progress; not disposable test data |
+| `medical_upload_transfer_admissions` | Idempotent byte-transfer admission records |
+| `medical_upload_budgets` | Per-user and project upload budgets |
+| `appointment_analytics_jobs` | Server-managed paged analytics jobs and expiry |
+| `appointment_analytics_admissions` | Per-caller analytics job admission control |
+| `maintenance` | Server maintenance and migration progress |
 | `doctor_patient_access/{doctorUid}/patients` | Patient access-grant subcollection for scoped doctor access |
 | `admin_audit_logs` | Governance audit trail; client writes are denied by Firestore rules |
 
@@ -203,47 +209,23 @@ firebase deploy --only firestore:indexes
 
 ## Firestore TTL (Time-To-Live) Policies
 
-The AI assistant documents contain an `expiresAt` timestamp field (`functions/src/assistant/quota.ts` also writes `expiresAt` on `assistant_user_limits` documents). To prevent stale session accumulation and ensure automated purging, future operators can configure Firestore TTL policies using Google Cloud CLI (these are future release steps; policies were not deployed or verified in this task):
+Assistant chats and rate-limit records contain `expiresAt` timestamps. Those fields alone do not enable automatic deletion. Inspect the target project's TTL configuration before relying on physical cleanup; application-level history expiry and quota windows are enforced separately.
+
+An authorized operator can configure TTL for each appropriate collection group, for example:
 
 ```bash
-gcloud firestore fields ttls update expiresAt --collection-group=assistant_chats --enable-ttl --project=uhca-20800
-gcloud firestore fields ttls update expiresAt --collection-group=assistant_user_limits --enable-ttl --project=uhca-20800
-gcloud firestore fields ttls update expiresAt --collection-group=assistant_project_quota --enable-ttl --project=uhca-20800
+gcloud firestore fields ttls update expiresAt --collection-group=assistant_chats --enable-ttl --project=<your-firebase-project-id>
 ```
 
-> [!NOTE]
-> Physical TTL deletion in Cloud Firestore is asynchronous and typically occurs within 24 hours of expiration ([official Firestore TTL documentation](https://firebase.google.com/docs/firestore/ttl)), not a hard guarantee. Application-level queries apply real-time expiration filters (`pruneExpiredMessages`) on every read, while `assistant_user_limits` records track per-minute usage (`USER_RPM` cap per `functions/src/assistant/quota.ts`). These TTL policies were not deployed or verified in this task; "no TTL deployment" indicates that the deployment step was not executed, not that cleanup is unnecessary.
+Review `assistant_user_limits` and `assistant_project_quota` similarly. TTL deletion is asynchronous; see the [Firestore TTL documentation](https://firebase.google.com/docs/firestore/ttl). Do not apply a blanket deletion policy to booking receipts, slot coordination, medical replacement records, or audit logs: these can support retries, ownership checks, and cleanup.
 
 ### AI Assistant Configuration & Privacy Gate
 
-The UHC conversational assistant uses the server-side `gemini-3.5-flash-lite` model via Google AI Studio / Gemini API.
+Live generation requires `AI_ASSISTANT_ENABLED=true`, `AI_PRIVACY_RELEASE_GATE_ACCEPTED=true`, and the server-side `GEMINI_API_KEY` Secret Manager binding. Unset flags default to disabled; inspect the target environment separately rather than assuming a deployment has these defaults.
 
-> [!CAUTION]
-> **Privacy, Provider Terms & Architecture Gates**
-> By default, the assistant is **strictly disabled** in Cloud Functions:
-> - `AI_ASSISTANT_ENABLED=false`
-> - `AI_PRIVACY_RELEASE_GATE_ACCEPTED=false`
-> 
-> Arbitrary production patient chat remains disabled pending an actual institutional provider/data decision.
+The model is selected on the server as `gemini-3.5-flash-lite`. Free-text scheduling messages and bounded conversation context are sent to Gemini without automatic redaction. Before enabling live use, the project owner must review the [Gemini API terms](https://ai.google.dev/gemini-api/terms), the billing status of the project that owns the API key, and the institution's data requirements. The Firebase project's Blaze plan alone does not establish the Gemini project's billing status.
 
-### Factual Gemini API Terms (Effective March 23, 2026)
-According to the official [Gemini API Additional Terms of Service](https://ai.google.dev/gemini-api/terms):
-1. **Unpaid vs. Paid Services**:
-   - **Unpaid Services**: Prohibit submitting sensitive, personal, or confidential information. User content (prompts, inputs, and outputs) may be used for model training and product improvement, and may be reviewed by human reviewers.
-   - **Paid Services**: User content is not used to train or improve Google models only when the Gemini API is enabled in a Google Cloud project with an active Cloud Billing account attached.
-2. **Project Billing Separation vs. Secret Key Location**:
-   - The user has **already saved `GEMINI_API_KEY` into Firebase Secret Manager in `uhca-20800`**.
-   - However, that API key was generated from a separate Gemini API project (on the free tier).
-   - The billing status of the project owning the Gemini API key, **not** the UHC Firebase project's Blaze plan, governs whether requests are treated as Paid or Unpaid.
-   - **Do Not Reconfigure Key**: Developers do not need to set, read, fetch, or overwrite the key again.
-3. **Universal Restrictions (All Tiers)**:
-   - **Age / Access Restriction**: Prohibits using the Services in a manner that is targeted to or likely to be accessed by individuals under the age of 18.
-   - **Clinical Practice Clause**: Models must not be used for clinical practice, providing medical advice, patient care, or diagnostic decision-making.
-   - **Territory**: Available only in authorized regions.
-4. **Architecture Gate Principles**:
-   - HIPAA applicability is **not** established for this application (university student/staff health center). Paying for the API or executing a BAA does not automatically satisfy all provider terms or acceptable use restrictions.
-   - Regex redaction, removing caller IDs, or superficial consent forms do not make raw natural-language medical scheduling text safe under unpaid terms.
-   - Therefore, production gates remain default OFF.
+Provision the secret through the approved server-side secret workflow. Never put its value in Flutter code, documentation, fixtures, or command output. Preserve existing secret configuration during local testing.
 
 ### Controlled Local Offline Synthetic Testing
 The codebase includes a deterministic offline synthetic testing mode that exercises the exact same scheduling, slot locking, idempotency, and booking confirmation pipelines without making any external AI calls or transmitting patient data.
@@ -251,10 +233,6 @@ The codebase includes a deterministic offline synthetic testing mode that exerci
 > [!NOTE]
 > **Fixture Parsing vs. Real AI Generation**
 > Synthetic mode uses deterministic keyword matching against local catalog fixtures. It does **not** evaluate real Gemini AI generation quality, fluency, context reasoning, or live network latency. It is designed to verify system plumbing and booking mechanics safely offline.
-
-> [!IMPORTANT]
-> **Runtime Testing Status Caveat**
-> Backend Node.js tests and emulator runtime execution remain **UNRUN / blocked** by the host administrative broker in this environment (sandboxed broker denies Node.js process execution with exit code 127). All source contracts, schema boundaries, and mock assertions are verified in code and Dart MCP static analysis (0 errors), but runtime backend test commands cannot be executed directly until host broker permissions are granted.
 
 #### Exact Runnable PowerShell Steps for Local Testing
 

@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+import { readPatientAccessChange, writePatientAccessChange } from './shared/patientAccess';
 
 import { admin, db } from './firebase';
 import { writeAdminAuditLog } from './shared/audit';
@@ -249,7 +250,11 @@ async function cancelActiveAppointmentsForUnavailableDoctor(params: {
                 const data = current.data();
                 if (!current.exists || !data || data.doctorId !== params.doctorId ||
                     !ACTIVE_APPOINTMENT_STATUSES.includes(data.status)) return null;
+                const accessChange = await readPatientAccessChange(transaction, {
+                    doctorId: data.doctorId, patientId: data.patientId, appointmentId: doc.id, nextStatus: 'cancelled',
+                });
                 await releaseAppointmentSlot(transaction, doc.id, data);
+                writePatientAccessChange(transaction, accessChange);
                 transaction.update(doc.ref, {
                     status: 'cancelled',
                     cancelReason: 'Doctor unavailable. Please cancel or reschedule with another available time.',

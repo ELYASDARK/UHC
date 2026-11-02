@@ -1,3 +1,4 @@
+import '../../../core/widgets/session_stream_builder.dart';
 import 'package:uhc/core/utils/app_messages.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import 'user_form_dialog.dart';
 import '../../../core/widgets/loading_skeleton.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/widgets/role_english_ltr_scope.dart';
+import '../../../core/widgets/management_action_footer.dart';
 
 /// User management screen for admin
 class UserManagementScreen extends StatefulWidget {
@@ -125,10 +127,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
             // Users List
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _getUsersStream(),
+              child: SessionStreamBuilder<QuerySnapshot>(
+                permission: 'users.view',
+                queryKey: _displayLimit,
+                createStream: () => _getUsersStream(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
                     return SkeletonList(
                       itemBuilder: (context, index) =>
                           const CardSkeleton(height: 80),
@@ -188,7 +193,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   final hasMore = totalFetched >= _displayLimit;
 
                   return ResponsiveListView(
-                    padding: UhcResponsive.pagePadding(context, bottom: 32),
+                    padding: UhcResponsive.pagePadding(context, bottom: 0),
                     maxWidth: 1440,
                     gridOnWide: true,
                     tabletColumns: 1,
@@ -227,7 +232,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
+        bottomNavigationBar: ManagementActionFooter(
+            child: FloatingActionButton.extended(
           onPressed: _canManageNonAdminUsers
               ? _showAddUserDialog
               : _showPermissionDenied,
@@ -243,7 +249,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             style: const TextStyle(color: Colors.white),
           ),
           shape: const StadiumBorder(),
-        ),
+        )),
       ),
     );
   }

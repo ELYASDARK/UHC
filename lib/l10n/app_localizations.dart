@@ -4971,6 +4971,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not save medical notes. Please try again.'**
   String get notesSaveFailed;
+
+  /// No description provided for @accountManagementLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Account management is locked. Contact a Super Admin to reconcile the account before trying again.'**
+  String get accountManagementLocked;
+
+  /// No description provided for @loadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get loadMore;
 }
 
 class _AppLocalizationsDelegate

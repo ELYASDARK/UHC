@@ -6,6 +6,8 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { admin, db } from './firebase';
 import { getCallerUserDoc, requireAuth } from './shared/auth';
+import { authenticatedMedicalUrl, authorizeMedicalMutation } from './shared/medicalDocumentAccess';
+import { reserveMedicalUpload } from './shared/medicalUploadBudget';
 
 const operations = db.collection('medical_document_replacements');
 const documents = db.collection('medical_documents');
@@ -19,7 +21,7 @@ function id(value: unknown): string {
     if (typeof value !== 'string' || !/^[\w-]{1,128}$/.test(value)) return fail('invalid-argument', 'Invalid identifier.');
     return value;
 }
-function metadata(value: unknown): Record<string, string> {
+export function validateMedicalMetadata(value: unknown): Record<string, string> {
     const data = value as Record<string, unknown> | null;
     if (!data || Object.keys(data).some(key => !['name', 'type', 'notes'].includes(key)) ||
         typeof data.name !== 'string' || !data.name.trim() || data.name.length > 200 ||
@@ -32,15 +34,7 @@ function metadata(value: unknown): Record<string, string> {
 
 // All permission-bearing Firestore reads are inside the committing transaction.
 async function authorize(tx: FirebaseFirestore.Transaction, uid: string, document: FirebaseFirestore.DocumentSnapshot): Promise<void> {
-    if (!document.exists) return fail('not-found', 'Document no longer exists.');
-    const data = document.data()!;
-    const user = (await tx.get(db.doc(`users/${uid}`))).data();
-    if (!user || user.isActive !== true || typeof user.googleEmail !== 'string' || !user.googleEmail ||
-        (data.addedBy ?? data.userId) !== uid) return fail('permission-denied', 'Document replacement is not permitted.');
-    if (data.userId === uid) return;
-    if (user.role !== 'doctor' || !(await tx.get(db.doc(`doctor_patient_access/${uid}/patients/${id(data.userId)}`))).exists) {
-        return fail('permission-denied', 'Patient access is unavailable.');
-    }
+    await authorizeMedicalMutation(tx, uid, document);
 }
 
 function candidatePath(docId: string, operationId: string): string {
@@ -52,7 +46,7 @@ async function removeCandidate(op: FirebaseFirestore.DocumentSnapshot): Promise<
     await admin.storage().bucket().file(candidatePath(id(op.data()!.docId), op.id)).delete({ ignoreNotFound: true });
 }
 
-async function cancel(uid: string, operationId: string): Promise<boolean> {
+export async function cancelMedicalUpload(uid: string, operationId: string): Promise<boolean> {
     const ref = operations.doc(operationId);
     const committed = await db.runTransaction(async tx => {
         const op = await tx.get(ref);
@@ -73,18 +67,19 @@ export const replaceMedicalDocument = onCall({ region: 'us-central1', concurrenc
     const uid = requireAuth(request);
     // Cancellation remains available after access revocation, but can only clean
     // the caller's uncommitted operation. It cannot remove a committed file.
-    if (input?.action === 'cancel') return { committed: await cancel(uid, id(input.operationId)) };
+    if (input?.action === 'cancel') return { committed: await cancelMedicalUpload(uid, id(input.operationId)) };
     await getCallerUserDoc(uid);
     if (input?.action === 'begin') {
         // Rollback can stop new uploads while existing finish/cancel recovery
         // remains available and committed-file reads keep their current policy.
         if (process.env.DOCUMENT_REPLACEMENT_PAUSED === 'true') return fail('unavailable', 'Document replacement is temporarily paused.');
         const docId = id(input.docId);
-        const changes = metadata(input.metadata);
+        const changes = validateMedicalMetadata(input.metadata);
         const fileName = input.fileName;
         if (typeof fileName !== 'string' || !fileName || fileName.length > 255 || /[\/\\\x00-\x1f]/.test(fileName) ||
             !/\.(pdf|jpe?g|png|docx?)$/i.test(fileName)) return fail('invalid-argument', 'Invalid file name.');
         const ref = operations.doc(randomUUID());
+        await reserveMedicalUpload(uid, `replacement-begin:${ref.id}`, 0);
         await db.runTransaction(async tx => {
             const doc = await tx.get(documents.doc(docId));
             await authorize(tx, uid, doc);
@@ -116,12 +111,9 @@ export const replaceMedicalDocument = onCall({ region: 'us-central1', concurrenc
             !/^(application\/pdf|image\/(jpeg|png)|application\/msword|application\/vnd.openxmlformats-officedocument.wordprocessingml.document)$/.test(fileMetadata.contentType ?? '')) {
             return fail('invalid-argument', 'Invalid document file.');
         }
-        const token = String(fileMetadata.metadata?.firebaseStorageDownloadTokens ?? '').split(',')[0];
-        if (!token) return fail('failed-precondition', 'Uploaded document has no download token.');
-        const host = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
-        const origin = host && process.env.GCLOUD_PROJECT === 'demo-uhc-test'
-            ? `http://${host}` : 'https://firebasestorage.googleapis.com';
-        const url = `${origin}/v0/b/${encodeURIComponent(file.bucket.name)}/o/${encodeURIComponent(path)}?alt=media&token=${encodeURIComponent(token)}`;
+        await file.setMetadata({ cacheControl: 'private, no-store, max-age=0',
+            metadata: { firebaseStorageDownloadTokens: null } });
+        const url = authenticatedMedicalUrl(id(op.data()!.docId));
         await db.runTransaction(async tx => {
             const fresh = await tx.get(ref);
             if (fresh.data()!.status === 'committed') return;
@@ -137,7 +129,7 @@ export const replaceMedicalDocument = onCall({ region: 'us-central1', concurrenc
     } catch (error) {
         // Also handles a lost transaction response: cancel serializes against
         // finish and reports success if the transaction actually committed.
-        if (!(await cancel(uid, operationId))) throw error;
+        if (!(await cancelMedicalUpload(uid, operationId))) throw error;
     }
     await processMaintenance(await ref.get());
     return { committed: true };
@@ -162,6 +154,7 @@ async function maintainCommittedFile(op: FirebaseFirestore.DocumentSnapshot): Pr
             uhcReplacementUser: data.userId,
             uhcReplacementAuthor: data.actor,
             uhcReplacementCommitted: 'true',
+            firebaseStorageDownloadTokens: null,
         } });
     } else {
         // No client can attach this server-owned path to another document.

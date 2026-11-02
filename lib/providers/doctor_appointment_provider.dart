@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../core/utils/session_read_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,7 +15,39 @@ import '../services/local_notification_service.dart';
 class DoctorAppointmentProvider extends ChangeNotifier {
   final AppointmentRepository _appointmentRepo;
 
-  DoctorAppointmentProvider({AppointmentRepository? appointmentRepository})
+  final String? sessionUserId;
+  final String? sessionScope;
+  bool _hasLoaded = false;
+  bool _hasLoadedFull = false;
+  bool _loadingFull = false;
+  DateTime? _loadedAt;
+  Future<void>? _loadInFlight;
+  Future<void>? _maintenanceInFlight;
+  int _mutationsPending = 0;
+  final _reads = SessionReadCache<List<AppointmentModel>>(
+      retention: Duration.zero, timeout: const Duration(seconds: 15));
+  Future<void>? _photoLoad;
+  DateTime? _lastPhotoRefresh;
+  bool _disposed = false;
+  int _loadGeneration = 0;
+  String? loadedDoctorId;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _loadGeneration++;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  DoctorAppointmentProvider(
+      {this.sessionUserId,
+      this.sessionScope,
+      AppointmentRepository? appointmentRepository})
       : _appointmentRepo = appointmentRepository ?? AppointmentRepository();
   final UserRepository _userRepo = UserRepository();
 
@@ -32,6 +66,8 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   // Getters
   List<AppointmentModel> get appointments => _appointments;
   bool get isLoading => _isLoading;
+  bool get hasLoaded => _hasLoaded;
+  bool get hasLoadedFull => _hasLoadedFull;
   String? get error => _error;
   Map<String, String?> get patientPhotos => _patientPhotos;
 
@@ -117,50 +153,102 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     }
   }
 
-  /// Load all appointments for this doctor
-  Future<void> loadAppointments(String doctorId) async {
+  Future<void> loadAppointments(String doctorId, {bool forceRefresh = true}) =>
+      _loadDoctorAppointments(doctorId,
+          dashboard: false, forceRefresh: forceRefresh);
+
+  Future<void> loadDashboardAppointments(String doctorId) =>
+      _loadDoctorAppointments(doctorId, dashboard: true, forceRefresh: true);
+
+  bool _isCurrentLoad(int generation) =>
+      !_disposed && generation == _loadGeneration;
+
+  Future<void> _loadDoctorAppointments(String doctorId,
+      {required bool dashboard, required bool forceRefresh}) {
+    if (_disposed) return Future.value();
+    if (loadedDoctorId != doctorId) {
+      clear();
+      loadedDoctorId = doctorId;
+    }
+    if (_loadInFlight != null) {
+      if (dashboard || _loadingFull) return _loadInFlight!;
+      return _loadInFlight!
+          .then((_) => loadAppointments(doctorId, forceRefresh: forceRefresh));
+    }
+    if (!forceRefresh &&
+        _hasLoadedFull &&
+        _loadedAt != null &&
+        DateTime.now().difference(_loadedAt!) < const Duration(seconds: 30)) {
+      return Future.value();
+    }
+    final generation = ++_loadGeneration;
+    _reads.bindSession('$doctorId/$dashboard');
+    _loadingFull = !dashboard;
     _isLoading = true;
     _error = null;
     notifyListeners();
-
-    try {
-      _appointments = await _appointmentRepo.getAllDoctorAppointments(doctorId);
-
-      // Auto-mark overdue pending appointments as no-show (best-effort)
-      await _autoMarkNoShow(doctorId);
-
-      await _fetchPatientPhotos();
-      _error = null;
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-
-    // Best-effort: schedule daily summary notifications in background
-    scheduleDailyNotifications();
+    return _loadInFlight =
+        _readAppointments(doctorId, generation, dashboard: dashboard);
   }
 
-  /// Load only the appointments needed by the dashboard first paint.
-  Future<void> loadDashboardAppointments(String doctorId) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
+  Future<void> _readAppointments(String doctorId, int generation,
+      {required bool dashboard}) async {
     try {
-      _appointments =
-          await _appointmentRepo.getDoctorDashboardAppointments(doctorId);
-      _error = null;
-    } catch (e) {
-      _error = e.toString();
+      final appointments = await _reads.read(() => dashboard
+          ? _appointmentRepo.getDoctorDashboardAppointments(doctorId)
+          : _appointmentRepo.getAllDoctorAppointments(doctorId));
+      if (!_isCurrentLoad(generation)) return;
+      if (dashboard && _hasLoadedFull) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        _appointments = [
+          ..._appointments.where((apt) => apt.appointmentDate.isBefore(today)),
+          ...appointments,
+        ];
+      } else {
+        _appointments = appointments;
+      }
+      _hasLoaded = true;
+      _hasLoadedFull = _hasLoadedFull || !dashboard;
+      _loadedAt = DateTime.now();
+    } catch (error) {
+      if (_isCurrentLoad(generation)) {
+        if (error is FirebaseException &&
+            ['permission-denied', 'unauthenticated'].contains(error.code)) {
+          _appointments = [];
+          _patientPhotos.clear();
+          _hasLoaded = false;
+          _hasLoadedFull = false;
+        }
+        _error = 'Unable to refresh appointments. Please try again.';
+      }
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (_isCurrentLoad(generation)) {
+        _isLoading = false;
+        _loadInFlight = null;
+        notifyListeners();
+      }
     }
-
+    if (!_isCurrentLoad(generation) || _error != null) return;
     _runDashboardPostLoadWork(doctorId);
-    scheduleDailyNotifications();
+    unawaited(scheduleDailyNotifications());
+  }
+
+  /// Pause maintenance after its current server operation before a user write.
+  Future<T> _mutate<T>(Future<T> Function() write) async {
+    _mutationsPending++;
+    try {
+      await _maintenanceInFlight;
+      if (_disposed) throw StateError('The session has ended.');
+      final result = await write();
+      _loadGeneration++;
+      _loadInFlight = null;
+      _reads.invalidate();
+      _loadedAt = null;
+      return result;
+    } finally {
+      _mutationsPending--;
+    }
   }
 
   /// Update appointment status (confirm, complete, no-show, cancel)
@@ -180,11 +268,11 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _appointmentRepo.updateAppointmentStatus(
-        appointmentId,
-        status,
-        statusUpdatedBy: statusUpdatedBy,
-      );
+      await _mutate(() => _appointmentRepo.updateAppointmentStatus(
+            appointmentId,
+            status,
+            statusUpdatedBy: statusUpdatedBy,
+          ));
 
       // Refresh
       await loadAppointments(doctorId);
@@ -207,7 +295,8 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _appointmentRepo.confirmAppointmentCheckIn(appointmentId, qrCode);
+      await _mutate(() =>
+          _appointmentRepo.confirmAppointmentCheckIn(appointmentId, qrCode));
       await loadAppointments(doctorId);
       return true;
     } catch (e) {
@@ -235,11 +324,11 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _appointmentRepo.cancelAppointment(
-        appointmentId,
-        reason,
-        statusUpdatedBy: statusUpdatedBy,
-      );
+      await _mutate(() => _appointmentRepo.cancelAppointment(
+            appointmentId,
+            reason,
+            statusUpdatedBy: statusUpdatedBy,
+          ));
 
       await loadAppointments(doctorId);
       return true;
@@ -258,7 +347,8 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     String doctorId,
   ) async {
     try {
-      await _appointmentRepo.updateMedicalNotes(appointmentId, notes);
+      await _mutate(
+          () => _appointmentRepo.updateMedicalNotes(appointmentId, notes));
       // Refresh
       await loadAppointments(doctorId);
       return true;
@@ -286,11 +376,11 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _appointmentRepo.completeAppointment(
-        appointmentId,
-        notes: notes,
-        statusUpdatedBy: statusUpdatedBy,
-      );
+      await _mutate(() => _appointmentRepo.completeAppointment(
+            appointmentId,
+            notes: notes,
+            statusUpdatedBy: statusUpdatedBy,
+          ));
 
       await loadAppointments(doctorId);
       return true;
@@ -321,6 +411,14 @@ class DoctorAppointmentProvider extends ChangeNotifier {
 
   /// Clear all data (on logout)
   void clear() {
+    _loadGeneration++;
+    loadedDoctorId = null;
+    _reads.bindSession(null);
+    _loadInFlight = null;
+    _hasLoaded = false;
+    _hasLoadedFull = false;
+    _loadedAt = null;
+    _isLoading = false;
     _appointments = [];
     _patientPhotos = {};
     _error = null;
@@ -347,7 +445,11 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   /// appointments. Cancels all existing summaries first, then recreates.
   /// Internal routine to sync local notifications with Firestore/SharedPreferences
   Future<void> scheduleDailyNotifications() async {
-    if (_dailyNotifDoctorUserId == null || _dailyNotifSchedule == null) return;
+    if (_disposed ||
+        _dailyNotifDoctorUserId == null ||
+        _dailyNotifSchedule == null) {
+      return;
+    }
     if (_dailyScheduleInFlight != null) {
       debugPrint(
         'Daily summary scheduling skipped: a previous sync is still in progress.',
@@ -393,6 +495,7 @@ class DoctorAppointmentProvider extends ChangeNotifier {
           .collection('users')
           .doc(_dailyNotifDoctorUserId)
           .get();
+      if (_disposed) return;
       final userData = userSnap.data();
       if (userData == null) return;
       final isDoctor = userData['role'] == 'doctor';
@@ -428,6 +531,7 @@ class DoctorAppointmentProvider extends ChangeNotifier {
       final today = DateTime(now.year, now.month, now.day);
 
       for (int dayOffset = 0; dayOffset < 7; dayOffset++) {
+        if (_disposed) return;
         final notificationDate = today.add(Duration(days: dayOffset));
         // Configured time on notificationDate
         final scheduledTime = notificationDate
@@ -474,8 +578,9 @@ class DoctorAppointmentProvider extends ChangeNotifier {
   /// the patient checked in (QR scan), so that stays for the doctor to close.
   Future<void> _autoMarkNoShow(
     String doctorId, {
-    bool refetchAll = true,
+    required int generation,
   }) async {
+    if (!_isCurrentLoad(generation)) return;
     final now = DateTime.now();
     // 30 min appointment duration + 30 min grace = 60 min after slot start
     const autoNoShowMinutes = 60;
@@ -493,29 +598,23 @@ class DoctorAppointmentProvider extends ChangeNotifier {
     debugPrint(
         'Auto no-show: marking ${overdue.length} overdue appointment(s)');
 
+    final changedIds = <String>{};
     for (final apt in overdue) {
+      if (!_isCurrentLoad(generation) || _mutationsPending > 0) break;
       try {
         await _appointmentRepo.updateAppointmentStatus(
           apt.id,
           AppointmentStatus.noShow,
           statusUpdatedBy: 'system_auto',
         );
+        changedIds.add(apt.id);
       } catch (e) {
         debugPrint('Auto no-show failed for ${apt.id}: $e');
       }
     }
 
-    if (refetchAll) {
-      try {
-        _appointments =
-            await _appointmentRepo.getAllDoctorAppointments(doctorId);
-      } catch (e) {
-        debugPrint('Re-fetch after auto no-show failed: $e');
-      }
-      return;
-    }
-
-    final overdueIds = overdue.map((apt) => apt.id).toSet();
+    if (!_isCurrentLoad(generation)) return;
+    final overdueIds = changedIds;
     _appointments = _appointments
         .map((apt) => overdueIds.contains(apt.id)
             ? apt.copyWith(status: AppointmentStatus.noShow)
@@ -526,29 +625,57 @@ class DoctorAppointmentProvider extends ChangeNotifier {
 
   /// Batch-fetch profile photos for all unique patients in the appointment list.
   Future<void> _fetchPatientPhotos() async {
-    final uniqueIds = _appointments.map((a) => a.patientId).toSet();
+    final pending = _photoLoad;
+    if (pending != null) await pending;
+    if (_disposed) return;
+    if (_photoLoad != null) return _photoLoad!;
+    if (_lastPhotoRefresh == null ||
+        DateTime.now().difference(_lastPhotoRefresh!) >=
+            const Duration(minutes: 5)) {
+      _patientPhotos.clear();
+      _lastPhotoRefresh = DateTime.now();
+    }
+    final work = _readPatientPhotos();
+    _photoLoad = work;
+    try {
+      await work;
+    } finally {
+      if (identical(_photoLoad, work)) _photoLoad = null;
+    }
+  }
+
+  Future<void> _readPatientPhotos() async {
+    final generation = _loadGeneration;
+    final uniqueIds = _appointments
+        .map((a) => a.patientId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
     // Only fetch IDs we haven't cached yet
     final idsToFetch =
         uniqueIds.where((id) => !_patientPhotos.containsKey(id)).toList();
     if (idsToFetch.isEmpty) return;
-    // Fetch all patient photos in parallel instead of sequentially (N+1 fix)
-    await Future.wait(idsToFetch.map((id) async {
-      try {
-        final user = await _userRepo.getUserById(id);
-        _patientPhotos[id] = user?.photoUrl;
-      } catch (_) {
-        _patientPhotos[id] = null;
+    var next = 0;
+    await Future.wait(List.generate(4, (_) async {
+      while (next < idsToFetch.length && _isCurrentLoad(generation)) {
+        final id = idsToFetch[next++];
+        try {
+          final user = await _userRepo.getUserById(id);
+          if (_isCurrentLoad(generation)) _patientPhotos[id] = user?.photoUrl;
+        } catch (_) {
+          // Transient failures can be retried on a later refresh.
+        }
       }
     }));
+    if (_isCurrentLoad(generation)) notifyListeners();
   }
 
-  Future<void> _runDashboardPostLoadWork(String doctorId) async {
-    try {
-      await _autoMarkNoShow(doctorId, refetchAll: false);
-      await _fetchPatientPhotos();
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Dashboard post-load work failed: $e');
-    }
+  void _runDashboardPostLoadWork(String doctorId) {
+    unawaited(_fetchPatientPhotos());
+    if (_maintenanceInFlight != null || _mutationsPending > 0) return;
+    final work = _autoMarkNoShow(doctorId, generation: _loadGeneration);
+    _maintenanceInFlight = work;
+    unawaited(work.whenComplete(() {
+      if (identical(_maintenanceInFlight, work)) _maintenanceInFlight = null;
+    }));
   }
 }

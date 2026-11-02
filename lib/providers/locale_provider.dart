@@ -35,8 +35,9 @@ class LocaleProvider extends ChangeNotifier {
       AppLocale.languageNames[_locale.languageCode] ?? 'English';
 
   LocaleProvider() {
-    _loadLocale();
+    ready = _loadLocale();
   }
+  late final Future<void> ready;
 
   Future<void> _loadLocale() async {
     final prefs = await SharedPreferences.getInstance();

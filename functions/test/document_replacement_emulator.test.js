@@ -100,6 +100,14 @@ async function begin(actor, document, fileName = 'new.png') {
     return call(actor, { action: 'begin', docId: document.ref.id, expectedStoragePath: current.storagePath, fileName, metadata: { name: 'Replaced', notes: 'Synthetic', type: 'other' } });
 }
 async function upload(actor, op, contentType = 'image/png', status = 200, customMetadata = {}) {
+    if (status === 200) {
+        const result = await fetch('http://127.0.0.1:5001/demo-uhc-test/us-central1/uploadMedicalDocument', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${actor.token}` },
+            body: JSON.stringify({ data: { action: 'stageReplacement', operationId: op.operationId, bytes: Buffer.from('synthetic bytes').toString('base64') } }),
+        });
+        assert.equal(result.status, 200, await result.text());
+        return;
+    }
     const boundary = 'qa_synthetic_boundary';
     const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ name: op.storagePath, contentType, metadata: customMetadata })}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\nsynthetic bytes\r\n--${boundary}--\r\n`;
     const response = await fetch(`http://127.0.0.1:9199/v0/b/demo-uhc-test.appspot.com/o?name=${encodeURIComponent(op.storagePath)}`, {
@@ -143,7 +151,8 @@ test('patient replacement preserves identity, rejects direct rule bypass and cle
     assert.equal(replaced.addedBy, document.data.addedBy);
     assert.equal(replaced.userId, document.data.userId);
     assert.equal(replaced.fileName, 'new.png');
-    assert.ok(replaced.url.includes(encodeURIComponent(first.storagePath)));
+    assert.ok(replaced.url.includes('readMedicalDocument?documentId='));
+    assert.equal(replaced.url.includes('token='), false);
     assert.equal((await call(patient, { action: 'cancel', operationId: first.operationId })).committed, true);
     assert.equal((await bucket.file(first.storagePath).exists())[0], true);
     const second = await begin(patient, document, 'new.pdf');
@@ -177,7 +186,7 @@ test('doctor author can replace, revoked access and cancelled/invalid uploads pr
     const patient = await account('student');
     const patientId = patient.uid;
     const access = db.doc(`doctor_patient_access/${doctor.uid}/patients/${patientId}`);
-    await access.set({ granted: true });
+    await access.set({ schemaVersion: 2, activeAppointmentCount: 1 });
     const document = await record(doctor, patientId);
     await call(patient, { action: 'begin', docId: document.ref.id,
         expectedStoragePath: document.data.storagePath, fileName: 'x.png',
@@ -202,7 +211,7 @@ test('doctor author can replace, revoked access and cancelled/invalid uploads pr
     assert.deepEqual((await document.ref.get()).data(), saved);
     assert.equal((await bucket.file(revoked.storagePath).exists())[0], false);
     await call(doctor, { action: 'begin', docId: document.ref.id, expectedStoragePath: saved.storagePath, fileName: 'x.png', metadata: { name: 'Bad', type: 'other', notes: '' } }, 403);
-    await access.set({ granted: true });
+    await access.set({ schemaVersion: 2, activeAppointmentCount: 1 });
     const cancelled = await begin(doctor, document);
     await upload(doctor, cancelled);
     assert.equal((await call(doctor, { action: 'cancel', operationId: cancelled.operationId })).committed, false);
@@ -216,11 +225,12 @@ test('doctor author can replace, revoked access and cancelled/invalid uploads pr
     const allowedRead = await fetch(`http://127.0.0.1:9199/v0/b/demo-uhc-test.appspot.com/o/${encodeURIComponent(success.storagePath)}`, {
         headers: { Authorization: `Bearer ${doctor.token}` },
     });
-    assert.equal(allowedRead.status, 200);
+    assert.equal(allowedRead.status, 403);
     const allowedDelete = await fetch(`http://127.0.0.1:9199/v0/b/demo-uhc-test.appspot.com/o/${encodeURIComponent(success.storagePath)}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${doctor.token}` },
     });
-    assert.equal(allowedDelete.status, 204);
+    assert.equal(allowedDelete.status, 403);
+    await bucket.file(success.storagePath).delete();
     assert.equal((await bucket.file(success.storagePath).exists())[0], false);
     const missingRef = db.doc(`medical_document_replacements/${success.operationId}`);
     await missingRef.update({ nextMaintenanceAt: admin.firestore.Timestamp.fromMillis(1) });
@@ -361,7 +371,7 @@ test('scheduler bounds its due batch and migration ends without rescanning settl
 
 test('v2 runtime contract delivers real Firestore events and HTTP scheduled cleanup without changing old paths', async () => {
     const functions = require('../lib/documentReplacement');
-    for (const fn of Object.values(functions)) assert.equal(fn.__endpoint.platform, 'gcfv2');
+    for (const fn of [functions.replaceMedicalDocument, functions.queueMedicalDocumentCleanup, functions.cleanDocumentReplacements]) assert.equal(fn.__endpoint.platform, 'gcfv2');
     assert.equal(functions.queueMedicalDocumentCleanup.__endpoint.eventTrigger.eventType, 'google.cloud.firestore.document.v1.written');
     assert.equal(functions.queueMedicalDocumentCleanup.__endpoint.eventTrigger.retry, true);
     assert.equal(functions.cleanDocumentReplacements.__endpoint.scheduleTrigger.schedule, 'every 60 minutes');
@@ -388,7 +398,7 @@ test('v2 runtime contract delivers real Firestore events and HTTP scheduled clea
     const oldImage = await fetch(`http://127.0.0.1:9199/v0/b/demo-uhc-test.appspot.com/o/${encodeURIComponent(document.data.storagePath)}?alt=media`, {
         headers: { Authorization: `Bearer ${patient.token}` },
     });
-    assert.equal(oldImage.status, 200);
+    assert.equal(oldImage.status, 403, 'Orphaned legacy bytes have no direct client access');
     const photo = await fetch(`http://127.0.0.1:9199/v0/b/demo-uhc-test.appspot.com/o/${encodeURIComponent(profile)}?alt=media`, {
         headers: { Authorization: `Bearer ${patient.token}` },
     });

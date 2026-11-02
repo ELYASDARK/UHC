@@ -1,3 +1,4 @@
+import '../../../core/utils/content_direction.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
@@ -25,6 +26,8 @@ class AssistantOfferCards extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: offers.map((offer) {
+        final departmentLabel = LocalizationHelper.translateDepartment(
+            offer.departmentName ?? offer.department, l10n);
         final now = DateTime.now();
         final isPendingRetry = provider.activeBookingOfferId == offer.offerId;
         final isBookable = offer.isBookable(now);
@@ -91,6 +94,9 @@ class AssistantOfferCards extends StatelessWidget {
                   Expanded(
                     child: Text(
                       offer.doctorName,
+                      textDirection: contentDirection(
+                          offer.doctorName, Directionality.of(context)),
+                      textAlign: TextAlign.start,
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
@@ -121,10 +127,10 @@ class AssistantOfferCards extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                LocalizationHelper.translateDepartment(
-                  offer.departmentName ?? offer.department,
-                  l10n,
-                ),
+                departmentLabel,
+                textDirection: contentDirection(
+                    departmentLabel, Directionality.of(context)),
+                textAlign: TextAlign.start,
                 style: GoogleFonts.roboto(
                   fontSize: 12,
                   color: isDark
@@ -157,6 +163,7 @@ class AssistantOfferCards extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     offer.timeSlot,
+                    textDirection: TextDirection.ltr,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

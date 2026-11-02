@@ -2,9 +2,9 @@
     "name": "uhc-functions",
     "description": "Cloud Functions for UHC",
     "scripts": {
-        "build": "tsc",
+        "build": "node scripts/build.js",
         "seed:emulator": "npm run build && node lib/assistant/seedCli.js",
-        "test": "npm run build && node test/admin_deletion.test.js && node test/assistant.test.js",
+        "test": "npm run build && node test/admin_deletion.test.js && node test/assistant.test.js && node test/security_fixes.test.js && node --test test/account_promotion_race.test.js test/account_ambiguous_deletion.test.js test/terminal_cancellation.test.js test/medical_upload_budget.test.js test/analytics_privacy.test.js test/analytics_completeness.test.js test/assistant_language_roles.test.js test/generated_output.test.js test/gemini_client_local.test.js",
         "test:emulator": "npm run build && node test/emulator_integration.test.js",
         "test:callable-emulator": "npm run build && node test/doctor_schedule_callable_emulator.test.js",
         "serve": "npm run build && firebase emulators:start --only functions",
@@ -19,7 +19,7 @@
     "main": "lib/index.js",
     "dependencies": {
         "firebase-admin": "^13.10.0",
-        "firebase-functions": "^6.0.0"
+        "firebase-functions": "^7.4.0"
     },
     "devDependencies": {
         "typescript": "^5.0.0"

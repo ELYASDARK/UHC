@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,7 +22,12 @@ class SuperAdminDashboardScreen extends StatefulWidget {
 
 class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   final _firestore = FirebaseFirestore.instance;
-  bool _isLoading = true;
+  final _loading = <String>{};
+  final _failed = <String>{};
+  final _loaded = <String>{};
+  final _outstanding = <String>{};
+  String? _session;
+  int _generation = 0;
 
   // KPIs
   int _totalAdmins = 0;
@@ -34,79 +42,163 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   List<Map<String, dynamic>> _recentLogs = [];
 
   @override
-  void initState() {
-    super.initState();
-    _loadDashboard();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = context.watch<AuthProvider>().cacheSessionKey;
+    if (_session == session) return;
+    _session = session;
+    _generation++;
+    _loading.clear();
+    _failed.clear();
+    _loaded.clear();
+    _outstanding.clear();
+    _recentLogs = [];
+    if (session != null) _loadDashboard();
   }
 
-  Future<void> _loadDashboard() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      // Use count() aggregations where possible to avoid downloading docs
-      final futures = await Future.wait([
-        // 0: Total admin count
-        _firestore
-            .collection('users')
-            .where('role', isEqualTo: 'admin')
-            .count()
-            .get(),
-        // 1: Active admin count
-        _firestore
-            .collection('users')
-            .where('role', isEqualTo: 'admin')
-            .where('isActive', isEqualTo: true)
-            .count()
-            .get(),
-        // 2: Total users count
-        _firestore.collection('users').count().get(),
-        // 3: Total doctors count
-        _firestore.collection('doctors').count().get(),
-      ]);
+  Future<void> _loadDashboard({bool failedOnly = false}) async {
+    await Future.wait([
+      _loadSection(
+          'totalAdmins',
+          () => _firestore
+              .collection('users')
+              .where('role', isEqualTo: 'admin')
+              .count()
+              .get(),
+          (aggregate) => _totalAdmins = aggregate.count!,
+          failedOnly: failedOnly),
+      _loadSection(
+          'activeAdmins',
+          () => _firestore
+              .collection('users')
+              .where('role', isEqualTo: 'admin')
+              .where('isActive', isEqualTo: true)
+              .count()
+              .get(),
+          (aggregate) => _activeAdmins = aggregate.count!,
+          failedOnly: failedOnly),
+      _loadSection('users', () => _firestore.collection('users').count().get(),
+          (aggregate) => _totalUsers = aggregate.count!,
+          failedOnly: failedOnly),
+      _loadSection(
+          'doctors',
+          () => _firestore.collection('doctors').count().get(),
+          (aggregate) => _totalDoctors = aggregate.count!,
+          failedOnly: failedOnly),
+      _loadSection(
+          'slots',
+          () => _firestore
+              .collection('users')
+              .where('role', isEqualTo: 'superAdmin')
+              .limit(5)
+              .get(const GetOptions(source: Source.server)), (slots) {
+        _superAdminCount = slots.docs.length;
+        _primarySlotFilled =
+            slots.docs.any((doc) => doc.data()['superAdminType'] == 'primary');
+        _backupSlotFilled =
+            slots.docs.any((doc) => doc.data()['superAdminType'] == 'backup');
+      }, failedOnly: failedOnly),
+      _loadSection(
+          'audit',
+          () => _firestore
+              .collection('admin_audit_logs')
+              .where('createdAt',
+                  isGreaterThan: Timestamp.fromDate(
+                      DateTime.now().subtract(const Duration(days: 7))))
+              .orderBy('createdAt', descending: true)
+              .limit(5)
+              .get(const GetOptions(source: Source.server)),
+          (logs) => _recentLogs = logs.docs.map((doc) => doc.data()).toList(),
+          failedOnly: failedOnly),
+    ]);
+  }
 
-      final totalAdminCount = futures[0].count ?? 0;
-      final activeAdminCount = futures[1].count ?? 0;
-
-      // Super admins: need actual docs for slot type detection (max 2 docs)
-      final saSnap = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: 'superAdmin')
-          .limit(5)
-          .get();
-      bool primaryFilled = false;
-      bool backupFilled = false;
-      for (final doc in saSnap.docs) {
-        final slot = doc.data()['superAdminType'] as String?;
-        if (slot == 'primary') primaryFilled = true;
-        if (slot == 'backup') backupFilled = true;
-      }
-
-      // Recent audit logs (last 7 days)
-      final weekAgo = DateTime.now().subtract(const Duration(days: 7));
-      final auditSnap = await _firestore
-          .collection('admin_audit_logs')
-          .where('createdAt', isGreaterThan: Timestamp.fromDate(weekAgo))
-          .orderBy('createdAt', descending: true)
-          .limit(5)
-          .get();
-
-      if (!mounted) return;
-      setState(() {
-        _totalAdmins = totalAdminCount;
-        _activeAdmins = activeAdminCount;
-        _inactiveAdmins = totalAdminCount - activeAdminCount;
-        _superAdminCount = saSnap.docs.length;
-        _primarySlotFilled = primaryFilled;
-        _backupSlotFilled = backupFilled;
-        _totalUsers = futures[2].count ?? 0;
-        _totalDoctors = futures[3].count ?? 0;
-        _recentLogs = auditSnap.docs.map((d) => d.data()).toList();
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-      debugPrint('Dashboard load error: $e');
+  Future<void> _loadSection<T>(
+      String key, Future<T> Function() read, void Function(T) apply,
+      {required bool failedOnly}) async {
+    if (_outstanding.contains(key) || (failedOnly && !_failed.contains(key))) {
+      return;
     }
+    final generation = _generation;
+    _outstanding.add(key);
+    setState(() {
+      _loading.add(key);
+      _failed.remove(key);
+    });
+    final request = Future.sync(read);
+    // Keep timed-out reads outstanding, so repeated Retry cannot stack requests.
+    unawaited(request.then((_) {
+      if (mounted && generation == _generation) _outstanding.remove(key);
+    }, onError: (Object _) {
+      if (mounted && generation == _generation) _outstanding.remove(key);
+    }));
+    try {
+      final value = await request.timeout(const Duration(seconds: 15));
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        apply(value);
+        _loaded.add(key);
+      });
+    } catch (error) {
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _failed.add(key);
+        if (error is FirebaseException &&
+            ['permission-denied', 'unauthenticated'].contains(error.code)) {
+          _loaded.remove(key);
+          if (key == 'totalAdmins' || key == 'activeAdmins') {
+            _loaded.remove('admins');
+          }
+          if (key == 'audit') _recentLogs = [];
+        }
+      });
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _loading.remove(key);
+          _updateInactiveCount();
+        });
+      }
+    }
+  }
+
+  void _updateInactiveCount() {
+    if (_loading.contains('totalAdmins') || _loading.contains('activeAdmins')) {
+      return;
+    }
+    if (_failed.contains('totalAdmins') || _failed.contains('activeAdmins')) {
+      if (!_loaded.contains('admins')) _failed.add('admins');
+      return;
+    }
+    if (!_loaded.contains('totalAdmins') || !_loaded.contains('activeAdmins')) {
+      return;
+    }
+    if (_activeAdmins > _totalAdmins) {
+      // The independent counts can straddle an account mutation. Retry the pair.
+      _failed.addAll(['totalAdmins', 'activeAdmins', 'admins']);
+      return;
+    }
+    _inactiveAdmins = _totalAdmins - _activeAdmins;
+    _loaded.add('admins');
+    _failed.remove('admins');
+  }
+
+  String _countLabel(String key, int count) => _loaded.contains(key)
+      ? '$count'
+      : _failed.contains(key)
+          ? 'Unavailable'
+          : '…';
+
+  Widget _sectionStatus(String key) {
+    if (_failed.contains(key)) {
+      return TextButton.icon(
+          onPressed: () => _loadDashboard(failedOnly: true),
+          icon: const Icon(Icons.refresh),
+          label: Text(AppLocalizations.of(context).tryAgain));
+    }
+    return _loading.contains(key)
+        ? const LinearProgressIndicator()
+        : const SizedBox.shrink();
   }
 
   @override
@@ -125,15 +217,13 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 icon: const Icon(Icons.refresh), onPressed: _loadDashboard),
           ],
         ),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _loadDashboard,
-                child: ResponsivePage(
-                  maxWidth: 1240,
-                  child: _buildDashboardBody(isDark, l10n),
-                ),
-              ),
+        body: RefreshIndicator(
+          onRefresh: _loadDashboard,
+          child: ResponsivePage(
+            maxWidth: 1240,
+            child: _buildDashboardBody(isDark, l10n),
+          ),
+        ),
       ),
     );
   }
@@ -141,8 +231,9 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   Widget _buildDashboardBody(bool isDark, AppLocalizations l10n) {
     final metrics =
         _buildMetricsGrid(isDark, compact: UhcResponsive.isWide(context));
-    final riskVisible =
-        _inactiveAdmins > 0 || !_primarySlotFilled || !_backupSlotFilled;
+    final riskVisible = (_loaded.contains('admins') && _inactiveAdmins > 0) ||
+        (_loaded.contains('slots') &&
+            (!_primarySlotFilled || !_backupSlotFilled));
 
     if (UhcResponsive.isWide(context)) {
       return Row(
@@ -154,6 +245,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildSlotHealthBanner(isDark, l10n),
+                _sectionStatus('slots'),
                 const SizedBox(height: 14),
                 _buildAdminDashboardEntry(isDark),
                 const SizedBox(height: 14),
@@ -178,6 +270,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSlotHealthBanner(isDark, l10n),
+        _sectionStatus('slots'),
         const SizedBox(height: 14),
         _buildAdminDashboardEntry(isDark),
         const SizedBox(height: 14),
@@ -237,42 +330,44 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       children: [
         _buildKpiCard(
           l10n.totalAdmins,
-          '$_totalAdmins',
+          _countLabel('totalAdmins', _totalAdmins),
           Icons.admin_panel_settings,
           AppColors.primary,
           isDark,
         ),
         _buildKpiCard(
           l10n.activeAdmins,
-          '$_activeAdmins',
+          _countLabel('activeAdmins', _activeAdmins),
           Icons.check_circle,
           AppColors.success,
           isDark,
         ),
         _buildKpiCard(
           l10n.inactiveAdmins,
-          '$_inactiveAdmins',
+          _countLabel('admins', _inactiveAdmins),
           Icons.block,
           AppColors.error,
           isDark,
         ),
         _buildKpiCard(
           l10n.superAdmins,
-          '$_superAdminCount/2',
+          _loaded.contains('slots')
+              ? '$_superAdminCount/2'
+              : _countLabel('slots', 0),
           Icons.shield,
           const Color(0xFFD32F2F),
           isDark,
         ),
         _buildKpiCard(
           l10n.manageUsers,
-          '$_totalUsers',
+          _countLabel('users', _totalUsers),
           Icons.people,
           AppColors.secondary,
           isDark,
         ),
         _buildKpiCard(
           l10n.doctors,
-          '$_totalDoctors',
+          _countLabel('doctors', _totalDoctors),
           Icons.local_hospital,
           AppColors.tertiary,
           isDark,
@@ -280,13 +375,18 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
       ],
     );
 
-    if (!breakpoint.isPhone) return grid;
+    final section = Column(mainAxisSize: MainAxisSize.min, children: [
+      grid,
+      for (final key in ['totalAdmins', 'activeAdmins', 'users', 'doctors'])
+        _sectionStatus(key),
+    ]);
+    if (!breakpoint.isPhone) return section;
 
     return Align(
       alignment: Alignment.topCenter,
       child: FractionallySizedBox(
         widthFactor: 0.93,
-        child: grid,
+        child: section,
       ),
     );
   }
@@ -300,7 +400,8 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
         ),
         const SizedBox(height: 8),
-        if (_recentLogs.isEmpty)
+        _sectionStatus('audit'),
+        if (_loaded.contains('audit') && _recentLogs.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Center(
@@ -321,6 +422,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   }
 
   Widget _buildSlotHealthBanner(bool isDark, AppLocalizations l10n) {
+    if (!_loaded.contains('slots')) return const SizedBox.shrink();
     final allFilled = _primarySlotFilled && _backupSlotFilled;
     final color = allFilled ? AppColors.success : AppColors.warning;
 
@@ -501,13 +603,13 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                   fontSize: 16,
                   color: AppColors.warning)),
           const SizedBox(height: 8),
-          if (!_primarySlotFilled)
+          if (_loaded.contains('slots') && !_primarySlotFilled)
             _riskTile(
                 l10n.primarySlotEmpty, Icons.star, AppColors.error, isDark),
-          if (!_backupSlotFilled)
+          if (_loaded.contains('slots') && !_backupSlotFilled)
             _riskTile(l10n.backupSlotEmpty, Icons.star_border,
                 AppColors.warning, isDark),
-          if (_inactiveAdmins > 0)
+          if (_loaded.contains('admins') && _inactiveAdmins > 0)
             _riskTile(l10n.inactiveAdminWarning(_inactiveAdmins), Icons.block,
                 AppColors.warning, isDark),
         ],

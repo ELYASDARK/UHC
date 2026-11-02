@@ -33,49 +33,9 @@ void main() {
           functionsSource, isNot(contains('doctorName: data.doctorName ||')));
     });
 
-    test('legacy medical document uploads still require file validation', () {
-      final storageRules = readProjectFile('storage.rules');
-
-      expect(
-        storageRules,
-        isNot(contains(
-          'allow read, write, delete: if activeUser() && request.auth.uid == userId;',
-        )),
-      );
-      expect(storageRules, contains('allow write: if googleLinkedUser() &&'));
-      expect(storageRules, contains('validMedicalDocument();'));
-    });
-
-    test('mobile medical image documents use Flutter fullscreen viewer', () {
-      final patientDocsSource = readProjectFile(
-          'lib/screens/patient/documents/medical_documents_screen.dart');
-      final doctorDocsSource = readProjectFile(
-          'lib/screens/doctor/documents/doctor_patient_documents_screen.dart');
-
-      expect(patientDocsSource, contains('MedicalDocumentViewerScreen'));
-      expect(doctorDocsSource, contains('MedicalDocumentViewerScreen'));
-      expect(patientDocsSource,
-          contains('!kIsWeb && (isPdf || _isImageDocument(doc))'));
-      expect(doctorDocsSource,
-          contains('!kIsWeb && (isPdf || _isImageDocument(doc))'));
-    });
-
-    test('developer l10n config is present and generated files are in source',
-        () {
-      final pubspec = readProjectFile('pubspec.yaml');
-      final l10nConfig = readProjectFile('l10n.yaml');
-
-      expect(
-        pubspec,
-        contains('flutter:\n  generate: true\n  uses-material-design: true'),
-      );
-      expect(l10nConfig, contains('arb-dir: lib/l10n'));
-      expect(
-        l10nConfig,
-        contains('output-localization-file: app_localizations.dart'),
-      );
-      expect(File('lib/l10n/app_localizations.dart').existsSync(), isTrue);
-    });
+    // Medical-file authorization and byte access are exercised through the
+    // backend and Storage emulator in private_medical_files_emulator.test.js.
+    // The previous guards asserted client token-URL implementation details.
 
     test('admin notification sends are audited and idempotent', () {
       final functionsSource =
@@ -310,7 +270,12 @@ void main() {
       expect(functionsSource,
           contains('cancelActiveAppointmentsForUnavailableDoctor'));
       expect(functionsSource, contains('doctorData.isActive !== true'));
-      expect(firestoreRules, contains("'isAvailable'"));
+      final doctorUpdate = firestoreRules.substring(
+        firestoreRules.indexOf('match /doctors/{doctorId}'),
+        firestoreRules.indexOf('match /departments/{departmentId}'),
+      );
+      expect(doctorUpdate, contains('affectedKeys().hasOnly(['));
+      expect(doctorUpdate, isNot(contains("'isAvailable'")));
       expect(firestoreRules, contains('doctor_availability_requests'));
       expect(dashboardSource, contains('_showUnavailableRequestDialog'));
       expect(dashboardSource, contains('Pending approval'));

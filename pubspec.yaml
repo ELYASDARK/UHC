@@ -2,7 +2,7 @@ name: uhc
 description: "University Health Center - Appointment Booking and Reminder System"
 publish_to: 'none'
 
-version: 2.4.0+24
+version: 2.4.1+25
 
 environment:
   sdk: ^3.5.0

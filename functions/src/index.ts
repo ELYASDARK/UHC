@@ -73,4 +73,7 @@ export {
     getAssistantHistory,
     sendAssistantMessage,
 } from './assistant';
+export { uploadMedicalDocument, readMedicalDocument, deleteMedicalDocument } from './medicalFiles';
 
+
+export { getAppointmentAnalytics } from './analytics';

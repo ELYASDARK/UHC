@@ -1,3 +1,4 @@
+import 'firebase_callable.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
@@ -100,9 +101,8 @@ class UserFunctionsService {
     Map<String, dynamic> payload,
   ) async {
     try {
-      final callable = _functions.httpsCallable(functionName);
-      final result = await callable.call<Map<String, dynamic>>(payload);
-      return Map<String, dynamic>.from(result.data);
+      return Map<String, dynamic>.from(
+          await invokeFirebaseCallable(_functions, functionName, payload));
     } on FirebaseFunctionsException catch (e) {
       debugPrint(
         '[$functionName] Firebase Functions Error: ${e.code} - ${e.message}',

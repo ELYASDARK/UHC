@@ -1,3 +1,4 @@
+import '../../core/utils/app_messages.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -95,9 +96,19 @@ class _DoctorShellState extends State<DoctorShell> {
 
   /// Re-fetch doctor data from Firestore and rebuild all tabs.
   Future<void> _refreshDoctor() async {
-    final updated = await _doctorRepo.getDoctorById(_doctor.id);
-    if (updated != null && mounted) {
-      setState(() => _doctor = updated);
+    final doctorId = _doctor.id;
+    try {
+      final updated = await _doctorRepo.getDoctorById(doctorId);
+      if (updated != null && mounted && _doctor.id == doctorId) {
+        setState(() => _doctor = updated);
+      }
+    } catch (_) {
+      if (mounted && _doctor.id == doctorId) {
+        AppMessages.show(
+            context,
+            SnackBar(
+                content: Text(AppLocalizations.of(context).connectionError)));
+      }
     }
   }
 

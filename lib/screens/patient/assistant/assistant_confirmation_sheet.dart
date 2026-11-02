@@ -1,3 +1,4 @@
+import '../../../core/utils/content_direction.dart';
 import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -64,6 +65,8 @@ class _AssistantConfirmationSheetState
   Widget build(BuildContext context) {
     final offer = widget.offer;
     final l10n = AppLocalizations.of(context);
+    final departmentLabel = LocalizationHelper.translateDepartment(
+        offer.departmentName ?? offer.department, l10n);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: EdgeInsets.only(
@@ -147,6 +150,9 @@ class _AssistantConfirmationSheetState
                           children: [
                             Text(
                               offer.doctorName,
+                              textDirection: contentDirection(
+                                  offer.doctorName, Directionality.of(context)),
+                              textAlign: TextAlign.start,
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -154,10 +160,10 @@ class _AssistantConfirmationSheetState
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              LocalizationHelper.translateDepartment(
-                                offer.departmentName ?? offer.department,
-                                l10n,
-                              ),
+                              departmentLabel,
+                              textDirection: contentDirection(
+                                  departmentLabel, Directionality.of(context)),
+                              textAlign: TextAlign.start,
                               style: GoogleFonts.roboto(
                                 fontSize: 13,
                                 color: isDark
@@ -212,6 +218,7 @@ class _AssistantConfirmationSheetState
                             Flexible(
                               child: Text(
                                 offer.timeSlot,
+                                textDirection: TextDirection.ltr,
                                 style: GoogleFonts.poppins(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
@@ -264,6 +271,10 @@ class _AssistantConfirmationSheetState
             // Optional Notes Field
             TextField(
               controller: _notesController,
+              onChanged: (_) => setState(() {}),
+              textDirection: contentDirection(
+                  _notesController.text, Directionality.of(context)),
+              textAlign: TextAlign.start,
               maxLines: 2,
               decoration: InputDecoration(
                 labelText: l10n.assistantNotesOptional,

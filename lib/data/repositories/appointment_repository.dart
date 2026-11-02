@@ -77,6 +77,20 @@ class DoctorDayAvailability {
   }
 }
 
+/// One bounded scan of history. The cursor also records the legacy email query.
+class AppointmentHistoryPage {
+  const AppointmentHistoryPage({
+    required this.appointments,
+    required this.hasMore,
+    this.cursor,
+    this.byEmail = false,
+  });
+  final List<AppointmentModel> appointments;
+  final bool hasMore;
+  final DocumentSnapshot<Map<String, dynamic>>? cursor;
+  final bool byEmail;
+}
+
 /// Repository for appointment-related Firestore operations and callables
 class AppointmentRepository {
   final FirebaseFirestore _firestore;
@@ -147,7 +161,9 @@ class AppointmentRepository {
 
   /// Get appointment by ID
   Future<AppointmentModel?> getAppointmentById(String appointmentId) async {
-    final doc = await _appointmentsRef.doc(appointmentId).get();
+    final doc = await _appointmentsRef.doc(appointmentId).get(
+          const GetOptions(source: Source.server),
+        );
     if (doc.exists) {
       return AppointmentModel.fromFirestore(doc);
     }
@@ -168,23 +184,27 @@ class AppointmentRepository {
     try {
       // Query by date on the server, then page through bounded batches so
       // older limited pages cannot hide valid upcoming appointments.
-      var docs = await _fetchAllPages(_appointmentsRef
-          .where('patientId', isEqualTo: userId)
-          .where(
-            'appointmentDate',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
-          )
-          .orderBy('appointmentDate', descending: true));
+      var docs = await _fetchAllPages(
+          _appointmentsRef
+              .where('patientId', isEqualTo: userId)
+              .where(
+                'appointmentDate',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
+              )
+              .orderBy('appointmentDate', descending: true),
+          requireServer: true);
 
       // If no results and email is provided, try by patientEmail only
       if (docs.isEmpty && email != null) {
-        docs = await _fetchAllPages(_appointmentsRef
-            .where('patientEmail', isEqualTo: email)
-            .where(
-              'appointmentDate',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
-            )
-            .orderBy('appointmentDate', descending: true));
+        docs = await _fetchAllPages(
+            _appointmentsRef
+                .where('patientEmail', isEqualTo: email)
+                .where(
+                  'appointmentDate',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
+                )
+                .orderBy('appointmentDate', descending: true),
+            requireServer: true);
       }
 
       // Filter for upcoming appointments and pending/confirmed status in-memory
@@ -205,8 +225,53 @@ class AppointmentRepository {
       return appointments;
     } catch (e) {
       debugPrint('Error getting upcoming appointments: $e');
-      return [];
+      rethrow;
     }
+  }
+
+  /// Scan at most [pageSize] records. Future terminal statuses remain in
+  /// history; active future records advance the cursor without being shown.
+  Future<AppointmentHistoryPage> getPastAppointmentsPage(
+    String userId, {
+    String? email,
+    AppointmentHistoryPage? after,
+    int pageSize = 30,
+  }) async {
+    final byEmail = after?.byEmail ?? false;
+    Query<Map<String, dynamic>> query = _appointmentsRef
+        .where(byEmail ? 'patientEmail' : 'patientId',
+            isEqualTo: byEmail ? email : userId)
+        .orderBy('appointmentDate', descending: true)
+        .orderBy(FieldPath.documentId, descending: true)
+        .limit(pageSize);
+    if (after?.cursor != null) query = query.startAfterDocument(after!.cursor!);
+    var snapshot = await query.get(const GetOptions(source: Source.server));
+    var usedEmail = byEmail;
+    if (after == null && snapshot.docs.isEmpty && email != null) {
+      usedEmail = true;
+      snapshot = await _appointmentsRef
+          .where('patientEmail', isEqualTo: email)
+          .orderBy('appointmentDate', descending: true)
+          .orderBy(FieldPath.documentId, descending: true)
+          .limit(pageSize)
+          .get(const GetOptions(source: Source.server));
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final appointments = snapshot.docs
+        .map(AppointmentModel.fromFirestore)
+        .where((apt) =>
+            apt.appointmentDate.isBefore(today) ||
+            apt.status == AppointmentStatus.cancelled ||
+            apt.status == AppointmentStatus.completed ||
+            apt.status == AppointmentStatus.noShow)
+        .toList();
+    return AppointmentHistoryPage(
+      appointments: appointments,
+      hasMore: snapshot.docs.length == pageSize,
+      cursor: snapshot.docs.lastOrNull,
+      byEmail: usedEmail,
+    );
   }
 
   /// Get user's past appointments (includes cancelled, completed, no-show, and past dates)
@@ -251,11 +316,10 @@ class AppointmentRepository {
         (a, b) => b.appointmentDate.compareTo(a.appointmentDate),
       );
 
-      // Limit to 50
-      return appointments.take(50).toList();
+      return appointments;
     } catch (e) {
       debugPrint('Error getting past appointments: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -517,9 +581,11 @@ class AppointmentRepository {
     String doctorId,
   ) async {
     try {
-      final docs = await _fetchAllPages(_appointmentsRef
-          .where('doctorId', isEqualTo: doctorId)
-          .orderBy('appointmentDate', descending: true));
+      final docs = await _fetchAllPages(
+          _appointmentsRef
+              .where('doctorId', isEqualTo: doctorId)
+              .orderBy('appointmentDate', descending: true),
+          requireServer: true);
       final appointments =
           docs.map((doc) => AppointmentModel.fromFirestore(doc)).toList();
       appointments.sort(
@@ -528,7 +594,7 @@ class AppointmentRepository {
       return appointments;
     } catch (e) {
       debugPrint('Error getting all doctor appointments: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -540,13 +606,15 @@ class AppointmentRepository {
     final startOfToday = DateTime(now.year, now.month, now.day);
 
     try {
-      final docs = await _fetchAllPages(_appointmentsRef
-          .where('doctorId', isEqualTo: doctorId)
-          .where(
-            'appointmentDate',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
-          )
-          .orderBy('appointmentDate', descending: true));
+      final docs = await _fetchAllPages(
+          _appointmentsRef
+              .where('doctorId', isEqualTo: doctorId)
+              .where(
+                'appointmentDate',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday),
+              )
+              .orderBy('appointmentDate', descending: true),
+          requireServer: true);
       final appointments =
           docs.map((doc) => AppointmentModel.fromFirestore(doc)).toList();
       appointments.sort(
@@ -555,7 +623,7 @@ class AppointmentRepository {
       return appointments;
     } catch (e) {
       debugPrint('Error getting doctor dashboard appointments: $e');
-      return [];
+      rethrow;
     }
   }
 

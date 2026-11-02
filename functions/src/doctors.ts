@@ -8,7 +8,9 @@ import {
     requirePermission,
     revokeSessionsAndClearFcm,
 } from './shared/auth';
-import { MIN_PASSWORD_ERROR_LONG, MIN_PASSWORD_LENGTH } from './shared/errors';
+import { MIN_PASSWORD_ERROR_LONG, MIN_PASSWORD_LENGTH, toHttpsError } from './shared/errors';
+import { withAccountMutation } from './shared/accountMutation';
+import { validateWeeklySchedule } from './shared/doctorSchedule';
 import { deleteProfilePhotos } from './shared/profilePhotos';
 
 interface CreateDoctorData {
@@ -56,6 +58,8 @@ export const createDoctorAccount = functions.https.onCall(
                 MIN_PASSWORD_ERROR_LONG
             );
         }
+
+        if (data.weeklySchedule !== undefined) validateWeeklySchedule(data.weeklySchedule);
 
         try {
             // Create Firebase Auth user
@@ -188,14 +192,16 @@ export const updateDoctorEmail = functions.https.onCall(
             const userId = doctorData?.userId;
 
             if (userId) {
-                // Update Firebase Auth email
-                await auth.updateUser(userId, { email: data.newEmail });
+                await withAccountMutation({ doctorId: data.doctorId, roles: ['doctor'], mutate: async userId => {
+                    // Update Firebase Auth email
+                    await auth.updateUser(userId, { email: data.newEmail });
 
-                // Update user document
-                await db.collection('users').doc(userId).update({
-                    email: data.newEmail,
-                    updatedAt: admin.firestore.Timestamp.now(),
-                });
+                    // Update user document
+                    await db.collection('users').doc(userId).update({
+                        email: data.newEmail,
+                        updatedAt: admin.firestore.Timestamp.now(),
+                    });
+                } });
             }
 
             // Update doctor document
@@ -207,10 +213,7 @@ export const updateDoctorEmail = functions.https.onCall(
             return { success: true, message: 'Email updated successfully' };
         } catch (error) {
             console.error('Error updating doctor email:', error);
-            throw new functions.https.HttpsError(
-                'internal',
-                'Failed to update doctor email.'
-            );
+            throw toHttpsError(error, 'Failed to update doctor email.');
         }
     }
 );
@@ -238,26 +241,25 @@ export const deleteDoctorAccount = functions.https.onCall(
 
             // Delete Firebase Auth user if exists
             if (userId && !userId.startsWith('sample_')) {
-                try {
-                    await auth.deleteUser(userId);
-                } catch (authError) {
-                    console.log('Auth user may not exist:', authError);
-                }
+                await withAccountMutation({ doctorId: data.doctorId, roles: ['doctor'], mutate: async userId => {
+                    try {
+                        await auth.deleteUser(userId);
+                    } catch (authError) {
+                        if ((authError as { code?: string }).code !== 'auth/user-not-found') throw authError;
+                    }
 
-                // Delete user document
-                await db.collection('users').doc(userId).delete();
+                    // Delete user document
+                    await db.collection('users').doc(userId).delete();
+                    await db.collection('doctors').doc(data.doctorId).delete();
+                } });
+            } else {
+                await db.collection('doctors').doc(data.doctorId).delete();
             }
-
-            // Delete doctor document
-            await db.collection('doctors').doc(data.doctorId).delete();
 
             return { success: true, message: 'Doctor account deleted successfully' };
         } catch (error) {
             console.error('Error deleting doctor account:', error);
-            throw new functions.https.HttpsError(
-                'internal',
-                'Failed to delete doctor account.'
-            );
+            throw toHttpsError(error, 'Failed to delete doctor account.');
         }
     }
 );
@@ -298,20 +300,20 @@ export const resetDoctorPassword = functions.https.onCall(
             }
 
             // Update password and require the doctor to replace it on next login.
-            await auth.updateUser(userId, { password: data.newPassword });
-            await db.collection('users').doc(userId).update({
-                requiresInitialPasswordChange: true,
-                initialPasswordChangedAt: admin.firestore.FieldValue.delete(),
-                updatedAt: admin.firestore.Timestamp.now(),
-            });
+            await withAccountMutation({ doctorId: data.doctorId, roles: ['doctor'], mutate: async userId => {
+                await auth.updateUser(userId, { password: data.newPassword });
+                await db.collection('users').doc(userId).update({
+                    requiresInitialPasswordChange: true,
+                    passwordResetAfter: Math.floor(Date.now() / 1000),
+                    initialPasswordChangedAt: admin.firestore.FieldValue.delete(),
+                    updatedAt: admin.firestore.Timestamp.now(),
+                });
+            } });
 
             return { success: true, message: 'Password reset successfully' };
         } catch (error) {
             console.error('Error resetting doctor password:', error);
-            throw new functions.https.HttpsError(
-                'internal',
-                'Failed to reset doctor password.'
-            );
+            throw toHttpsError(error, 'Failed to reset doctor password.');
         }
     }
 );
@@ -461,6 +463,7 @@ export const updateDoctorSchedule = functions.https.onCall(
             throw new functions.https.HttpsError('not-found', 'Doctor not found.');
         }
 
+        validateWeeklySchedule(data.weeklySchedule);
         await doctorRef.update({
             weeklySchedule: data.weeklySchedule,
             updatedAt: Timestamp.now(),

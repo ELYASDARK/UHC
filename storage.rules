@@ -37,22 +37,9 @@ service firebase.storage {
         );
     }
 
-    function doctorHasPatientAccess(userId) {
-      return googleLinkedUser() &&
-        currentUser().role == 'doctor' &&
-        firestore.exists(/databases/(default)/documents/doctor_patient_access/$(request.auth.uid)/patients/$(userId));
-    }
-
     function validProfileImage() {
       return request.resource.size < 5 * 1024 * 1024 &&
         request.resource.contentType.matches('image/(jpeg|png|webp)');
-    }
-
-    function validMedicalDocument() {
-      return request.resource.size < 20 * 1024 * 1024 &&
-        request.resource.contentType.matches(
-          'application/pdf|image/(jpeg|png)|application/msword|application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        );
     }
 
     match /profile_images/{fileName} {
@@ -76,65 +63,13 @@ service firebase.storage {
       allow delete: if hasPermission('users.manageNonAdmin');
     }
 
-    match /medical_document_replacement_files/{docId}/{operationId} {
-      function operation() {
-        return firestore.get(/databases/(default)/documents/medical_document_replacements/$(operationId)).data;
-      }
-      allow create: if resource == null && googleLinkedUser() && validMedicalDocument() &&
-        !request.resource.metadata.keys().hasAny([
-          'uhcReplacementUser', 'uhcReplacementAuthor', 'uhcReplacementCommitted'
-        ]) &&
-        request.resource.size > 0 && operation().docId == docId &&
-        operation().actor == request.auth.uid && operation().status == 'uploading' &&
-        operation().expiresAt > request.time;
-      // Immutable uploads avoid overwrite/cleanup races. Only the server swaps
-      // a document reference; existing Firestore metadata rules stay strict.
-      // Each branch reads at most two Firestore documents: caller + operation
-      // for staging, or caller + doctor-patient access for committed files.
-      allow read: if googleLinkedUser() &&
-        (
-          (('uhcReplacementCommitted' in resource.metadata) &&
-            resource.metadata.uhcReplacementCommitted == 'true' &&
-            (resource.metadata.uhcReplacementUser == request.auth.uid ||
-              doctorHasPatientAccess(resource.metadata.uhcReplacementUser) ||
-              hasPermission('reports.view') || hasPermission('appointments.view'))) ||
-          (!('uhcReplacementCommitted' in resource.metadata) &&
-            operation().docId == docId && operation().actor == request.auth.uid &&
-            operation().status == 'uploading' && operation().expiresAt > request.time)
-        );
-      allow delete: if googleLinkedUser() &&
-        resource.metadata.uhcReplacementCommitted == 'true' &&
-        resource.metadata.uhcReplacementAuthor == request.auth.uid &&
-        (resource.metadata.uhcReplacementUser == request.auth.uid ||
-          doctorHasPatientAccess(resource.metadata.uhcReplacementUser));
+    // Firebase metadata/media reads can mint download tokens. Medical bytes
+    // are served only by the backend after fresh document authorization.
+    match /medical_document_replacement_files/{allPaths=**} {
+      allow read, write: if false;
     }
-
-    match /medical_documents/{userId}/{scope}/{fileName} {
-      allow read: if googleLinkedUser() &&
-        (
-          request.auth.uid == userId ||
-          doctorHasPatientAccess(userId) ||
-          hasPermission('reports.view') ||
-          hasPermission('appointments.view')
-        );
-      allow write: if googleLinkedUser() &&
-        validMedicalDocument() &&
-        (
-          (request.auth.uid == userId && scope == 'self') ||
-          (scope != 'self' && doctorHasPatientAccess(userId))
-        );
-      allow delete: if googleLinkedUser() &&
-        (
-          request.auth.uid == userId ||
-          (scope != 'self' && doctorHasPatientAccess(userId))
-        );
-    }
-
-    match /medical_documents/{userId}/{fileName} {
-      allow read, delete: if googleLinkedUser() && request.auth.uid == userId;
-      allow write: if googleLinkedUser() &&
-        request.auth.uid == userId &&
-        validMedicalDocument();
+    match /medical_documents/{allPaths=**} {
+      allow read, write: if false;
     }
 
     match /{allPaths=**} {

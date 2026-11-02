@@ -69,7 +69,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         dailyNotificationTime: _doctor.dailyNotificationTime,
       );
 
-      if (provider.appointments.isEmpty && !provider.isLoading) {
+      if (provider.loadedDoctorId != _doctor.id && !provider.isLoading) {
         provider.loadDashboardAppointments(_doctor.id);
       }
     });
@@ -79,7 +79,16 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   void didUpdateWidget(covariant DoctorDashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.doctor != oldWidget.doctor) {
-      setState(() => _doctor = widget.doctor);
+      _doctor = widget.doctor;
+      if (widget.doctor.id != oldWidget.doctor.id) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            context
+                .read<DoctorAppointmentProvider>()
+                .loadDashboardAppointments(_doctor.id);
+          }
+        });
+      }
     }
   }
 
@@ -95,64 +104,80 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
         return Scaffold(
           body: SafeArea(
             bottom: false,
-            child: provider.isLoading
+            child: ((provider.isLoading && !provider.hasLoaded) ||
+                    provider.loadedDoctorId != _doctor.id)
                 ? _buildSkeleton(isDark)
-                : RefreshIndicator(
-                    onRefresh: () =>
-                        provider.loadDashboardAppointments(_doctor.id),
-                    child: ResponsivePage(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      maxWidth: 1560,
-                      bottomPadding: UhcResponsive.scrollBottomPadding(context),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (isWide)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 5,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildGreetingCard(isDark, l10n),
-                                      const SizedBox(height: 24),
-                                      _buildStatsRow(isDark, provider, l10n),
-                                      const SizedBox(height: 28),
-                                      _buildNextAppointment(
+                : !provider.hasLoaded && provider.error != null
+                    ? Center(
+                        child: TextButton.icon(
+                            onPressed: () =>
+                                provider.loadDashboardAppointments(_doctor.id),
+                            icon: const Icon(Icons.refresh),
+                            label: Text(l10n.tryAgain)))
+                    : RefreshIndicator(
+                        onRefresh: () =>
+                            provider.loadDashboardAppointments(_doctor.id),
+                        child: ResponsivePage(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          maxWidth: 1560,
+                          bottomPadding:
+                              UhcResponsive.scrollBottomPadding(context),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (provider.error != null)
+                                TextButton.icon(
+                                    onPressed: () => provider
+                                        .loadDashboardAppointments(_doctor.id),
+                                    icon: const Icon(Icons.refresh),
+                                    label: Text(l10n.tryAgain)),
+                              if (isWide)
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      flex: 5,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _buildGreetingCard(isDark, l10n),
+                                          const SizedBox(height: 24),
+                                          _buildStatsRow(
+                                              isDark, provider, l10n),
+                                          const SizedBox(height: 28),
+                                          _buildNextAppointment(
+                                            isDark,
+                                            provider,
+                                            l10n,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 28),
+                                    Expanded(
+                                      flex: 4,
+                                      child: _buildTodaysList(
                                         isDark,
                                         provider,
                                         l10n,
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 28),
-                                Expanded(
-                                  flex: 4,
-                                  child: _buildTodaysList(
-                                    isDark,
-                                    provider,
-                                    l10n,
-                                  ),
-                                ),
+                                    ),
+                                  ],
+                                )
+                              else ...[
+                                _buildGreetingCard(isDark, l10n),
+                                const SizedBox(height: 24),
+                                _buildStatsRow(isDark, provider, l10n),
+                                const SizedBox(height: 28),
+                                _buildNextAppointment(isDark, provider, l10n),
+                                const SizedBox(height: 28),
+                                _buildTodaysList(isDark, provider, l10n),
                               ],
-                            )
-                          else ...[
-                            _buildGreetingCard(isDark, l10n),
-                            const SizedBox(height: 24),
-                            _buildStatsRow(isDark, provider, l10n),
-                            const SizedBox(height: 28),
-                            _buildNextAppointment(isDark, provider, l10n),
-                            const SizedBox(height: 28),
-                            _buildTodaysList(isDark, provider, l10n),
-                          ],
-                        ],
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
           ),
         );
       },

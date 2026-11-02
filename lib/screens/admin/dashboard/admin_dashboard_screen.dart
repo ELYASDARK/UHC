@@ -1,10 +1,11 @@
+import '../../../core/widgets/session_stream_builder.dart';
 import 'package:uhc/core/utils/app_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../services/admin_statistics_service.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../data/models/user_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../departments/department_management_screen.dart';
 import '../doctors/doctor_management_screen.dart';
@@ -18,7 +19,9 @@ import '../../../core/widgets/role_english_ltr_scope.dart';
 
 /// Admin dashboard with overview and navigation
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({super.key});
+  const AdminDashboardScreen({super.key, this.statistics});
+
+  final AdminStatisticsService? statistics;
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
@@ -26,132 +29,114 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final _firestore = FirebaseFirestore.instance;
-  bool _isLoading = true;
-
-  // Stats
-  int _totalUsers = 0;
-  int _totalDoctors = 0;
-  int _totalAppointments = 0;
-  int _pendingAppointments = 0;
-  int _todayAppointments = 0;
-  int _completedAppointments = 0;
-
-  Future<int> _countSafely(
-    Future<AggregateQuerySnapshot> countFuture,
-    String label,
-  ) async {
-    try {
-      final snapshot = await countFuture;
-      return snapshot.count ?? 0;
-    } on FirebaseException catch (e) {
-      debugPrint('Dashboard stat "$label" unavailable: ${e.code}');
-      return 0;
-    } catch (e) {
-      debugPrint('Dashboard stat "$label" failed: $e');
-      return 0;
-    }
-  }
+  late AdminStatisticsService _statistics;
+  String? _session;
+  bool _initialized = false;
+  final _loading = <String>{};
+  final _failed = <String>{};
+  final _waiting = <String>{};
+  final _values = <String, int>{};
+  Future<void>? _activeLoad;
+  int _generation = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _loadDashboardStats();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final user = context.watch<AuthProvider>().user;
+    final session = '${user?.id}:${user?.isActive}:'
+        '${user?.hasPermission('users.view')}:'
+        '${[
+      'appointments.view',
+      'analytics.view',
+      'reports.view'
+    ].any((key) => user?.hasPermission(key) ?? false)}';
+    if (!_initialized || session != _session) {
+      _initialized = true;
+      _session = session;
+      _generation++;
+      _activeLoad = null;
+      _values.clear();
+      _loading.clear();
+      _failed.clear();
+      _waiting.clear();
+      _statistics = widget.statistics ?? AdminStatisticsService();
+      _loadDashboardStats();
+    }
   }
 
-  Future<void> _loadDashboardStats() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final user = context.read<AuthProvider>().user;
-      final canViewUsers = user?.hasPermission('users.view') ?? false;
-      final canViewAppointments =
-          (user?.hasPermission('appointments.view') ?? false) ||
-              (user?.hasPermission('analytics.view') ?? false) ||
-              (user?.hasPermission('reports.view') ?? false);
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
-
-      // Define all futures to run in parallel
-      final futures = [
-        // 0: Total Users (Students)
-        canViewUsers
-            ? _countSafely(
-                _firestore
-                    .collection('users')
-                    .where('role', isEqualTo: UserRole.student.name)
-                    .count()
-                    .get(),
-                'students',
-              )
-            : Future.value(0),
-        // 1: Total Doctors
-        _countSafely(_firestore.collection('doctors').count().get(), 'doctors'),
-        // 2: Total Appointments
-        canViewAppointments
-            ? _countSafely(
-                _firestore.collection('appointments').count().get(),
-                'appointments',
-              )
-            : Future.value(0),
-        // 3: Pending Appointments
-        canViewAppointments
-            ? _countSafely(
-                _firestore
-                    .collection('appointments')
-                    .where('status', isEqualTo: 'pending')
-                    .count()
-                    .get(),
-                'pending appointments',
-              )
-            : Future.value(0),
-        // 4: Today's Appointments
-        canViewAppointments
-            ? _countSafely(
-                _firestore
-                    .collection('appointments')
-                    .where(
-                      'appointmentDate',
-                      isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-                    )
-                    .where(
-                      'appointmentDate',
-                      isLessThan: Timestamp.fromDate(endOfDay),
-                    )
-                    .count()
-                    .get(),
-                "today's appointments",
-              )
-            : Future.value(0),
-        // 5: Completed Appointments
-        canViewAppointments
-            ? _countSafely(
-                _firestore
-                    .collection('appointments')
-                    .where('status', isEqualTo: 'completed')
-                    .count()
-                    .get(),
-                'completed appointments',
-              )
-            : Future.value(0),
-      ];
-
-      // Wait for all futures to complete
-      final results = await Future.wait(futures);
-
-      _totalUsers = results[0];
-      _totalDoctors = results[1];
-      _totalAppointments = results[2];
-      _pendingAppointments = results[3];
-      _todayAppointments = results[4];
-      _completedAppointments = results[5];
-    } catch (e) {
-      debugPrint('Error loading dashboard stats: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+  Future<void> _loadDashboardStats({bool failedOnly = false}) {
+    if (_activeLoad != null) return _activeLoad!;
+    final user = context.read<AuthProvider>().user;
+    final uid = user?.id;
+    final generation = ++_generation;
+    final groups = <String, Future<Map<String, int>> Function()>{
+      if (user?.hasPermission('users.view') ?? false)
+        'users': () async => {'users': await _statistics.users()},
+      if (user?.isActive ?? false)
+        'doctors': () async => {'doctors': await _statistics.doctors()},
+      if (['appointments.view', 'analytics.view', 'reports.view']
+          .any((key) => user?.hasPermission(key) ?? false))
+        'appointments': () async {
+          final result = await _statistics.analytics('dashboard');
+          return {
+            for (final key in ['total', 'pending', 'today', 'completed'])
+              key: (result[key] as num).toInt()
+          };
+        },
+    };
+    if (failedOnly) groups.removeWhere((key, _) => !_failed.contains(key));
+    setState(() {
+      _loading.addAll(groups.keys);
+      _failed.removeAll(groups.keys);
+      _waiting.removeAll(groups.keys);
+      for (final key in groups.keys) {
+        for (final value in key == 'appointments'
+            ? ['total', 'pending', 'today', 'completed']
+            : [key]) {
+          _values.remove(value);
+        }
+      }
+    });
+    Future<void> load(
+        String key, Future<Map<String, int>> Function() request) async {
+      try {
+        final values = await request().timeout(AdminStatisticsService.timeout);
+        if (!mounted ||
+            generation != _generation ||
+            context.read<AuthProvider>().user?.id != uid) {
+          return;
+        }
+        setState(() => _values.addAll(values));
+      } catch (error) {
+        if (!mounted ||
+            generation != _generation ||
+            context.read<AuthProvider>().user?.id != uid) {
+          return;
+        }
+        setState(() {
+          _failed.add(key);
+          if (error is StatisticsRequestsPending) _waiting.add(key);
+        });
+      } finally {
+        if (mounted && generation == _generation) {
+          setState(() => _loading.remove(key));
+        }
       }
     }
+
+    final request = Future.wait(
+        groups.entries.map((entry) => load(entry.key, entry.value)));
+    _activeLoad = request;
+    return request.whenComplete(() {
+      if (identical(_activeLoad, request)) _activeLoad = null;
+    });
+  }
+
+  String _stat(String key, String group) {
+    if (_loading.contains(group)) return 'Loading...';
+    if (_failed.contains(group)) return 'Unavailable';
+    final value = _values[key];
+    return value == null ? 'No access' : NumberFormat.compact().format(value);
   }
 
   @override
@@ -164,54 +149,59 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           title: const Text('Admin Dashboard'),
           centerTitle: true,
         ),
-        body: _isLoading
-            ? _buildDashboardSkeleton(isDark)
-            : RefreshIndicator(
-                onRefresh: _loadDashboardStats,
-                child: ResponsivePage(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  maxWidth: 1280,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Stats Grid
-                      _buildStatsGrid(isDark),
-                      const SizedBox(height: 24),
+        body: RefreshIndicator(
+          onRefresh: () => _loadDashboardStats(),
+          child: ResponsivePage(
+            physics: const AlwaysScrollableScrollPhysics(),
+            maxWidth: 1280,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_failed.isNotEmpty)
+                  Row(children: [
+                    Expanded(
+                        child: Text(_waiting.isNotEmpty
+                            ? 'Statistics are still waiting for the server. Check your connection or reopen this screen.'
+                            : 'Some statistics are unavailable.')),
+                    TextButton(
+                        onPressed: _loading.isEmpty
+                            ? () => _loadDashboardStats(failedOnly: true)
+                            : null,
+                        child: const Text('Retry statistics')),
+                  ]),
+                // Stats Grid
+                _buildStatsGrid(isDark),
+                const SizedBox(height: 24),
 
-                      // Quick Actions
-                      Text(
-                        'Quick Actions',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                // Quick Actions
+                Text(
+                  'Quick Actions',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 12),
-                      _buildQuickActions(isDark),
-                      const SizedBox(height: 24),
-
-                      // Recent Activity
-                      Text(
-                        'Recent Activity',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildRecentActivity(isDark),
-                    ],
-                  ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                _buildQuickActions(isDark),
+                const SizedBox(height: 24),
+
+                // Recent Activity
+                Text(
+                  'Recent Activity',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                _buildRecentActivity(isDark),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildStatsGrid(bool isDark) {
-    // Number formatter
-    final numberFormat = NumberFormat.compact(); // 1.2K, 1M, etc.
-
     return ResponsiveGrid(
       phoneColumns: 2,
       tabletColumns: 3,
@@ -222,42 +212,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _buildStatCard(
           isDark: isDark,
           title: 'Total Users',
-          value: numberFormat.format(_totalUsers),
+          value: _stat('users', 'users'),
           icon: Icons.people,
           color: AppColors.primary,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Total Doctors',
-          value: numberFormat.format(_totalDoctors),
+          value: _stat('doctors', 'doctors'),
           icon: Icons.medical_services,
           color: AppColors.secondary,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Appointments',
-          value: numberFormat.format(_totalAppointments),
+          value: _stat('total', 'appointments'),
           icon: Icons.calendar_today,
           color: AppColors.tertiary,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Booked',
-          value: numberFormat.format(_pendingAppointments),
+          value: _stat('pending', 'appointments'),
           icon: Icons.pending_actions,
           color: AppColors.warning,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Today',
-          value: numberFormat.format(_todayAppointments),
+          value: _stat('today', 'appointments'),
           icon: Icons.today,
           color: AppColors.success,
         ),
         _buildStatCard(
           isDark: isDark,
           title: 'Completed',
-          value: numberFormat.format(_completedAppointments),
+          value: _stat('completed', 'appointments'),
           icon: Icons.check_circle,
           color: AppColors.info,
         ),
@@ -302,7 +292,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Text(
                 value,
                 style: const TextStyle(
-                  fontSize: 24,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -471,14 +461,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildRecentActivity(bool isDark) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
+    final user = context.read<AuthProvider>().user;
+    if (!(user?.hasPermission('appointments.view') ?? false) &&
+        !(user?.hasPermission('reports.view') ?? false)) {
+      return const Text(
+          'Clinical activity requires appointment or report access.');
+    }
+    if (!(user?.googleEmail?.isNotEmpty ?? false)) {
+      return const Text('Link your Google account to view clinical activity.');
+    }
+    return SessionStreamBuilder<QuerySnapshot>(
+      permission: user!.hasPermission('appointments.view')
+          ? 'appointments.view'
+          : 'reports.view',
+      queryKey: 'recent-activity',
+      createStream: () => _firestore
           .collection('appointments')
           .orderBy('createdAt', descending: true)
           .limit(5)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return _buildRecentActivitySkeleton(isDark);
         }
 
@@ -621,63 +625,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } else {
       return '${diff.inDays}d ago';
     }
-  }
-
-  Widget _buildDashboardSkeleton(bool isDark) {
-    final width = MediaQuery.of(context).size.width;
-    final statsCrossAxisCount = width > 1200 ? 6 : (width > 600 ? 3 : 2);
-    final actionsCrossAxisCount = width > 1200 ? 4 : (width > 600 ? 3 : 2);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Stats Grid Skeleton
-          GridView.count(
-            crossAxisCount: statsCrossAxisCount,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.4,
-            children: List.generate(
-              6,
-              (index) => LoadingSkeleton(
-                height: 100,
-                borderRadius: 16,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Quick Actions Skeleton
-          const LoadingSkeleton(width: 150, height: 24),
-          const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: actionsCrossAxisCount,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 2.5,
-            children: List.generate(
-              4,
-              (index) => LoadingSkeleton(
-                height: 60,
-                borderRadius: 12,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Recent Activity Skeleton
-          const LoadingSkeleton(width: 150, height: 24),
-          const SizedBox(height: 12),
-          _buildRecentActivitySkeleton(isDark),
-        ],
-      ),
-    );
   }
 
   Widget _buildRecentActivitySkeleton(bool isDark) {
